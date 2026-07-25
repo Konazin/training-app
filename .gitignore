@@ -1,0 +1,134 @@
+# ---------------------------------------------------------------------------
+# Training App — Java / Spring Boot, Vue / Vite e React Native / Expo
+# ---------------------------------------------------------------------------
+
+# Segredos e configurações locais
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.local
+secrets/
+credentials/
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# Java / Maven / Spring Boot
+backend/target/
+backend/out/
+backend/.classpath
+backend/.project
+backend/.settings/
+backend/.factorypath
+backend/hs_err_pid*
+backend/replay_pid*
+*.class
+*.jar
+*.war
+*.ear
+
+# Banco de dados e persistência local
+backend/data/
+*.db
+*.db-journal
+*.mv.db
+*.trace.db
+*.sqlite
+*.sqlite3
+
+# Node.js
+node_modules/
+web/node_modules/
+mobile/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.npm/
+.yarn/cache/
+.yarn/unplugged/
+.pnp.*
+
+# Builds, cobertura e caches web
+web/dist/
+web/.vite/
+web/.cache/
+web/coverage/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# React Native / Expo
+mobile/.expo/
+mobile/.expo-shared/
+mobile/.cache/
+mobile/web-build/
+mobile/android/
+mobile/ios/
+mobile/*.jks
+mobile/*.keystore
+mobile/google-services.json
+mobile/GoogleService-Info.plist
+*.mobileprovision
+*.orig.*
+
+# Metro / Watchman
+.metro-health-check*
+.watchmanconfig.local
+
+# Logs e arquivos temporários
+*.log
+logs/
+tmp/
+temp/
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# IDEs e editores
+.idea/
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.example.json
+*.iml
+.fleet/
+.project
+.classpath
+.settings/
+
+# Sistema operacional
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+Thumbs.db
+Thumbs.db:encryptable
+Desktop.ini
+$RECYCLE.BIN/
+
+# Ferramentas locais de agentes/assistentes
+.agents/
+.codex/
+
+# Artefatos de testes
+backend/target/surefire-reports/
+backend/target/failsafe-reports/
+test-results/
+playwright-report/
+blob-report/
+
+# Arquivos compactados e dumps locais
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.dump
+*.bak

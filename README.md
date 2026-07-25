@@ -1,0 +1,172 @@
+# Training App
+
+Primeira versão de um gerenciador de treinos com aplicativo React Native, cliente web para teste e debug e uma API Java compartilhada.
+
+## Estrutura
+
+```text
+training-app/
+├── backend/  # Java 21, Spring Boot 4.1, Spring MVC, JPA e H2
+├── mobile/   # React Native, Expo e TypeScript
+└── web/      # Vue 3, Vite, Tailwind CSS e TypeScript
+```
+
+As duas interfaces agora cobrem o fluxo normal completo:
+
+1. **Início:** resumo de treinos, exercícios, minutos e sessões recentes.
+2. **Gestão de treinos:** cadastro, listagem e exclusão de treinos.
+3. **Fichas semanais:** sete dias configuráveis como treino ou descanso, com atividades opcionais.
+4. **Biblioteca:** busca e cadastro de exercícios reutilizáveis.
+5. **Sessão:** séries, carga, repetições, RPE, cronômetro e conclusão.
+6. **Histórico:** sessões persistidas, volume, frequência e aderência.
+7. **Adicionar exercício:** fluxo legado preservado para sessões avulsas.
+
+O visual usa uma paleta neutra em preto, branco e cinza, oferece modos claro e escuro e mantém navegação lateral no desktop e inferior no mobile.
+
+## Arquitetura
+
+O backend segue MVC com uma camada de serviço:
+
+- `model`: entidades JPA e conversão das estatísticas JSON;
+- `repository`: persistência;
+- `service`: regras de negócio e mapeamento dos DTOs;
+- `controller`: contrato HTTP;
+- `dto`: entradas e respostas da API.
+
+Nos clientes, `models` descreve o contrato, `services` concentra o acesso HTTP, `controllers` gerencia estado e ações, e `views`/`screens` renderiza a interface.
+
+## Requisitos
+
+- Java 21
+- Maven 3.9+
+- Node.js 20.19.4 ou superior
+- npm 9+
+
+## Executar
+
+Abra três terminais.
+
+### 1. Backend
+
+```bash
+cd backend
+mvn spring-boot:run
+```
+
+A API fica em `http://localhost:8080`. O banco H2 é persistido em `backend/data/`. A inicialização executa `schema.sql` antes do JPA para migrar fichas antigas e cria a ficha demonstrativa “Base de força e condicionamento” sem duplicá-la.
+
+### 2. Web
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+Abra `http://localhost:5173`. Durante o desenvolvimento, o Vite encaminha `/api` para o backend. Para outro endereço, copie `.env.example` para `.env` e ajuste `VITE_API_URL`.
+
+### 3. Mobile
+
+```bash
+cd mobile
+npm install
+npm start
+```
+
+No emulador Android, a API padrão é `http://10.0.2.2:8080/api`; no simulador iOS, `http://localhost:8080/api`. Em um aparelho físico, copie `.env.example` para `.env` e informe o IP local do computador:
+
+```env
+EXPO_PUBLIC_API_URL=http://192.168.0.10:8080/api
+```
+
+O celular e o computador precisam estar na mesma rede. Se necessário, inclua a origem web adicional em `CORS_ALLOWED_ORIGINS` ao iniciar o backend.
+
+## API
+
+| Método | Rota | Função |
+| --- | --- | --- |
+| `GET` | `/api/dashboard` | Resumo e treinos recentes |
+| `GET` | `/api/workouts` | Lista os treinos |
+| `GET` | `/api/workouts/{id}` | Detalha um treino |
+| `POST` | `/api/workouts` | Cria um treino |
+| `PUT` | `/api/workouts/{id}` | Atualiza um treino |
+| `DELETE` | `/api/workouts/{id}` | Exclui um treino |
+| `POST` | `/api/workouts/{id}/exercises` | Adiciona um exercício |
+| `DELETE` | `/api/workouts/{id}/exercises/{exerciseId}` | Exclui um exercício |
+| `GET` | `/api/training-plans` | Lista as fichas |
+| `GET` | `/api/training-plans/{id}` | Detalha uma ficha |
+| `POST` | `/api/training-plans` | Cria uma ficha |
+| `PUT` | `/api/training-plans/{id}` | Atualiza uma ficha |
+| `DELETE` | `/api/training-plans/{id}` | Exclui uma ficha |
+| `POST` | `/api/training-plans/{id}/exercises` | Adiciona exercício à ficha |
+| `DELETE` | `/api/training-plans/{id}/exercises/{exerciseId}` | Remove exercício da ficha |
+| `PUT` | `/api/training-plans/{planId}/days/{dayId}` | Configura treino ou descanso |
+| `POST` | `/api/training-plans/{planId}/days/{dayId}/exercises` | Adiciona exercício reutilizável ao dia |
+| `PUT` | `/api/training-plans/{planId}/days/{dayId}/exercises/order` | Reordena exercícios |
+| `POST` | `/api/training-plans/{planId}/days/{dayId}/rest-activities` | Adiciona atividade opcional |
+| `POST` | `/api/training-plans/{id}/activate` | Define a ficha ativa |
+| `POST` | `/api/training-plans/{id}/duplicate` | Duplica a ficha |
+| `PATCH` | `/api/training-plans/{id}/archive` | Arquiva a ficha |
+| `GET/POST` | `/api/exercise-library` | Pesquisa ou cria exercício |
+| `PUT` | `/api/exercise-library/{id}` | Edita exercício personalizado |
+| `PATCH` | `/api/exercise-library/{id}/archive` | Arquiva exercício |
+| `GET/POST` | `/api/sessions` | Lista histórico ou inicia sessão |
+| `GET` | `/api/sessions/active` | Recupera a sessão ativa |
+| `PUT` | `/api/sessions/{id}/exercises/{exerciseId}/sets/{setId}` | Salva uma série imediatamente |
+| `POST` | `/api/sessions/{id}/pause` | Pausa a sessão |
+| `POST` | `/api/sessions/{id}/resume` | Continua a sessão |
+| `POST` | `/api/sessions/{id}/complete` | Conclui e calcula o resumo |
+| `POST` | `/api/sessions/{id}/abandon` | Abandona preservando registros |
+
+Exemplo de treino com estatísticas padrão e livres:
+
+```json
+{
+  "name": "Treino de força",
+  "description": "Sessão A",
+  "scheduledDate": "2026-07-24",
+  "status": "PLANNED",
+  "durationMinutes": 50,
+  "calories": 320,
+  "customStats": {
+    "intensidade": "moderada",
+    "qualidadeSono": 8,
+    "tags": ["força", "superior"]
+  }
+}
+```
+
+`customStats` aceita qualquer objeto JSON, inclusive valores aninhados. O backend valida os campos padrão e conserva o conteúdo personalizado sem impor um esquema.
+
+## Validação
+
+```bash
+# Backend
+cd backend
+mvn test
+
+# Web
+cd web
+npm run build
+
+# Mobile
+cd mobile
+npm run typecheck
+npx expo install --check
+```
+
+Estado atual:
+
+- backend: 6 testes de integração aprovados;
+- web: typecheck e bundle de produção aprovados;
+- mobile: typecheck, compatibilidade Expo e bundle Android aprovados.
+
+## Persistência e migração
+
+- `schema.sql` é a migração incremental de compatibilidade da versão semanal.
+- As novas tabelas são gerenciadas pelo JPA/Hibernate conforme o padrão que o projeto já utilizava.
+- Sessões guardam snapshots do nome e configuração dos exercícios; mudanças futuras na ficha não alteram o histórico.
+- Volume de musculação é calculado somente para séries concluídas: `carga × repetições`.
+- Não são inventadas calorias para sessões do novo domínio.
+
+Não há comando separado de migration: ela roda automaticamente com `mvn spring-boot:run`. Também não há scripts de lint configurados atualmente; as verificações disponíveis são os testes Maven, `vue-tsc` no build web e `tsc --noEmit` no mobile.

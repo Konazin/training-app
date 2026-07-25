@@ -1,0 +1,252 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Inter", "SF Pro Display", "Segoe UI", sans-serif;
+  --color-ink: #111111;
+  --color-canvas: #f2f1ed;
+  --color-surface: #fafaf8;
+}
+
+:root {
+  color: #171717;
+  background: #f2f1ed;
+  font-family: var(--font-sans);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: #f2f1ed;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  overscroll-behavior-y: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #111;
+  outline-offset: 2px;
+}
+
+.field {
+  @apply w-full rounded-2xl border border-neutral-200 bg-[#fafaf8] px-4 py-3.5 text-[15px] text-neutral-950 outline-none transition duration-200 placeholder:text-neutral-400 focus:border-neutral-950 focus:bg-white focus:ring-4 focus:ring-neutral-950/5;
+  min-height: 52px;
+}
+
+.label {
+  @apply mb-2 block text-[11px] font-bold uppercase tracking-[0.14em] text-neutral-500;
+}
+
+.card {
+  @apply rounded-[22px] border border-black/[0.07] bg-white shadow-[0_8px_30px_rgba(0,0,0,0.035)];
+}
+
+.tap {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.primary-action {
+  background: #111;
+  color: #fff;
+}
+
+html.dark {
+  color-scheme: dark;
+  background: #0b0b0b;
+}
+
+html.dark body,
+html.dark #app,
+html.dark #app > div,
+html.dark main {
+  background: #0b0b0b !important;
+  color: #f5f5f5;
+}
+
+.dark main .card,
+.dark main [class~="bg-white"] {
+  background: #171717 !important;
+  border-color: rgba(255, 255, 255, 0.09) !important;
+}
+
+.dark main [class~="bg-[#fafaf8]"],
+.dark main [class~="bg-[#fcfcfa]"],
+.dark main [class~="bg-[#f5f4f1]"],
+.dark main [class~="bg-[#f7f6f3]"],
+.dark main [class~="bg-[#f4f3ef]"],
+.dark main [class~="bg-neutral-100"],
+.dark main [class~="bg-neutral-200/70"] {
+  background: #242424 !important;
+}
+
+.dark main [class~="border-neutral-100"],
+.dark main [class~="border-neutral-200"],
+.dark main [class~="border-black/[0.07]"] {
+  border-color: rgba(255, 255, 255, 0.09) !important;
+}
+
+.dark main [class~="divide-neutral-100"] > :not(:last-child) {
+  border-color: rgba(255, 255, 255, 0.09) !important;
+}
+
+.dark main [class~="text-neutral-950"],
+.dark main [class~="text-neutral-900"],
+.dark main [class~="text-neutral-700"],
+.dark main [class~="text-neutral-600"],
+.dark main [class~="text-black"] {
+  color: #f5f5f5 !important;
+}
+
+.dark main [class~="text-neutral-500"] {
+  color: #a3a3a3 !important;
+}
+
+.dark main [class~="text-neutral-400"] {
+  color: #858585 !important;
+}
+
+.dark main [class~="bg-neutral-950"] {
+  background: #111 !important;
+}
+
+.dark main [class~="bg-neutral-950"] [class~="bg-white"] {
+  background: #f5f5f5 !important;
+}
+
+.dark main [class~="bg-neutral-950"] [class~="text-neutral-950"],
+.dark main [class~="bg-neutral-950"] [class~="text-black"] {
+  color: #111 !important;
+}
+
+.dark .field {
+  border-color: #333;
+  background: #202020 !important;
+  color: #f5f5f5 !important;
+}
+
+.dark .field:focus {
+  border-color: #8a8a8a;
+  background: #242424 !important;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.05);
+}
+
+.dark .primary-action {
+  background: #f5f5f5 !important;
+  color: #111 !important;
+}
+
+.dark .skeleton {
+  background: #242424;
+}
+
+.dark button:focus-visible,
+.dark input:focus-visible,
+.dark select:focus-visible,
+.dark textarea:focus-visible {
+  outline-color: #f5f5f5;
+}
+
+.page-enter-active,
+.page-leave-active {
+  transition: opacity 180ms ease, transform 220ms ease;
+}
+
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+.toast-enter-active,
+.toast-leave-active {
+  transition: opacity 180ms ease, transform 220ms cubic-bezier(.2,.8,.2,1);
+}
+
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translateY(-10px) scale(.98);
+}
+
+.sheet-enter-active,
+.sheet-leave-active {
+  transition: opacity 200ms ease;
+}
+
+.sheet-enter-active > section,
+.sheet-leave-active > section {
+  transition: transform 280ms cubic-bezier(.2,.8,.2,1);
+}
+
+.sheet-enter-from,
+.sheet-leave-to {
+  opacity: 0;
+}
+
+.sheet-enter-from > section,
+.sheet-leave-to > section {
+  transform: translateY(100%);
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: .55; }
+  50% { opacity: 1; }
+}
+
+.skeleton {
+  animation: breathe 1.4s ease-in-out infinite;
+  background: #e8e7e3;
+}
+
+@media (min-width: 768px) {
+  .sheet-enter-from > section,
+  .sheet-leave-to > section {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (max-width: 767px) {
+  body {
+    padding-bottom: calc(88px + env(safe-area-inset-bottom));
+  }
+}
