@@ -79,3 +79,12 @@ export interface RestTimerState {
   paused: boolean
   pausedAt?: number
 }
+
+export function adjustRestTimer(
+  timer: RestTimerState,
+  seconds: number,
+  now = Date.now(),
+): RestTimerState {
+  const floor = timer.paused ? timer.pausedAt ?? timer.endsAt : now
+  return { ...timer, endsAt: Math.max(floor, timer.endsAt + seconds * 1000) }
+}

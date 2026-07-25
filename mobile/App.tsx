@@ -18,6 +18,12 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
 import type { MainTabParamList, RootStackParamList } from './src/core/navigation/types'
 import { useTrainingController } from './src/controllers/useTrainingController'
+import { useTrainingPlanController } from './src/features/training-plan/controller/useTrainingPlanController'
+import { DayExerciseEditorScreen } from './src/features/training-plan/views/DayExerciseEditorScreen'
+import { RestActivityEditorScreen } from './src/features/training-plan/views/RestActivityEditorScreen'
+import { TrainingPlanDayScreen } from './src/features/training-plan/views/TrainingPlanDayScreen'
+import { TrainingPlanEditorScreen } from './src/features/training-plan/views/TrainingPlanEditorScreen'
+import { TrainingPlanView } from './src/features/training-plan/views/TrainingPlanView'
 import { useWorkoutSessionController } from './src/features/workout-session/controller/useWorkoutSessionController'
 import { WorkoutSessionScreen } from './src/features/workout-session/views/WorkoutSessionScreen'
 import { ExerciseScreen } from './src/screens/ExerciseScreen'
@@ -25,7 +31,6 @@ import { HomeScreen } from './src/screens/HomeScreen'
 import { HistoryScreen } from './src/screens/HistoryScreen'
 import { LibraryScreen } from './src/screens/LibraryScreen'
 import { MoreScreen } from './src/screens/MoreScreen'
-import { WeeklyPlanScreen } from './src/screens/WeeklyPlanScreen'
 import { WorkoutsScreen } from './src/screens/WorkoutsScreen'
 import { ThemeProvider, type ThemeColors, useTheme } from './src/theme'
 
@@ -44,10 +49,10 @@ function TrainingApp() {
   const { colors, isDark, toggleTheme } = useTheme()
   const styles = createStyles(colors)
   const controller = useTrainingController()
+  const trainingPlan = useTrainingPlanController()
   const workoutSession = useWorkoutSessionController()
-  const [exerciseDestination, setExerciseDestination] = useState<'workout' | 'plan'>('workout')
   const [currentRoute, setCurrentRoute] = useState('MainTabs')
-  const message = workoutSession.message || controller.message
+  const message = workoutSession.message || trainingPlan.message || controller.message
   const navigationTheme = useMemo<NavigationTheme>(() => ({
     ...DefaultTheme,
     dark: isDark,
@@ -63,8 +68,8 @@ function TrainingApp() {
   }), [colors, isDark])
 
   useEffect(() => {
-    void Promise.all([controller.refresh(), workoutSession.refresh()])
-  }, [controller.refresh, workoutSession.refresh])
+    void Promise.all([controller.refresh(), trainingPlan.refresh(), workoutSession.refresh()])
+  }, [controller.refresh, trainingPlan.refresh, workoutSession.refresh])
 
   return (
     <SafeAreaProvider>
@@ -94,8 +99,8 @@ function TrainingApp() {
                 <MainTabs
                   navigation={navigation}
                   controller={controller}
+                  trainingPlan={trainingPlan}
                   workoutSession={workoutSession}
-                  setExerciseDestination={setExerciseDestination}
                 />
               )}
             </Stack.Screen>
@@ -108,8 +113,7 @@ function TrainingApp() {
                   onRemove={controller.removeWorkout}
                   onAddExercise={(workoutId) => {
                     controller.setSelectedWorkoutId(workoutId)
-                    setExerciseDestination('workout')
-                    navigation.navigate('Exercise', { destination: 'workout' })
+                    navigation.navigate('Exercise')
                   }}
                 />
               )}
@@ -126,18 +130,68 @@ function TrainingApp() {
               {() => (
                 <ExerciseScreen
                   workouts={controller.workouts}
-                  trainingPlans={controller.trainingPlans}
                   selectedWorkout={controller.selectedWorkout}
-                  selectedPlan={controller.selectedTrainingPlan}
-                  destination={exerciseDestination}
                   loading={controller.loading}
-                  onDestinationChange={setExerciseDestination}
                   onSelectWorkout={controller.setSelectedWorkoutId}
-                  onSelectPlan={controller.setSelectedTrainingPlanId}
                   onCreateWorkoutExercise={controller.addExercise}
-                  onCreatePlanExercise={controller.addPlanExercise}
                   onRemoveWorkoutExercise={controller.removeExercise}
-                  onRemovePlanExercise={controller.removePlanExercise}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen name="TrainingPlanEditor">
+              {() => (
+                <TrainingPlanEditorScreen
+                  plans={trainingPlan.trainingPlans}
+                  busyKeys={trainingPlan.busyKeys}
+                  errors={trainingPlan.errors}
+                  onCreate={trainingPlan.create}
+                  onUpdate={trainingPlan.update}
+                  onActivate={trainingPlan.activate}
+                  onDuplicate={trainingPlan.duplicate}
+                  onArchive={trainingPlan.archive}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen name="TrainingPlanDay">
+              {({ navigation }) => (
+                <TrainingPlanDayScreen
+                  plans={trainingPlan.trainingPlans}
+                  library={controller.exerciseLibrary}
+                  busyKeys={trainingPlan.busyKeys}
+                  errors={trainingPlan.errors}
+                  onUpdateDay={trainingPlan.updateDay}
+                  onRemoveExercise={trainingPlan.removeDayExercise}
+                  onReorderExercises={trainingPlan.reorderDayExercises}
+                  onRemoveActivity={trainingPlan.removeRestActivity}
+                  onReorderActivities={trainingPlan.reorderRestActivities}
+                  onStart={async (planId, dayId) => {
+                    const success = await workoutSession.start(planId, dayId)
+                    if (success) navigation.navigate('Session')
+                    return success
+                  }}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen name="DayExerciseEditor">
+              {() => (
+                <DayExerciseEditorScreen
+                  plans={trainingPlan.trainingPlans}
+                  library={controller.exerciseLibrary}
+                  busyKeys={trainingPlan.busyKeys}
+                  errors={trainingPlan.errors}
+                  onCreate={trainingPlan.addDayExercise}
+                  onUpdate={trainingPlan.updateDayExercise}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen name="RestActivityEditor">
+              {() => (
+                <RestActivityEditorScreen
+                  plans={trainingPlan.trainingPlans}
+                  busyKeys={trainingPlan.busyKeys}
+                  errors={trainingPlan.errors}
+                  onCreate={trainingPlan.addRestActivity}
+                  onUpdate={trainingPlan.updateRestActivity}
                 />
               )}
             </Stack.Screen>
@@ -188,13 +242,13 @@ function TrainingApp() {
 function MainTabs({
   navigation,
   controller,
+  trainingPlan,
   workoutSession,
-  setExerciseDestination,
 }: {
   navigation: NativeStackNavigationProp<RootStackParamList, 'MainTabs'>
   controller: ReturnType<typeof useTrainingController>
+  trainingPlan: ReturnType<typeof useTrainingPlanController>
   workoutSession: ReturnType<typeof useWorkoutSessionController>
-  setExerciseDestination: (destination: 'workout' | 'plan') => void
 }) {
   const { colors } = useTheme()
   const symbols: Record<keyof MainTabParamList, string> = {
@@ -236,10 +290,7 @@ function MainTabs({
             onRefresh={controller.refresh}
             onNavigate={(screen) => {
               if (screen === 'workouts') navigation.navigate('Workouts')
-              else {
-                setExerciseDestination('workout')
-                navigation.navigate('Exercise', { destination: 'workout' })
-              }
+              else navigation.navigate('Exercise')
             }}
             activeSession={workoutSession.activeSession}
             onResumeSession={() => navigation.navigate('Session')}
@@ -248,17 +299,11 @@ function MainTabs({
       </Tabs.Screen>
       <Tabs.Screen name="Plan">
         {() => (
-          <WeeklyPlanScreen
-            plans={controller.trainingPlans}
-            selectedPlan={controller.selectedTrainingPlan}
-            library={controller.exerciseLibrary}
-            loading={controller.loading || workoutSession.busyKeys.has('start')}
-            onSelectPlan={controller.setSelectedTrainingPlanId}
-            onCreate={controller.createTrainingPlan}
-            onActivate={controller.activateTrainingPlan}
-            onUpdateDay={controller.updatePlanDay}
-            onAddExercise={controller.addDayExercise}
-            onAddRestActivity={controller.addRestActivity}
+          <TrainingPlanView
+            plans={trainingPlan.trainingPlans}
+            selectedPlan={trainingPlan.selectedTrainingPlan}
+            loading={trainingPlan.loading || workoutSession.busyKeys.has('start')}
+            onSelect={trainingPlan.setSelectedTrainingPlanId}
             onStart={async (planId, dayId) => {
               const success = await workoutSession.start(planId, dayId)
               if (success) navigation.navigate('Session')
@@ -275,8 +320,7 @@ function MainTabs({
           <MoreScreen
             onOpen={(screen) => {
               if (screen === 'Exercise') {
-                setExerciseDestination('workout')
-                navigation.navigate('Exercise', { destination: 'workout' })
+                navigation.navigate('Exercise')
               } else if (screen === 'Workouts') {
                 navigation.navigate('Workouts')
               } else {

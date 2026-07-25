@@ -1,271 +1,374 @@
-Analise e melhore o repositório atual `training-app`.
+Continue o hardening incremental do repositório atual `training-app`, a partir do commit:
 
-O produto real é o APK React Native/Expo. A versão web serve apenas para debugging. O backend é Spring Boot e deve continuar sendo compartilhado.
+b810861db20cfdfa6a5d5688a029804eef5423b0
 
-Esta etapa NÃO deve implementar o Modo Umamusume, novos dashboards, gráficos ou uma grande reformulação visual.
+O APK React Native/Expo é o produto principal. A web serve somente para debugging.
 
-O objetivo é fortalecer a arquitetura mobile e tornar a execução de treino realmente utilizável.
+A feature `workout-session` já foi extraída para MVC por feature. Não refatore novamente essa feature, exceto pela pequena correção do cronômetro descrita abaixo.
 
-==================================================
-1. PRINCÍPIOS OBRIGATÓRIOS
-==================================================
-
-- Mobile-first e Android-first.
-- Manter React Native, Expo, TypeScript e Spring Boot.
-- Preservar o design atual.
-- Organizar o mobile em MVC por feature.
-- Não reescrever todo o projeto.
-- Não alterar a web, exceto quando um contrato compartilhado exigir.
-- Não criar funcionalidades apenas visuais ou mockadas.
-- Executar typecheck, testes e build disponíveis ao final.
+O objetivo desta etapa é extrair e completar somente a feature `training-plan`.
 
 ==================================================
-2. PROBLEMAS ATUAIS
+1. ESTADO ATUAL QUE DEVE SER RESPEITADO
 ==================================================
 
-Corrigir de forma incremental os seguintes problemas:
+Atualmente:
 
-1. `useTrainingController` concentra dashboard, fichas, biblioteca, treinos e sessões.
-2. `models/training.ts` concentra todo o domínio.
-3. O mobile está separado por camadas técnicas, mas não por feature.
-4. Toda mutação recarrega treinos, dashboard, fichas, biblioteca, histórico e sessão ativa.
-5. A navegação usa um estado manual no `App.tsx`, sem stack real ou suporte adequado ao botão voltar do Android.
-6. A tela de sessão exibe carga e repetições, mas não permite editá-las.
-7. O backend suporta adicionar série, pausar e continuar sessão, mas o mobile não expõe completamente essas ações.
-8. O cronômetro de descanso existe apenas em memória e desaparece ao reconstruir a tela.
-9. O aplicativo depende totalmente da API e não possui uma abstração preparada para persistência local.
-10. É possível iniciar sessões ativas em dias diferentes e `/sessions/active` retorna apenas uma.
-11. A barra inferior continua visível durante uma sessão.
-12. O domínio antigo de `Workout` convive com o novo domínio de `TrainingPlan` e `WorkoutSession`, causando fluxos e métricas duplicadas.
+- `useTrainingController` ainda controla fichas, biblioteca, dashboard e o domínio legado de Workout.
+- `WeeklyPlanScreen` usa fichas semanais.
+- exercícios adicionados ao dia recebem silenciosamente:
+  - 3 séries;
+  - 8–12 repetições;
+  - carga 0;
+  - descanso 60 segundos;
+  - tipo NORMAL.
+- atividades de descanso recebem silenciosamente:
+  - 15 minutos;
+  - categoria “Recuperação ativa”.
+- o backend já suporta:
+  - criar, atualizar, excluir, duplicar, ativar e arquivar ficha;
+  - atualizar dia;
+  - adicionar, remover e reordenar exercícios do dia;
+  - adicionar e remover atividades de descanso.
+- ainda faltam:
+  - editar configuração do exercício do dia;
+  - editar atividade de descanso;
+  - reordenar atividades de descanso.
+- o backend atualmente impede transformar um dia com exercícios em descanso.
+- `ExerciseScreen` ainda contém um ramo legado para adicionar `PlanExercise` diretamente à ficha.
 
-==================================================
-3. ARQUITETURA POR FEATURE
-==================================================
-
-Refatore apenas as partes tocadas nesta etapa para uma estrutura semelhante a:
-
-src/
-├── core/
-│   ├── api/
-│   ├── navigation/
-│   ├── storage/
-│   └── ui/
-│
-└── features/
-    ├── workout-session/
-    │   ├── model/
-    │   ├── service/
-    │   ├── repository/
-    │   ├── controller/
-    │   └── views/
-    │
-    ├── training-plan/
-    ├── exercise-library/
-    ├── history/
-    └── dashboard/
-
-Regras:
-
-- `model`: tipos, entidades e regras puras.
-- `service`: comunicação HTTP e operações externas.
-- `repository`: interface de acesso aos dados.
-- `controller`: estado, ações e coordenação da feature.
-- `views`: componentes e telas sem regras de negócio.
-- `core`: apenas elementos realmente compartilhados.
-
-Não mova todos os arquivos apenas por estética. Refatore primeiro a feature `workout-session` e extraia somente o compartilhamento necessário.
-
-Crie uma interface de repository para sessões, por exemplo:
-
-WorkoutSessionRepository
-- getActive()
-- start()
-- updateSet()
-- addSet()
-- pause()
-- resume()
-- complete()
-- abandon()
-
-A primeira implementação pode continuar usando HTTP.
-
-A arquitetura deve permitir futuramente uma implementação SQLite/local-first sem alterar controllers e views.
+Não implemente o Modo Umamusume nesta etapa.
 
 ==================================================
-4. EXECUÇÃO REAL DA SESSÃO
+2. ARQUITETURA MOBILE
 ==================================================
 
-Melhore a tela de sessão para permitir, em cada série:
+Criar:
 
-- editar repetições;
-- editar carga;
-- editar duração;
-- editar distância;
-- editar RPE;
-- editar observação;
-- marcar ou desmarcar como concluída;
-- adicionar uma nova série;
-- remover uma série adicionada manualmente, caso o backend ainda não suporte isso, implementar o endpoint necessário.
+src/features/training-plan/
+├── model/
+├── repository/
+├── service/
+├── controller/
+└── views/
 
-Regras:
+Criar a interface `TrainingPlanRepository` com:
 
-- apresentar apenas campos relevantes para o tipo de exercício;
-- musculação usa principalmente repetições e carga;
-- exercícios temporizados usam duração;
-- cardio pode usar duração e distância;
-- não obrigar o usuário a preencher todos os campos;
-- salvar alterações sem recarregar todo o aplicativo;
-- manter o valor digitado caso a requisição falhe;
-- bloquear ações duplicadas enquanto uma série está sendo salva;
-- fornecer feedback de erro por série sem substituir toda a tela.
+- list()
+- getById()
+- create()
+- update()
+- activate()
+- duplicate()
+- archive()
+- updateDay()
+- addDayExercise()
+- updateDayExercise()
+- removeDayExercise()
+- reorderDayExercises()
+- addRestActivity()
+- updateRestActivity()
+- removeRestActivity()
+- reorderRestActivities()
 
-Ao concluir uma série:
+Criar implementação HTTP em:
 
-- persistir os valores editados;
-- iniciar o descanso configurado;
-- atualizar progresso e volume localmente;
-- não buscar novamente dashboard, fichas, biblioteca e histórico.
+src/features/training-plan/service/httpTrainingPlanRepository.ts
 
-==================================================
-5. PAUSA, RETOMADA E RECUPERAÇÃO
-==================================================
+Extrair do `useTrainingController`:
 
-Adicionar controles claros para:
+- trainingPlans;
+- selectedTrainingPlanId;
+- selectedTrainingPlan;
+- createTrainingPlan;
+- removeTrainingPlan;
+- activateTrainingPlan;
+- updatePlanDay;
+- addDayExercise;
+- addRestActivity;
+- demais operações da ficha.
 
-- pausar sessão;
-- continuar sessão;
-- abandonar sessão;
-- concluir sessão.
+Não duplicar esses estados entre controllers.
 
-Durante uma sessão:
+O controller da ficha deve atualizar somente o estado de `training-plan`. Alterar uma ficha não deve recarregar dashboard, workouts, biblioteca e histórico.
 
-- esconder a navegação inferior;
-- impedir saída acidental;
-- integrar corretamente o botão voltar do Android;
-- ao tentar sair, oferecer continuar, pausar ou abandonar;
-- recuperar a sessão ativa ao reabrir o aplicativo.
-
-A API deve impedir mais de uma sessão globalmente ativa para o usuário atual.
-
-Como ainda não há autenticação, trate a instalação como um único usuário.
+A biblioteca de exercícios pode continuar sendo fornecida como dependência somente para leitura. Não extraia `exercise-library` nesta etapa.
 
 ==================================================
-6. CRONÔMETRO DE DESCANSO
+3. REMOVER RAMO MOBILE LEGADO DA FICHA
 ==================================================
 
-O cronômetro deve:
+O fluxo moderno usa:
 
-- usar `endsAt`, não apenas contagem acumulada;
-- permitir +15 segundos, -15 segundos e pular;
-- sobreviver à troca de tela;
-- sobreviver à reconstrução do componente;
-- restaurar o tempo correto ao reabrir o app;
-- vibrar ao terminar;
-- não vibrar repetidamente.
+TrainingPlan
+→ TrainingPlanDay
+→ TrainingDayExercise
 
-Crie uma abstração simples de storage em `core/storage`.
+Remover do mobile o ramo que adiciona `PlanExercise` diretamente à ficha:
 
-Pode usar AsyncStorage nesta etapa.
+- remover destination `plan` de `ExerciseScreen`;
+- remover `addPlanExercise` e `removePlanExercise` do controller mobile;
+- remover o estado `exerciseDestination` quando ele deixar de ser necessário;
+- manter `ExerciseScreen` somente para o domínio legado de Workout;
+- não excluir ainda os endpoints de compatibilidade do backend.
 
-Persistir apenas:
-
-- sessionId;
-- exerciseId;
-- setId;
-- endsAt;
-- estado pausado, quando necessário.
-
-Não implemente SQLite completo agora.
+Não adicionar novas funcionalidades ao domínio legado.
 
 ==================================================
-7. NAVEGAÇÃO
+4. NAVEGAÇÃO
 ==================================================
 
-Substitua a navegação manual por uma solução apropriada para React Native/Expo, preferencialmente React Navigation.
+Integrar a feature nova com a navegação existente.
 
-Estrutura sugerida:
+Adicionar rotas tipadas para:
 
-Bottom tabs:
-- Hoje
-- Ficha
-- Histórico
-- Mais
+- TrainingPlanEditor
+- TrainingPlanDay
+- DayExerciseEditor
+- RestActivityEditor
 
-Stack:
-- Biblioteca
-- Configurar exercício
-- Executar sessão
-- Resumo da sessão
+A aba “Ficha” deve exibir a ficha ativa e permitir selecionar outra.
 
-Regras:
+O controller deve selecionar inicialmente:
 
-- a sessão deve abrir em stack;
-- a barra inferior não deve aparecer durante a execução;
-- o botão voltar do Android deve respeitar a stack;
-- uma sessão ativa deve poder ser retomada facilmente;
-- não manter seis itens apertados na barra inferior.
+1. a ficha ativa;
+2. se não houver, a primeira não arquivada;
+3. se não houver ficha, nenhuma seleção.
 
-Não redesenhar todas as telas nesta etapa.
+Não selecionar simplesmente o primeiro item retornado pela API.
+
+Não colocar toda a edição em um único modal.
 
 ==================================================
-8. REDUÇÃO DO CONTROLLER GLOBAL
+5. EDIÇÃO DA FICHA
 ==================================================
 
-Não remover `useTrainingController` de uma vez.
+Permitir:
 
-Faça uma migração incremental:
+- criar ficha;
+- editar nome;
+- editar descrição;
+- editar categoria;
+- editar dificuldade;
+- ativar;
+- duplicar;
+- arquivar.
 
-1. extrair `workout-session` para seu próprio controller;
-2. remover dele o estado e as ações de sessão;
-3. manter outras features temporariamente no controller antigo;
-4. documentar o próximo ponto de extração.
+Não excluir automaticamente fichas antigas ao ativar uma nova.
 
-Evitar duplicar lógica entre controllers.
+Toda ficha deve possuir exatamente os sete dias da semana.
 
-==================================================
-9. DOMÍNIO LEGADO
-==================================================
-
-Não excluir `Workout` e `Exercise` nesta etapa.
-
-Porém:
-
-- marcar internamente o fluxo como legado;
-- não adicionar novas funcionalidades nele;
-- não usá-lo como fonte principal da sessão;
-- usar `TrainingPlan`, `TrainingPlanDay` e `WorkoutSession` no novo fluxo;
-- documentar quais telas ainda dependem do domínio antigo.
-
-Não criar novas métricas combinando os dois domínios.
+Para bases antigas parcialmente preenchidas, completar apenas os dias ausentes sem duplicar dias existentes.
 
 ==================================================
-10. BACKEND
+6. EDIÇÃO DO DIA
 ==================================================
 
-No backend:
+Cada dia deve permitir editar:
 
-- garantir apenas uma sessão global ativa;
-- manter snapshots da sessão;
-- adicionar endpoint para remover série manual, caso necessário;
-- validar que séries só podem ser alteradas em sessões ativas ou pausadas;
-- preservar registros ao abandonar;
-- não mover regras para controllers;
-- manter controller fino e regras no service.
+- título;
+- descrição;
+- duração estimada;
+- observações;
+- estado de descanso.
 
-Adicionar testes para:
+Usar um controle claro para:
 
-- impedir duas sessões ativas;
-- editar série;
-- adicionar série;
-- remover série manual;
-- pausar;
-- continuar;
-- concluir;
-- abandonar;
-- recuperar sessão ativa.
+[ ] Marcar como dia de descanso
+
+Ao marcar como descanso:
+
+- preservar todos os exercícios;
+- não apagar ou desativar registros no banco;
+- esconder a montagem convencional na interface;
+- impedir iniciar sessão convencional;
+- mostrar atividades opcionais.
+
+Ao transformar novamente em treino:
+
+- restaurar os exercícios já configurados.
+
+Remover do backend a validação que obriga remover exercícios antes de marcar descanso.
+
+Sessões históricas não devem ser alteradas.
 
 ==================================================
-11. FORA DO ESCOPO
+7. CONFIGURAÇÃO DOS EXERCÍCIOS
+==================================================
+
+Ao escolher um exercício da biblioteca, abrir `DayExerciseEditor`.
+
+Não criar o exercício imediatamente com valores fixos.
+
+Permitir configurar antes de salvar:
+
+- séries;
+- repetições mínimas;
+- repetições máximas;
+- carga planejada;
+- duração planejada;
+- distância planejada;
+- descanso;
+- RPE planejado;
+- tipo de série;
+- observações;
+- exercício alternativo.
+
+Tipos:
+
+- NORMAL
+- WARM_UP
+- DROP_SET
+- BI_SET
+- CIRCUIT
+- TO_FAILURE
+- CONTROLLED_TEMPO
+
+Mostrar campos conforme a categoria:
+
+- força/hipertrofia: séries, repetições e carga;
+- cardio: duração e distância;
+- exercício temporizado: duração;
+- mobilidade/alongamento: duração e observação.
+
+Depois de adicionado, permitir:
+
+- editar;
+- remover;
+- mover para cima;
+- mover para baixo.
+
+Nesta etapa, usar botões de subir/descer em vez de adicionar dependência de drag-and-drop.
+
+A reordenação enviada ao backend deve:
+
+- conter todos os IDs existentes;
+- não conter IDs duplicados;
+- não conter IDs pertencentes a outro dia.
+
+Não proibir completamente exercícios duplicados no mesmo dia, pois podem existir usos intencionais. Pedir confirmação no mobile ao adicionar uma duplicata.
+
+==================================================
+8. ATIVIDADES DE DESCANSO
+==================================================
+
+Permitir criar e editar:
+
+- nome;
+- descrição;
+- categoria;
+- duração estimada;
+- indicação de opcional.
+
+Permitir:
+
+- editar;
+- remover;
+- mover para cima;
+- mover para baixo.
+
+Categorias sugeridas na interface:
+
+- caminhada;
+- mobilidade;
+- alongamento;
+- recuperação ativa;
+- descanso completo;
+- personalizada.
+
+Não transformar categorias em enum rígido no banco.
+
+==================================================
+9. BACKEND
+==================================================
+
+Adicionar:
+
+PUT /api/training-plans/{planId}/days/{dayId}/exercises/{exerciseId}
+
+PUT /api/training-plans/{planId}/days/{dayId}/rest-activities/{activityId}
+
+PUT /api/training-plans/{planId}/days/{dayId}/rest-activities/order
+
+Para atualizar exercício, criar um DTO próprio de configuração. Não permitir trocar silenciosamente o exercício-base pelo ID de outro exercício durante a edição.
+
+Manter controller fino e regras em `TrainingPlanService`.
+
+Validar:
+
+- séries maiores que zero;
+- repetições não negativas;
+- máximo maior ou igual ao mínimo;
+- carga, duração, distância e descanso não negativos;
+- RPE entre 1 e 10;
+- exercício pertencente ao dia e à ficha;
+- atividade pertencente ao dia e à ficha;
+- listas de reordenação sem IDs ausentes, externos ou duplicados.
+
+==================================================
+10. ESTADO E ERROS
+==================================================
+
+No controller da ficha:
+
+- loading por operação;
+- chave busy por ficha, dia, exercício ou atividade;
+- erro contextual;
+- impedir envios duplicados;
+- preservar formulário quando a API falhar;
+- não substituir toda a tela por loading;
+- atualizar o estado usando a resposta retornada pelo backend;
+- não executar refresh global depois de uma mutação.
+
+==================================================
+11. CORREÇÃO RESIDUAL DO CRONÔMETRO
+==================================================
+
+Corrigir apenas este problema em `useWorkoutSessionController`:
+
+- ao usar +15 ou -15 durante uma sessão pausada, calcular a alteração com base no tempo restante congelado em `pausedAt`;
+- não usar `Date.now()` como limite para um timer pausado;
+- preservar corretamente o tempo restante após retomar.
+
+Adicionar uma função pura para o cálculo, caso facilite o teste.
+
+Não realizar outras refatorações na feature de sessão.
+
+==================================================
+12. TESTES
+==================================================
+
+Adicionar testes backend para:
+
+- ficha criada com sete dias;
+- completar dias ausentes sem duplicação;
+- transformar treino com exercícios em descanso;
+- voltar de descanso para treino preservando exercícios;
+- editar exercício do dia;
+- remover exercício;
+- reordenar exercícios;
+- rejeitar lista de reordenação duplicada;
+- criar, editar, remover e reordenar atividade de descanso;
+- impedir iniciar sessão convencional em descanso;
+- manter sessão histórica intacta após alteração da ficha.
+
+Executar:
+
+Backend:
+mvn test
+
+Mobile:
+npm run typecheck
+EXPO_NO_TELEMETRY=1 npx expo export --platform android --output-dir dist
+
+Web:
+npm run build
+
+Geral:
+git diff --check
+
+==================================================
+13. FORA DO ESCOPO
 ==================================================
 
 Não implementar:
@@ -273,53 +376,34 @@ Não implementar:
 - Modo Umamusume;
 - eventos narrativos;
 - atributos;
-- gamificação;
-- SQLite completo;
+- SQLite;
 - sincronização offline;
 - autenticação;
 - gráficos;
 - dieta;
-- redesign da web;
-- grande refatoração do backend;
-- remoção completa do domínio legado.
+- drag-and-drop;
+- extração da biblioteca;
+- remoção dos endpoints legados backend;
+- grande redesign visual.
 
 ==================================================
-12. CRITÉRIOS DE ACEITAÇÃO
+14. CRITÉRIOS DE ACEITAÇÃO
 ==================================================
 
-A etapa estará concluída quando:
+Concluir somente quando:
 
-- a feature de sessão estiver organizada em MVC por feature;
-- carga e repetições puderem ser editadas;
-- RPE, duração e distância puderem ser registrados;
-- séries puderem ser adicionadas;
-- séries manuais puderem ser removidas;
-- cada alteração salvar sem recarregar todos os recursos;
-- pausa e retomada funcionarem;
-- o cronômetro sobreviver à troca de tela e reinício do app;
-- a sessão ativa for recuperada;
-- apenas uma sessão puder ficar ativa;
-- a barra inferior desaparecer durante a sessão;
-- o botão voltar do Android funcionar corretamente;
-- erros não apagarem valores digitados;
-- testes backend passarem;
-- typecheck mobile passar;
-- bundle Android/Expo passar.
+- `training-plan` estiver em MVC por feature;
+- o controller global não controlar mais fichas;
+- o ramo móvel legado de PlanExercise tiver sido removido;
+- ficha e dias puderem ser editados;
+- descanso preservar exercícios;
+- exercício puder ser configurado antes de ser adicionado;
+- exercício puder ser editado, removido e reordenado;
+- atividade de descanso puder ser criada, editada, removida e reordenada;
+- nenhuma mutação da ficha recarregar as outras features;
+- navegação Android funcionar;
+- cronômetro pausado ajustar corretamente ±15 segundos;
+- testes, typecheck, export Android, build web e diff check passarem.
 
-==================================================
-13. ENTREGA
-==================================================
-
-Ao finalizar, informar:
-
-1. problemas encontrados;
-2. estrutura anterior e nova da feature de sessão;
-3. arquivos criados, movidos e alterados;
-4. endpoints alterados ou adicionados;
-5. testes adicionados;
-6. comandos executados;
-7. resultados de testes, typecheck e build;
-8. limitações restantes;
-9. próximos pontos recomendados, sem implementá-los.
-
-Não declarar a etapa concluída se os comandos de validação falharem.
+Ao final, listar arquivos alterados, endpoints, testes, validações e limitações.
+Não avançar para outra feature.

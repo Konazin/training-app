@@ -2,6 +2,7 @@ package com.trainingapp.controller;
 
 import com.trainingapp.dto.ExerciseRequest;
 import com.trainingapp.dto.DayExerciseRequest;
+import com.trainingapp.dto.DayExerciseConfigRequest;
 import com.trainingapp.dto.PlanDayRequest;
 import com.trainingapp.dto.RestActivityRequest;
 import com.trainingapp.dto.TrainingPlanRequest;
@@ -95,6 +96,14 @@ public class TrainingPlanController {
             @PathVariable Long exerciseId
     ) { return service.removeDayExercise(planId, dayId, exerciseId); }
 
+    @PutMapping("/{planId}/days/{dayId}/exercises/{exerciseId}")
+    public TrainingPlanResponse updateDayExercise(
+            @PathVariable Long planId,
+            @PathVariable Long dayId,
+            @PathVariable Long exerciseId,
+            @Valid @RequestBody DayExerciseConfigRequest request
+    ) { return service.updateDayExercise(planId, dayId, exerciseId, request); }
+
     @PutMapping("/{planId}/days/{dayId}/exercises/order")
     public TrainingPlanResponse reorderDayExercises(
             @PathVariable Long planId,
@@ -111,12 +120,27 @@ public class TrainingPlanController {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.addRestActivity(planId, dayId, request));
     }
 
+    @PutMapping("/{planId}/days/{dayId}/rest-activities/{activityId}")
+    public TrainingPlanResponse updateRestActivity(
+            @PathVariable Long planId,
+            @PathVariable Long dayId,
+            @PathVariable Long activityId,
+            @Valid @RequestBody RestActivityRequest request
+    ) { return service.updateRestActivity(planId, dayId, activityId, request); }
+
     @DeleteMapping("/{planId}/days/{dayId}/rest-activities/{activityId}")
     public TrainingPlanResponse removeRestActivity(
             @PathVariable Long planId,
             @PathVariable Long dayId,
             @PathVariable Long activityId
     ) { return service.removeRestActivity(planId, dayId, activityId); }
+
+    @PutMapping("/{planId}/days/{dayId}/rest-activities/order")
+    public TrainingPlanResponse reorderRestActivities(
+            @PathVariable Long planId,
+            @PathVariable Long dayId,
+            @RequestBody List<Long> activityIds
+    ) { return service.reorderRestActivities(planId, dayId, activityIds); }
 
     @PostMapping("/{id}/exercises")
     public ResponseEntity<TrainingPlanResponse> addExercise(

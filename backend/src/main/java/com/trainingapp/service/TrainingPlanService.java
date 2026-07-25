@@ -1,6 +1,7 @@
 package com.trainingapp.service;
 
 import com.trainingapp.dto.DayExerciseRequest;
+import com.trainingapp.dto.DayExerciseConfigRequest;
 import com.trainingapp.dto.ExerciseRequest;
 import com.trainingapp.dto.PlanDayRequest;
 import com.trainingapp.dto.PlanDayResponse;
@@ -22,7 +23,10 @@ import org.springframework.stereotype.Service;
 import java.time.DayOfWeek;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @Transactional
@@ -42,21 +46,20 @@ public class TrainingPlanService {
     }
 
     public List<TrainingPlanResponse> findAll() {
-        return repository.findAllByOrderByUpdatedAtDesc().stream().map(this::toResponse).toList();
+        return repository.findAllByOrderByUpdatedAtDesc().stream().map(plan -> {
+            if (completeMissingDays(plan)) {
+                touch(plan);
+                repository.save(plan);
+            }
+            return toResponse(plan);
+        }).toList();
     }
 
-    public TrainingPlanResponse findById(Long id) { return toResponse(findPlan(id)); }
+    public TrainingPlanResponse findById(Long id) { return ensureWeek(id); }
 
     public TrainingPlanResponse ensureWeek(Long id) {
         TrainingPlan plan = findPlan(id);
-        if (plan.getDays().isEmpty()) {
-            for (DayOfWeek weekday : DayOfWeek.values()) {
-                TrainingPlanDay day = new TrainingPlanDay();
-                day.setTrainingPlan(plan);
-                day.setWeekday(weekday);
-                day.setSortOrder(weekday.getValue());
-                plan.getDays().add(day);
-            }
+        if (completeMissingDays(plan)) {
             touch(plan);
             repository.save(plan);
         }
@@ -90,6 +93,10 @@ public class TrainingPlanService {
 
     public TrainingPlanResponse duplicate(Long id) {
         TrainingPlan source = findPlan(id);
+        if (completeMissingDays(source)) {
+            touch(source);
+            repository.save(source);
+        }
         TrainingPlan copy = new TrainingPlan();
         copy.setName(source.getName() + " — cópia");
         copy.setDescription(source.getDescription());
@@ -144,9 +151,6 @@ public class TrainingPlanService {
 
     public TrainingPlanResponse updateDay(Long planId, Long dayId, PlanDayRequest request) {
         TrainingPlanDay day = findDay(planId, dayId);
-        if (request.restDay() && !day.getExercises().isEmpty() && !day.isRestDay()) {
-            throw new IllegalArgumentException("Este dia possui exercícios. Confirme a remoção ou mantenha-os antes de marcar descanso");
-        }
         day.setTitle(clean(request.title()));
         day.setDescription(clean(request.description()));
         day.setRestDay(request.restDay());
@@ -159,13 +163,27 @@ public class TrainingPlanService {
     public TrainingPlanResponse addDayExercise(Long planId, Long dayId, DayExerciseRequest request) {
         TrainingPlanDay day = findDay(planId, dayId);
         if (day.isRestDay()) throw new IllegalArgumentException("Transforme o dia em treino antes de adicionar exercícios");
-        if (request.maxReps() < request.minReps()) throw new IllegalArgumentException("A repetição máxima deve ser maior ou igual à mínima");
+        validateReps(request.minReps(), request.maxReps());
         TrainingDayExercise item = new TrainingDayExercise();
         item.setPlanDay(day);
         item.setExercise(exerciseLibrary.findEntity(request.exerciseDefinitionId()));
         item.setSortOrder(day.getExercises().size() + 1);
         applyExercise(item, request);
         day.getExercises().add(item);
+        touch(day.getTrainingPlan());
+        return persist(day.getTrainingPlan());
+    }
+
+    public TrainingPlanResponse updateDayExercise(
+            Long planId,
+            Long dayId,
+            Long exerciseId,
+            DayExerciseConfigRequest request
+    ) {
+        TrainingPlanDay day = findDay(planId, dayId);
+        TrainingDayExercise item = findDayExercise(day, exerciseId);
+        validateReps(request.minReps(), request.maxReps());
+        applyExercise(item, request);
         touch(day.getTrainingPlan());
         return persist(day.getTrainingPlan());
     }
@@ -181,14 +199,13 @@ public class TrainingPlanService {
 
     public TrainingPlanResponse reorderDayExercises(Long planId, Long dayId, List<Long> ids) {
         TrainingPlanDay day = findDay(planId, dayId);
-        if (ids.size() != day.getExercises().size()) throw new IllegalArgumentException("A ordem deve conter todos os exercícios do dia");
+        validateOrder(ids, day.getExercises().stream().map(TrainingDayExercise::getId).toList(), "exercícios");
         for (int index = 0; index < ids.size(); index++) {
             long id = ids.get(index);
-            TrainingDayExercise item = day.getExercises().stream().filter(value -> value.getId().equals(id))
-                    .findFirst().orElseThrow(() -> new IllegalArgumentException("Exercício inválido na ordenação"));
+            TrainingDayExercise item = findDayExercise(day, id);
             item.setSortOrder(index + 1);
         }
-        day.getExercises().sort(java.util.Comparator.comparingInt(TrainingDayExercise::getSortOrder));
+        day.getExercises().sort(Comparator.comparingInt(TrainingDayExercise::getSortOrder));
         touch(day.getTrainingPlan());
         return persist(day.getTrainingPlan());
     }
@@ -213,6 +230,31 @@ public class TrainingPlanService {
         TrainingPlanDay day = findDay(planId, dayId);
         boolean removed = day.getRestActivities().removeIf(item -> item.getId().equals(activityId));
         if (!removed) throw new ResourceNotFoundException("Atividade não encontrada neste dia");
+        reorderRestActivities(day);
+        touch(day.getTrainingPlan());
+        return persist(day.getTrainingPlan());
+    }
+
+    public TrainingPlanResponse updateRestActivity(
+            Long planId,
+            Long dayId,
+            Long activityId,
+            RestActivityRequest request
+    ) {
+        TrainingPlanDay day = findDay(planId, dayId);
+        RestDayActivity activity = findRestActivity(day, activityId);
+        applyRestActivity(activity, request);
+        touch(day.getTrainingPlan());
+        return persist(day.getTrainingPlan());
+    }
+
+    public TrainingPlanResponse reorderRestActivities(Long planId, Long dayId, List<Long> ids) {
+        TrainingPlanDay day = findDay(planId, dayId);
+        validateOrder(ids, day.getRestActivities().stream().map(RestDayActivity::getId).toList(), "atividades");
+        for (int index = 0; index < ids.size(); index++) {
+            findRestActivity(day, ids.get(index)).setSortOrder(index + 1);
+        }
+        day.getRestActivities().sort(Comparator.comparingInt(RestDayActivity::getSortOrder));
         touch(day.getTrainingPlan());
         return persist(day.getTrainingPlan());
     }
@@ -277,6 +319,28 @@ public class TrainingPlanService {
         item.setAlternativeExercise(request.alternativeExerciseId() == null ? null : exerciseLibrary.findEntity(request.alternativeExerciseId()));
     }
 
+    private void applyExercise(TrainingDayExercise item, DayExerciseConfigRequest request) {
+        item.setSets(request.sets());
+        item.setMinReps(request.minReps());
+        item.setMaxReps(request.maxReps());
+        item.setPlannedLoad(request.plannedLoad());
+        item.setPlannedDurationSeconds(request.plannedDurationSeconds());
+        item.setPlannedDistance(request.plannedDistance());
+        item.setRestSeconds(request.restSeconds());
+        item.setPlannedRpe(request.plannedRpe());
+        item.setSetType(request.setType() == null ? com.trainingapp.model.SetType.NORMAL : request.setType());
+        item.setNotes(clean(request.notes()));
+        item.setAlternativeExercise(request.alternativeExerciseId() == null ? null : exerciseLibrary.findEntity(request.alternativeExerciseId()));
+    }
+
+    private void applyRestActivity(RestDayActivity activity, RestActivityRequest request) {
+        activity.setName(request.name().trim());
+        activity.setDescription(clean(request.description()));
+        activity.setEstimatedDurationMinutes(request.estimatedDurationMinutes());
+        activity.setCategory(request.category().trim());
+        activity.setOptional(request.optional());
+    }
+
     private TrainingDayExercise cloneExercise(TrainingDayExercise source, TrainingPlanDay day) {
         TrainingDayExercise item = new TrainingDayExercise();
         item.setPlanDay(day);
@@ -308,6 +372,51 @@ public class TrainingPlanService {
 
     private void reorder(TrainingPlanDay day) {
         for (int index = 0; index < day.getExercises().size(); index++) day.getExercises().get(index).setSortOrder(index + 1);
+    }
+
+    private void reorderRestActivities(TrainingPlanDay day) {
+        for (int index = 0; index < day.getRestActivities().size(); index++) {
+            day.getRestActivities().get(index).setSortOrder(index + 1);
+        }
+    }
+
+    private TrainingDayExercise findDayExercise(TrainingPlanDay day, Long exerciseId) {
+        return day.getExercises().stream().filter(item -> item.getId().equals(exerciseId)).findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Exercício não encontrado neste dia"));
+    }
+
+    private RestDayActivity findRestActivity(TrainingPlanDay day, Long activityId) {
+        return day.getRestActivities().stream().filter(item -> item.getId().equals(activityId)).findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Atividade não encontrada neste dia"));
+    }
+
+    private void validateOrder(List<Long> requested, List<Long> existing, String label) {
+        if (requested == null || requested.size() != existing.size()
+                || new HashSet<>(requested).size() != requested.size()
+                || !new HashSet<>(requested).equals(new HashSet<>(existing))) {
+            throw new IllegalArgumentException("A ordem deve conter todos os " + label + " do dia, sem duplicações");
+        }
+    }
+
+    private void validateReps(int minReps, int maxReps) {
+        if (maxReps < minReps) throw new IllegalArgumentException("A repetição máxima deve ser maior ou igual à mínima");
+    }
+
+    private boolean completeMissingDays(TrainingPlan plan) {
+        Set<DayOfWeek> existing = new HashSet<>();
+        plan.getDays().forEach(day -> existing.add(day.getWeekday()));
+        boolean changed = false;
+        for (DayOfWeek weekday : DayOfWeek.values()) {
+            if (existing.contains(weekday)) continue;
+            TrainingPlanDay day = new TrainingPlanDay();
+            day.setTrainingPlan(plan);
+            day.setWeekday(weekday);
+            day.setSortOrder(weekday.getValue());
+            plan.getDays().add(day);
+            changed = true;
+        }
+        if (changed) plan.getDays().sort(Comparator.comparingInt(TrainingPlanDay::getSortOrder));
+        return changed;
     }
 
     private void validateDates(TrainingPlanRequest request) {

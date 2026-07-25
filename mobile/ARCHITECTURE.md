@@ -20,11 +20,16 @@ Agora, `src/features/workout-session` contém:
 persiste somente o cronômetro de descanso e `src/core/navigation` tipa a
 navegação.
 
+## Fichas de treino
+
+`src/features/training-plan` contém os modelos, o contrato de repository, o
+serviço HTTP, o controller e as telas da montagem semanal. Suas mutações
+atualizam somente o estado da própria feature.
+
 ## Migração restante
 
-`useTrainingController` ainda coordena dashboard, fichas, biblioteca e o fluxo
-legado de `Workout`. O próximo ponto de extração recomendado é
-`training-plan`, pois concentra a montagem semanal usada para iniciar sessões.
+`useTrainingController` ainda coordena dashboard, biblioteca e o fluxo legado
+de `Workout`.
 
 As telas `WorkoutsScreen` e `ExerciseScreen` ainda dependem de `Workout` e
 `Exercise`. Esse domínio é legado e não deve receber novas funcionalidades.

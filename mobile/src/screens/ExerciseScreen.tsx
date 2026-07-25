@@ -12,41 +12,27 @@ import {
 import { FormField } from '../components/FormField'
 import { PrimaryButton } from '../components/PrimaryButton'
 import { ScreenHeader } from '../components/ScreenHeader'
-import type { CustomStats, ExerciseInput, TrainingPlan, Workout } from '../models/training'
+import type { CustomStats, ExerciseInput, Workout } from '../models/training'
 import { colors, shared, type ThemeColors, useTheme } from '../theme'
 
 interface Props {
   workouts: Workout[]
-  trainingPlans: TrainingPlan[]
   selectedWorkout: Workout | undefined
-  selectedPlan: TrainingPlan | undefined
-  destination: 'workout' | 'plan'
   loading: boolean
-  onDestinationChange: (destination: 'workout' | 'plan') => void
   onSelectWorkout: (id: number) => void
-  onSelectPlan: (id: number) => void
   onCreateWorkoutExercise: (input: ExerciseInput) => Promise<boolean>
-  onCreatePlanExercise: (input: ExerciseInput) => Promise<boolean>
   onRemoveWorkoutExercise: (workoutId: number, exerciseId: number) => Promise<boolean>
-  onRemovePlanExercise: (planId: number, exerciseId: number) => Promise<boolean>
 }
 
 const muscles = ['Peitoral', 'Costas', 'Pernas', 'Ombros', 'Braços', 'Core']
 
 export function ExerciseScreen({
   workouts,
-  trainingPlans,
   selectedWorkout,
-  selectedPlan,
-  destination,
   loading,
-  onDestinationChange,
   onSelectWorkout,
-  onSelectPlan,
   onCreateWorkoutExercise,
-  onCreatePlanExercise,
   onRemoveWorkoutExercise,
-  onRemovePlanExercise,
 }: Props) {
   styles = createStyles(useTheme().colors)
   const [name, setName] = useState('')
@@ -58,12 +44,9 @@ export function ExerciseScreen({
   const [customStats, setCustomStats] = useState('{\n  "rir": 2\n}')
   const [formError, setFormError] = useState('')
   const [showAdvanced, setShowAdvanced] = useState(false)
-  const selectedTarget = destination === 'workout' ? selectedWorkout : selectedPlan
-  const destinations = destination === 'workout' ? workouts : trainingPlans
-
   async function submit() {
-    if (!selectedTarget) {
-      setFormError(`Selecione uma ${destination === 'workout' ? 'sessão' : 'ficha'}.`)
+    if (!selectedWorkout) {
+      setFormError('Selecione uma sessão.')
       return
     }
     if (!name.trim() || !muscleGroup.trim()) {
@@ -82,9 +65,7 @@ export function ExerciseScreen({
         restSeconds: Number(restSeconds),
         customStats: stats,
       }
-      const success = destination === 'workout'
-        ? await onCreateWorkoutExercise(payload)
-        : await onCreatePlanExercise(payload)
+      const success = await onCreateWorkoutExercise(payload)
       if (success) {
         setName('')
         setMuscleGroup('')
@@ -95,15 +76,13 @@ export function ExerciseScreen({
   }
 
   function confirmRemoval(exerciseId: number, exerciseName: string) {
-    if (!selectedTarget) return
-    Alert.alert('Remover exercício', `Deseja remover “${exerciseName}” desta ${destination === 'workout' ? 'sessão' : 'ficha'}?`, [
+    if (!selectedWorkout) return
+    Alert.alert('Remover exercício', `Deseja remover “${exerciseName}” desta sessão?`, [
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Remover',
         style: 'destructive',
-        onPress: () => void (destination === 'workout'
-          ? onRemoveWorkoutExercise(selectedTarget.id, exerciseId)
-          : onRemovePlanExercise(selectedTarget.id, exerciseId)),
+        onPress: () => void onRemoveWorkoutExercise(selectedWorkout.id, exerciseId),
       },
     ])
   }
@@ -122,49 +101,30 @@ export function ExerciseScreen({
       <ScreenHeader
         eyebrow="Montagem de treino"
         title={'Adicionar\nexercício'}
-        description="Registre em uma sessão ou guarde em uma ficha reutilizável."
+        description="Registre um exercício na sessão selecionada."
       />
 
-      <View style={styles.destinationSwitch}>
-        <TouchableOpacity
-          style={[styles.destinationButton, destination === 'workout' && styles.destinationButtonActive]}
-          onPress={() => onDestinationChange('workout')}
-        >
-          <Text style={[styles.destinationText, destination === 'workout' && styles.destinationTextActive]}>
-            Sessão atual
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.destinationButton, destination === 'plan' && styles.destinationButtonActive]}
-          onPress={() => onDestinationChange('plan')}
-        >
-          <Text style={[styles.destinationText, destination === 'plan' && styles.destinationTextActive]}>
-            Ficha de treino
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {!destinations.length ? (
+      {!workouts.length ? (
         <View style={styles.empty}>
           <View style={styles.emptyIcon}><Text style={styles.emptyIconText}>⌁</Text></View>
-          <Text style={styles.emptyTitle}>Primeiro, crie {destination === 'workout' ? 'um treino' : 'uma ficha'}</Text>
+          <Text style={styles.emptyTitle}>Primeiro, crie um treino</Text>
           <Text style={styles.emptyText}>O exercício precisa de um destino para manter sua rotina organizada.</Text>
         </View>
       ) : (
         <>
-          <StepHeader number="1" title={`Escolha ${destination === 'workout' ? 'a sessão' : 'a ficha'}`} description="Onde este exercício será registrado?" />
+          <StepHeader number="1" title="Escolha a sessão" description="Onde este exercício será registrado?" />
           <ScrollView
             horizontal
             contentContainerStyle={styles.workoutSelector}
             showsHorizontalScrollIndicator={false}
             style={styles.workoutSelectorScroll}
           >
-            {destinations.map((target) => {
-              const active = selectedTarget?.id === target.id
+            {workouts.map((target) => {
+              const active = selectedWorkout?.id === target.id
               return (
                 <Pressable
                   key={target.id}
-                  onPress={() => destination === 'workout' ? onSelectWorkout(target.id) : onSelectPlan(target.id)}
+                  onPress={() => onSelectWorkout(target.id)}
                   style={({ pressed }) => [
                     styles.workoutOption,
                     active && styles.workoutOptionActive,
@@ -183,16 +143,14 @@ export function ExerciseScreen({
                     {target.name}
                   </Text>
                   <Text style={[styles.workoutOptionDate, active && styles.optionMutedActive]}>
-                    {'scheduledDate' in target
-                      ? target.scheduledDate.split('-').reverse().join('/')
-                      : `${target.category} · ${target.difficulty}`}
+                    {target.scheduledDate.split('-').reverse().join('/')}
                   </Text>
                 </Pressable>
               )
             })}
           </ScrollView>
 
-          <StepHeader number="2" title={destination === 'workout' ? 'Registre a execução' : 'Defina o exercício'} description="Os campos mais usados vêm primeiro." />
+          <StepHeader number="2" title="Registre a execução" description="Os campos mais usados vêm primeiro." />
           <View style={styles.formCard}>
             <FormField label="Nome do exercício" value={name} onChangeText={setName} placeholder="Ex.: Remada baixa" />
             <FormField label="Grupo muscular" value={muscleGroup} onChangeText={setMuscleGroup} placeholder="Ex.: Costas" />
@@ -249,32 +207,32 @@ export function ExerciseScreen({
               </View>
             )}
             {!!formError && <Text style={styles.error}>{formError}</Text>}
-            <PrimaryButton label={`＋  Adicionar à ${destination === 'workout' ? 'sessão' : 'ficha'}`} loading={loading} onPress={() => void submit()} />
+            <PrimaryButton label="＋  Adicionar à sessão" loading={loading} onPress={() => void submit()} />
           </View>
 
           <View style={styles.reviewHeader}>
-            <StepHeader number="3" title={`Revise ${destination === 'workout' ? 'a sessão' : 'a ficha'}`} description="Confira a ordem e os números." />
+            <StepHeader number="3" title="Revise a sessão" description="Confira a ordem e os números." />
           </View>
           <View style={styles.seriesCard}>
             <View style={styles.seriesHeading}>
               <View>
-                <Text style={styles.seriesEyebrow}>{destination === 'workout' ? 'SESSÃO ATUAL' : 'FICHA SELECIONADA'}</Text>
-                <Text numberOfLines={1} style={styles.seriesName}>{selectedTarget?.name ?? 'Selecione um destino'}</Text>
+                <Text style={styles.seriesEyebrow}>SESSÃO ATUAL</Text>
+                <Text numberOfLines={1} style={styles.seriesName}>{selectedWorkout?.name ?? 'Selecione uma sessão'}</Text>
               </View>
               <View style={styles.seriesCount}>
-                <Text style={styles.seriesCountText}>{selectedTarget?.exercises.length ?? 0}</Text>
+                <Text style={styles.seriesCountText}>{selectedWorkout?.exercises.length ?? 0}</Text>
               </View>
             </View>
 
-            {!selectedTarget?.exercises.length ? (
+            {!selectedWorkout?.exercises.length ? (
               <View style={styles.noExercises}>
                 <View style={styles.noExercisesIcon}><Text style={styles.noExercisesIconText}>＋</Text></View>
-                <Text style={styles.noExercisesTitle}>{destination === 'workout' ? 'A sessão' : 'A ficha'} está vazia</Text>
+                <Text style={styles.noExercisesTitle}>A sessão está vazia</Text>
                 <Text style={styles.noExercisesText}>O próximo exercício aparecerá aqui.</Text>
               </View>
             ) : (
               <>
-                {selectedTarget.exercises.map((exercise, index) => (
+                {selectedWorkout.exercises.map((exercise, index) => (
                   <View key={exercise.id} style={[styles.exerciseRow, index > 0 && styles.exerciseBorder]}>
                     <View style={styles.exerciseIndex}>
                       <Text style={styles.exerciseIndexText}>{String(index + 1).padStart(2, '0')}</Text>
@@ -292,13 +250,13 @@ export function ExerciseScreen({
                 ))}
                 <View style={styles.seriesSummary}>
                   <SummaryItem
-                    value={selectedTarget.exercises.reduce((sum, item) => sum + item.sets, 0)}
+                    value={selectedWorkout.exercises.reduce((sum, item) => sum + item.sets, 0)}
                     label="séries"
                   />
                   <View style={styles.summaryDivider} />
-                  <SummaryItem value={selectedTarget.exercises.reduce((sum, item) => sum + item.sets * item.reps, 0)} label="repetições" />
+                  <SummaryItem value={selectedWorkout.exercises.reduce((sum, item) => sum + item.sets * item.reps, 0)} label="repetições" />
                   <View style={styles.summaryDivider} />
-                  <SummaryItem value={selectedTarget.exercises.reduce((sum, item) => sum + item.restSeconds, 0)} label="seg descanso" />
+                  <SummaryItem value={selectedWorkout.exercises.reduce((sum, item) => sum + item.restSeconds, 0)} label="seg descanso" />
                 </View>
               </>
             )}
@@ -364,31 +322,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   content: {
     padding: shared.pagePadding,
     paddingBottom: 124,
-  },
-  destinationSwitch: {
-    backgroundColor: colors.gray100,
-    borderRadius: 18,
-    flexDirection: 'row',
-    marginBottom: 22,
-    padding: 4,
-  },
-  destinationButton: {
-    alignItems: 'center',
-    borderRadius: 14,
-    flex: 1,
-    justifyContent: 'center',
-    minHeight: 46,
-  },
-  destinationButtonActive: {
-    backgroundColor: colors.card,
-  },
-  destinationText: {
-    color: colors.gray500,
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  destinationTextActive: {
-    color: colors.ink,
   },
   stepHeader: {
     alignItems: 'center',

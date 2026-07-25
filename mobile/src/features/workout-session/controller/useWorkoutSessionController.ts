@@ -6,6 +6,7 @@ import type {
   SetLogInput,
   WorkoutSession,
 } from '../model/workoutSession'
+import { adjustRestTimer } from '../model/workoutSession'
 import type { WorkoutSessionRepository } from '../repository/WorkoutSessionRepository'
 import { httpWorkoutSessionRepository } from '../service/httpWorkoutSessionRepository'
 
@@ -213,7 +214,7 @@ export function useWorkoutSessionController(
   const adjustRest = useCallback((seconds: number) => {
     setRestTimer((current) => {
       if (!current) return null
-      const next = { ...current, endsAt: Math.max(Date.now(), current.endsAt + seconds * 1000) }
+      const next = adjustRestTimer(current, seconds)
       void workoutSessionStorage.setRestTimer(next)
       return next
     })
