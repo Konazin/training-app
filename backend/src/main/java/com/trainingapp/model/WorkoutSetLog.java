@@ -36,6 +36,7 @@ public class WorkoutSetLog {
     @Column(nullable = false)
     private boolean completed;
     private OffsetDateTime completedAt;
+    private Boolean manuallyAdded = false;
     @Column(length = 500)
     private String notes = "";
 
@@ -58,6 +59,8 @@ public class WorkoutSetLog {
     public void setCompleted(boolean value) { completed = value; }
     public OffsetDateTime getCompletedAt() { return completedAt; }
     public void setCompletedAt(OffsetDateTime value) { completedAt = value; }
+    public boolean isManuallyAdded() { return Boolean.TRUE.equals(manuallyAdded); }
+    public void setManuallyAdded(boolean value) { manuallyAdded = value; }
     public String getNotes() { return notes; }
     public void setNotes(String value) { notes = value; }
 }

@@ -75,8 +75,6 @@ export interface TrainingPlanInput {
 export type Weekday = 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY'
 export type ExerciseCategory = 'STRENGTH' | 'HYPERTROPHY' | 'ENDURANCE' | 'CARDIO' | 'MOBILITY' | 'STRETCHING' | 'TECHNIQUE' | 'RECOVERY'
 export type SetType = 'NORMAL' | 'WARM_UP' | 'DROP_SET' | 'BI_SET' | 'CIRCUIT' | 'TO_FAILURE' | 'CONTROLLED_TEMPO'
-export type SessionStatus = 'IN_PROGRESS' | 'PAUSED' | 'COMPLETED' | 'ABANDONED'
-export type SessionExerciseStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED'
 
 export interface ExerciseDefinition {
   id: number; name: string; description: string; primaryMuscleGroup: string
@@ -101,22 +99,6 @@ export interface TrainingPlanDay {
   id: number; weekday: Weekday; title: string; description: string; sortOrder: number; restDay: boolean
   estimatedDurationMinutes: number; notes: string; exercises: DayExercise[]; restActivities: RestActivity[]
 }
-export interface SetLog {
-  id: number; setNumber: number; reps: number; load: number; durationSeconds: number; distance: number
-  rpe: number | null; completed: boolean; completedAt: string | null; notes: string; volume: number
-}
-export interface SessionExercise {
-  id: number; exerciseDefinitionId: number; name: string; muscleGroup: string; sortOrder: number
-  plannedSets: number; plannedMinReps: number; plannedMaxReps: number; restSeconds: number
-  status: SessionExerciseStatus; notes: string; sets: SetLog[]
-}
-export interface WorkoutSession {
-  id: number; trainingPlanId: number; planDayId: number; workoutName: string; scheduledDate: string
-  startedAt: string; completedAt: string | null; pausedAt: string | null; status: SessionStatus
-  totalDurationSeconds: number; overallRpe: number | null; notes: string; completedSets: number
-  totalPlannedSets: number; totalVolume: number; exercises: SessionExercise[]
-}
-
 export interface Dashboard {
   totalWorkouts: number
   completedWorkouts: number

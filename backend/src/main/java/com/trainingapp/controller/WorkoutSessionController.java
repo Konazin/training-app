@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -62,6 +63,13 @@ public class WorkoutSessionController {
     public WorkoutSessionResponse addSet(@PathVariable Long sessionId, @PathVariable Long exerciseId) {
         return service.addSet(sessionId, exerciseId);
     }
+
+    @DeleteMapping("/{sessionId}/exercises/{exerciseId}/sets/{setId}")
+    public WorkoutSessionResponse removeSet(
+            @PathVariable Long sessionId,
+            @PathVariable Long exerciseId,
+            @PathVariable Long setId
+    ) { return service.removeSet(sessionId, exerciseId, setId); }
 
     @PatchMapping("/{sessionId}/exercises/{exerciseId}/status")
     public WorkoutSessionResponse setExerciseStatus(

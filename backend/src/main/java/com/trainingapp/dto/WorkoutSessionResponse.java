@@ -2,6 +2,7 @@ package com.trainingapp.dto;
 
 import com.trainingapp.model.SessionExerciseStatus;
 import com.trainingapp.model.SessionStatus;
+import com.trainingapp.model.ExerciseCategory;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -31,6 +32,8 @@ public record WorkoutSessionResponse(
             Long exerciseDefinitionId,
             String name,
             String muscleGroup,
+            ExerciseCategory category,
+            boolean timed,
             int sortOrder,
             int plannedSets,
             int plannedMinReps,
@@ -51,6 +54,7 @@ public record WorkoutSessionResponse(
             BigDecimal rpe,
             boolean completed,
             OffsetDateTime completedAt,
+            boolean manuallyAdded,
             String notes,
             BigDecimal volume
     ) {}

@@ -31,6 +31,10 @@ public class WorkoutSessionExercise {
     private String exerciseNameSnapshot;
     @Column(nullable = false, length = 80)
     private String muscleGroupSnapshot;
+    @Enumerated(EnumType.STRING)
+    @Column(length = 30)
+    private ExerciseCategory categorySnapshot;
+    private Boolean timedSnapshot = false;
     @Column(nullable = false)
     private int sortOrder;
     @Column(nullable = false)
@@ -58,6 +62,10 @@ public class WorkoutSessionExercise {
     public void setExerciseNameSnapshot(String value) { exerciseNameSnapshot = value; }
     public String getMuscleGroupSnapshot() { return muscleGroupSnapshot; }
     public void setMuscleGroupSnapshot(String value) { muscleGroupSnapshot = value; }
+    public ExerciseCategory getCategorySnapshot() { return categorySnapshot; }
+    public void setCategorySnapshot(ExerciseCategory value) { categorySnapshot = value; }
+    public boolean isTimedSnapshot() { return Boolean.TRUE.equals(timedSnapshot); }
+    public void setTimedSnapshot(boolean value) { timedSnapshot = value; }
     public int getSortOrder() { return sortOrder; }
     public void setSortOrder(int value) { sortOrder = value; }
     public int getPlannedSets() { return plannedSets; }

@@ -1,36 +1,36 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
-  Animated,
-  AccessibilityInfo,
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
 } from 'react-native'
+import {
+  DefaultTheme,
+  NavigationContainer,
+  type Theme as NavigationTheme,
+} from '@react-navigation/native'
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
+import { createNativeStackNavigator, type NativeStackNavigationProp } from '@react-navigation/native-stack'
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
+import type { MainTabParamList, RootStackParamList } from './src/core/navigation/types'
 import { useTrainingController } from './src/controllers/useTrainingController'
+import { useWorkoutSessionController } from './src/features/workout-session/controller/useWorkoutSessionController'
+import { WorkoutSessionScreen } from './src/features/workout-session/views/WorkoutSessionScreen'
 import { ExerciseScreen } from './src/screens/ExerciseScreen'
 import { HomeScreen } from './src/screens/HomeScreen'
 import { HistoryScreen } from './src/screens/HistoryScreen'
 import { LibraryScreen } from './src/screens/LibraryScreen'
-import { SessionScreen } from './src/screens/SessionScreen'
+import { MoreScreen } from './src/screens/MoreScreen'
 import { WeeklyPlanScreen } from './src/screens/WeeklyPlanScreen'
 import { WorkoutsScreen } from './src/screens/WorkoutsScreen'
 import { ThemeProvider, type ThemeColors, useTheme } from './src/theme'
 
-type ScreenName = 'home' | 'workouts' | 'plans' | 'library' | 'session' | 'history' | 'exercise'
-
-const navigation: { id: ScreenName; label: string; symbol: string }[] = [
-  { id: 'home', label: 'Início', symbol: '⌂' },
-  { id: 'workouts', label: 'Treinos', symbol: '▤' },
-  { id: 'plans', label: 'Fichas', symbol: '▥' },
-  { id: 'library', label: 'Biblioteca', symbol: '⌁' },
-  { id: 'session', label: 'Sessão', symbol: '▶' },
-  { id: 'history', label: 'Histórico', symbol: '◷' },
-]
+const Stack = createNativeStackNavigator<RootStackParamList>()
+const Tabs = createBottomTabNavigator<MainTabParamList>()
 
 export default function App() {
   return (
@@ -43,203 +43,255 @@ export default function App() {
 function TrainingApp() {
   const { colors, isDark, toggleTheme } = useTheme()
   const styles = createStyles(colors)
-  const [screen, setScreen] = useState<ScreenName>('home')
-  const [exerciseDestination, setExerciseDestination] = useState<'workout' | 'plan'>('workout')
-  const [reduceMotion, setReduceMotion] = useState(false)
   const controller = useTrainingController()
-  const pageOpacity = useRef(new Animated.Value(1)).current
-  const pageOffset = useRef(new Animated.Value(0)).current
+  const workoutSession = useWorkoutSessionController()
+  const [exerciseDestination, setExerciseDestination] = useState<'workout' | 'plan'>('workout')
+  const [currentRoute, setCurrentRoute] = useState('MainTabs')
+  const message = workoutSession.message || controller.message
+  const navigationTheme = useMemo<NavigationTheme>(() => ({
+    ...DefaultTheme,
+    dark: isDark,
+    colors: {
+      ...DefaultTheme.colors,
+      background: colors.background,
+      card: colors.card,
+      border: colors.gray200,
+      text: colors.ink,
+      primary: colors.primary,
+      notification: colors.danger,
+    },
+  }), [colors, isDark])
 
   useEffect(() => {
-    void controller.refresh()
-  }, [controller.refresh])
-
-  useEffect(() => {
-    void AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion)
-    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion)
-    return () => subscription.remove()
-  }, [])
-
-  useEffect(() => {
-    if (reduceMotion) {
-      pageOpacity.setValue(1)
-      pageOffset.setValue(0)
-      return
-    }
-    pageOpacity.setValue(0)
-    pageOffset.setValue(8)
-    Animated.parallel([
-      Animated.timing(pageOpacity, {
-        duration: 180,
-        toValue: 1,
-        useNativeDriver: true,
-      }),
-      Animated.spring(pageOffset, {
-        damping: 18,
-        mass: 0.6,
-        stiffness: 180,
-        toValue: 0,
-        useNativeDriver: true,
-      }),
-    ]).start()
-  }, [pageOffset, pageOpacity, reduceMotion, screen])
-
-  function openExercise(workoutId: number) {
-    controller.setSelectedWorkoutId(workoutId)
-    setExerciseDestination('workout')
-    setScreen('exercise')
-  }
-
-  function openPlanExercise(planId: number) {
-    controller.setSelectedTrainingPlanId(planId)
-    setExerciseDestination('plan')
-    setScreen('exercise')
-  }
-
-  async function beginSession(planId: number, dayId: number) {
-    const success = await controller.startSession(planId, dayId)
-    if (success) setScreen('session')
-    return success
-  }
+    void Promise.all([controller.refresh(), workoutSession.refresh()])
+  }, [controller.refresh, workoutSession.refresh])
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaProvider>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.container}
       >
-        {!!controller.message && (
-          <View style={styles.message}>
-            <Text style={styles.messageText}>{controller.message}</Text>
-          </View>
-        )}
+        <SafeAreaView edges={['top']} style={styles.container}>
+          <NavigationContainer
+            theme={navigationTheme}
+            onReady={() => setCurrentRoute('MainTabs')}
+            onStateChange={(state) => {
+              const route = state?.routes[state.index ?? 0]
+              if (route?.name) setCurrentRoute(route.name)
+            }}
+          >
+          <Stack.Navigator
+            screenOptions={{
+              animation: 'slide_from_right',
+              contentStyle: { backgroundColor: colors.background },
+              headerShown: false,
+            }}
+          >
+            <Stack.Screen name="MainTabs">
+              {({ navigation }) => (
+                <MainTabs
+                  navigation={navigation}
+                  controller={controller}
+                  workoutSession={workoutSession}
+                  setExerciseDestination={setExerciseDestination}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen name="Workouts">
+              {({ navigation }) => (
+                <WorkoutsScreen
+                  workouts={controller.workouts}
+                  loading={controller.loading}
+                  onCreate={controller.createWorkout}
+                  onRemove={controller.removeWorkout}
+                  onAddExercise={(workoutId) => {
+                    controller.setSelectedWorkoutId(workoutId)
+                    setExerciseDestination('workout')
+                    navigation.navigate('Exercise', { destination: 'workout' })
+                  }}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen name="Library">
+              {() => (
+                <LibraryScreen
+                  exercises={controller.exerciseLibrary}
+                  onCreate={controller.createExerciseDefinition}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen name="Exercise">
+              {() => (
+                <ExerciseScreen
+                  workouts={controller.workouts}
+                  trainingPlans={controller.trainingPlans}
+                  selectedWorkout={controller.selectedWorkout}
+                  selectedPlan={controller.selectedTrainingPlan}
+                  destination={exerciseDestination}
+                  loading={controller.loading}
+                  onDestinationChange={setExerciseDestination}
+                  onSelectWorkout={controller.setSelectedWorkoutId}
+                  onSelectPlan={controller.setSelectedTrainingPlanId}
+                  onCreateWorkoutExercise={controller.addExercise}
+                  onCreatePlanExercise={controller.addPlanExercise}
+                  onRemoveWorkoutExercise={controller.removeExercise}
+                  onRemovePlanExercise={controller.removePlanExercise}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen name="Session">
+              {() => (
+                <WorkoutSessionScreen
+                  session={workoutSession.activeSession}
+                  restTimer={workoutSession.restTimer}
+                  errors={workoutSession.errors}
+                  busyKeys={workoutSession.busyKeys}
+                  onUpdateSet={workoutSession.updateSet}
+                  onAddSet={workoutSession.addSet}
+                  onRemoveSet={workoutSession.removeSet}
+                  onSetExerciseStatus={workoutSession.setExerciseStatus}
+                  onPause={workoutSession.pause}
+                  onResume={workoutSession.resume}
+                  onComplete={workoutSession.complete}
+                  onAbandon={workoutSession.abandon}
+                  onStartRest={workoutSession.startRest}
+                  onAdjustRest={workoutSession.adjustRest}
+                  onSkipRest={workoutSession.skipRest}
+                />
+              )}
+            </Stack.Screen>
+          </Stack.Navigator>
+          </NavigationContainer>
 
-        <Pressable
-          accessibilityLabel={isDark ? 'Ativar modo claro' : 'Ativar modo escuro'}
-          onPress={toggleTheme}
-          style={({ pressed }) => [styles.themeButton, pressed && styles.pressed]}
-        >
-          <Text style={styles.themeButtonText}>{isDark ? '☀' : '☾'}</Text>
-        </Pressable>
-
-        <Animated.View
-          style={[
-            styles.screen,
-            {
-              opacity: pageOpacity,
-              transform: [{ translateY: pageOffset }],
-            },
-          ]}
-        >
-          {screen === 'home' && (
-            <HomeScreen
-              dashboard={controller.dashboard}
-              loading={controller.loading}
-              onRefresh={controller.refresh}
-              onNavigate={setScreen}
-            />
+          {!!message && (
+            <View style={styles.message}>
+              <Text style={styles.messageText}>{message}</Text>
+            </View>
           )}
-          {screen === 'workouts' && (
-            <WorkoutsScreen
-              workouts={controller.workouts}
-              loading={controller.loading}
-              onCreate={controller.createWorkout}
-              onRemove={controller.removeWorkout}
-              onAddExercise={openExercise}
-            />
+          {currentRoute !== 'Session' && (
+            <Pressable
+              accessibilityLabel={isDark ? 'Ativar modo claro' : 'Ativar modo escuro'}
+              onPress={toggleTheme}
+              style={({ pressed }) => [styles.themeButton, pressed && styles.pressed]}
+            >
+              <Text style={styles.themeButtonText}>{isDark ? '☀' : '☾'}</Text>
+            </Pressable>
           )}
-          {screen === 'plans' && (
-            <WeeklyPlanScreen
-              plans={controller.trainingPlans}
-              selectedPlan={controller.selectedTrainingPlan}
-              library={controller.exerciseLibrary}
-              loading={controller.loading}
-              onSelectPlan={controller.setSelectedTrainingPlanId}
-              onCreate={controller.createTrainingPlan}
-              onActivate={controller.activateTrainingPlan}
-              onUpdateDay={controller.updatePlanDay}
-              onAddExercise={controller.addDayExercise}
-              onAddRestActivity={controller.addRestActivity}
-              onStart={beginSession}
-            />
-          )}
-          {screen === 'library' && (
-            <LibraryScreen exercises={controller.exerciseLibrary} onCreate={controller.createExerciseDefinition} />
-          )}
-          {screen === 'session' && (
-            <SessionScreen
-              session={controller.activeSession}
-              onOpenPlans={() => setScreen('plans')}
-              onUpdateSet={controller.updateSessionSet}
-              onSkip={controller.setSessionExerciseStatus}
-              onComplete={async (rpe, notes) => {
-                const success = await controller.completeSession(rpe, notes)
-                if (success) setScreen('history')
-                return success
-              }}
-              onAbandon={async () => {
-                const success = await controller.abandonSession()
-                if (success) setScreen('history')
-                return success
-              }}
-            />
-          )}
-          {screen === 'history' && <HistoryScreen sessions={controller.sessions} />}
-          {screen === 'exercise' && (
-            <ExerciseScreen
-              workouts={controller.workouts}
-              trainingPlans={controller.trainingPlans}
-              selectedWorkout={controller.selectedWorkout}
-              selectedPlan={controller.selectedTrainingPlan}
-              destination={exerciseDestination}
-              loading={controller.loading}
-              onDestinationChange={setExerciseDestination}
-              onSelectWorkout={controller.setSelectedWorkoutId}
-              onSelectPlan={controller.setSelectedTrainingPlanId}
-              onCreateWorkoutExercise={controller.addExercise}
-              onCreatePlanExercise={controller.addPlanExercise}
-              onRemoveWorkoutExercise={controller.removeExercise}
-              onRemovePlanExercise={controller.removePlanExercise}
-            />
-          )}
-        </Animated.View>
-
-        <View style={styles.navigation}>
-          {navigation.map((item) => {
-            const active = screen === item.id
-            return (
-              <Pressable
-                key={item.id}
-                onPress={() => setScreen(item.id)}
-                style={({ pressed }) => [
-                  styles.navItem,
-                  active && styles.navItemActive,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <Text style={[styles.navSymbol, active && styles.navTextActive]}>{item.symbol}</Text>
-                <Text style={[styles.navLabel, active && styles.navTextActive]}>{item.label}</Text>
-              </Pressable>
-            )
-          })}
-        </View>
+        </SafeAreaView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </SafeAreaProvider>
+  )
+}
+
+function MainTabs({
+  navigation,
+  controller,
+  workoutSession,
+  setExerciseDestination,
+}: {
+  navigation: NativeStackNavigationProp<RootStackParamList, 'MainTabs'>
+  controller: ReturnType<typeof useTrainingController>
+  workoutSession: ReturnType<typeof useWorkoutSessionController>
+  setExerciseDestination: (destination: 'workout' | 'plan') => void
+}) {
+  const { colors } = useTheme()
+  const symbols: Record<keyof MainTabParamList, string> = {
+    Today: '⌂',
+    Plan: '▥',
+    History: '◷',
+    More: '•••',
+  }
+  const labels: Record<keyof MainTabParamList, string> = {
+    Today: 'Hoje',
+    Plan: 'Ficha',
+    History: 'Histórico',
+    More: 'Mais',
+  }
+
+  return (
+    <Tabs.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarActiveTintColor: colors.onPrimary,
+        tabBarInactiveTintColor: colors.gray500,
+        tabBarLabel: labels[route.name],
+        tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 17 }}>{symbols[route.name]}</Text>,
+        tabBarStyle: {
+          backgroundColor: colors.nearBlack,
+          borderTopColor: colors.gray200,
+          height: 72,
+          paddingBottom: 9,
+          paddingTop: 7,
+        },
+        tabBarLabelStyle: { fontSize: 9, fontWeight: '700' },
+      })}
+    >
+      <Tabs.Screen name="Today">
+        {() => (
+          <HomeScreen
+            dashboard={controller.dashboard}
+            loading={controller.loading}
+            onRefresh={controller.refresh}
+            onNavigate={(screen) => {
+              if (screen === 'workouts') navigation.navigate('Workouts')
+              else {
+                setExerciseDestination('workout')
+                navigation.navigate('Exercise', { destination: 'workout' })
+              }
+            }}
+            activeSession={workoutSession.activeSession}
+            onResumeSession={() => navigation.navigate('Session')}
+          />
+        )}
+      </Tabs.Screen>
+      <Tabs.Screen name="Plan">
+        {() => (
+          <WeeklyPlanScreen
+            plans={controller.trainingPlans}
+            selectedPlan={controller.selectedTrainingPlan}
+            library={controller.exerciseLibrary}
+            loading={controller.loading || workoutSession.busyKeys.has('start')}
+            onSelectPlan={controller.setSelectedTrainingPlanId}
+            onCreate={controller.createTrainingPlan}
+            onActivate={controller.activateTrainingPlan}
+            onUpdateDay={controller.updatePlanDay}
+            onAddExercise={controller.addDayExercise}
+            onAddRestActivity={controller.addRestActivity}
+            onStart={async (planId, dayId) => {
+              const success = await workoutSession.start(planId, dayId)
+              if (success) navigation.navigate('Session')
+              return success
+            }}
+          />
+        )}
+      </Tabs.Screen>
+      <Tabs.Screen name="History">
+        {() => <HistoryScreen sessions={workoutSession.sessions} />}
+      </Tabs.Screen>
+      <Tabs.Screen name="More">
+        {() => (
+          <MoreScreen
+            onOpen={(screen) => {
+              if (screen === 'Exercise') {
+                setExerciseDestination('workout')
+                navigation.navigate('Exercise', { destination: 'workout' })
+              } else if (screen === 'Workouts') {
+                navigation.navigate('Workouts')
+              } else {
+                navigation.navigate('Library')
+              }
+            }}
+          />
+        )}
+      </Tabs.Screen>
+    </Tabs.Navigator>
   )
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  safeArea: {
-    backgroundColor: colors.background,
-    flex: 1,
-  },
-  container: {
-    flex: 1,
-  },
-  screen: {
-    flex: 1,
-  },
+  container: { backgroundColor: colors.background, flex: 1 },
   themeButton: {
     alignItems: 'center',
     backgroundColor: colors.card,
@@ -254,10 +306,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     width: 44,
     zIndex: 15,
   },
-  themeButtonText: {
-    color: colors.ink,
-    fontSize: 19,
-  },
+  themeButtonText: { color: colors.ink, fontSize: 19 },
   message: {
     backgroundColor: colors.nearBlack,
     borderRadius: 16,
@@ -270,49 +319,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     top: 8,
     zIndex: 20,
   },
-  messageText: {
-    color: colors.white,
-    fontSize: 10,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  navigation: {
-    backgroundColor: 'rgba(17,17,17,0.97)',
-    borderColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 22,
-    borderWidth: 1,
-    bottom: 12,
-    flexDirection: 'row',
-    left: 12,
-    padding: 6,
-    position: 'absolute',
-    right: 12,
-  },
-  navItem: {
-    alignItems: 'center',
-    borderRadius: 17,
-    flex: 1,
-    minHeight: 55,
-    paddingVertical: 7,
-  },
-  navItemActive: {
-    backgroundColor: colors.primary,
-  },
-  navSymbol: {
-    color: colors.gray500,
-    fontSize: 17,
-    lineHeight: 19,
-  },
-  navLabel: {
-    color: colors.gray500,
-    fontSize: 9,
-    fontWeight: '700',
-    marginTop: 3,
-  },
-  navTextActive: {
-    color: colors.onPrimary,
-  },
-  pressed: {
-    opacity: 0.72,
-  },
+  messageText: { color: colors.white, fontSize: 10, fontWeight: '700', textAlign: 'center' },
+  pressed: { opacity: 0.72 },
 })

@@ -15,5 +15,5 @@ public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, 
 
     Optional<WorkoutSession> findFirstByStatusInOrderByStartedAtDesc(List<SessionStatus> statuses);
 
-    boolean existsByPlanDayIdAndStatusIn(Long planDayId, List<SessionStatus> statuses);
+    boolean existsByStatusIn(List<SessionStatus> statuses);
 }

@@ -1,790 +1,325 @@
-Quero transformar o aplicativo atual em um aplicativo de treino realmente completo e funcional.
+Analise e melhore o repositório atual `training-app`.
 
-O projeto já possui uma interface com:
+O produto real é o APK React Native/Expo. A versão web serve apenas para debugging. O backend é Spring Boot e deve continuar sendo compartilhado.
 
-- Sidebar com Início, Treinos, Fichas e Adicionar.
-- Tema escuro e opção de modo claro.
-- Tela “Seus treinos”.
-- Filtros Todos, Planejados, Em andamento e Concluídos.
-- Cards de treino com nome, descrição, duração, exercícios, calorias e status.
-- Possibilidade básica de adicionar exercícios.
-- Indicação de sincronização entre web e mobile.
+Esta etapa NÃO deve implementar o Modo Umamusume, novos dashboards, gráficos ou uma grande reformulação visual.
 
-Neste momento, NÃO implemente o Modo Umamusume completo, personagens, eventos narrativos, sistema de status ou gamificação. Porém, prepare corretamente o domínio e a arquitetura para que esse modo possa usar os mesmos treinos, fichas, sessões e registros posteriormente.
-
-O objetivo desta fase é deixar o modo normal do aplicativo completo.
+O objetivo é fortalecer a arquitetura mobile e tornar a execução de treino realmente utilizável.
 
 ==================================================
-1. PRIMEIRO: ANALISE O PROJETO
+1. PRINCÍPIOS OBRIGATÓRIOS
 ==================================================
 
-Antes de alterar código:
-
-1. Inspecione a estrutura completa do repositório.
-2. Identifique:
-   - framework e versão;
-   - linguagem;
-   - sistema de rotas;
-   - gerenciamento de estado;
-   - banco de dados;
-   - backend ou camada de persistência;
-   - sistema de autenticação;
-   - componentes reutilizáveis;
-   - biblioteca de ícones;
-   - biblioteca de UI;
-   - forma atual de estilização;
-   - testes existentes;
-   - modelos relacionados a treinos e exercícios.
-3. Execute os comandos disponíveis de lint, typecheck, testes e build.
-4. Não troque a stack existente sem necessidade.
-5. Não reescreva o projeto inteiro.
-6. Preserve o design atual, refinando-o em vez de substituí-lo por uma interface genérica.
-7. Identifique dados mockados, campos hardcoded e funcionalidades apenas visuais.
-
-Depois da análise, implemente a solução. Não pare apenas em um relatório.
+- Mobile-first e Android-first.
+- Manter React Native, Expo, TypeScript e Spring Boot.
+- Preservar o design atual.
+- Organizar o mobile em MVC por feature.
+- Não reescrever todo o projeto.
+- Não alterar a web, exceto quando um contrato compartilhado exigir.
+- Não criar funcionalidades apenas visuais ou mockadas.
+- Executar typecheck, testes e build disponíveis ao final.
 
 ==================================================
-2. OBJETIVO FUNCIONAL
+2. PROBLEMAS ATUAIS
 ==================================================
 
-O usuário deve conseguir realizar o seguinte fluxo completo:
+Corrigir de forma incremental os seguintes problemas:
 
-1. Criar uma ficha semanal.
-2. Planejar treinos de segunda-feira a domingo.
-3. Marcar dias como treino ou descanso.
-4. Adicionar exercícios aos dias de treino.
-5. Adicionar atividades opcionais aos dias de descanso.
-6. Iniciar uma sessão de treino.
-7. Registrar séries, repetições, carga, duração e observações.
-8. Usar cronômetro de descanso.
-9. Concluir ou abandonar uma sessão.
-10. Consultar o histórico.
-11. Visualizar evolução de carga, volume e frequência.
-12. Editar ou duplicar fichas.
-13. Reutilizar exercícios cadastrados.
-14. Ver claramente qual é o próximo treino planejado.
-
-O aplicativo não deve continuar sendo apenas um CRUD de cards.
+1. `useTrainingController` concentra dashboard, fichas, biblioteca, treinos e sessões.
+2. `models/training.ts` concentra todo o domínio.
+3. O mobile está separado por camadas técnicas, mas não por feature.
+4. Toda mutação recarrega treinos, dashboard, fichas, biblioteca, histórico e sessão ativa.
+5. A navegação usa um estado manual no `App.tsx`, sem stack real ou suporte adequado ao botão voltar do Android.
+6. A tela de sessão exibe carga e repetições, mas não permite editá-las.
+7. O backend suporta adicionar série, pausar e continuar sessão, mas o mobile não expõe completamente essas ações.
+8. O cronômetro de descanso existe apenas em memória e desaparece ao reconstruir a tela.
+9. O aplicativo depende totalmente da API e não possui uma abstração preparada para persistência local.
+10. É possível iniciar sessões ativas em dias diferentes e `/sessions/active` retorna apenas uma.
+11. A barra inferior continua visível durante uma sessão.
+12. O domínio antigo de `Workout` convive com o novo domínio de `TrainingPlan` e `WorkoutSession`, causando fluxos e métricas duplicadas.
 
 ==================================================
-3. MODELO SEMANAL DE FICHA
+3. ARQUITETURA POR FEATURE
 ==================================================
 
-Implemente fichas compostas pelos sete dias da semana:
+Refatore apenas as partes tocadas nesta etapa para uma estrutura semelhante a:
 
-- Segunda-feira
-- Terça-feira
-- Quarta-feira
-- Quinta-feira
-- Sexta-feira
-- Sábado
-- Domingo
+src/
+├── core/
+│   ├── api/
+│   ├── navigation/
+│   ├── storage/
+│   └── ui/
+│
+└── features/
+    ├── workout-session/
+    │   ├── model/
+    │   ├── service/
+    │   ├── repository/
+    │   ├── controller/
+    │   └── views/
+    │
+    ├── training-plan/
+    ├── exercise-library/
+    ├── history/
+    └── dashboard/
 
-Cada dia deve possuir:
+Regras:
 
-- id;
-- dia da semana;
-- título opcional;
-- descrição opcional;
-- ordem;
-- indicador de descanso;
-- lista de exercícios;
-- lista de atividades opcionais de descanso;
-- duração estimada;
-- observações.
+- `model`: tipos, entidades e regras puras.
+- `service`: comunicação HTTP e operações externas.
+- `repository`: interface de acesso aos dados.
+- `controller`: estado, ações e coordenação da feature.
+- `views`: componentes e telas sem regras de negócio.
+- `core`: apenas elementos realmente compartilhados.
 
-Na interface de edição da ficha, cada dia deve ter um checkbox:
+Não mova todos os arquivos apenas por estética. Refatore primeiro a feature `workout-session` e extraia somente o compartilhamento necessário.
 
-[ ] Marcar como dia de descanso
+Crie uma interface de repository para sessões, por exemplo:
 
-Quando o checkbox estiver marcado:
+WorkoutSessionRepository
+- getActive()
+- start()
+- updateSet()
+- addSet()
+- pause()
+- resume()
+- complete()
+- abandon()
 
-- esconder ou desabilitar a montagem do treino convencional;
-- não apagar exercícios existentes sem confirmação;
-- permitir cadastrar atividades opcionais;
-- mostrar claramente que nenhuma atividade é obrigatória;
-- permitir voltar a transformar o dia em dia de treino.
+A primeira implementação pode continuar usando HTTP.
 
-Atividades opcionais para descanso podem incluir:
-
-- caminhada;
-- alongamento;
-- mobilidade;
-- recuperação ativa;
-- descanso completo;
-- atividade personalizada.
-
-Não limite isso a um enum rígido. Deve ser possível criar uma atividade personalizada.
-
-Estrutura conceitual sugerida:
-
-WorkoutPlan
-WorkoutPlanDay
-RestDayActivity
-Exercise
-WorkoutDayExercise
-WorkoutSession
-WorkoutSessionExercise
-WorkoutSetLog
-
-Adapte os nomes ao padrão já usado no projeto.
+A arquitetura deve permitir futuramente uma implementação SQLite/local-first sem alterar controllers e views.
 
 ==================================================
-4. BIBLIOTECA DE EXERCÍCIOS
+4. EXECUÇÃO REAL DA SESSÃO
 ==================================================
 
-Implemente uma biblioteca de exercícios reutilizável.
+Melhore a tela de sessão para permitir, em cada série:
 
-Cada exercício deve suportar:
+- editar repetições;
+- editar carga;
+- editar duração;
+- editar distância;
+- editar RPE;
+- editar observação;
+- marcar ou desmarcar como concluída;
+- adicionar uma nova série;
+- remover uma série adicionada manualmente, caso o backend ainda não suporte isso, implementar o endpoint necessário.
 
-- nome;
-- descrição;
-- grupo muscular principal;
-- grupos musculares secundários;
-- equipamento;
-- categoria;
-- dificuldade;
-- instruções;
-- observações;
-- imagem ou vídeo opcional;
-- exercício unilateral ou bilateral;
-- duração em vez de repetições, quando aplicável;
-- exercício criado pelo sistema ou pelo usuário;
-- status ativo ou arquivado.
+Regras:
 
-Categorias mínimas:
+- apresentar apenas campos relevantes para o tipo de exercício;
+- musculação usa principalmente repetições e carga;
+- exercícios temporizados usam duração;
+- cardio pode usar duração e distância;
+- não obrigar o usuário a preencher todos os campos;
+- salvar alterações sem recarregar todo o aplicativo;
+- manter o valor digitado caso a requisição falhe;
+- bloquear ações duplicadas enquanto uma série está sendo salva;
+- fornecer feedback de erro por série sem substituir toda a tela.
 
-- força;
-- hipertrofia;
-- resistência;
-- cardio;
-- mobilidade;
-- alongamento;
-- técnica;
-- recuperação.
+Ao concluir uma série:
 
-Equipamentos devem ser extensíveis e não ficar presos em valores hardcoded espalhados pela interface.
-
-A biblioteca deve possuir:
-
-- busca por nome;
-- filtro por grupo muscular;
-- filtro por equipamento;
-- filtro por categoria;
-- criação de exercício personalizado;
-- edição de exercícios criados pelo usuário;
-- arquivamento;
-- seleção de exercício para uma ficha.
-
-Não permita duplicatas acidentais apenas por diferença de letras maiúsculas ou espaços.
+- persistir os valores editados;
+- iniciar o descanso configurado;
+- atualizar progresso e volume localmente;
+- não buscar novamente dashboard, fichas, biblioteca e histórico.
 
 ==================================================
-5. CONFIGURAÇÃO DO EXERCÍCIO NA FICHA
+5. PAUSA, RETOMADA E RECUPERAÇÃO
 ==================================================
 
-Ao adicionar um exercício a um dia, permita configurar:
+Adicionar controles claros para:
 
-- ordem;
-- número de séries;
-- faixa ou valor de repetições;
-- carga planejada opcional;
-- duração opcional;
-- distância opcional;
-- tempo de descanso;
-- RPE ou esforço planejado opcional;
-- observações;
-- tipo de série;
-- exercício alternativo opcional.
+- pausar sessão;
+- continuar sessão;
+- abandonar sessão;
+- concluir sessão.
 
-Tipos de série:
+Durante uma sessão:
 
-- normal;
-- aquecimento;
-- drop set;
-- bi-set;
-- circuito;
-- até a falha;
-- tempo controlado.
+- esconder a navegação inferior;
+- impedir saída acidental;
+- integrar corretamente o botão voltar do Android;
+- ao tentar sair, oferecer continuar, pausar ou abandonar;
+- recuperar a sessão ativa ao reabrir o aplicativo.
 
-Não é necessário implementar lógica avançada para todos os tipos agora, mas o modelo não deve impedir essa evolução.
+A API deve impedir mais de uma sessão globalmente ativa para o usuário atual.
 
-Permita reordenar exercícios.
+Como ainda não há autenticação, trate a instalação como um único usuário.
 
 ==================================================
-6. TELA DE TREINOS
+6. CRONÔMETRO DE DESCANSO
 ==================================================
 
-Corrija a hierarquia atual dos cards.
+O cronômetro deve:
 
-O botão principal de um treino planejado deve ser:
+- usar `endsAt`, não apenas contagem acumulada;
+- permitir +15 segundos, -15 segundos e pular;
+- sobreviver à troca de tela;
+- sobreviver à reconstrução do componente;
+- restaurar o tempo correto ao reabrir o app;
+- vibrar ao terminar;
+- não vibrar repetidamente.
 
-“Iniciar treino”
+Crie uma abstração simples de storage em `core/storage`.
 
-Ações secundárias:
+Pode usar AsyncStorage nesta etapa.
 
-- ver detalhes;
-- editar;
-- duplicar;
-- excluir;
-- adicionar exercício.
+Persistir apenas:
 
-“Adicionar exercício” não deve continuar sendo a ação visual mais importante do card.
+- sessionId;
+- exerciseId;
+- setId;
+- endsAt;
+- estado pausado, quando necessário.
 
-O card deve mostrar:
-
-- data;
-- nome;
-- descrição;
-- status;
-- duração estimada;
-- número de exercícios;
-- volume anterior, quando existir;
-- lista resumida dos primeiros exercícios;
-- indicador de progresso, quando a sessão estiver em andamento.
-
-Status:
-
-- planejado;
-- em andamento;
-- concluído;
-- ignorado;
-- cancelado.
-
-Filtros devem funcionar com dados reais e apresentar suas contagens corretamente.
-
-Aproveite melhor o espaço horizontal em desktop. A tela atual deixa uma área muito grande vazia.
-
-Use uma disposição responsiva:
-
-Desktop:
-- coluna principal com os treinos;
-- coluna lateral com próximo treino, progresso semanal, sequência e resumo.
-
-Mobile:
-- uma única coluna;
-- ações importantes acessíveis;
-- cards sem overflow horizontal;
-- botões com área de toque adequada.
+Não implemente SQLite completo agora.
 
 ==================================================
-7. TELA DE EXECUÇÃO DO TREINO
+7. NAVEGAÇÃO
 ==================================================
 
-Crie uma tela dedicada para executar uma sessão.
+Substitua a navegação manual por uma solução apropriada para React Native/Expo, preferencialmente React Navigation.
 
-Ela deve mostrar:
+Estrutura sugerida:
 
-- nome do treino;
-- tempo total;
-- exercício atual;
-- progresso da sessão;
-- exercício anterior;
-- próximo exercício;
-- séries planejadas;
-- séries já realizadas;
-- cronômetro de descanso;
-- observações;
-- opção de pausar;
-- opção de encerrar;
-- opção de substituir exercício;
-- opção de adicionar série;
-- opção de pular exercício.
+Bottom tabs:
+- Hoje
+- Ficha
+- Histórico
+- Mais
 
-Para cada série, permita registrar:
+Stack:
+- Biblioteca
+- Configurar exercício
+- Executar sessão
+- Resumo da sessão
 
-- concluída ou não;
-- repetições;
-- carga;
-- duração;
-- distância;
-- RPE;
-- observação opcional.
+Regras:
 
-Ao marcar uma série como concluída:
+- a sessão deve abrir em stack;
+- a barra inferior não deve aparecer durante a execução;
+- o botão voltar do Android deve respeitar a stack;
+- uma sessão ativa deve poder ser retomada facilmente;
+- não manter seis itens apertados na barra inferior.
 
-- salvar imediatamente;
-- iniciar descanso automaticamente, caso configurado;
-- permitir desfazer;
-- atualizar o progresso da sessão.
-
-A sessão deve sobreviver a:
-
-- atualização da página;
-- navegação acidental;
-- fechamento e reabertura do aplicativo, quando a persistência disponível permitir.
-
-Não descarte uma sessão em andamento silenciosamente.
-
-Antes de abandonar uma sessão, exiba confirmação.
+Não redesenhar todas as telas nesta etapa.
 
 ==================================================
-8. CRONÔMETRO DE DESCANSO
+8. REDUÇÃO DO CONTROLLER GLOBAL
 ==================================================
 
-Implemente um cronômetro reutilizável com:
+Não remover `useTrainingController` de uma vez.
 
-- iniciar;
+Faça uma migração incremental:
+
+1. extrair `workout-session` para seu próprio controller;
+2. remover dele o estado e as ações de sessão;
+3. manter outras features temporariamente no controller antigo;
+4. documentar o próximo ponto de extração.
+
+Evitar duplicar lógica entre controllers.
+
+==================================================
+9. DOMÍNIO LEGADO
+==================================================
+
+Não excluir `Workout` e `Exercise` nesta etapa.
+
+Porém:
+
+- marcar internamente o fluxo como legado;
+- não adicionar novas funcionalidades nele;
+- não usá-lo como fonte principal da sessão;
+- usar `TrainingPlan`, `TrainingPlanDay` e `WorkoutSession` no novo fluxo;
+- documentar quais telas ainda dependem do domínio antigo.
+
+Não criar novas métricas combinando os dois domínios.
+
+==================================================
+10. BACKEND
+==================================================
+
+No backend:
+
+- garantir apenas uma sessão global ativa;
+- manter snapshots da sessão;
+- adicionar endpoint para remover série manual, caso necessário;
+- validar que séries só podem ser alteradas em sessões ativas ou pausadas;
+- preservar registros ao abandonar;
+- não mover regras para controllers;
+- manter controller fino e regras no service.
+
+Adicionar testes para:
+
+- impedir duas sessões ativas;
+- editar série;
+- adicionar série;
+- remover série manual;
 - pausar;
 - continuar;
-- reiniciar;
-- adicionar 15 segundos;
-- remover 15 segundos;
-- pular;
-- indicação visual quando terminar;
-- alerta sonoro ou vibração quando suportado;
-- funcionamento correto com a aba em segundo plano.
-
-Evite depender exclusivamente de setInterval acumulando segundos. Salve o horário final e calcule o tempo restante a partir do relógio atual.
+- concluir;
+- abandonar;
+- recuperar sessão ativa.
 
 ==================================================
-9. CONCLUSÃO DA SESSÃO
+11. FORA DO ESCOPO
 ==================================================
 
-Ao concluir o treino, exiba um resumo com:
+Não implementar:
 
-- duração total;
-- exercícios concluídos;
-- exercícios pulados;
-- séries realizadas;
-- volume total;
-- recordes pessoais;
-- RPE geral;
-- observações;
-- comparação com a sessão anterior equivalente.
-
-Permita:
-
-- confirmar conclusão;
-- editar registros antes de salvar;
-- voltar ao histórico;
-- repetir o treino em outra data.
-
-Calorias não devem ser tratadas como valor exato inventado.
-
-Caso o projeto já possua estimativa calórica, deixe explícito que é uma estimativa e documente a fórmula. Caso não exista base confiável, não gere um número aleatório apenas para preencher o card.
-
-==================================================
-10. HISTÓRICO E PROGRESSÃO
-==================================================
-
-Crie uma área de histórico com:
-
-- sessões por data;
-- filtro por ficha;
-- filtro por exercício;
-- filtro por status;
-- detalhes completos de uma sessão;
-- comparação com sessão anterior;
-- calendário ou agrupamento mensal.
-
-Métricas mínimas:
-
-- frequência semanal;
-- treinos planejados;
-- treinos concluídos;
-- aderência;
-- duração total;
-- volume total;
-- evolução de carga;
-- recordes pessoais;
-- sequência de dias ou semanas;
-- grupos musculares trabalhados.
-
-Definição inicial de volume para exercícios com carga:
-
-volume = soma de carga × repetições realizadas
-
-Não misture volume de exercícios temporizados ou cardio com volume de musculação. Use métricas próprias para cada tipo.
-
-==================================================
-11. TELA INICIAL
-==================================================
-
-A página inicial deve mostrar dados úteis, não apenas atalhos.
-
-Adicionar:
-
-- próximo treino;
-- botão “Iniciar treino”;
-- progresso da semana;
-- sessões concluídas;
-- dias de descanso;
-- sequência atual;
-- últimos recordes;
-- últimos treinos;
-- resumo de volume;
-- calendário resumido;
-- estado vazio para novos usuários.
-
-Estados vazios devem explicar qual é a próxima ação possível.
-
-Exemplo:
-
-“Você ainda não possui uma ficha ativa.”
-
-Ações:
-
-- criar ficha;
-- usar modelo;
-- importar ficha, caso a estrutura já permita.
-
-==================================================
-12. GERENCIAMENTO DE FICHAS
-==================================================
-
-Na área de fichas, implemente:
-
-- criar ficha;
-- editar ficha;
-- visualizar ficha;
-- duplicar ficha;
-- arquivar ficha;
-- excluir ficha;
-- definir como ativa;
-- configurar período de uso;
-- ordenar dias e exercícios;
-- salvar como modelo.
-
-Apenas uma ficha precisa ser considerada principal por vez, mas fichas antigas não devem ser apagadas ao trocar a ficha ativa.
-
-Uma alteração futura na ficha não deve modificar retroativamente sessões já concluídas.
-
-Ao iniciar uma sessão, salve uma cópia estrutural dos dados necessários para manter o histórico consistente.
-
-==================================================
-13. MODELO DE DADOS E CONSISTÊNCIA
-==================================================
-
-Use IDs reais e relacionamentos consistentes.
-
-Não use o texto do nome do exercício como chave.
-
-Considere os seguintes campos conceituais:
-
-WorkoutPlan:
-- id
-- name
-- description
-- isActive
-- startDate
-- endDate
-- createdAt
-- updatedAt
-- archivedAt
-
-WorkoutPlanDay:
-- id
-- workoutPlanId
-- weekday
-- title
-- description
-- isRestDay
-- sortOrder
-
-RestDayActivity:
-- id
-- workoutPlanDayId
-- name
-- description
-- estimatedDuration
-- category
-- isOptional
-- sortOrder
-
-Exercise:
-- id
-- name
-- slug ou normalizedName
-- description
-- primaryMuscleGroup
-- secondaryMuscleGroups
-- equipment
-- category
-- instructions
-- mediaUrl
-- createdByUserId
-- isCustom
-- isArchived
-
-WorkoutDayExercise:
-- id
-- workoutPlanDayId
-- exerciseId
-- sortOrder
-- sets
-- minReps
-- maxReps
-- plannedLoad
-- plannedDuration
-- plannedDistance
-- restSeconds
-- plannedRpe
-- setType
-- notes
-
-WorkoutSession:
-- id
-- workoutPlanId
-- workoutPlanDayId
-- scheduledDate
-- startedAt
-- completedAt
-- status
-- totalDuration
-- overallRpe
-- notes
-
-WorkoutSessionExercise:
-- id
-- workoutSessionId
-- exerciseId
-- exerciseNameSnapshot
-- sortOrder
-- status
-- notes
-
-WorkoutSetLog:
-- id
-- workoutSessionExerciseId
-- setNumber
-- reps
-- load
-- duration
-- distance
-- rpe
-- isCompleted
-- completedAt
-
-Adapte ao banco e aos padrões existentes.
-
-Crie migrations quando necessário.
-
-Não altere migrations antigas já aplicadas. Crie novas migrations incrementais.
-
-==================================================
-14. PREPARAÇÃO PARA O MODO UMAMUSUME
-==================================================
-
-Ainda não implemente a interface ou a lógica completa do Modo Umamusume.
-
-Entretanto:
-
-- mantenha ficha, treino, sessão e registros independentes da interface;
-- não coloque regras de gamificação dentro dos componentes visuais;
-- exponha eventos de domínio ou serviços que permitam detectar:
-  - sessão iniciada;
-  - sessão concluída;
-  - exercício concluído;
-  - série concluída;
-  - dia de descanso realizado;
-  - meta alcançada;
-  - recorde pessoal;
-  - treino ignorado;
-- permita que uma camada futura consuma esses acontecimentos para conceder status;
-- não acople os modelos normais a personagens;
-- não crie campos como characterId diretamente em WorkoutSession.
-
-O Modo Umamusume será uma camada adicional sobre o sistema normal.
-
-==================================================
-15. REGRAS DE UI E UX
-==================================================
-
-- Preserve a identidade visual escura atual.
-- Preserve a opção de modo claro.
-- Reutilize componentes.
-- Evite modais gigantes para edição complexa.
-- Use páginas ou drawers para fluxos longos.
-- Não esconda ações essenciais em menus pouco visíveis.
-- Garanta feedback de carregamento, sucesso e erro.
-- Use confirmações apenas em ações destrutivas.
-- Adicione estados disabled corretos.
-- Não use apenas cor para representar status.
-- Garanta navegação por teclado.
-- Adicione aria-label em botões apenas com ícone.
-- Evite textos minúsculos e contraste insuficiente.
-- Não permita overflow horizontal em telas pequenas.
-- Não substitua o layout por um template genérico de dashboard.
-
-==================================================
-16. VALIDAÇÕES
-==================================================
-
-Valide, no frontend e na camada de domínio ou backend:
-
-- nome obrigatório;
-- séries maiores que zero;
-- repetições não negativas;
-- carga não negativa;
-- duração não negativa;
-- distância não negativa;
-- descanso não negativo;
-- RPE dentro da faixa definida;
-- datas coerentes;
-- apenas dias válidos da semana;
-- impedir criação acidental de múltiplas sessões ativas para o mesmo treino;
-- impedir conclusão sem salvar corretamente os registros.
-
-Não dependa apenas de validação HTML.
-
-==================================================
-17. TRATAMENTO DE ERROS
-==================================================
-
-- Não engula exceções.
-- Não deixe console.log como tratamento final.
-- Mostre mensagens compreensíveis.
-- Preserve dados preenchidos quando uma operação falhar.
-- Implemente retry onde fizer sentido.
-- Não marque como salvo antes da confirmação real da persistência.
-- Evite optimistic update em ações destrutivas.
-- Registre erros conforme a infraestrutura existente.
-
-==================================================
-18. TESTES
-==================================================
-
-Adicione testes compatíveis com a stack existente.
-
-Cobrir no mínimo:
-
-- criação de ficha;
-- semana com sete dias;
-- marcação de dia como descanso;
-- atividade opcional em dia de descanso;
-- adição de exercício;
-- criação de sessão;
-- registro de série;
-- cálculo de volume;
-- conclusão de sessão;
-- persistência de sessão em andamento;
-- filtros de treino;
-- histórico;
-- responsividade básica dos componentes principais, quando a stack permitir.
-
-Não remova testes existentes para fazer o build passar.
-
-==================================================
-19. DADOS DEMONSTRATIVOS
-==================================================
-
-Caso o projeto use seed ou dados de demonstração, adicione uma ficha coerente:
-
-Nome:
-“Base de força e condicionamento”
-
-Segunda:
-- membros superiores
-
-Terça:
-- caminhada leve ou cardio
-
-Quarta:
-- membros inferiores
-
-Quinta:
-- descanso
-- caminhada opcional
-- mobilidade opcional
-
-Sexta:
-- corpo inteiro
-
-Sábado:
-- cardio ou atividade livre
-
-Domingo:
-- descanso completo
-- alongamento opcional
-
-Não dependa desses dados para o funcionamento real da aplicação.
-
-==================================================
-20. FORA DO ESCOPO DESTA FASE
-==================================================
-
-Não implementar agora:
-
-- personagens;
-- diálogos;
-- sistema de energia fictícia;
-- status de força, resistência, velocidade ou inteligência;
+- Modo Umamusume;
 - eventos narrativos;
-- corrida animada;
-- gacha;
-- cartas de suporte;
-- ranking online;
-- feed social;
+- atributos;
+- gamificação;
+- SQLite completo;
+- sincronização offline;
+- autenticação;
+- gráficos;
 - dieta;
-- diagnóstico médico;
-- recomendações médicas automáticas;
-- integração com smartwatch, salvo se ela já existir no projeto.
+- redesign da web;
+- grande refatoração do backend;
+- remoção completa do domínio legado.
 
 ==================================================
-21. ORDEM DE IMPLEMENTAÇÃO
+12. CRITÉRIOS DE ACEITAÇÃO
 ==================================================
 
-Implemente nesta ordem:
+A etapa estará concluída quando:
 
-1. Auditoria e correção dos modelos atuais.
-2. Fichas semanais e dias de descanso.
-3. Biblioteca de exercícios.
-4. Configuração de exercícios por dia.
-5. Criação e persistência de sessões.
-6. Tela de execução.
-7. Registro de séries.
-8. Cronômetro.
-9. Conclusão e resumo.
-10. Histórico.
-11. Métricas.
-12. Dashboard.
-13. Responsividade.
-14. Testes e limpeza.
-
-Não comece pelas telas de métricas antes de existir histórico real.
-
-==================================================
-22. CRITÉRIOS DE ACEITAÇÃO
-==================================================
-
-A implementação será considerada concluída quando:
-
-- for possível criar uma ficha de segunda a domingo;
-- cada dia puder ser treino ou descanso;
-- dias de descanso aceitarem atividades opcionais;
-- exercícios puderem ser buscados e adicionados;
-- um treino puder ser iniciado;
-- séries puderem ser registradas;
-- o descanso puder ser cronometrado;
-- a sessão sobreviver a uma atualização da página;
-- o treino puder ser concluído;
-- o histórico mostrar os dados registrados;
-- o dashboard usar dados reais;
-- os filtros funcionarem;
-- desktop e mobile não apresentarem overflow;
-- lint, typecheck, testes e build passarem;
-- nenhuma funcionalidade atual válida seja quebrada.
+- a feature de sessão estiver organizada em MVC por feature;
+- carga e repetições puderem ser editadas;
+- RPE, duração e distância puderem ser registrados;
+- séries puderem ser adicionadas;
+- séries manuais puderem ser removidas;
+- cada alteração salvar sem recarregar todos os recursos;
+- pausa e retomada funcionarem;
+- o cronômetro sobreviver à troca de tela e reinício do app;
+- a sessão ativa for recuperada;
+- apenas uma sessão puder ficar ativa;
+- a barra inferior desaparecer durante a sessão;
+- o botão voltar do Android funcionar corretamente;
+- erros não apagarem valores digitados;
+- testes backend passarem;
+- typecheck mobile passar;
+- bundle Android/Expo passar.
 
 ==================================================
-23. ENTREGA FINAL
+13. ENTREGA
 ==================================================
 
-Ao terminar:
+Ao finalizar, informar:
 
-1. Liste os principais problemas encontrados.
-2. Liste os arquivos criados e alterados.
-3. Explique as alterações no banco.
-4. Informe migrations criadas.
-5. Informe rotas ou endpoints adicionados.
-6. Informe componentes reutilizáveis criados.
-7. Mostre como executar:
-   - aplicação;
-   - migrations;
-   - seed;
-   - testes;
-   - lint;
-   - typecheck;
-   - build.
-8. Liste limitações restantes.
-9. Não declare algo como concluído sem executar as validações disponíveis.
-10. Não deixe TODOs genéricos substituindo funcionalidades essenciais.
+1. problemas encontrados;
+2. estrutura anterior e nova da feature de sessão;
+3. arquivos criados, movidos e alterados;
+4. endpoints alterados ou adicionados;
+5. testes adicionados;
+6. comandos executados;
+7. resultados de testes, typecheck e build;
+8. limitações restantes;
+9. próximos pontos recomendados, sem implementá-los.
+
+Não declarar a etapa concluída se os comandos de validação falharem.

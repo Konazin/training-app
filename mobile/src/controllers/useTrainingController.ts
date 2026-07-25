@@ -4,12 +4,10 @@ import type {
   ExerciseInput,
   ExerciseDefinition,
   ExerciseDefinitionInput,
-  SessionExerciseStatus,
   TrainingPlan,
   TrainingPlanInput,
   Workout,
   WorkoutInput,
-  WorkoutSession,
 } from '../models/training'
 import { trainingApi } from '../services/trainingApi'
 
@@ -17,8 +15,6 @@ export function useTrainingController() {
   const [workouts, setWorkouts] = useState<Workout[]>([])
   const [trainingPlans, setTrainingPlans] = useState<TrainingPlan[]>([])
   const [exerciseLibrary, setExerciseLibrary] = useState<ExerciseDefinition[]>([])
-  const [sessions, setSessions] = useState<WorkoutSession[]>([])
-  const [activeSession, setActiveSession] = useState<WorkoutSession | null>(null)
   const [dashboard, setDashboard] = useState<Dashboard | null>(null)
   const [selectedWorkoutId, setSelectedWorkoutId] = useState<number | null>(null)
   const [selectedTrainingPlanId, setSelectedTrainingPlanId] = useState<number | null>(null)
@@ -38,20 +34,16 @@ export function useTrainingController() {
     setLoading(true)
     setMessage('')
     try {
-      const [workoutData, dashboardData, planData, libraryData, sessionData, activeData] = await Promise.all([
+      const [workoutData, dashboardData, planData, libraryData] = await Promise.all([
         trainingApi.getWorkouts(),
         trainingApi.getDashboard(),
         trainingApi.getTrainingPlans(),
         trainingApi.getExerciseLibrary(),
-        trainingApi.getSessions(),
-        trainingApi.getActiveSession(),
       ])
       setWorkouts(workoutData)
       setDashboard(dashboardData)
       setTrainingPlans(planData)
       setExerciseLibrary(libraryData)
-      setSessions(sessionData)
-      setActiveSession(activeData ?? null)
       setSelectedWorkoutId((current) => current ?? workoutData[0]?.id ?? null)
       setSelectedTrainingPlanId((current) => current ?? planData[0]?.id ?? null)
     } catch (cause) {
@@ -66,20 +58,16 @@ export function useTrainingController() {
     setMessage('')
     try {
       await operation()
-      const [workoutData, dashboardData, planData, libraryData, sessionData, activeData] = await Promise.all([
+      const [workoutData, dashboardData, planData, libraryData] = await Promise.all([
         trainingApi.getWorkouts(),
         trainingApi.getDashboard(),
         trainingApi.getTrainingPlans(),
         trainingApi.getExerciseLibrary(),
-        trainingApi.getSessions(),
-        trainingApi.getActiveSession(),
       ])
       setWorkouts(workoutData)
       setDashboard(dashboardData)
       setTrainingPlans(planData)
       setExerciseLibrary(libraryData)
-      setSessions(sessionData)
-      setActiveSession(activeData ?? null)
       setSelectedWorkoutId((current) =>
         workoutData.some((item) => item.id === current) ? current : workoutData[0]?.id ?? null,
       )
@@ -181,41 +169,10 @@ export function useTrainingController() {
   const createExerciseDefinition = useCallback((payload: ExerciseDefinitionInput) =>
     mutate(() => trainingApi.createExerciseDefinition(payload).then(() => undefined)), [mutate])
 
-  const startSession = useCallback((planId: number, dayId: number) =>
-    mutate(async () => { setActiveSession(await trainingApi.startSession(planId, dayId)) }), [mutate])
-
-  const updateSessionSet = useCallback(async (exerciseId: number, setId: number, payload: {
-    reps: number; load: number; durationSeconds: number; distance: number; rpe: number | null; completed: boolean; notes: string
-  }) => {
-    if (!activeSession) return false
-    try {
-      setActiveSession(await trainingApi.updateSet(activeSession.id, exerciseId, setId, payload))
-      return true
-    } catch (cause) { setMessage(messageFrom(cause)); return false }
-  }, [activeSession])
-
-  const setSessionExerciseStatus = useCallback(async (exerciseId: number, status: SessionExerciseStatus) => {
-    if (!activeSession) return false
-    setActiveSession(await trainingApi.setSessionExerciseStatus(activeSession.id, exerciseId, status))
-    return true
-  }, [activeSession])
-
-  const completeSession = useCallback((rpe: number | null, notes: string) => {
-    if (!activeSession) return Promise.resolve(false)
-    return mutate(() => trainingApi.completeSession(activeSession.id, rpe, notes).then(() => { setActiveSession(null) }))
-  }, [activeSession, mutate])
-
-  const abandonSession = useCallback(() => {
-    if (!activeSession) return Promise.resolve(false)
-    return mutate(() => trainingApi.abandonSession(activeSession.id).then(() => { setActiveSession(null) }))
-  }, [activeSession, mutate])
-
   return {
     workouts,
     trainingPlans,
     exerciseLibrary,
-    sessions,
-    activeSession,
     dashboard,
     selectedWorkout,
     selectedWorkoutId,
@@ -239,11 +196,6 @@ export function useTrainingController() {
     addDayExercise,
     addRestActivity,
     createExerciseDefinition,
-    startSession,
-    updateSessionSet,
-    setSessionExerciseStatus,
-    completeSession,
-    abandonSession,
   }
 }
 

@@ -8,6 +8,7 @@ import {
 } from 'react-native'
 import { ScreenHeader } from '../components/ScreenHeader'
 import { StatusPill } from '../components/StatusPill'
+import type { WorkoutSession } from '../features/workout-session/model/workoutSession'
 import type { Dashboard } from '../models/training'
 import { colors, shared, type ThemeColors, useTheme } from '../theme'
 
@@ -16,9 +17,18 @@ interface Props {
   loading: boolean
   onRefresh: () => void
   onNavigate: (screen: 'workouts' | 'exercise') => void
+  activeSession: WorkoutSession | null
+  onResumeSession: () => void
 }
 
-export function HomeScreen({ dashboard, loading, onRefresh, onNavigate }: Props) {
+export function HomeScreen({
+  dashboard,
+  loading,
+  onRefresh,
+  onNavigate,
+  activeSession,
+  onResumeSession,
+}: Props) {
   styles = createStyles(useTheme().colors)
   const highlighted =
     dashboard?.recentWorkouts.find((item) => item.status !== 'COMPLETED')
@@ -39,6 +49,18 @@ export function HomeScreen({ dashboard, loading, onRefresh, onNavigate }: Props)
         title={`${getGreeting()},\natleta.`}
         description="Tudo que importa para manter sua rotina em movimento."
       />
+
+      {!!activeSession && (
+        <TouchableOpacity style={styles.resumeCard} onPress={onResumeSession}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.cardEyebrow}>
+              {activeSession.status === 'PAUSED' ? 'SESSÃO PAUSADA' : 'SESSÃO ATIVA'}
+            </Text>
+            <Text style={styles.resumeTitle}>{activeSession.workoutName}</Text>
+          </View>
+          <Text style={styles.resumeAction}>Retomar →</Text>
+        </TouchableOpacity>
+      )}
 
       <View style={styles.hero}>
         <View style={styles.orbitLarge} />
@@ -199,6 +221,27 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     overflow: 'hidden',
     padding: 20,
     position: 'relative',
+  },
+  resumeCard: {
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderColor: colors.gray200,
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: 'row',
+    marginBottom: 12,
+    padding: 15,
+  },
+  resumeTitle: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: '700',
+    marginTop: 5,
+  },
+  resumeAction: {
+    color: colors.ink,
+    fontSize: 10,
+    fontWeight: '800',
   },
   orbitLarge: {
     borderColor: 'rgba(255,255,255,0.08)',

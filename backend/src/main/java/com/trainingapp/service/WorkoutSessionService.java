@@ -8,6 +8,7 @@ import com.trainingapp.event.TrainingDomainEvent;
 import com.trainingapp.exception.ResourceNotFoundException;
 import com.trainingapp.model.SessionExerciseStatus;
 import com.trainingapp.model.SessionStatus;
+import com.trainingapp.model.ExerciseCategory;
 import com.trainingapp.model.TrainingDayExercise;
 import com.trainingapp.model.TrainingPlan;
 import com.trainingapp.model.TrainingPlanDay;
@@ -54,8 +55,9 @@ public class WorkoutSessionService {
         if (!day.getTrainingPlan().getId().equals(plan.getId())) throw new IllegalArgumentException("Dia não pertence à ficha informada");
         if (day.isRestDay()) throw new IllegalArgumentException("Um dia de descanso não inicia uma sessão convencional");
         if (day.getExercises().isEmpty()) throw new IllegalArgumentException("Adicione exercícios antes de iniciar o treino");
-        if (repository.existsByPlanDayIdAndStatusIn(day.getId(), ACTIVE)) {
-            throw new IllegalArgumentException("Já existe uma sessão ativa para este treino");
+        // ponytail: single app instance; use a database lock before horizontally scaling the API.
+        if (repository.existsByStatusIn(ACTIVE)) {
+            throw new IllegalArgumentException("Já existe uma sessão ativa");
         }
         WorkoutSession session = new WorkoutSession();
         session.setTrainingPlan(plan);
@@ -69,6 +71,8 @@ public class WorkoutSessionService {
             exercise.setExerciseDefinitionId(planned.getExercise().getId());
             exercise.setExerciseNameSnapshot(planned.getExercise().getName());
             exercise.setMuscleGroupSnapshot(planned.getExercise().getPrimaryMuscleGroup());
+            exercise.setCategorySnapshot(planned.getExercise().getCategory());
+            exercise.setTimedSnapshot(planned.getExercise().isTimed());
             exercise.setSortOrder(planned.getSortOrder());
             exercise.setPlannedSets(planned.getSets());
             exercise.setPlannedMinReps(planned.getMinReps());
@@ -81,6 +85,9 @@ public class WorkoutSessionService {
                 set.setSetNumber(setNumber);
                 set.setReps(planned.getMinReps());
                 set.setLoad(planned.getPlannedLoad() == null ? BigDecimal.ZERO : planned.getPlannedLoad());
+                set.setDurationSeconds(planned.getPlannedDurationSeconds() == null ? 0 : planned.getPlannedDurationSeconds());
+                set.setDistance(planned.getPlannedDistance() == null ? BigDecimal.ZERO : planned.getPlannedDistance());
+                set.setRpe(planned.getPlannedRpe());
                 exercise.getSets().add(set);
             }
             session.getExercises().add(exercise);
@@ -138,7 +145,29 @@ public class WorkoutSessionService {
         WorkoutSetLog set = new WorkoutSetLog();
         set.setSessionExercise(exercise);
         set.setSetNumber(exercise.getSets().size() + 1);
+        set.setManuallyAdded(true);
+        if (!exercise.getSets().isEmpty()) {
+            WorkoutSetLog previous = exercise.getSets().get(exercise.getSets().size() - 1);
+            set.setReps(previous.getReps());
+            set.setLoad(previous.getLoad());
+            set.setDurationSeconds(previous.getDurationSeconds());
+            set.setDistance(previous.getDistance());
+            set.setRpe(previous.getRpe());
+        }
         exercise.getSets().add(set);
+        return toResponse(repository.save(session));
+    }
+
+    public WorkoutSessionResponse removeSet(Long sessionId, Long exerciseId, Long setId) {
+        WorkoutSession session = requireEditable(sessionId);
+        WorkoutSessionExercise exercise = findExercise(session, exerciseId);
+        WorkoutSetLog set = exercise.getSets().stream().filter(item -> item.getId().equals(setId)).findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Série não encontrada"));
+        if (!set.isManuallyAdded()) throw new IllegalArgumentException("Apenas séries adicionadas manualmente podem ser removidas");
+        exercise.getSets().remove(set);
+        for (int index = 0; index < exercise.getSets().size(); index++) {
+            exercise.getSets().get(index).setSetNumber(index + 1);
+        }
         return toResponse(repository.save(session));
     }
 
@@ -236,12 +265,15 @@ public class WorkoutSessionService {
                 session.getStatus(), duration, session.getOverallRpe(), session.getNotes(), completedSets, plannedSets,
                 volume, session.getExercises().stream().map(exercise -> new WorkoutSessionResponse.SessionExerciseResponse(
                         exercise.getId(), exercise.getExerciseDefinitionId(), exercise.getExerciseNameSnapshot(),
-                        exercise.getMuscleGroupSnapshot(), exercise.getSortOrder(), exercise.getPlannedSets(),
+                        exercise.getMuscleGroupSnapshot(),
+                        exercise.getCategorySnapshot() == null ? ExerciseCategory.STRENGTH : exercise.getCategorySnapshot(),
+                        exercise.isTimedSnapshot(), exercise.getSortOrder(), exercise.getPlannedSets(),
                         exercise.getPlannedMinReps(), exercise.getPlannedMaxReps(), exercise.getRestSeconds(),
                         exercise.getStatus(), exercise.getNotes(), exercise.getSets().stream().map(set ->
                                 new WorkoutSessionResponse.SetLogResponse(
                                         set.getId(), set.getSetNumber(), set.getReps(), set.getLoad(), set.getDurationSeconds(),
-                                        set.getDistance(), set.getRpe(), set.isCompleted(), set.getCompletedAt(), set.getNotes(),
+                                        set.getDistance(), set.getRpe(), set.isCompleted(), set.getCompletedAt(),
+                                        set.isManuallyAdded(), set.getNotes(),
                                         set.getLoad().multiply(BigDecimal.valueOf(set.getReps())))).toList())).toList());
     }
 }
