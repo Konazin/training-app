@@ -130,6 +130,7 @@ O celular e o computador precisam estar na mesma rede. Se necessário, inclua a 
 | `POST` | `/api/umamusume/careers/{id}/start-training` | Inicia a sessão real do dia |
 | `POST` | `/api/umamusume/careers/{id}/rest-activities/{activityId}/accept` | Aceita uma atividade |
 | `POST` | `/api/umamusume/careers/{id}/rest-activities/{activityId}/complete` | Conclui uma atividade |
+| `POST` | `/api/umamusume/careers/{id}/rest-activity/cancel` | Cancela uma atividade pendente |
 | `POST` | `/api/umamusume/careers/{id}/full-rest` | Realiza descanso completo |
 | `POST` | `/api/umamusume/careers/{id}/abandon` | Encerra a carreira |
 
@@ -191,6 +192,12 @@ depender de uma quantidade fixa documentada.
 - Não são inventadas calorias para sessões do novo domínio.
 - A carreira do Modo Umamusume persiste no backend, aplica progressão pelos
   eventos de conclusão/abandono da sessão e não depende de armazenamento local.
+- Atividades aceitas usam snapshots de nome, categoria e duração, portanto
+  continuam concluíveis ou canceláveis mesmo após mudanças na ficha.
+- O histórico registra somente os deltas efetivamente aplicados após os limites,
+  e carreiras concluídas ou abandonadas continuam disponíveis para consulta.
+- A retomada de sessão compara o ID da sessão ativa com o turno pendente para
+  preservar corretamente a origem normal ou Umamusume.
 - Nesta primeira versão, a carreira consulta a ficha atual diretamente. Alterar
   a ficha durante uma carreira muda os próximos dias; o snapshot completo fica
   para uma etapa futura.

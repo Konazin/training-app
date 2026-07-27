@@ -1,671 +1,461 @@
 Continue o desenvolvimento do repositório `training-app` a partir do commit:
 
-e1d09254030de51bdc3cc3d21d5b3ecc91d83426
+422474d312145c735aa4a512af70a713c5440597
 
-Implemente a primeira versão jogável do **Modo Umamusume**.
+Esta etapa deve endurecer o núcleo já implementado do Modo Umamusume.
 
-O APK React Native/Expo é o produto principal. A web continua sendo apenas uma interface de debugging.
-
-Esta etapa deve criar o loop central do modo, sem implementar corridas, personagens oficiais, gacha, skills ou eventos aleatórios complexos.
+Não implemente corridas, eventos narrativos, skills, personagens, gacha ou novas mecânicas de progressão.
 
 ==================================================
-1. OBJETIVO DA ETAPA
+1. OBJETIVO
 ==================================================
 
-O usuário deve conseguir:
+Corrigir os seguintes problemas:
 
-1. abrir o Modo Umamusume;
-2. criar uma carreira usando uma ficha semanal existente;
-3. começar na segunda-feira da primeira semana;
-4. executar o treino real configurado para o dia;
-5. receber evolução de atributos ao concluir a sessão;
-6. realizar ou recusar atividades em dias de descanso;
-7. avançar de segunda a domingo;
-8. avançar semanas;
-9. concluir uma carreira após 8, 12 ou 16 semanas;
-10. fechar e reabrir o app sem perder o progresso.
+1. atividade de descanso aceita pode deixar a carreira presa se a ficha for alterada;
+2. efeitos registrados no histórico podem diferir dos efeitos realmente aplicados por causa do clamp;
+3. uma sessão Umamusume retomada pela Home perde sua origem;
+4. “Continuar treino” aceita qualquer sessão ativa, mesmo de outro fluxo;
+5. histórico pode mostrar dados vazios ou de outra carreira durante o carregamento;
+6. não existe navegação adequada entre carreiras anteriores;
+7. não existe saída segura para atividade de descanso pendente.
 
-O modo deve usar os treinos reais do aplicativo. Não criar sessões falsas ou simuladas.
+Esta etapa deve preservar o loop atual e torná-lo recuperável.
 
 ==================================================
-2. NOMENCLATURA E DIREITOS AUTORAIS
+2. ATIVIDADE ACEITA NÃO DEVE DEPENDER DA FICHA VIVA
 ==================================================
 
-O nome da funcionalidade deve permanecer:
+Atualmente, concluir uma atividade aceita consulta novamente o estado atual do `TrainingPlanDay`.
 
-Modo Umamusume
+Remover essa dependência.
 
-Porém:
+Ao concluir uma atividade de descanso pendente:
 
-- não usar personagens oficiais;
-- não usar nomes de personagens oficiais;
-- não copiar textos, artes, músicas, ícones ou assets oficiais;
-- usar avatar neutro ou placeholder original;
-- usar apenas o design e a paleta já existentes no projeto.
+- localizar o turno atual da carreira;
+- validar que ele é `REST_ACTIVITY`;
+- validar que está `IN_PROGRESS`;
+- validar o `restActivityId` associado;
+- usar apenas os snapshots persistidos no turno:
+  - nome;
+  - categoria;
+  - duração;
+- calcular os efeitos pela categoria armazenada;
+- concluir o turno;
+- avançar o dia.
 
-O projeto é open source, portanto não incorporar material protegido de terceiros.
+Não chamar `requireRestDay(career)` durante a conclusão.
 
-==================================================
-3. ARQUITETURA BACKEND POR FEATURE
-==================================================
+A atividade deve continuar concluível mesmo que, após ser aceita:
 
-Criar uma feature isolada:
+- o dia tenha sido transformado em treino;
+- a atividade tenha sido editada;
+- a atividade tenha sido removida;
+- a ficha tenha sido arquivada;
+- o nome ou categoria original tenham sido alterados.
 
-backend/src/main/java/com/trainingapp/umamusume/
-├── controller/
-├── dto/
-├── model/
-├── repository/
-├── service/
-├── rules/
-└── listener/
-
-Não colocar regras do modo em:
-
-- WorkoutSessionController;
-- WorkoutSessionService;
-- TrainingPlanService;
-- controllers mobile;
-- componentes visuais.
-
-A integração com sessões deve ocorrer por serviço e pelos eventos de domínio já existentes.
+O turno aceito representa um compromisso já iniciado e deve ser independente da configuração futura.
 
 ==================================================
-4. MODELO DA CARREIRA
+3. CANCELAMENTO DE ATIVIDADE PENDENTE
 ==================================================
 
-Criar a entidade `UmaCareer`.
+Adicionar endpoint:
 
-Campos mínimos:
+POST /api/umamusume/careers/{careerId}/rest-activity/cancel
 
-- id;
-- name;
-- trainingPlan;
-- status;
-- totalWeeks;
-- currentWeek;
-- currentWeekday;
-- strength;
-- endurance;
-- agility;
-- technique;
-- discipline;
-- energy;
-- fatigue;
-- mood;
-- confidence;
-- createdAt;
-- updatedAt;
-- completedAt;
-- version para optimistic locking.
+Regras:
 
-Enums:
+- somente cancelar um turno `REST_ACTIVITY` com status `IN_PROGRESS`;
+- não aplicar ganhos ou penalidades;
+- remover o turno pendente para permitir escolher outra ação no mesmo dia;
+- não avançar o dia;
+- não permitir usar esse endpoint para turno de treino;
+- não permitir cancelar turno já concluído ou abandonado.
 
-CareerStatus:
-- ACTIVE
-- COMPLETED
-- ABANDONED
+A remoção é aceitável nesta etapa porque o turno ainda não produziu resultado.
 
-Atributos iniciais:
+Adicionar operação correspondente no repository e controller mobile:
 
-- strength: 10
-- endurance: 10
-- agility: 10
-- technique: 10
-- discipline: 10
-- energy: 100
-- fatigue: 0
-- mood: 60
-- confidence: 50
-- currentWeek: 1
-- currentWeekday: MONDAY
+cancelRestActivity()
 
-Limites:
+Na interface da atividade aceita, mostrar:
+
+- “Concluir atividade”;
+- “Cancelar atividade”.
+
+Antes de cancelar, exibir confirmação clara.
+
+==================================================
+4. ABANDONO DA CARREIRA COM AÇÃO PENDENTE
+==================================================
+
+Alterar `abandonCareer`.
+
+Se houver atividade de descanso pendente:
+
+- remover ou cancelar a atividade pendente;
+- encerrar a carreira como `ABANDONED`;
+- preencher `completedAt`.
+
+Se houver treino pendente com uma sessão ativa:
+
+- continuar exigindo que a sessão seja abandonada pela tela de sessão;
+- retornar mensagem clara indicando que o treino precisa ser encerrado primeiro.
+
+Não deixar uma carreira impossível de abandonar por causa de uma atividade aceita.
+
+==================================================
+5. EFEITOS REALMENTE APLICADOS
+==================================================
+
+Atualmente o turno persiste os efeitos solicitados pela regra, mesmo quando o clamp reduz o efeito real.
+
+Exemplo:
+
+- energia antes: 99;
+- regra: +18;
+- energia final: 100;
+- efeito efetivamente aplicado: +1.
+
+Refatorar a aplicação dos efeitos.
+
+Criar método puro ou claramente isolado, por exemplo:
+
+UmaEffects applyAndReturnEffectiveEffects(
+    UmaCareer career,
+    UmaEffects requested
+)
+
+O método deve:
+
+1. guardar todos os valores anteriores;
+2. aplicar os efeitos solicitados;
+3. aplicar limites;
+4. calcular a diferença real entre valor anterior e final;
+5. retornar `UmaEffects` com os deltas realmente aplicados.
+
+`completeTurn` deve persistir e apresentar somente os efeitos efetivos:
+
+UmaEffects applied = applyAndReturnEffectiveEffects(career, requested);
+turn.setEffects(applied);
+turn.setResultText(resultText(status, applied));
+
+Os limites permanecem:
 
 - atributos principais: 0–999;
-- energy: 0–100;
-- fatigue: 0–100;
-- mood: 0–100;
-- confidence: 0–100.
+- energia, fadiga, humor e confiança: 0–100.
 
-Permitir somente uma carreira ACTIVE nesta etapa.
-
-`totalWeeks` deve aceitar apenas:
-
-- 8;
-- 12;
-- 16.
+Adicionar testes para limite máximo e mínimo de todos os grupos.
 
 ==================================================
-5. REGISTRO DOS TURNOS
+6. RESULTADO DO TURNO
 ==================================================
 
-Criar `UmaCareerTurn`.
+Melhorar `resultText`.
 
-Cada turno representa um dia da carreira.
+Não incluir atributos com delta zero.
 
-Campos mínimos:
+Exemplo desejado:
 
-- id;
-- career;
-- weekNumber;
-- weekday;
-- actionType;
+Treino concluído: Força +2 · Disciplina +2 · Energia -10 · Fadiga +14
+
+Para abandono:
+
+Sessão abandonada: Disciplina -2 · Energia -5 · Fadiga +2 · Humor -4 · Confiança -3
+
+Para descanso:
+
+Descanso concluído: Energia +1 · Fadiga -4
+
+Usar os efeitos efetivamente aplicados, não os solicitados.
+
+Manter o texto persistido como snapshot histórico.
+
+==================================================
+7. DETECÇÃO DA ORIGEM DA SESSÃO
+==================================================
+
+Criar uma função pura no mobile para determinar se uma sessão pertence à carreira atual.
+
+Exemplo:
+
+isUmaCareerSession(
+    career: UmaCareer | null,
+    sessionId: number | null
+): boolean
+
+Retornar true somente quando:
+
+- carreira estiver `ACTIVE`;
+- existir `pendingTurn`;
+- o turno for `TRAINING`;
+- o turno estiver `IN_PROGRESS`;
+- `pendingTurn.workoutSessionId` for igual ao ID da sessão ativa.
+
+Adicionar testes Vitest.
+
+==================================================
+8. RETOMADA PELA HOME
+==================================================
+
+A Home atualmente navega para Session sem informar origem.
+
+Corrigir:
+
+- se a sessão ativa corresponder ao turno pendente da carreira, navegar com:
+  `{ origin: 'UMAMUSUME' }`;
+- caso contrário, navegar com:
+  `{ origin: 'NORMAL' }`.
+
+Ao concluir ou abandonar uma sessão Umamusume retomada pela Home:
+
+- atualizar a carreira;
+- voltar para `UmaCareer`.
+
+Sessões normais devem continuar indo para o histórico normal.
+
+Não usar apenas a existência de uma carreira ativa como critério. Comparar o `workoutSessionId`.
+
+==================================================
+9. CONTINUAR TREINO COM ID CORRETO
+==================================================
+
+Na tela da carreira, substituir:
+
+canContinueTraining = Boolean(activeSession)
+
+por uma validação de identidade.
+
+“Continuar treino” deve ficar habilitado somente quando:
+
+- o turno pendente for de treino;
+- existir sessão ativa;
+- o ID da sessão ativa for igual ao `workoutSessionId` do turno.
+
+Se existir turno pendente de treino, mas:
+
+- não houver sessão ativa; ou
+- houver uma sessão ativa diferente;
+
+mostrar estado de inconsistência:
+
+“Não foi possível localizar a sessão desta carreira.”
+
+Oferecer botão:
+
+“Atualizar”
+
+Esse botão deve executar:
+
+- refresh da sessão;
+- refresh da carreira.
+
+Não iniciar uma nova sessão automaticamente.
+
+==================================================
+10. HISTÓRICO SEM CONDIÇÃO DE CORRIDA
+==================================================
+
+Refatorar o estado de histórico no `useUmaCareerController`.
+
+Adicionar:
+
+- turnsCareerId;
+- turnsLoading;
+- turnsError.
+
+Criar método:
+
+loadTurns(careerId)
+
+Regras:
+
+- ao iniciar, limpar ou ocultar os turnos da carreira anterior;
+- marcar `turnsLoading`;
+- armazenar o ID da carreira carregada;
+- tratar erro separado da mensagem global;
+- impedir resultado antigo de sobrescrever uma requisição mais nova;
+- não depender de `void refreshTurns()` antes de navegar.
+
+`UmaCareerHistoryScreen` deve receber `careerId` pela rota e carregar o histórico ao entrar.
+
+Mostrar:
+
+- loading;
+- erro com botão “Tentar novamente”;
+- estado vazio;
+- lista correta.
+
+Não mostrar temporariamente o histórico de outra carreira.
+
+==================================================
+11. LISTA DE CARREIRAS
+==================================================
+
+Adicionar rota:
+
+UmaCareerList
+
+Criar tela:
+
+UmaCareerListScreen
+
+A tela deve listar:
+
+- carreira ativa;
+- carreiras concluídas;
+- carreiras abandonadas.
+
+Cada item deve mostrar:
+
+- nome;
 - status;
-- trainingPlanDay;
-- workoutSessionId opcional;
-- restActivityId opcional;
-- actionTitleSnapshot;
-- resultText;
-- efeitos aplicados;
-- createdAt;
-- completedAt.
+- ficha utilizada;
+- semana alcançada;
+- total de semanas;
+- data de criação;
+- atributos finais principais.
 
-Enums:
+Permitir abrir qualquer carreira em modo de consulta.
 
-TurnActionType:
-- TRAINING
-- REST_ACTIVITY
-- FULL_REST
+No controller mobile, adicionar:
 
-TurnStatus:
-- IN_PROGRESS
-- COMPLETED
-- ABANDONED
+- selectedCareerId;
+- selectCareer(id);
+- getCareer(id), se necessário.
 
-Criar constraint única para:
+Ao atualizar a aplicação:
 
-(career_id, week_number, weekday)
+1. selecionar carreira ativa;
+2. se não houver, manter a carreira anteriormente selecionada caso ainda exista;
+3. caso contrário, selecionar a mais recente;
+4. se não houver carreiras, usar null.
 
-Não permitir executar duas ações para o mesmo turno.
+A tela `UmaCareerScreen` deve funcionar tanto para carreira ativa quanto histórica.
 
-Persistir os efeitos aplicados ao turno para que o histórico explique por que cada atributo mudou.
+Para carreira concluída ou abandonada:
 
-Os efeitos podem ser armazenados com um `@Embeddable` contendo os deltas de cada atributo.
+- mostrar atributos finais;
+- mostrar histórico;
+- bloquear ações;
+- permitir criar nova carreira.
 
-==================================================
-6. CALENDÁRIO DA CARREIRA
-==================================================
-
-A carreira começa sempre em:
-
-Semana 1 · Segunda-feira
-
-O dia atual deve utilizar o dia correspondente da ficha associada:
-
-- MONDAY usa o TrainingPlanDay de segunda;
-- TUESDAY usa o de terça;
-- e assim por diante.
-
-Ao concluir uma ação:
-
-- segunda avança para terça;
-- terça avança para quarta;
-- domingo avança para segunda e incrementa a semana.
-
-Ao concluir o domingo da última semana:
-
-- status passa para COMPLETED;
-- completedAt é preenchido;
-- nenhuma nova ação pode ser iniciada.
-
-Nesta etapa, a carreira pode usar a ficha atual diretamente.
-
-Não implementar snapshot completo da ficha ainda, mas documentar essa limitação.
+Adicionar acesso “Ver todas as carreiras” na tela principal.
 
 ==================================================
-7. DIAS DE TREINO
+12. CONTROLLER MOBILE
 ==================================================
 
-Quando o dia atual não for descanso:
+Não transformar o controller em outro controller global.
 
-- exibir o treino correspondente;
-- permitir iniciar a sessão real;
-- usar os exercícios configurados no TrainingPlanDay;
-- criar um UmaCareerTurn com tipo TRAINING e status IN_PROGRESS;
-- associar o ID da WorkoutSession criada ao turno;
-- abrir a tela normal de execução de sessão.
+Manter responsabilidades apenas da feature Umamusume.
 
-Criar endpoint semelhante a:
+Separar busy keys:
 
-POST /api/umamusume/careers/{careerId}/start-training
+- career:create;
+- career:abandon;
+- training:start;
+- rest:accept:{activityId};
+- rest:complete:{activityId};
+- rest:cancel;
+- rest:full;
+- turns:load:{careerId}.
 
-O backend deve:
+Não bloquear todas as operações por uma única string global quando isso não for necessário.
 
-1. validar que a carreira está ativa;
-2. validar que o dia atual é de treino;
-3. validar que ainda não há turno para o dia;
-4. iniciar a sessão usando WorkoutSessionService;
-5. criar o turno ligado à sessão;
-6. retornar carreira e sessão.
-
-Se a sessão não puder ser iniciada, não deixar turno incompleto salvo.
+Manter proteção contra múltiplos envios da mesma operação.
 
 ==================================================
-8. CONCLUSÃO E ABANDONO DA SESSÃO
+13. BACKEND E CONCORRÊNCIA
 ==================================================
 
-Criar listener para:
+Continuar usando `@Version` em `UmaCareer`.
 
-- TrainingDomainEvent.SessionCompleted;
-- TrainingDomainEvent.SessionAbandoned.
+Tratar conflitos de optimistic locking com mensagem compreensível:
 
-Ao receber o evento:
+“A carreira foi atualizada em outra operação. Atualize os dados e tente novamente.”
 
-- localizar um UmaCareerTurn pelo workoutSessionId;
-- ignorar sessões que não pertençam ao modo;
-- impedir aplicação duplicada;
-- aplicar os efeitos;
-- completar ou abandonar o turno;
-- avançar o dia da carreira.
+Garantir que duas requisições simultâneas não consigam:
 
-Sessão concluída:
+- concluir o mesmo turno duas vezes;
+- aplicar efeitos duplicados;
+- avançar dois dias;
+- aceitar duas atividades no mesmo turno.
 
-- aplica ganhos conforme os exercícios realmente concluídos;
-- usa somente séries marcadas como concluídas;
-- avança o dia.
+As constraints atuais devem continuar preservadas.
 
-Sessão abandonada:
-
-- não concede ganhos positivos de treino;
-- aplica penalidade;
-- marca o turno como ABANDONED;
-- avança o dia.
-
-Penalidade inicial de abandono:
-
-- discipline: -2
-- mood: -4
-- confidence: -3
-- energy: -5
-- fatigue: +2
-
-Centralizar esses valores em uma classe de regras, não espalhá-los pelo listener.
+Adicionar testes concorrentes ou testes que simulem versão desatualizada, caso seja viável sem tornar a suíte excessivamente complexa.
 
 ==================================================
-9. REGRAS DE PROGRESSÃO DO TREINO
-==================================================
-
-Criar uma classe pura:
-
-UmaProgressionRules
-
-Ela deve receber uma WorkoutSession concluída e retornar os deltas.
-
-Regras iniciais por exercício concluído:
-
-STRENGTH ou HYPERTROPHY:
-- strength +2
-
-ENDURANCE ou CARDIO:
-- endurance +2
-- agility +1
-
-MOBILITY ou STRETCHING:
-- technique +2
-- fatigue -2
-
-TECHNIQUE:
-- technique +2
-- confidence +1
-
-RECOVERY:
-- energy +4
-- fatigue -5
-
-Ganhos gerais por sessão concluída:
-
-- discipline +2
-- mood +2
-- confidence +2
-
-Custos da sessão:
-
-- energy diminui em `8 + quantidade de séries concluídas`;
-- limitar a perda máxima de energy a 30;
-- fatigue aumenta em:
-  - 5;
-  - mais o RPE geral arredondado, usando 5 quando não informado;
-  - mais metade das séries concluídas;
-- limitar o ganho máximo de fatigue a 25.
-
-Aplicar clamp após todos os efeitos.
-
-Esses números são regras iniciais de balanceamento e devem ficar centralizados para ajuste futuro.
-
-==================================================
-10. DIAS DE DESCANSO
-==================================================
-
-Quando o dia atual for descanso:
-
-- não permitir iniciar sessão convencional;
-- listar as atividades opcionais configuradas no TrainingPlanDay;
-- oferecer também “Descanso completo”.
-
-Atividade opcional deve possuir dois passos:
-
-1. aceitar;
-2. concluir depois de realizar.
-
-Endpoints sugeridos:
-
-POST /api/umamusume/careers/{careerId}/rest-activities/{activityId}/accept
-
-POST /api/umamusume/careers/{careerId}/rest-activities/{activityId}/complete
-
-Ao aceitar:
-
-- criar turno IN_PROGRESS;
-- salvar nome, categoria e duração como snapshot;
-- não aplicar efeitos;
-- não avançar o dia.
-
-Ao concluir:
-
-- aplicar efeitos;
-- marcar turno COMPLETED;
-- avançar o dia.
-
-Se o aplicativo for fechado após aceitar, a atividade deve continuar pendente ao reabrir.
-
-==================================================
-11. REGRAS DE ATIVIDADES DE DESCANSO
-==================================================
-
-Centralizar em `UmaProgressionRules`.
-
-Normalizar categoria ignorando maiúsculas, minúsculas e acentos quando necessário.
-
-Caminhada:
-
-- endurance +2
-- discipline +2
-- mood +3
-- energy -5
-- fatigue -1
-
-Mobilidade ou alongamento:
-
-- technique +2
-- discipline +1
-- energy -2
-- fatigue -5
-
-Recuperação ativa:
-
-- energy +5
-- fatigue -8
-- mood +1
-
-Descanso completo:
-
-- energy +18
-- fatigue -12
-- discipline -1
-
-Categoria personalizada:
-
-- discipline +1
-- mood +1
-- energy -3
-
-Criar endpoint:
-
-POST /api/umamusume/careers/{careerId}/full-rest
-
-Esse endpoint representa recusar as atividades opcionais e descansar.
-
-Ele deve:
-
-- criar e completar o turno;
-- aplicar os efeitos de descanso completo;
-- avançar o dia.
-
-==================================================
-12. API
-==================================================
-
-Criar endpoints mínimos:
-
-GET /api/umamusume/careers
-GET /api/umamusume/careers/active
-GET /api/umamusume/careers/{id}
-GET /api/umamusume/careers/{id}/turns
-
-POST /api/umamusume/careers
-POST /api/umamusume/careers/{id}/start-training
-POST /api/umamusume/careers/{id}/rest-activities/{activityId}/accept
-POST /api/umamusume/careers/{id}/rest-activities/{activityId}/complete
-POST /api/umamusume/careers/{id}/full-rest
-POST /api/umamusume/careers/{id}/abandon
-
-As respostas da carreira devem incluir:
-
-- atributos;
-- semana atual;
-- weekday atual;
-- ficha associada;
-- dados resumidos do dia atual;
-- turno atual pendente;
-- progresso percentual da carreira;
-- últimos resultados.
-
-Controllers devem permanecer finos.
-
-==================================================
-13. ARQUITETURA MOBILE
-==================================================
-
-Criar:
-
-mobile/src/features/umamusume/
-├── model/
-├── repository/
-├── service/
-├── controller/
-└── views/
-
-Criar `UmaCareerRepository` e implementação HTTP.
-
-Criar controller próprio, sem adicionar estado ao `useTrainingController`.
-
-Operações mínimas:
-
-- refresh;
-- createCareer;
-- startTraining;
-- acceptRestActivity;
-- completeRestActivity;
-- fullRest;
-- abandonCareer.
-
-==================================================
-14. NAVEGAÇÃO MOBILE
-==================================================
-
-Adicionar “Modo Umamusume” à tela `More`.
-
-A tela `MoreScreen` atualmente contém apenas os atalhos legados e biblioteca; ampliar o contrato sem misturar regras nela.
-
-Adicionar rotas tipadas:
-
-- UmaCareer
-- UmaCareerCreate
-- UmaCareerHistory
-
-Fluxo:
-
-Mais
-→ Modo Umamusume
-→ carreira ativa ou criação
-
-Ao iniciar treino pelo modo:
-
-- navegar para a tela Session já existente;
-- marcar a origem da navegação como UMAMUSUME.
-
-Atualizar a rota Session para aceitar:
-
-origin?: NORMAL | UMAMUSUME
-
-Ao concluir ou abandonar uma sessão:
-
-- NORMAL retorna ao Histórico;
-- UMAMUSUME retorna à tela da carreira;
-- atualizar a carreira ao retornar.
-
-Não duplicar a tela de execução de treino.
-
-==================================================
-15. INTEGRAÇÃO COM O CONTROLLER DE SESSÃO
-==================================================
-
-O endpoint de início da carreira deve retornar a WorkoutSession criada.
-
-Adicionar ao `useWorkoutSessionController` uma operação explícita, por exemplo:
-
-adoptSession(session)
-
-Ela deve:
-
-- definir a sessão retornada como ativa;
-- atualizar a lista local;
-- não iniciar uma segunda requisição;
-- não duplicar regras de sessão.
-
-Não expor setters React diretamente.
-
-==================================================
-16. TELA PRINCIPAL DO MODO
-==================================================
-
-Criar uma tela mobile-first para 360–430 px.
-
-Exibir:
-
-- nome da carreira;
-- semana atual e total;
-- dia atual;
-- progresso da temporada;
-- ficha associada;
-- status principais;
-- energy;
-- fatigue;
-- mood;
-- confidence;
-- ação disponível para o dia;
-- resultado do último turno.
-
-Atributos principais:
-
-- Força
-- Resistência
-- Agilidade
-- Técnica
-- Disciplina
-
-Usar barras compactas para:
-
-- energia;
-- fadiga;
-- humor;
-- confiança.
-
-Não usar gráficos complexos.
-
-Não copiar a interface oficial. Criar uma interface original coerente com o aplicativo atual.
-
-==================================================
-17. AÇÃO DO DIA
-==================================================
-
-Dia de treino:
-
-- mostrar nome;
-- quantidade de exercícios;
-- duração estimada;
-- botão “Iniciar treino”.
-
-Se já existir uma sessão ativa do modo:
-
-- mostrar “Continuar treino”.
-
-Dia de descanso sem atividade aceita:
-
-- listar atividades opcionais;
-- botão para aceitar cada atividade;
-- botão “Descanso completo”.
-
-Atividade aceita:
-
-- mostrar nome e duração;
-- botão “Concluir atividade”;
-- não permitir escolher outra ação.
-
-Carreira concluída:
-
-- mostrar resumo final;
-- bloquear novas ações.
-
-==================================================
-18. TESTES BACKEND
+14. TESTES BACKEND
 ==================================================
 
 Adicionar testes para:
 
-- criar carreira com ficha válida;
-- rejeitar duração diferente de 8, 12 ou 16;
-- impedir duas carreiras ativas;
-- iniciar na segunda da semana 1;
-- impedir treino em dia de descanso;
-- impedir atividade de descanso em dia de treino;
-- concluir sessão de força e aplicar ganhos;
-- concluir sessão de cardio e aplicar ganhos;
-- abandonar sessão, aplicar penalidade e avançar;
-- ignorar sessão não vinculada a uma carreira;
-- aceitar atividade sem avançar;
-- concluir atividade e avançar;
-- descanso completo;
-- impedir duas ações no mesmo turno;
-- domingo avançar para próxima semana;
-- último domingo concluir a carreira;
-- atributos respeitarem limites;
-- listener não aplicar efeitos duas vezes.
-
-Testar `UmaProgressionRules` separadamente como regra pura.
+1. atividade aceita continuar concluível depois de o dia virar treino;
+2. atividade aceita continuar concluível depois de ser removida da ficha;
+3. atividade usar categoria snapshot;
+4. cancelar atividade não avançar o dia;
+5. após cancelar, permitir escolher outra ação;
+6. abandonar carreira com atividade pendente;
+7. impedir abandono direto com treino ativo;
+8. clamp registrar delta efetivamente aplicado;
+9. energia 99 com descanso +18 registrar +1;
+10. fadiga 4 com descanso -12 registrar -4;
+11. atributo em 998 recebendo +2 registrar +1;
+12. atributo em 0 recebendo penalidade registrar 0;
+13. listener continuar idempotente;
+14. turno não avançar duas vezes;
+15. `resultText` não conter atributos com delta zero.
 
 ==================================================
-19. TESTES MOBILE
+15. TESTES MOBILE
 ==================================================
 
-Usar Vitest somente para regras puras nesta etapa.
+Adicionar testes Vitest para:
 
-Adicionar testes para:
+- identificar sessão Umamusume pelo ID;
+- rejeitar sessão ativa de outro fluxo;
+- rejeitar turno sem sessão;
+- identificar origem NORMAL e UMAMUSUME;
+- seleção inicial da carreira;
+- histórico não reutilizar dados de outra carreira;
+- formatação de resultado sem deltas zero, caso essa formatação exista também no mobile.
 
-- cálculo de progresso da carreira;
-- formatação de semana e dia;
-- clamp visual dos atributos;
-- identificação de ação disponível pelo estado recebido.
-
-Não adicionar testes de componentes React Native agora.
+Não adicionar testes de componentes React Native nesta etapa.
 
 ==================================================
-20. FORA DO ESCOPO
+16. DOCUMENTAÇÃO
 ==================================================
 
-Não implementar nesta etapa:
+Atualizar README e ARCHITECTURE.md.
+
+Documentar:
+
+- turno aceito usa snapshots;
+- efeitos históricos são deltas efetivamente aplicados;
+- retomada da sessão detecta origem por ID;
+- carreiras anteriores podem ser consultadas;
+- ficha continua viva e editável durante a carreira;
+- snapshot completo da ficha continua fora do escopo.
+
+Não afirmar que corridas ou eventos narrativos existem.
+
+==================================================
+17. FORA DO ESCOPO
+==================================================
+
+Não implementar:
 
 - corridas;
 - provas;
 - ranking;
+- eventos narrativos;
+- escolhas aleatórias;
 - skills;
 - árvore de habilidades;
-- eventos aleatórios narrativos;
-- escolhas aleatórias;
-- personagens oficiais;
-- criação de personagem;
-- roupas;
+- personagens;
 - gacha;
 - moedas;
 - loja;
@@ -673,12 +463,13 @@ Não implementar nesta etapa:
 - notificações;
 - offline;
 - SQLite;
-- sincronização;
 - snapshot completo da ficha;
-- redesign das telas normais.
+- redesign geral;
+- extração da biblioteca;
+- remoção do domínio Workout.
 
 ==================================================
-21. VALIDAÇÃO
+18. VALIDAÇÃO
 ==================================================
 
 Executar:
@@ -706,19 +497,19 @@ git diff --check
 Não declarar conclusão se qualquer comando falhar.
 
 ==================================================
-22. ENTREGA
+19. ENTREGA
 ==================================================
 
 Ao finalizar, informar:
 
-1. entidades e enums criados;
-2. regras de progressão;
-3. endpoints;
-4. integração com eventos de sessão;
-5. estrutura mobile criada;
-6. fluxo de navegação;
+1. problemas corrigidos;
+2. comportamento de turnos pendentes;
+3. estratégia para efeitos efetivamente aplicados;
+4. mudanças na recuperação de sessões;
+5. fluxo de histórico e seleção de carreiras;
+6. endpoints adicionados;
 7. testes adicionados;
-8. resultados das validações;
+8. resultados de todas as validações;
 9. limitações restantes.
 
-Não avançar para corridas ou eventos narrativos nesta etapa.
+Não avançar para eventos narrativos ou corridas.

@@ -135,3 +135,32 @@ export function availableCareerAction(career: UmaCareer) {
   if (career.pendingTurn?.actionType === 'REST_ACTIVITY') return 'COMPLETE_REST_ACTIVITY' as const
   return career.currentDay.restDay ? 'CHOOSE_REST' as const : 'START_TRAINING' as const
 }
+
+export function isUmaCareerSession(career: UmaCareer | null, sessionId: number | null) {
+  return Boolean(
+    career?.status === 'ACTIVE'
+    && career.pendingTurn?.actionType === 'TRAINING'
+    && career.pendingTurn.status === 'IN_PROGRESS'
+    && sessionId != null
+    && career.pendingTurn.workoutSessionId === sessionId,
+  )
+}
+
+export function sessionOrigin(career: UmaCareer | null, sessionId: number | null) {
+  return isUmaCareerSession(career, sessionId) ? 'UMAMUSUME' as const : 'NORMAL' as const
+}
+
+export function selectInitialCareerId(careers: UmaCareer[], selectedCareerId: number | null) {
+  return careers.find((career) => career.status === 'ACTIVE')?.id
+    ?? careers.find((career) => career.id === selectedCareerId)?.id
+    ?? careers[0]?.id
+    ?? null
+}
+
+export function turnsForCareer(
+  turns: UmaTurn[],
+  turnsCareerId: number | null,
+  careerId: number,
+) {
+  return turnsCareerId === careerId ? turns : []
+}

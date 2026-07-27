@@ -2,6 +2,7 @@ package com.trainingapp.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -32,5 +33,15 @@ public class ApiExceptionHandler {
     public ResponseEntity<ApiError> handleBadRequest(IllegalArgumentException exception) {
         return ResponseEntity.badRequest()
                 .body(new ApiError(400, exception.getMessage(), Map.of(), OffsetDateTime.now()));
+    }
+
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ApiError> handleOptimisticLock() {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ApiError(
+                409,
+                "A carreira foi atualizada em outra operação. Atualize os dados e tente novamente.",
+                Map.of(),
+                OffsetDateTime.now()
+        ));
     }
 }

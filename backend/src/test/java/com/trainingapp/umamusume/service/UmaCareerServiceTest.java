@@ -19,11 +19,14 @@ import com.trainingapp.umamusume.dto.UmaCareerResponse;
 import com.trainingapp.umamusume.model.CareerStatus;
 import com.trainingapp.umamusume.model.TurnStatus;
 import com.trainingapp.umamusume.model.UmaCareer;
+import com.trainingapp.umamusume.model.UmaEffects;
 import com.trainingapp.umamusume.repository.UmaCareerRepository;
 import jakarta.transaction.Transactional;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
@@ -39,6 +42,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class UmaCareerServiceTest {
     @Autowired UmaCareerService service;
     @Autowired WorkoutSessionService sessions;
+    @Autowired EntityManager entityManager;
+    @Autowired JdbcTemplate jdbc;
     @Autowired UmaCareerRepository careerRepository;
     @Autowired WorkoutSessionRepository sessionRepository;
     @Autowired TrainingPlanRepository planRepository;
@@ -84,6 +89,7 @@ class UmaCareerServiceTest {
         WorkoutSession linked = sessionRepository.findById(started.session().id()).orElseThrow();
         service.sessionCompleted(linked);
         assertEquals(12, service.findById(career.id()).strength());
+        assertEquals(DayOfWeek.TUESDAY, service.findById(career.id()).currentWeekday());
 
         WorkoutSession unrelated = new WorkoutSession();
         unrelated.setWorkoutNameSnapshot("Sem carreira");
@@ -157,10 +163,119 @@ class UmaCareerServiceTest {
         assertEquals(DayOfWeek.MONDAY, nextWeek.currentWeekday());
         assertEquals(0, nextWeek.fatigue());
         assertEquals(100, nextWeek.energy());
+        assertEquals(1, nextWeek.lastResults().get(0).effects().getEnergyDelta());
+        assertEquals(-4, nextWeek.lastResults().get(0).effects().getFatigueDelta());
+        assertEquals("Descanso concluído: Disciplina -1 · Energia +1 · Fadiga -4",
+                nextWeek.lastResults().get(0).resultText());
     }
 
     @Test
-    void completesCareerOnLastSundayAndCanAbandonOnlyWithoutPendingAction() {
+    void completesAcceptedActivityFromSnapshotAfterDayBecomesTraining() {
+        TrainingPlan plan = createPlan(true, ExerciseCategory.RECOVERY);
+        UmaCareerResponse response = service.create(new CreateUmaCareerRequest("Snapshot", plan.getId(), 8));
+        UmaCareer career = careerRepository.findById(response.id()).orElseThrow();
+        career.setEnergy(50);
+        career.setFatigue(20);
+        Long activityId = response.currentDay().restActivities().get(0).id();
+        service.acceptRestActivity(career.getId(), activityId);
+
+        TrainingPlanDay monday = day(plan, DayOfWeek.MONDAY);
+        monday.setRestDay(false);
+        monday.getRestActivities().get(0).setName("Caminhada editada");
+        monday.getRestActivities().get(0).setCategory("Caminhada");
+        planRepository.saveAndFlush(plan);
+
+        UmaCareerResponse completed = service.completeRestActivity(career.getId(), activityId);
+        assertEquals(55, completed.energy());
+        assertEquals(12, completed.fatigue());
+        assertEquals(0, completed.endurance() - 10);
+        assertEquals("Recuperação ativa", completed.lastResults().get(0).actionTitle());
+    }
+
+    @Test
+    void completesAcceptedActivityAfterItIsRemovedFromPlan() {
+        TrainingPlan plan = createPlan(true, ExerciseCategory.RECOVERY);
+        UmaCareerResponse response = service.create(new CreateUmaCareerRequest("Remoção", plan.getId(), 8));
+        Long activityId = response.currentDay().restActivities().get(0).id();
+        service.acceptRestActivity(response.id(), activityId);
+
+        jdbc.update("delete from rest_day_activities where id = ?", activityId);
+        entityManager.clear();
+
+        assertEquals(DayOfWeek.TUESDAY,
+                service.completeRestActivity(response.id(), activityId).currentWeekday());
+    }
+
+    @Test
+    void cancelsRestAndAllowsAnotherChoiceOrCareerAbandonment() {
+        TrainingPlan plan = createPlan(true, ExerciseCategory.RECOVERY);
+        UmaCareerResponse response = service.create(new CreateUmaCareerRequest("Cancelamento", plan.getId(), 8));
+        Long activityId = response.currentDay().restActivities().get(0).id();
+        service.acceptRestActivity(response.id(), activityId);
+
+        UmaCareerResponse canceled = service.cancelRestActivity(response.id());
+        assertEquals(DayOfWeek.MONDAY, canceled.currentWeekday());
+        assertNull(canceled.pendingTurn());
+        assertEquals(0, service.findTurns(response.id()).size());
+
+        service.acceptRestActivity(response.id(), activityId);
+        UmaCareerResponse abandoned = service.abandon(response.id());
+        assertEquals(CareerStatus.ABANDONED, abandoned.status());
+        assertNotNull(abandoned.completedAt());
+        assertEquals(0, service.findTurns(response.id()).size());
+    }
+
+    @Test
+    void refusesDirectCareerAbandonmentWhileTrainingIsPending() {
+        TrainingPlan plan = createPlan(false, ExerciseCategory.STRENGTH);
+        UmaCareerResponse response = service.create(new CreateUmaCareerRequest("Treino pendente", plan.getId(), 8));
+        service.startTraining(response.id());
+
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.abandon(response.id())
+        );
+        assertEquals("Abandone a sessão de treino pela tela da sessão antes de encerrar a carreira",
+                error.getMessage());
+    }
+
+    @Test
+    void recordsEffectiveDeltasAtEveryUpperAndLowerLimit() {
+        UmaCareer career = new UmaCareer();
+        career.setStrength(998);
+        career.setEndurance(998);
+        career.setAgility(998);
+        career.setTechnique(998);
+        career.setDiscipline(998);
+        career.setEnergy(99);
+        career.setFatigue(1);
+        career.setMood(99);
+        career.setConfidence(99);
+
+        UmaEffects upper = service.applyAndReturnEffectiveEffects(
+                career,
+                new UmaEffects(2, 2, 2, 2, 2, 2, -2, 2, 2)
+        );
+        assertEffects(upper, 1, 1, 1, 1, 1, 1, -1, 1, 1);
+
+        career.setStrength(0);
+        career.setEndurance(0);
+        career.setAgility(0);
+        career.setTechnique(0);
+        career.setDiscipline(0);
+        career.setEnergy(0);
+        career.setFatigue(0);
+        career.setMood(0);
+        career.setConfidence(0);
+        UmaEffects lower = service.applyAndReturnEffectiveEffects(
+                career,
+                new UmaEffects(-2, -2, -2, -2, -2, -2, -2, -2, -2)
+        );
+        assertEffects(lower, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    }
+
+    @Test
+    void completesCareerOnLastSundayAndCanAbandonWithoutPendingAction() {
         TrainingPlan plan = createPlan(true, ExerciseCategory.RECOVERY);
         UmaCareerResponse response = service.create(new CreateUmaCareerRequest("Final", plan.getId(), 8));
         UmaCareer career = careerRepository.findById(response.id()).orElseThrow();
@@ -181,6 +296,29 @@ class UmaCareerServiceTest {
         careerRepository.save(career);
         UmaCareerResponse abandoned = service.abandon(career.getId());
         assertEquals(CareerStatus.ABANDONED, abandoned.status());
+    }
+
+    private void assertEffects(
+            UmaEffects effects,
+            int strength,
+            int endurance,
+            int agility,
+            int technique,
+            int discipline,
+            int energy,
+            int fatigue,
+            int mood,
+            int confidence
+    ) {
+        assertEquals(strength, effects.getStrengthDelta());
+        assertEquals(endurance, effects.getEnduranceDelta());
+        assertEquals(agility, effects.getAgilityDelta());
+        assertEquals(technique, effects.getTechniqueDelta());
+        assertEquals(discipline, effects.getDisciplineDelta());
+        assertEquals(energy, effects.getEnergyDelta());
+        assertEquals(fatigue, effects.getFatigueDelta());
+        assertEquals(mood, effects.getMoodDelta());
+        assertEquals(confidence, effects.getConfidenceDelta());
     }
 
     private void completeAllSets(StartUmaTrainingResponse started, BigDecimal overallRpe) {
@@ -247,5 +385,12 @@ class UmaCareerServiceTest {
             plan = planRepository.saveAndFlush(plan);
         }
         return plan;
+    }
+
+    private TrainingPlanDay day(TrainingPlan plan, DayOfWeek weekday) {
+        return plan.getDays().stream()
+                .filter(item -> item.getWeekday() == weekday)
+                .findFirst()
+                .orElseThrow();
     }
 }

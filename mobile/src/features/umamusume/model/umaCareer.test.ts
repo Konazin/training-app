@@ -5,6 +5,10 @@ import {
   careerProgress,
   formatCareerPeriod,
   formatWeekday,
+  isUmaCareerSession,
+  selectInitialCareerId,
+  sessionOrigin,
+  turnsForCareer,
   visualClamp,
 } from './umaCareer'
 
@@ -38,5 +42,39 @@ describe('regras visuais da carreira', () => {
     expect(availableCareerAction(career)).toBe('CONTINUE_TRAINING')
     career.status = 'COMPLETED'
     expect(availableCareerAction(career)).toBe('FINISHED')
+  })
+
+  it('detecta a origem apenas pelo ID do treino pendente', () => {
+    const career = {
+      id: 1,
+      status: 'ACTIVE',
+      pendingTurn: {
+        actionType: 'TRAINING',
+        status: 'IN_PROGRESS',
+        workoutSessionId: 42,
+      },
+    } as UmaCareer
+    expect(isUmaCareerSession(career, 42)).toBe(true)
+    expect(sessionOrigin(career, 42)).toBe('UMAMUSUME')
+    expect(isUmaCareerSession(career, 99)).toBe(false)
+    expect(sessionOrigin(career, 99)).toBe('NORMAL')
+    career.pendingTurn!.workoutSessionId = null
+    expect(isUmaCareerSession(career, 42)).toBe(false)
+  })
+
+  it('seleciona carreira ativa, seleção anterior ou a mais recente', () => {
+    const completed = { id: 1, status: 'COMPLETED' } as UmaCareer
+    const abandoned = { id: 2, status: 'ABANDONED' } as UmaCareer
+    const active = { id: 3, status: 'ACTIVE' } as UmaCareer
+    expect(selectInitialCareerId([completed, active], 1)).toBe(3)
+    expect(selectInitialCareerId([completed, abandoned], 2)).toBe(2)
+    expect(selectInitialCareerId([completed, abandoned], 99)).toBe(1)
+    expect(selectInitialCareerId([], 1)).toBeNull()
+  })
+
+  it('não reutiliza turnos carregados para outra carreira', () => {
+    const turns = [{ id: 10 }] as UmaCareer['lastResults']
+    expect(turnsForCareer(turns, 1, 1)).toBe(turns)
+    expect(turnsForCareer(turns, 1, 2)).toEqual([])
   })
 })

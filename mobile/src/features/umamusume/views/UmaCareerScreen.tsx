@@ -11,14 +11,17 @@ import { shared, type ThemeColors, useTheme } from '../../../theme'
 interface Props {
   career: UmaCareer | null
   loading: boolean
-  busyKey: string
+  busyKeys: Set<string>
   canContinueTraining: boolean
   onCreate: () => void
   onHistory: (careerId: number) => void
+  onAllCareers: () => void
+  onRefresh: () => Promise<void>
   onStartTraining: () => void
   onContinueTraining: () => void
   onAcceptRestActivity: (activityId: number) => Promise<boolean>
   onCompleteRestActivity: (activityId: number) => Promise<boolean>
+  onCancelRestActivity: () => Promise<boolean>
   onFullRest: () => Promise<boolean>
   onAbandon: () => Promise<boolean>
 }
@@ -26,14 +29,17 @@ interface Props {
 export function UmaCareerScreen({
   career,
   loading,
-  busyKey,
+  busyKeys,
   canContinueTraining,
   onCreate,
   onHistory,
+  onAllCareers,
+  onRefresh,
   onStartTraining,
   onContinueTraining,
   onAcceptRestActivity,
   onCompleteRestActivity,
+  onCancelRestActivity,
   onFullRest,
   onAbandon,
 }: Props) {
@@ -111,17 +117,22 @@ export function UmaCareerScreen({
 
         {action === 'START_TRAINING' && (
           <PrimaryAction
-            disabled={Boolean(busyKey)}
-            label={busyKey === 'training' ? 'Iniciando…' : 'Iniciar treino'}
+            disabled={busyKeys.has('training:start')}
+            label={busyKeys.has('training:start') ? 'Iniciando…' : 'Iniciar treino'}
             onPress={onStartTraining}
           />
         )}
-        {action === 'CONTINUE_TRAINING' && (
+        {action === 'CONTINUE_TRAINING' && canContinueTraining && (
           <PrimaryAction
-            disabled={!canContinueTraining}
             label="Continuar treino"
             onPress={onContinueTraining}
           />
+        )}
+        {action === 'CONTINUE_TRAINING' && !canContinueTraining && (
+          <View style={styles.inconsistency}>
+            <Text style={styles.error}>Não foi possível localizar a sessão desta carreira.</Text>
+            <PrimaryAction label="Atualizar" onPress={() => void onRefresh()} />
+          </View>
         )}
         {action === 'COMPLETE_REST_ACTIVITY' && career.pendingTurn && (
           <View style={styles.pending}>
@@ -131,10 +142,29 @@ export function UmaCareerScreen({
               {career.pendingTurn.activityDurationMinutes ?? 0} min
             </Text>
             <PrimaryAction
-              disabled={Boolean(busyKey)}
-              label={busyKey === 'rest' ? 'Concluindo…' : 'Concluir atividade'}
+              disabled={busyKeys.has(`rest:complete:${career.pendingTurn.restActivityId}`)}
+              label={busyKeys.has(`rest:complete:${career.pendingTurn.restActivityId}`)
+                ? 'Concluindo…'
+                : 'Concluir atividade'}
               onPress={() => void onCompleteRestActivity(career.pendingTurn!.restActivityId!)}
             />
+            <TouchableOpacity
+              disabled={busyKeys.has('rest:cancel')}
+              onPress={() => Alert.alert(
+                'Cancelar atividade?',
+                'Você poderá escolher outra ação para este dia.',
+                [
+                  { text: 'Manter atividade', style: 'cancel' },
+                  {
+                    text: 'Cancelar atividade',
+                    style: 'destructive',
+                    onPress: () => void onCancelRestActivity(),
+                  },
+                ],
+              )}
+            >
+              <Text style={styles.cancelActivity}>Cancelar atividade</Text>
+            </TouchableOpacity>
           </View>
         )}
         {action === 'CHOOSE_REST' && (
@@ -142,7 +172,7 @@ export function UmaCareerScreen({
             {career.currentDay.restActivities.map((activity) => (
               <TouchableOpacity
                 key={activity.id}
-                disabled={Boolean(busyKey)}
+                disabled={busyKeys.has(`rest:accept:${activity.id}`)}
                 onPress={() => void onAcceptRestActivity(activity.id)}
                 style={styles.activity}
               >
@@ -154,7 +184,7 @@ export function UmaCareerScreen({
               </TouchableOpacity>
             ))}
             <TouchableOpacity
-              disabled={Boolean(busyKey)}
+              disabled={busyKeys.has('rest:full')}
               onPress={() => Alert.alert(
                 'Descanso completo?',
                 'As atividades opcionais serão recusadas neste dia.',
@@ -196,10 +226,14 @@ export function UmaCareerScreen({
         <Text style={styles.historyText}>Ver histórico da carreira</Text>
         <Text style={styles.arrow}>→</Text>
       </TouchableOpacity>
+      <TouchableOpacity style={styles.history} onPress={onAllCareers}>
+        <Text style={styles.historyText}>Ver todas as carreiras</Text>
+        <Text style={styles.arrow}>→</Text>
+      </TouchableOpacity>
 
-      {career.status === 'ACTIVE' && !career.pendingTurn && (
+      {career.status === 'ACTIVE' && (
         <TouchableOpacity
-          disabled={Boolean(busyKey)}
+          disabled={busyKeys.has('career:abandon')}
           onPress={() => Alert.alert(
             'Abandonar carreira?',
             'A carreira será encerrada e continuará disponível no histórico.',
@@ -324,12 +358,15 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   pending: { backgroundColor: colors.surface, borderRadius: 16, marginTop: 14, padding: 14 },
   pendingLabel: { color: colors.gray500, fontSize: 8, fontWeight: '800' },
   pendingTitle: { color: colors.ink, fontSize: 14, fontWeight: '800', marginBottom: 4, marginTop: 7 },
+  cancelActivity: { color: colors.danger, fontSize: 9, fontWeight: '700', padding: 13, textAlign: 'center' },
+  inconsistency: { backgroundColor: colors.surface, borderRadius: 15, marginTop: 14, padding: 14 },
+  error: { color: colors.danger, fontSize: 9, lineHeight: 15, textAlign: 'center' },
   final: { marginTop: 13 },
   finalTitle: { color: colors.ink, fontSize: 15, fontWeight: '800', marginBottom: 5 },
   resultCard: { backgroundColor: colors.nearBlack, borderRadius: 20, marginBottom: 10, padding: 16 },
   resultTitle: { color: '#fff', fontSize: 13, fontWeight: '800', marginBottom: 6, marginTop: 7 },
   resultText: { color: '#bdbdbd', fontSize: 9, lineHeight: 15 },
-  history: { alignItems: 'center', backgroundColor: colors.card, borderColor: colors.gray200, borderRadius: 16, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: 54, paddingHorizontal: 15 },
+  history: { alignItems: 'center', backgroundColor: colors.card, borderColor: colors.gray200, borderRadius: 16, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8, minHeight: 54, paddingHorizontal: 15 },
   historyText: { color: colors.ink, fontSize: 10, fontWeight: '800' },
   abandon: { color: colors.danger, fontSize: 10, fontWeight: '700', padding: 18, textAlign: 'center' },
   empty: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: 28 },

@@ -43,7 +43,14 @@ npm run test
 telas isolados. O modo inicia a sessão real pelo backend e entrega a resposta
 ao controller de sessão com `adoptSession`, sem repetir a requisição ou a tela
 de execução. A origem tipada da rota `Session` determina se o encerramento
-retorna ao histórico normal ou à carreira.
+retorna ao histórico normal ou à carreira; essa origem é recuperada comparando
+o ID da sessão ativa com o snapshot do turno pendente.
+
+O controller mantém a seleção entre carreiras atuais e anteriores. O histórico
+é carregado por ID com token de requisição próprio, limpa dados anteriores ao
+trocar de carreira e expõe loading e erro separados. Atividades aceitas podem
+ser concluídas ou canceladas pelos snapshots persistidos no backend; efeitos
+históricos já chegam limitados ao delta realmente aplicado.
 
 ## Migração restante
 

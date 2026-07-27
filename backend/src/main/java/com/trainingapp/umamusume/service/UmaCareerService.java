@@ -28,6 +28,7 @@ import org.springframework.stereotype.Service;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -126,7 +127,6 @@ public class UmaCareerService {
 
     public UmaCareerResponse completeRestActivity(Long careerId, Long activityId) {
         UmaCareer career = requireActive(careerId);
-        requireRestDay(career);
         UmaCareerTurn turn = currentTurn(career);
         if (turn.getActionType() != TurnActionType.REST_ACTIVITY
                 || turn.getStatus() != TurnStatus.IN_PROGRESS
@@ -134,6 +134,18 @@ public class UmaCareerService {
             throw new IllegalArgumentException("Esta atividade não está pendente");
         }
         completeTurn(career, turn, rules.restActivity(turn.getActivityCategorySnapshot()), TurnStatus.COMPLETED);
+        return toResponse(career);
+    }
+
+    public UmaCareerResponse cancelRestActivity(Long careerId) {
+        UmaCareer career = requireActive(careerId);
+        UmaCareerTurn turn = currentTurn(career);
+        if (turn.getActionType() != TurnActionType.REST_ACTIVITY
+                || turn.getStatus() != TurnStatus.IN_PROGRESS) {
+            throw new IllegalArgumentException("A ação atual não é uma atividade de descanso pendente");
+        }
+        turns.delete(turn);
+        touch(career);
         return toResponse(career);
     }
 
@@ -150,9 +162,11 @@ public class UmaCareerService {
 
     public UmaCareerResponse abandon(Long careerId) {
         UmaCareer career = requireActive(careerId);
-        if (pendingTurn(career) != null) {
-            throw new IllegalArgumentException("Conclua ou abandone a ação atual antes de encerrar a carreira");
+        UmaCareerTurn pending = pendingTurn(career);
+        if (pending != null && pending.getActionType() == TurnActionType.TRAINING) {
+            throw new IllegalArgumentException("Abandone a sessão de treino pela tela da sessão antes de encerrar a carreira");
         }
+        if (pending != null) turns.delete(pending);
         career.setStatus(CareerStatus.ABANDONED);
         career.setCompletedAt(OffsetDateTime.now());
         touch(career);
@@ -173,27 +187,49 @@ public class UmaCareerService {
         });
     }
 
-    private void completeTurn(UmaCareer career, UmaCareerTurn turn, UmaEffects effects, TurnStatus status) {
-        apply(career, effects);
-        turn.setEffects(effects);
+    private void completeTurn(UmaCareer career, UmaCareerTurn turn, UmaEffects requested, TurnStatus status) {
+        UmaEffects applied = applyAndReturnEffectiveEffects(career, requested);
+        turn.setEffects(applied);
         turn.setStatus(status);
-        turn.setResultText(resultText(status, effects));
+        turn.setResultText(resultText(turn, applied));
         turn.setCompletedAt(OffsetDateTime.now());
         advance(career);
         turns.save(turn);
         touch(career);
     }
 
-    private void apply(UmaCareer career, UmaEffects effects) {
-        career.setStrength(clamp(career.getStrength() + effects.getStrengthDelta(), 999));
-        career.setEndurance(clamp(career.getEndurance() + effects.getEnduranceDelta(), 999));
-        career.setAgility(clamp(career.getAgility() + effects.getAgilityDelta(), 999));
-        career.setTechnique(clamp(career.getTechnique() + effects.getTechniqueDelta(), 999));
-        career.setDiscipline(clamp(career.getDiscipline() + effects.getDisciplineDelta(), 999));
-        career.setEnergy(clamp(career.getEnergy() + effects.getEnergyDelta(), 100));
-        career.setFatigue(clamp(career.getFatigue() + effects.getFatigueDelta(), 100));
-        career.setMood(clamp(career.getMood() + effects.getMoodDelta(), 100));
-        career.setConfidence(clamp(career.getConfidence() + effects.getConfidenceDelta(), 100));
+    UmaEffects applyAndReturnEffectiveEffects(UmaCareer career, UmaEffects requested) {
+        int strength = career.getStrength();
+        int endurance = career.getEndurance();
+        int agility = career.getAgility();
+        int technique = career.getTechnique();
+        int discipline = career.getDiscipline();
+        int energy = career.getEnergy();
+        int fatigue = career.getFatigue();
+        int mood = career.getMood();
+        int confidence = career.getConfidence();
+
+        career.setStrength(clamp(strength + requested.getStrengthDelta(), 999));
+        career.setEndurance(clamp(endurance + requested.getEnduranceDelta(), 999));
+        career.setAgility(clamp(agility + requested.getAgilityDelta(), 999));
+        career.setTechnique(clamp(technique + requested.getTechniqueDelta(), 999));
+        career.setDiscipline(clamp(discipline + requested.getDisciplineDelta(), 999));
+        career.setEnergy(clamp(energy + requested.getEnergyDelta(), 100));
+        career.setFatigue(clamp(fatigue + requested.getFatigueDelta(), 100));
+        career.setMood(clamp(mood + requested.getMoodDelta(), 100));
+        career.setConfidence(clamp(confidence + requested.getConfidenceDelta(), 100));
+
+        return new UmaEffects(
+                career.getStrength() - strength,
+                career.getEndurance() - endurance,
+                career.getAgility() - agility,
+                career.getTechnique() - technique,
+                career.getDiscipline() - discipline,
+                career.getEnergy() - energy,
+                career.getFatigue() - fatigue,
+                career.getMood() - mood,
+                career.getConfidence() - confidence
+        );
     }
 
     private int clamp(int value, int maximum) {
@@ -342,20 +378,24 @@ public class UmaCareerService {
         );
     }
 
-    private String resultText(TurnStatus status, UmaEffects effects) {
-        String prefix = status == TurnStatus.ABANDONED ? "Sessão abandonada" : "Ação concluída";
-        return prefix + ": força " + signed(effects.getStrengthDelta())
-                + ", resistência " + signed(effects.getEnduranceDelta())
-                + ", agilidade " + signed(effects.getAgilityDelta())
-                + ", técnica " + signed(effects.getTechniqueDelta())
-                + ", disciplina " + signed(effects.getDisciplineDelta())
-                + ", energia " + signed(effects.getEnergyDelta())
-                + ", fadiga " + signed(effects.getFatigueDelta())
-                + ", humor " + signed(effects.getMoodDelta())
-                + ", confiança " + signed(effects.getConfidenceDelta());
+    private String resultText(UmaCareerTurn turn, UmaEffects effects) {
+        String prefix = turn.getStatus() == TurnStatus.ABANDONED
+                ? "Sessão abandonada"
+                : turn.getActionType() == TurnActionType.TRAINING ? "Treino concluído" : "Descanso concluído";
+        List<String> changes = new ArrayList<>();
+        addEffect(changes, "Força", effects.getStrengthDelta());
+        addEffect(changes, "Resistência", effects.getEnduranceDelta());
+        addEffect(changes, "Agilidade", effects.getAgilityDelta());
+        addEffect(changes, "Técnica", effects.getTechniqueDelta());
+        addEffect(changes, "Disciplina", effects.getDisciplineDelta());
+        addEffect(changes, "Energia", effects.getEnergyDelta());
+        addEffect(changes, "Fadiga", effects.getFatigueDelta());
+        addEffect(changes, "Humor", effects.getMoodDelta());
+        addEffect(changes, "Confiança", effects.getConfidenceDelta());
+        return changes.isEmpty() ? prefix : prefix + ": " + String.join(" · ", changes);
     }
 
-    private String signed(int value) {
-        return value > 0 ? "+" + value : String.valueOf(value);
+    private void addEffect(List<String> changes, String label, int value) {
+        if (value != 0) changes.add(label + " " + (value > 0 ? "+" : "") + value);
     }
 }

@@ -27,8 +27,10 @@ import { TrainingPlanDayScreen } from './src/features/training-plan/views/Traini
 import { TrainingPlanEditorScreen } from './src/features/training-plan/views/TrainingPlanEditorScreen'
 import { TrainingPlanView } from './src/features/training-plan/views/TrainingPlanView'
 import { useUmaCareerController } from './src/features/umamusume/controller/useUmaCareerController'
+import { isUmaCareerSession, sessionOrigin } from './src/features/umamusume/model/umaCareer'
 import { UmaCareerCreateScreen } from './src/features/umamusume/views/UmaCareerCreateScreen'
 import { UmaCareerHistoryScreen } from './src/features/umamusume/views/UmaCareerHistoryScreen'
+import { UmaCareerListScreen } from './src/features/umamusume/views/UmaCareerListScreen'
 import { UmaCareerScreen } from './src/features/umamusume/views/UmaCareerScreen'
 import { useWorkoutSessionController } from './src/features/workout-session/controller/useWorkoutSessionController'
 import { WorkoutSessionScreen } from './src/features/workout-session/views/WorkoutSessionScreen'
@@ -230,12 +232,16 @@ function TrainingApp() {
                 <UmaCareerScreen
                   career={umaCareer.career}
                   loading={umaCareer.loading}
-                  busyKey={umaCareer.busyKey}
-                  canContinueTraining={Boolean(workoutSession.activeSession)}
+                  busyKeys={umaCareer.busyKeys}
+                  canContinueTraining={isUmaCareerSession(
+                    umaCareer.career,
+                    workoutSession.activeSession?.id ?? null,
+                  )}
                   onCreate={() => navigation.navigate('UmaCareerCreate')}
-                  onHistory={(careerId) => {
-                    void umaCareer.refreshTurns(careerId)
-                    navigation.navigate('UmaCareerHistory', { careerId })
+                  onHistory={(careerId) => navigation.navigate('UmaCareerHistory', { careerId })}
+                  onAllCareers={() => navigation.navigate('UmaCareerList')}
+                  onRefresh={async () => {
+                    await Promise.all([workoutSession.refresh(), umaCareer.refresh()])
                   }}
                   onStartTraining={() => void (async () => {
                     const session = await umaCareer.startTraining()
@@ -246,8 +252,18 @@ function TrainingApp() {
                   onContinueTraining={() => navigation.navigate('Session', { origin: 'UMAMUSUME' })}
                   onAcceptRestActivity={umaCareer.acceptRestActivity}
                   onCompleteRestActivity={umaCareer.completeRestActivity}
+                  onCancelRestActivity={umaCareer.cancelRestActivity}
                   onFullRest={umaCareer.fullRest}
                   onAbandon={umaCareer.abandonCareer}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen name="UmaCareerList">
+              {() => (
+                <UmaCareerListScreen
+                  careers={umaCareer.careers}
+                  selectedCareerId={umaCareer.selectedCareerId}
+                  onSelect={umaCareer.selectCareer}
                 />
               )}
             </Stack.Screen>
@@ -255,13 +271,22 @@ function TrainingApp() {
               {() => (
                 <UmaCareerCreateScreen
                   plans={trainingPlan.trainingPlans}
-                  busy={umaCareer.busyKey === 'create'}
+                  busy={umaCareer.busyKeys.has('career:create')}
                   onCreate={umaCareer.createCareer}
                 />
               )}
             </Stack.Screen>
             <Stack.Screen name="UmaCareerHistory">
-              {() => <UmaCareerHistoryScreen turns={umaCareer.turns} />}
+              {({ route }) => (
+                <UmaCareerHistoryScreen
+                  careerId={route.params.careerId}
+                  turns={umaCareer.turns}
+                  turnsCareerId={umaCareer.turnsCareerId}
+                  loading={umaCareer.turnsLoading}
+                  error={umaCareer.turnsError}
+                  onLoad={umaCareer.loadTurns}
+                />
+              )}
             </Stack.Screen>
             <Stack.Screen name="Session">
               {({ route }) => (
@@ -365,7 +390,12 @@ function MainTabs({
               else navigation.navigate('Exercise')
             }}
             activeSession={workoutSession.activeSession}
-            onResumeSession={() => navigation.navigate('Session')}
+            onResumeSession={() => navigation.navigate('Session', {
+              origin: sessionOrigin(
+                umaCareer.activeCareer,
+                workoutSession.activeSession?.id ?? null,
+              ),
+            })}
           />
         )}
       </Tabs.Screen>

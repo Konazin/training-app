@@ -16,6 +16,7 @@ export type RootStackParamList = {
   Exercise: undefined
   Session: { origin?: SessionOrigin } | undefined
   UmaCareer: undefined
+  UmaCareerList: undefined
   UmaCareerCreate: undefined
   UmaCareerHistory: { careerId: number }
   ArchivedTrainingPlans: undefined

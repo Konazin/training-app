@@ -67,6 +67,11 @@ public class UmaCareerController {
         return service.completeRestActivity(id, activityId);
     }
 
+    @PostMapping("/{id}/rest-activity/cancel")
+    public UmaCareerResponse cancelRestActivity(@PathVariable Long id) {
+        return service.cancelRestActivity(id);
+    }
+
     @PostMapping("/{id}/full-rest")
     public UmaCareerResponse fullRest(@PathVariable Long id) {
         return service.fullRest(id);

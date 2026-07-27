@@ -14,10 +14,6 @@ const post = (body?: unknown): RequestInit => ({
 
 export const httpUmaCareerRepository: UmaCareerRepository = {
   list: () => request<UmaCareer[]>('/umamusume/careers'),
-  async active() {
-    return await request<UmaCareer | undefined>('/umamusume/careers/active') ?? null
-  },
-  get: (id) => request<UmaCareer>(`/umamusume/careers/${id}`),
   turns: (id) => request<UmaTurn[]>(`/umamusume/careers/${id}/turns`),
   create: (input) => request<UmaCareer>('/umamusume/careers', post(input)),
   startTraining: (id) =>
@@ -32,6 +28,8 @@ export const httpUmaCareerRepository: UmaCareerRepository = {
       `/umamusume/careers/${id}/rest-activities/${activityId}/complete`,
       post(),
     ),
+  cancelRestActivity: (id) =>
+    request<UmaCareer>(`/umamusume/careers/${id}/rest-activity/cancel`, post()),
   fullRest: (id) => request<UmaCareer>(`/umamusume/careers/${id}/full-rest`, post()),
   abandon: (id) => request<UmaCareer>(`/umamusume/careers/${id}/abandon`, post()),
 }
