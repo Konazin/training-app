@@ -6,6 +6,7 @@ import { FormField } from '../../../components/FormField'
 import { PrimaryButton } from '../../../components/PrimaryButton'
 import { ScreenHeader } from '../../../components/ScreenHeader'
 import type { RootStackParamList } from '../../../core/navigation/types'
+import { useUnsavedChangesGuard } from '../../../core/navigation/useUnsavedChangesGuard'
 import type { RestActivityInput, TrainingPlan } from '../model/trainingPlan'
 import { shared, type ThemeColors, useTheme } from '../../../theme'
 
@@ -49,6 +50,14 @@ export function RestActivityEditorScreen({
   const [duration, setDuration] = useState(String(activity?.estimatedDurationMinutes ?? 15))
   const [optional, setOptional] = useState(activity?.optional ?? true)
   const [formError, setFormError] = useState('')
+  const form: RestActivityInput = {
+    name,
+    description,
+    category,
+    estimatedDurationMinutes: Number(duration) || 0,
+    optional,
+  }
+  const { commit } = useUnsavedChangesGuard(form)
 
   if (!plan || !day) {
     return <View style={styles.empty}><Text style={styles.title}>Dia não encontrado</Text></View>
@@ -56,24 +65,17 @@ export function RestActivityEditorScreen({
 
   const planId = plan.id
   const dayId = day.id
-  const key = activity ? `activity:${activity.id}` : `day:${day.id}`
+  const key = activity ? `activity:update:${activity.id}` : `day:activity:add:${day.id}`
 
   async function save() {
     if (!name.trim() || !category.trim()) {
       setFormError('Preencha nome e categoria.')
       return
     }
-    const input: RestActivityInput = {
-      name,
-      description,
-      category,
-      estimatedDurationMinutes: Number(duration) || 0,
-      optional,
-    }
     const success = activity
-      ? await onUpdate(planId, dayId, activity.id, input)
-      : await onCreate(planId, dayId, input)
-    if (success) navigation.goBack()
+      ? await onUpdate(planId, dayId, activity.id, form)
+      : await onCreate(planId, dayId, form)
+    if (success) commit(form, navigation.goBack)
   }
 
   return (

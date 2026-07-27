@@ -13,6 +13,8 @@ export type RootStackParamList = {
   Library: undefined
   Exercise: undefined
   Session: undefined
+  ArchivedTrainingPlans: undefined
+  ExercisePicker: { planId: number; dayId: number }
   TrainingPlanEditor: { planId?: number } | undefined
   TrainingPlanDay: { planId: number; dayId: number }
   DayExerciseEditor: {

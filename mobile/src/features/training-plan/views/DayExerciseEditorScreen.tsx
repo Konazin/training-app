@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { FormField } from '../../../components/FormField'
 import { PrimaryButton } from '../../../components/PrimaryButton'
 import { ScreenHeader } from '../../../components/ScreenHeader'
 import type { RootStackParamList } from '../../../core/navigation/types'
+import { useUnsavedChangesGuard } from '../../../core/navigation/useUnsavedChangesGuard'
 import type { ExerciseDefinition } from '../../../models/training'
 import type {
   DayExerciseConfigInput,
@@ -14,6 +15,7 @@ import type {
   TrainingPlan,
 } from '../model/trainingPlan'
 import { shared, type ThemeColors, useTheme } from '../../../theme'
+import { ExercisePicker } from './ExercisePicker'
 
 const setTypes: SetType[] = [
   'NORMAL',
@@ -67,7 +69,28 @@ export function DayExerciseEditorScreen({
   const [alternativeId, setAlternativeId] = useState<number | null>(
     configured?.alternativeExerciseId ?? null,
   )
+  const [showAlternativePicker, setShowAlternativePicker] = useState(false)
   const [formError, setFormError] = useState('')
+  const strength = definition?.category === 'STRENGTH' || definition?.category === 'HYPERTROPHY'
+  const cardio = definition?.category === 'CARDIO'
+  const durationBased = cardio
+    || definition?.timed
+    || definition?.category === 'MOBILITY'
+    || definition?.category === 'STRETCHING'
+  const form: DayExerciseConfigInput = {
+    sets: number(sets),
+    minReps: strength ? number(minReps) : 0,
+    maxReps: strength ? number(maxReps) : 0,
+    plannedLoad: strength ? number(load) : 0,
+    plannedDurationSeconds: durationBased ? number(duration) : null,
+    plannedDistance: cardio ? number(distance) : 0,
+    restSeconds: number(rest),
+    plannedRpe: rpe ? number(rpe) : null,
+    setType,
+    notes,
+    alternativeExerciseId: alternativeId,
+  }
+  const { commit } = useUnsavedChangesGuard(form)
 
   if (!plan || !day || !definition) {
     return <View style={styles.empty}><Text style={styles.title}>Exercício não encontrado</Text></View>
@@ -76,37 +99,18 @@ export function DayExerciseEditorScreen({
   const planId = plan.id
   const dayId = day.id
   const definitionId = definition.id
-  const strength = definition.category === 'STRENGTH' || definition.category === 'HYPERTROPHY'
-  const cardio = definition.category === 'CARDIO'
-  const durationBased = cardio
-    || definition.timed
-    || definition.category === 'MOBILITY'
-    || definition.category === 'STRETCHING'
-  const key = configured ? `exercise:${configured.id}` : `day:${day.id}`
+  const key = configured ? `exercise:update:${configured.id}` : `day:exercise:add:${day.id}`
 
   async function save() {
-    const config: DayExerciseConfigInput = {
-      sets: number(sets),
-      minReps: strength ? number(minReps) : 0,
-      maxReps: strength ? number(maxReps) : 0,
-      plannedLoad: strength ? number(load) : 0,
-      plannedDurationSeconds: durationBased ? number(duration) : null,
-      plannedDistance: cardio ? number(distance) : 0,
-      restSeconds: number(rest),
-      plannedRpe: rpe ? number(rpe) : null,
-      setType,
-      notes,
-      alternativeExerciseId: alternativeId,
-    }
-    if (config.sets < 1 || config.maxReps < config.minReps) {
+    if (form.sets < 1 || form.maxReps < form.minReps) {
       setFormError('Use ao menos uma série e mantenha a repetição máxima acima da mínima.')
       return
     }
     setFormError('')
     const success = configured
-      ? await onUpdate(planId, dayId, configured.id, config)
-      : await onCreate(planId, dayId, { ...config, exerciseDefinitionId: definitionId })
-    if (success) navigation.goBack()
+      ? await onUpdate(planId, dayId, configured.id, form)
+      : await onCreate(planId, dayId, { ...form, exerciseDefinitionId: definitionId })
+    if (success) commit(form, navigation.goBack)
   }
 
   return (
@@ -155,23 +159,18 @@ export function DayExerciseEditorScreen({
         </ScrollView>
 
         <Text style={styles.label}>EXERCÍCIO ALTERNATIVO</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chips}>
-          <TouchableOpacity
-            style={[styles.chip, alternativeId == null && styles.chipActive]}
-            onPress={() => setAlternativeId(null)}
-          >
-            <Text style={[styles.chipText, alternativeId == null && styles.chipTextActive]}>Nenhum</Text>
+        <View style={styles.alternativeRow}>
+          <TouchableOpacity style={styles.alternative} onPress={() => setShowAlternativePicker(true)}>
+            <Text style={styles.alternativeText}>
+              {library.find((item) => item.id === alternativeId)?.name ?? 'Nenhum'}
+            </Text>
           </TouchableOpacity>
-          {library.filter((item) => !item.archived && item.id !== definition.id).map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              style={[styles.chip, alternativeId === item.id && styles.chipActive]}
-              onPress={() => setAlternativeId(item.id)}
-            >
-              <Text style={[styles.chipText, alternativeId === item.id && styles.chipTextActive]}>{item.name}</Text>
+          {alternativeId != null && (
+            <TouchableOpacity onPress={() => setAlternativeId(null)}>
+              <Text style={styles.clear}>Limpar</Text>
             </TouchableOpacity>
-          ))}
-        </ScrollView>
+          )}
+        </View>
         {!!(formError || errors[key]) && <Text style={styles.error}>{formError || errors[key]}</Text>}
         <PrimaryButton
           label={configured ? 'Salvar configuração' : 'Adicionar ao dia'}
@@ -179,6 +178,28 @@ export function DayExerciseEditorScreen({
           onPress={() => void save()}
         />
       </View>
+      <Modal
+        animationType="slide"
+        visible={showAlternativePicker}
+        onRequestClose={() => setShowAlternativePicker(false)}
+      >
+        <View style={[styles.modal, { backgroundColor: colors.background }]}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Exercício alternativo</Text>
+            <TouchableOpacity onPress={() => setShowAlternativePicker(false)}>
+              <Text style={styles.clear}>Fechar</Text>
+            </TouchableOpacity>
+          </View>
+          <ExercisePicker
+            exercises={library}
+            excludedId={definition.id}
+            onSelect={(exercise) => {
+              setAlternativeId(exercise.id)
+              setShowAlternativePicker(false)
+            }}
+          />
+        </View>
+      </Modal>
     </ScrollView>
   )
 }
@@ -199,6 +220,13 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   chipActive: { backgroundColor: colors.primary },
   chipText: { color: colors.gray500, fontSize: 8, fontWeight: '700' },
   chipTextActive: { color: colors.onPrimary },
+  alternativeRow: { alignItems: 'center', flexDirection: 'row', gap: 9, marginBottom: 14 },
+  alternative: { backgroundColor: colors.gray100, borderRadius: 12, flex: 1, minHeight: 42, justifyContent: 'center', paddingHorizontal: 11 },
+  alternativeText: { color: colors.ink, fontSize: 9, fontWeight: '700' },
+  clear: { color: colors.ink, fontSize: 9, fontWeight: '800', padding: 8 },
+  modal: { flex: 1, paddingTop: 45 },
+  modalHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: shared.pagePadding, paddingVertical: 12 },
+  modalTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
   error: { color: colors.danger, fontSize: 9, marginBottom: 9 },
   empty: { alignItems: 'center', flex: 1, justifyContent: 'center' },
   title: { color: colors.ink, fontSize: 18, fontWeight: '800' },

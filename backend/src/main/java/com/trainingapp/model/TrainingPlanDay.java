@@ -14,13 +14,18 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 import java.time.DayOfWeek;
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "training_plan_days")
+@Table(
+        name = "training_plan_days",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uq_training_plan_weekday",
+                columnNames = {"training_plan_id", "weekday"}))
 public class TrainingPlanDay {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

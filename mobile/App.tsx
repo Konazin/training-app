@@ -19,7 +19,9 @@ import { StatusBar } from 'expo-status-bar'
 import type { MainTabParamList, RootStackParamList } from './src/core/navigation/types'
 import { useTrainingController } from './src/controllers/useTrainingController'
 import { useTrainingPlanController } from './src/features/training-plan/controller/useTrainingPlanController'
+import { ArchivedTrainingPlansScreen } from './src/features/training-plan/views/ArchivedTrainingPlansScreen'
 import { DayExerciseEditorScreen } from './src/features/training-plan/views/DayExerciseEditorScreen'
+import { ExercisePickerScreen } from './src/features/training-plan/views/ExercisePickerScreen'
 import { RestActivityEditorScreen } from './src/features/training-plan/views/RestActivityEditorScreen'
 import { TrainingPlanDayScreen } from './src/features/training-plan/views/TrainingPlanDayScreen'
 import { TrainingPlanEditorScreen } from './src/features/training-plan/views/TrainingPlanEditorScreen'
@@ -156,7 +158,6 @@ function TrainingApp() {
               {({ navigation }) => (
                 <TrainingPlanDayScreen
                   plans={trainingPlan.trainingPlans}
-                  library={controller.exerciseLibrary}
                   busyKeys={trainingPlan.busyKeys}
                   errors={trainingPlan.errors}
                   onUpdateDay={trainingPlan.updateDay}
@@ -169,6 +170,24 @@ function TrainingApp() {
                     if (success) navigation.navigate('Session')
                     return success
                   }}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen name="ExercisePicker">
+              {() => (
+                <ExercisePickerScreen
+                  plans={trainingPlan.trainingPlans}
+                  library={controller.exerciseLibrary}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen name="ArchivedTrainingPlans">
+              {() => (
+                <ArchivedTrainingPlansScreen
+                  plans={trainingPlan.trainingPlans}
+                  busyKeys={trainingPlan.busyKeys}
+                  errors={trainingPlan.errors}
+                  onRestore={trainingPlan.archive}
                 />
               )}
             </Stack.Screen>

@@ -6,7 +6,7 @@ import { FormField } from '../../../components/FormField'
 import { PrimaryButton } from '../../../components/PrimaryButton'
 import { ScreenHeader } from '../../../components/ScreenHeader'
 import type { RootStackParamList } from '../../../core/navigation/types'
-import type { ExerciseDefinition } from '../../../models/training'
+import { useUnsavedChangesGuard } from '../../../core/navigation/useUnsavedChangesGuard'
 import type { TrainingPlan } from '../model/trainingPlan'
 import { shared, type ThemeColors, useTheme } from '../../../theme'
 
@@ -22,7 +22,6 @@ const labels = {
 
 export function TrainingPlanDayScreen({
   plans,
-  library,
   busyKeys,
   errors,
   onUpdateDay,
@@ -33,7 +32,6 @@ export function TrainingPlanDayScreen({
   onStart,
 }: {
   plans: TrainingPlan[]
-  library: ExerciseDefinition[]
   busyKeys: Set<string>
   errors: Record<string, string>
   onUpdateDay: (planId: number, dayId: number, input: {
@@ -60,6 +58,14 @@ export function TrainingPlanDayScreen({
   const [duration, setDuration] = useState(String(day?.estimatedDurationMinutes ?? 0))
   const [notes, setNotes] = useState(day?.notes ?? '')
   const [restDay, setRestDay] = useState(day?.restDay ?? false)
+  const form = {
+    title,
+    description,
+    restDay,
+    estimatedDurationMinutes: Number(duration) || 0,
+    notes,
+  }
+  const { dirty, commit } = useUnsavedChangesGuard(form)
 
   if (!plan || !day) {
     return <View style={styles.empty}><Text style={styles.title}>Dia não encontrado</Text></View>
@@ -69,28 +75,7 @@ export function TrainingPlanDayScreen({
   const dayId = day.id
   const exercises = day.exercises
   const restActivities = day.restActivities
-  const dayKey = `day:${day.id}`
-
-  function openExercise(exerciseDefinitionId: number) {
-    const duplicate = exercises.some((item) => item.exercise.id === exerciseDefinitionId)
-    const navigate = () => navigation.navigate('DayExerciseEditor', {
-      planId,
-      dayId,
-      exerciseDefinitionId,
-    })
-    if (!duplicate) {
-      navigate()
-      return
-    }
-    Alert.alert(
-      'Exercício repetido',
-      'Este exercício já está no dia. Deseja adicionar outra configuração?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Adicionar novamente', onPress: navigate },
-      ],
-    )
-  }
+  const dayKey = `day:update:${day.id}`
 
   async function moveExercise(index: number, delta: number) {
     const ids = exercises.map((item) => item.id)
@@ -106,6 +91,10 @@ export function TrainingPlanDayScreen({
     if (target < 0 || target >= ids.length) return
     ;[ids[index], ids[target]] = [ids[target]!, ids[index]!]
     await onReorderActivities(planId, dayId, ids)
+  }
+
+  async function save() {
+    if (await onUpdateDay(planId, dayId, form)) commit(form)
   }
 
   return (
@@ -135,17 +124,11 @@ export function TrainingPlanDayScreen({
         <PrimaryButton
           label="Salvar dia"
           loading={busyKeys.has(dayKey)}
-          onPress={() => void onUpdateDay(plan.id, day.id, {
-            title,
-            description,
-            restDay,
-            estimatedDurationMinutes: Number(duration) || 0,
-            notes,
-          })}
+          onPress={() => void save()}
         />
       </View>
 
-      {day.restDay ? (
+      {restDay ? (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Atividades opcionais</Text>
@@ -159,7 +142,7 @@ export function TrainingPlanDayScreen({
               <Text style={styles.addText}>＋</Text>
             </TouchableOpacity>
           </View>
-          {day.restActivities.map((activity, index) => (
+          {restActivities.map((activity, index) => (
             <View key={activity.id} style={styles.item}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.itemTitle}>{activity.name}</Text>
@@ -167,7 +150,8 @@ export function TrainingPlanDayScreen({
               </View>
               <OrderButtons
                 up={index > 0}
-                down={index < day.restActivities.length - 1}
+                down={index < restActivities.length - 1}
+                busy={busyKeys.has(`day:activity:reorder:${dayId}`)}
                 onUp={() => void moveActivity(index, -1)}
                 onDown={() => void moveActivity(index, 1)}
               />
@@ -180,17 +164,37 @@ export function TrainingPlanDayScreen({
               >
                 <Text style={styles.link}>Editar</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => void onRemoveActivity(plan.id, day.id, activity.id)}>
+              <TouchableOpacity
+                disabled={busyKeys.has(`activity:remove:${activity.id}`)}
+                onPress={() => Alert.alert(
+                  'Remover atividade?',
+                  `“${activity.name}” será removida e esta ação não poderá ser desfeita.`,
+                  [
+                    { text: 'Cancelar', style: 'cancel' },
+                    {
+                      text: 'Remover',
+                      style: 'destructive',
+                      onPress: () => void onRemoveActivity(planId, dayId, activity.id),
+                    },
+                  ],
+                )}
+              >
                 <Text style={styles.remove}>×</Text>
               </TouchableOpacity>
+              {!!errors[`activity:remove:${activity.id}`] && (
+                <Text style={styles.rowError}>{errors[`activity:remove:${activity.id}`]}</Text>
+              )}
             </View>
           ))}
+          {!!errors[`day:activity:reorder:${dayId}`] && (
+            <Text style={styles.error}>{errors[`day:activity:reorder:${dayId}`]}</Text>
+          )}
         </View>
       ) : (
         <>
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Exercícios configurados</Text>
-            {day.exercises.map((exercise, index) => (
+            {exercises.map((exercise, index) => (
               <View key={exercise.id} style={styles.item}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.itemTitle}>{exercise.exercise.name}</Text>
@@ -200,7 +204,8 @@ export function TrainingPlanDayScreen({
                 </View>
                 <OrderButtons
                   up={index > 0}
-                  down={index < day.exercises.length - 1}
+                  down={index < exercises.length - 1}
+                  busy={busyKeys.has(`day:exercise:reorder:${dayId}`)}
                   onUp={() => void moveExercise(index, -1)}
                   onDown={() => void moveExercise(index, 1)}
                 />
@@ -214,6 +219,7 @@ export function TrainingPlanDayScreen({
                   <Text style={styles.link}>Editar</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
+                  disabled={busyKeys.has(`exercise:remove:${exercise.id}`)}
                   onPress={() => Alert.alert(
                     'Remover exercício?',
                     exercise.exercise.name,
@@ -229,33 +235,36 @@ export function TrainingPlanDayScreen({
                 >
                   <Text style={styles.remove}>×</Text>
                 </TouchableOpacity>
+                {!!errors[`exercise:remove:${exercise.id}`] && (
+                  <Text style={styles.rowError}>{errors[`exercise:remove:${exercise.id}`]}</Text>
+                )}
               </View>
             ))}
+            {!!errors[`day:exercise:reorder:${dayId}`] && (
+              <Text style={styles.error}>{errors[`day:exercise:reorder:${dayId}`]}</Text>
+            )}
           </View>
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Adicionar da biblioteca</Text>
-            {library.filter((item) => !item.archived).map((exercise) => (
-              <TouchableOpacity
-                key={exercise.id}
-                style={styles.libraryItem}
-                onPress={() => openExercise(exercise.id)}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.itemTitle}>{exercise.name}</Text>
-                  <Text style={styles.meta}>{exercise.primaryMuscleGroup} · {exercise.category}</Text>
-                </View>
-                <Text style={styles.link}>Configurar →</Text>
-              </TouchableOpacity>
-            ))}
+            <TouchableOpacity
+              style={styles.libraryItem}
+              onPress={() => navigation.navigate('ExercisePicker', { planId, dayId })}
+            >
+              <Text style={styles.itemTitle}>Buscar exercício</Text>
+              <Text style={styles.link}>Abrir biblioteca →</Text>
+            </TouchableOpacity>
           </View>
-          {!!day.exercises.length && (
+          {!!exercises.length && !day.restDay && !dirty && (
             <TouchableOpacity
               style={styles.start}
               onPress={() => void onStart(plan.id, day.id)}
             >
               <Text style={styles.startText}>Iniciar este treino</Text>
             </TouchableOpacity>
+          )}
+          {!!exercises.length && !day.restDay && dirty && (
+            <Text style={styles.saveHint}>Salve as alterações antes de iniciar o treino.</Text>
           )}
         </>
       )}
@@ -266,18 +275,20 @@ export function TrainingPlanDayScreen({
 function OrderButtons({
   up,
   down,
+  busy,
   onUp,
   onDown,
 }: {
   up: boolean
   down: boolean
+  busy: boolean
   onUp: () => void
   onDown: () => void
 }) {
   return (
     <View style={{ flexDirection: 'row' }}>
-      <TouchableOpacity disabled={!up} onPress={onUp}><Text style={{ opacity: up ? 1 : 0.2, padding: 6 }}>↑</Text></TouchableOpacity>
-      <TouchableOpacity disabled={!down} onPress={onDown}><Text style={{ opacity: down ? 1 : 0.2, padding: 6 }}>↓</Text></TouchableOpacity>
+      <TouchableOpacity disabled={!up || busy} onPress={onUp}><Text style={{ opacity: up && !busy ? 1 : 0.2, padding: 6 }}>↑</Text></TouchableOpacity>
+      <TouchableOpacity disabled={!down || busy} onPress={onDown}><Text style={{ opacity: down && !busy ? 1 : 0.2, padding: 6 }}>↓</Text></TouchableOpacity>
     </View>
   )
 }
@@ -301,9 +312,11 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   meta: { color: colors.gray500, fontSize: 8, marginTop: 4 },
   link: { color: colors.ink, fontSize: 8, fontWeight: '800', padding: 6 },
   remove: { color: colors.danger, fontSize: 17, padding: 6 },
+  rowError: { color: colors.danger, fontSize: 7, maxWidth: 90 },
   error: { color: colors.danger, fontSize: 9, marginBottom: 8 },
   start: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 16, minHeight: 52, justifyContent: 'center' },
   startText: { color: colors.onPrimary, fontSize: 11, fontWeight: '800' },
+  saveHint: { color: colors.gray500, fontSize: 9, textAlign: 'center' },
   empty: { alignItems: 'center', flex: 1, justifyContent: 'center' },
   title: { color: colors.ink, fontSize: 18, fontWeight: '800' },
 })

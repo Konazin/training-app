@@ -11,7 +11,7 @@ training-app/
 └── web/      # Vue 3, Vite, Tailwind CSS e TypeScript
 ```
 
-As duas interfaces agora cobrem o fluxo normal completo:
+O mobile concentra o fluxo principal; a interface web permanece como apoio para teste e debug:
 
 1. **Início:** resumo de treinos, exercícios, minutos e sessões recentes.
 2. **Gestão de treinos:** cadastro, listagem e exclusão de treinos.
@@ -33,7 +33,9 @@ O backend segue MVC com uma camada de serviço:
 - `controller`: contrato HTTP;
 - `dto`: entradas e respostas da API.
 
-Nos clientes, `models` descreve o contrato, `services` concentra o acesso HTTP, `controllers` gerencia estado e ações, e `views`/`screens` renderiza a interface.
+No mobile, `workout-session` e `training-plan` seguem MVC por feature, com
+`model`, `repository`, `service`, `controller` e `views`. Dashboard,
+biblioteca e o domínio legado `Workout` ainda usam as pastas globais.
 
 ## Requisitos
 
@@ -102,8 +104,11 @@ O celular e o computador precisam estar na mesma rede. Se necessário, inclua a 
 | `DELETE` | `/api/training-plans/{id}/exercises/{exerciseId}` | Remove exercício da ficha |
 | `PUT` | `/api/training-plans/{planId}/days/{dayId}` | Configura treino ou descanso |
 | `POST` | `/api/training-plans/{planId}/days/{dayId}/exercises` | Adiciona exercício reutilizável ao dia |
+| `PUT` | `/api/training-plans/{planId}/days/{dayId}/exercises/{exerciseId}` | Edita a configuração do exercício |
 | `PUT` | `/api/training-plans/{planId}/days/{dayId}/exercises/order` | Reordena exercícios |
 | `POST` | `/api/training-plans/{planId}/days/{dayId}/rest-activities` | Adiciona atividade opcional |
+| `PUT` | `/api/training-plans/{planId}/days/{dayId}/rest-activities/{activityId}` | Edita atividade opcional |
+| `PUT` | `/api/training-plans/{planId}/days/{dayId}/rest-activities/order` | Reordena atividades opcionais |
 | `POST` | `/api/training-plans/{id}/activate` | Define a ficha ativa |
 | `POST` | `/api/training-plans/{id}/duplicate` | Duplica a ficha |
 | `PATCH` | `/api/training-plans/{id}/archive` | Arquiva a ficha |
@@ -147,26 +152,35 @@ mvn test
 
 # Web
 cd web
+npm ci
 npm run build
 
 # Mobile
 cd mobile
+npm ci
 npm run typecheck
+npm run test
 npx expo install --check
+EXPO_NO_TELEMETRY=1 npx expo export --platform android --output-dir dist
 ```
 
-Estado atual:
-
-- backend: 6 testes de integração aprovados;
-- web: typecheck e bundle de produção aprovados;
-- mobile: typecheck, compatibilidade Expo e bundle Android aprovados.
+Os testes Maven e Vitest descobrem automaticamente os casos disponíveis, sem
+depender de uma quantidade fixa documentada.
 
 ## Persistência e migração
 
-- `schema.sql` é a migração incremental de compatibilidade da versão semanal.
+- `schema.sql` mantém a compatibilidade das colunas da versão semanal.
+- `TrainingPlanWeekMigration` consolida somente dias duplicados vazios,
+  completa weekdays ausentes de forma idempotente e cria a restrição única
+  `(training_plan_id, weekday)` antes da inicialização do Hibernate.
+- Duplicatas em que mais de um dia contém exercícios ou atividades interrompem
+  a inicialização com uma mensagem clara.
 - As novas tabelas são gerenciadas pelo JPA/Hibernate conforme o padrão que o projeto já utilizava.
 - Sessões guardam snapshots do nome e configuração dos exercícios; mudanças futuras na ficha não alteram o histórico.
 - Volume de musculação é calculado somente para séries concluídas: `carga × repetições`.
 - Não são inventadas calorias para sessões do novo domínio.
 
-Não há comando separado de migration: ela roda automaticamente com `mvn spring-boot:run`. Também não há scripts de lint configurados atualmente; as verificações disponíveis são os testes Maven, `vue-tsc` no build web e `tsc --noEmit` no mobile.
+Não há comando separado de migration: ela roda automaticamente com
+`mvn spring-boot:run`. O APK depende da API Java e ainda não possui banco
+local, sincronização ou funcionamento offline. O fluxo legado `Workout`
+continua disponível para sessões avulsas.

@@ -6,7 +6,7 @@ import type {
   SetLogInput,
   WorkoutSession,
 } from '../model/workoutSession'
-import { adjustRestTimer } from '../model/workoutSession'
+import { adjustRestTimer, resumeRestTimer } from '../model/workoutSession'
 import type { WorkoutSessionRepository } from '../repository/WorkoutSessionRepository'
 import { httpWorkoutSessionRepository } from '../service/httpWorkoutSessionRepository'
 
@@ -150,9 +150,7 @@ export function useWorkoutSessionController(
     if (success) {
       setRestTimer((current) => {
         if (!current?.paused) return current
-        const pausedFor = Date.now() - (current.pausedAt ?? Date.now())
-        const next = { ...current, endsAt: current.endsAt + pausedFor, paused: false }
-        delete next.pausedAt
+        const next = resumeRestTimer(current)
         void workoutSessionStorage.setRestTimer(next)
         return next
       })

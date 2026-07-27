@@ -26,7 +26,6 @@ import java.util.LinkedHashMap;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 @Service
 @Transactional
@@ -46,25 +45,10 @@ public class TrainingPlanService {
     }
 
     public List<TrainingPlanResponse> findAll() {
-        return repository.findAllByOrderByUpdatedAtDesc().stream().map(plan -> {
-            if (completeMissingDays(plan)) {
-                touch(plan);
-                repository.save(plan);
-            }
-            return toResponse(plan);
-        }).toList();
+        return repository.findAllByOrderByUpdatedAtDesc().stream().map(this::toResponse).toList();
     }
 
-    public TrainingPlanResponse findById(Long id) { return ensureWeek(id); }
-
-    public TrainingPlanResponse ensureWeek(Long id) {
-        TrainingPlan plan = findPlan(id);
-        if (completeMissingDays(plan)) {
-            touch(plan);
-            repository.save(plan);
-        }
-        return toResponse(plan);
-    }
+    public TrainingPlanResponse findById(Long id) { return toResponse(findPlan(id)); }
 
     public TrainingPlanResponse create(TrainingPlanRequest request) {
         validateDates(request);
@@ -93,10 +77,6 @@ public class TrainingPlanService {
 
     public TrainingPlanResponse duplicate(Long id) {
         TrainingPlan source = findPlan(id);
-        if (completeMissingDays(source)) {
-            touch(source);
-            repository.save(source);
-        }
         TrainingPlan copy = new TrainingPlan();
         copy.setName(source.getName() + " — cópia");
         copy.setDescription(source.getDescription());
@@ -107,24 +87,33 @@ public class TrainingPlanService {
         OffsetDateTime now = OffsetDateTime.now();
         copy.setCreatedAt(now);
         copy.setUpdatedAt(now);
-        for (TrainingPlanDay sourceDay : source.getDays()) {
+        for (DayOfWeek weekday : DayOfWeek.values()) {
+            TrainingPlanDay sourceDay = source.getDays().stream()
+                    .filter(day -> day.getWeekday() == weekday)
+                    .findFirst()
+                    .orElse(null);
             TrainingPlanDay day = new TrainingPlanDay();
             day.setTrainingPlan(copy);
-            copyDayFields(sourceDay, day);
-            for (TrainingDayExercise sourceExercise : sourceDay.getExercises()) {
-                TrainingDayExercise exercise = cloneExercise(sourceExercise, day);
-                day.getExercises().add(exercise);
-            }
-            for (RestDayActivity sourceActivity : sourceDay.getRestActivities()) {
-                RestDayActivity activity = new RestDayActivity();
-                activity.setPlanDay(day);
-                activity.setName(sourceActivity.getName());
-                activity.setDescription(sourceActivity.getDescription());
-                activity.setEstimatedDurationMinutes(sourceActivity.getEstimatedDurationMinutes());
-                activity.setCategory(sourceActivity.getCategory());
-                activity.setOptional(sourceActivity.isOptional());
-                activity.setSortOrder(sourceActivity.getSortOrder());
-                day.getRestActivities().add(activity);
+            if (sourceDay == null) {
+                day.setWeekday(weekday);
+                day.setSortOrder(weekday.getValue());
+            } else {
+                copyDayFields(sourceDay, day);
+                for (TrainingDayExercise sourceExercise : sourceDay.getExercises()) {
+                    TrainingDayExercise exercise = cloneExercise(sourceExercise, day);
+                    day.getExercises().add(exercise);
+                }
+                for (RestDayActivity sourceActivity : sourceDay.getRestActivities()) {
+                    RestDayActivity activity = new RestDayActivity();
+                    activity.setPlanDay(day);
+                    activity.setName(sourceActivity.getName());
+                    activity.setDescription(sourceActivity.getDescription());
+                    activity.setEstimatedDurationMinutes(sourceActivity.getEstimatedDurationMinutes());
+                    activity.setCategory(sourceActivity.getCategory());
+                    activity.setOptional(sourceActivity.isOptional());
+                    activity.setSortOrder(sourceActivity.getSortOrder());
+                    day.getRestActivities().add(activity);
+                }
             }
             copy.getDays().add(day);
         }
@@ -400,23 +389,6 @@ public class TrainingPlanService {
 
     private void validateReps(int minReps, int maxReps) {
         if (maxReps < minReps) throw new IllegalArgumentException("A repetição máxima deve ser maior ou igual à mínima");
-    }
-
-    private boolean completeMissingDays(TrainingPlan plan) {
-        Set<DayOfWeek> existing = new HashSet<>();
-        plan.getDays().forEach(day -> existing.add(day.getWeekday()));
-        boolean changed = false;
-        for (DayOfWeek weekday : DayOfWeek.values()) {
-            if (existing.contains(weekday)) continue;
-            TrainingPlanDay day = new TrainingPlanDay();
-            day.setTrainingPlan(plan);
-            day.setWeekday(weekday);
-            day.setSortOrder(weekday.getValue());
-            plan.getDays().add(day);
-            changed = true;
-        }
-        if (changed) plan.getDays().sort(Comparator.comparingInt(TrainingPlanDay::getSortOrder));
-        return changed;
     }
 
     private void validateDates(TrainingPlanRequest request) {

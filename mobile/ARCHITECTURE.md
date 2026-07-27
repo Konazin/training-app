@@ -26,6 +26,17 @@ navegação.
 serviço HTTP, o controller e as telas da montagem semanal. Suas mutações
 atualizam somente o estado da própria feature.
 
+Os formulários da ficha usam `useUnsavedChangesGuard`, baseado no
+`usePreventRemove` da navegação, para proteger alterações reais ainda não
+salvas. A biblioteca permanece como dependência somente de leitura; o seletor
+da ficha usa `FlatList`, busca e filtro sem extrair uma nova feature.
+
+Testes de funções puras usam Vitest:
+
+```bash
+npm run test
+```
+
 ## Migração restante
 
 `useTrainingController` ainda coordena dashboard, biblioteca e o fluxo legado
@@ -34,3 +45,4 @@ de `Workout`.
 As telas `WorkoutsScreen` e `ExerciseScreen` ainda dependem de `Workout` e
 `Exercise`. Esse domínio é legado e não deve receber novas funcionalidades.
 Sessões novas usam `TrainingPlan`, `TrainingPlanDay` e `WorkoutSession`.
+O APK depende da API Java e não oferece persistência ou sincronização offline.

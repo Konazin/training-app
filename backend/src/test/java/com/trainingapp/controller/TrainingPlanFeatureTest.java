@@ -50,20 +50,25 @@ class TrainingPlanFeatureTest {
     }
 
     @Test
-    void createsSevenDaysAndCompletesOnlyMissingDays() throws Exception {
+    void createsSevenUniqueDaysAndGetDoesNotRepairMissingDays() throws Exception {
         JsonNode plan = createPlan("Semana íntegra");
         assertEquals(7, plan.get("days").size());
 
         long removedDayId = plan.get("days").get(3).get("id").asLong();
         dayRepository.deleteById(removedDayId);
 
-        JsonNode completed = json(mockMvc.perform(get("/api/training-plans/{id}", plan.get("id").asLong()))
+        JsonNode unchanged = json(mockMvc.perform(get("/api/training-plans/{id}", plan.get("id").asLong()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.days", hasSize(7)))
+                .andExpect(jsonPath("$.days", hasSize(6)))
                 .andReturn().getResponse().getContentAsString());
         Set<String> weekdays = new HashSet<>();
-        completed.get("days").forEach(day -> weekdays.add(day.get("weekday").asText()));
-        assertEquals(7, weekdays.size());
+        unchanged.get("days").forEach(day -> weekdays.add(day.get("weekday").asText()));
+        assertEquals(6, weekdays.size());
+        assertEquals(6, dayRepository.count());
+
+        mockMvc.perform(post("/api/training-plans/{id}/duplicate", plan.get("id").asLong()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.days", hasSize(7)));
     }
 
     @Test

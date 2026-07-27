@@ -49,6 +49,12 @@ export function TrainingPlanView({
           </TouchableOpacity>
         )}
       />
+      <TouchableOpacity
+        style={styles.archivedLink}
+        onPress={() => navigation.navigate('ArchivedTrainingPlans')}
+      >
+        <Text style={styles.archivedLinkText}>Ver fichas arquivadas</Text>
+      </TouchableOpacity>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.planScroll}>
         {visiblePlans.map((plan) => (
           <TouchableOpacity
@@ -133,6 +139,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   content: { padding: shared.pagePadding, paddingBottom: 110 },
   headerButton: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 15, height: 44, justifyContent: 'center', width: 44 },
   headerButtonText: { color: colors.onPrimary, fontSize: 20 },
+  archivedLink: { alignSelf: 'flex-start', marginBottom: 12 },
+  archivedLinkText: { color: colors.gray500, fontSize: 9, fontWeight: '700' },
   planScroll: { marginBottom: 14 },
   planChip: { backgroundColor: colors.card, borderColor: colors.gray200, borderRadius: 16, borderWidth: 1, marginRight: 8, minWidth: 145, padding: 12 },
   planChipActive: { backgroundColor: colors.nearBlack },

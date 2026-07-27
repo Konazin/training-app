@@ -56,8 +56,6 @@ public class SeedDataConfig {
                 ));
             }
 
-            trainingPlanRepository.findAll().forEach(plan -> trainingPlanService.ensureWeek(plan.getId()));
-
             var pushUp = exerciseLibrary.createSystem(exercise(
                     "Flexão de braços", "Peitoral", "Peso corporal", ExerciseCategory.STRENGTH));
             var pullUp = exerciseLibrary.createSystem(exercise(
