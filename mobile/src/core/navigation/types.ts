@@ -1,5 +1,7 @@
 import type { NavigatorScreenParams } from '@react-navigation/native'
 
+export type SessionOrigin = 'NORMAL' | 'UMAMUSUME'
+
 export type MainTabParamList = {
   Today: undefined
   Plan: undefined
@@ -12,7 +14,10 @@ export type RootStackParamList = {
   Workouts: undefined
   Library: undefined
   Exercise: undefined
-  Session: undefined
+  Session: { origin?: SessionOrigin } | undefined
+  UmaCareer: undefined
+  UmaCareerCreate: undefined
+  UmaCareerHistory: { careerId: number }
   ArchivedTrainingPlans: undefined
   ExercisePicker: { planId: number; dayId: number }
   TrainingPlanEditor: { planId?: number } | undefined

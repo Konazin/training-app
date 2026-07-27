@@ -94,6 +94,11 @@ export function useWorkoutSessionController(
     }
   }, [repository])
 
+  const adoptSession = useCallback((session: WorkoutSession) => {
+    setActiveSession(session)
+    setSessions((current) => [session, ...current.filter((item) => item.id !== session.id)])
+  }, [])
+
   const updateSet = useCallback((
     exerciseId: number,
     setId: number,
@@ -233,6 +238,7 @@ export function useWorkoutSessionController(
     busyKeys,
     refresh,
     start,
+    adoptSession,
     updateSet,
     addSet,
     removeSet,

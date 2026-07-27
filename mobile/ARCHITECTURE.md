@@ -37,6 +37,14 @@ Testes de funções puras usam Vitest:
 npm run test
 ```
 
+## Modo Umamusume
+
+`src/features/umamusume` mantém seus modelos, repository HTTP, controller e
+telas isolados. O modo inicia a sessão real pelo backend e entrega a resposta
+ao controller de sessão com `adoptSession`, sem repetir a requisição ou a tela
+de execução. A origem tipada da rota `Session` determina se o encerramento
+retorna ao histórico normal ou à carreira.
+
 ## Migração restante
 
 `useTrainingController` ainda coordena dashboard, biblioteca e o fluxo legado

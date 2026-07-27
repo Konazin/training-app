@@ -26,6 +26,10 @@ import { RestActivityEditorScreen } from './src/features/training-plan/views/Res
 import { TrainingPlanDayScreen } from './src/features/training-plan/views/TrainingPlanDayScreen'
 import { TrainingPlanEditorScreen } from './src/features/training-plan/views/TrainingPlanEditorScreen'
 import { TrainingPlanView } from './src/features/training-plan/views/TrainingPlanView'
+import { useUmaCareerController } from './src/features/umamusume/controller/useUmaCareerController'
+import { UmaCareerCreateScreen } from './src/features/umamusume/views/UmaCareerCreateScreen'
+import { UmaCareerHistoryScreen } from './src/features/umamusume/views/UmaCareerHistoryScreen'
+import { UmaCareerScreen } from './src/features/umamusume/views/UmaCareerScreen'
 import { useWorkoutSessionController } from './src/features/workout-session/controller/useWorkoutSessionController'
 import { WorkoutSessionScreen } from './src/features/workout-session/views/WorkoutSessionScreen'
 import { ExerciseScreen } from './src/screens/ExerciseScreen'
@@ -53,8 +57,9 @@ function TrainingApp() {
   const controller = useTrainingController()
   const trainingPlan = useTrainingPlanController()
   const workoutSession = useWorkoutSessionController()
+  const umaCareer = useUmaCareerController()
   const [currentRoute, setCurrentRoute] = useState('MainTabs')
-  const message = workoutSession.message || trainingPlan.message || controller.message
+  const message = umaCareer.message || workoutSession.message || trainingPlan.message || controller.message
   const navigationTheme = useMemo<NavigationTheme>(() => ({
     ...DefaultTheme,
     dark: isDark,
@@ -70,8 +75,13 @@ function TrainingApp() {
   }), [colors, isDark])
 
   useEffect(() => {
-    void Promise.all([controller.refresh(), trainingPlan.refresh(), workoutSession.refresh()])
-  }, [controller.refresh, trainingPlan.refresh, workoutSession.refresh])
+    void Promise.all([
+      controller.refresh(),
+      trainingPlan.refresh(),
+      workoutSession.refresh(),
+      umaCareer.refresh(),
+    ])
+  }, [controller.refresh, trainingPlan.refresh, workoutSession.refresh, umaCareer.refresh])
 
   return (
     <SafeAreaProvider>
@@ -103,6 +113,7 @@ function TrainingApp() {
                   controller={controller}
                   trainingPlan={trainingPlan}
                   workoutSession={workoutSession}
+                  umaCareer={umaCareer}
                 />
               )}
             </Stack.Screen>
@@ -214,9 +225,48 @@ function TrainingApp() {
                 />
               )}
             </Stack.Screen>
-            <Stack.Screen name="Session">
+            <Stack.Screen name="UmaCareer">
+              {({ navigation }) => (
+                <UmaCareerScreen
+                  career={umaCareer.career}
+                  loading={umaCareer.loading}
+                  busyKey={umaCareer.busyKey}
+                  canContinueTraining={Boolean(workoutSession.activeSession)}
+                  onCreate={() => navigation.navigate('UmaCareerCreate')}
+                  onHistory={(careerId) => {
+                    void umaCareer.refreshTurns(careerId)
+                    navigation.navigate('UmaCareerHistory', { careerId })
+                  }}
+                  onStartTraining={() => void (async () => {
+                    const session = await umaCareer.startTraining()
+                    if (!session) return
+                    workoutSession.adoptSession(session)
+                    navigation.navigate('Session', { origin: 'UMAMUSUME' })
+                  })()}
+                  onContinueTraining={() => navigation.navigate('Session', { origin: 'UMAMUSUME' })}
+                  onAcceptRestActivity={umaCareer.acceptRestActivity}
+                  onCompleteRestActivity={umaCareer.completeRestActivity}
+                  onFullRest={umaCareer.fullRest}
+                  onAbandon={umaCareer.abandonCareer}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen name="UmaCareerCreate">
               {() => (
+                <UmaCareerCreateScreen
+                  plans={trainingPlan.trainingPlans}
+                  busy={umaCareer.busyKey === 'create'}
+                  onCreate={umaCareer.createCareer}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen name="UmaCareerHistory">
+              {() => <UmaCareerHistoryScreen turns={umaCareer.turns} />}
+            </Stack.Screen>
+            <Stack.Screen name="Session">
+              {({ route }) => (
                 <WorkoutSessionScreen
+                  origin={route.params?.origin ?? 'NORMAL'}
                   session={workoutSession.activeSession}
                   restTimer={workoutSession.restTimer}
                   errors={workoutSession.errors}
@@ -232,6 +282,7 @@ function TrainingApp() {
                   onStartRest={workoutSession.startRest}
                   onAdjustRest={workoutSession.adjustRest}
                   onSkipRest={workoutSession.skipRest}
+                  onCareerRefresh={umaCareer.refresh}
                 />
               )}
             </Stack.Screen>
@@ -263,11 +314,13 @@ function MainTabs({
   controller,
   trainingPlan,
   workoutSession,
+  umaCareer,
 }: {
   navigation: NativeStackNavigationProp<RootStackParamList, 'MainTabs'>
   controller: ReturnType<typeof useTrainingController>
   trainingPlan: ReturnType<typeof useTrainingPlanController>
   workoutSession: ReturnType<typeof useWorkoutSessionController>
+  umaCareer: ReturnType<typeof useUmaCareerController>
 }) {
   const { colors } = useTheme()
   const symbols: Record<keyof MainTabParamList, string> = {
@@ -338,7 +391,10 @@ function MainTabs({
         {() => (
           <MoreScreen
             onOpen={(screen) => {
-              if (screen === 'Exercise') {
+              if (screen === 'UmaCareer') {
+                void umaCareer.refresh()
+                navigation.navigate('UmaCareer')
+              } else if (screen === 'Exercise') {
                 navigation.navigate('Exercise')
               } else if (screen === 'Workouts') {
                 navigation.navigate('Workouts')

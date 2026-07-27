@@ -5,7 +5,7 @@ import { shared, type ThemeColors, useTheme } from '../theme'
 export function MoreScreen({
   onOpen,
 }: {
-  onOpen: (screen: 'Workouts' | 'Library' | 'Exercise') => void
+  onOpen: (screen: 'Workouts' | 'Library' | 'Exercise' | 'UmaCareer') => void
 }) {
   const { colors } = useTheme()
   const styles = createStyles(colors)
@@ -16,6 +16,7 @@ export function MoreScreen({
         title="Mais"
         description="Acesse ferramentas usadas com menos frequência."
       />
+      <MenuItem label="Modo Umamusume" onPress={() => onOpen('UmaCareer')} />
       <MenuItem label="Treinos legados" onPress={() => onOpen('Workouts')} />
       <MenuItem label="Biblioteca de exercícios" onPress={() => onOpen('Library')} />
       <MenuItem label="Configurar exercício" onPress={() => onOpen('Exercise')} />

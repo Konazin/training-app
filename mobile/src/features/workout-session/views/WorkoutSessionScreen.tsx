@@ -12,6 +12,7 @@ import {
 import { useNavigation, usePreventRemove } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import type { RootStackParamList } from '../../../core/navigation/types'
+import type { SessionOrigin } from '../../../core/navigation/types'
 import type {
   RestTimerState,
   SessionExercise,
@@ -23,6 +24,7 @@ import type {
 import { shared, type ThemeColors, useTheme } from '../../../theme'
 
 interface Props {
+  origin: SessionOrigin
   session: WorkoutSession | null
   restTimer: RestTimerState | null
   errors: Record<string, string>
@@ -38,11 +40,13 @@ interface Props {
   onStartRest: (exerciseId: number, setId: number, seconds: number) => void
   onAdjustRest: (seconds: number) => void
   onSkipRest: () => void
+  onCareerRefresh: () => Promise<void>
 }
 
 export function WorkoutSessionScreen(props: Props) {
   const {
     session,
+    origin,
     restTimer,
     errors,
     busyKeys,
@@ -57,6 +61,7 @@ export function WorkoutSessionScreen(props: Props) {
     onStartRest,
     onAdjustRest,
     onSkipRest,
+    onCareerRefresh,
   } = props
   const { colors } = useTheme()
   const styles = createStyles(colors)
@@ -107,6 +112,7 @@ export function WorkoutSessionScreen(props: Props) {
         onPress: () => {
           void (async () => {
             if (!await onAbandon()) return
+            if (origin === 'UMAMUSUME') await onCareerRefresh()
             setCanLeave(true)
             setTimeout(() => navigation.dispatch(data.action), 0)
           })()
@@ -122,7 +128,9 @@ export function WorkoutSessionScreen(props: Props) {
         <Text style={styles.muted}>Escolha um treino na ficha semanal.</Text>
         <TouchableOpacity
           style={styles.primary}
-          onPress={() => navigation.navigate('MainTabs', { screen: 'Plan' })}
+          onPress={() => origin === 'UMAMUSUME'
+            ? navigation.navigate('UmaCareer')
+            : navigation.navigate('MainTabs', { screen: 'Plan' })}
         >
           <Text style={styles.primaryText}>Abrir ficha</Text>
         </TouchableOpacity>
@@ -132,8 +140,14 @@ export function WorkoutSessionScreen(props: Props) {
 
   async function completeSession() {
     if (await onComplete(rpe ? toNumber(rpe) : null, notes)) {
+      if (origin === 'UMAMUSUME') await onCareerRefresh()
       setCanLeave(true)
-      setTimeout(() => navigation.navigate('MainTabs', { screen: 'History' }), 0)
+      setTimeout(
+        () => origin === 'UMAMUSUME'
+          ? navigation.navigate('UmaCareer')
+          : navigation.navigate('MainTabs', { screen: 'History' }),
+        0,
+      )
     }
   }
 
@@ -278,8 +292,14 @@ export function WorkoutSessionScreen(props: Props) {
                 style: 'destructive',
                 onPress: () => void (async () => {
                   if (await onAbandon()) {
+                    if (origin === 'UMAMUSUME') await onCareerRefresh()
                     setCanLeave(true)
-                    setTimeout(() => navigation.navigate('MainTabs', { screen: 'History' }), 0)
+                    setTimeout(
+                      () => origin === 'UMAMUSUME'
+                        ? navigation.navigate('UmaCareer')
+                        : navigation.navigate('MainTabs', { screen: 'History' }),
+                      0,
+                    )
                   }
                 })(),
               },

@@ -20,6 +20,8 @@ O mobile concentra o fluxo principal; a interface web permanece como apoio para 
 5. **Sessão:** séries, carga, repetições, RPE, cronômetro e conclusão.
 6. **Histórico:** sessões persistidas, volume, frequência e aderência.
 7. **Adicionar exercício:** fluxo legado preservado para sessões avulsas.
+8. **Modo Umamusume:** carreira de 8, 12 ou 16 semanas usando os treinos e
+   atividades reais da ficha semanal.
 
 O visual usa uma paleta neutra em preto, branco e cinza, oferece modos claro e escuro e mantém navegação lateral no desktop e inferior no mobile.
 
@@ -33,7 +35,7 @@ O backend segue MVC com uma camada de serviço:
 - `controller`: contrato HTTP;
 - `dto`: entradas e respostas da API.
 
-No mobile, `workout-session` e `training-plan` seguem MVC por feature, com
+No mobile, `workout-session`, `training-plan` e `umamusume` seguem MVC por feature, com
 `model`, `repository`, `service`, `controller` e `views`. Dashboard,
 biblioteca e o domínio legado `Workout` ainda usam as pastas globais.
 
@@ -122,6 +124,14 @@ O celular e o computador precisam estar na mesma rede. Se necessário, inclua a 
 | `POST` | `/api/sessions/{id}/resume` | Continua a sessão |
 | `POST` | `/api/sessions/{id}/complete` | Conclui e calcula o resumo |
 | `POST` | `/api/sessions/{id}/abandon` | Abandona preservando registros |
+| `GET/POST` | `/api/umamusume/careers` | Lista ou cria carreiras |
+| `GET` | `/api/umamusume/careers/active` | Recupera a carreira ativa |
+| `GET` | `/api/umamusume/careers/{id}/turns` | Lista o histórico diário |
+| `POST` | `/api/umamusume/careers/{id}/start-training` | Inicia a sessão real do dia |
+| `POST` | `/api/umamusume/careers/{id}/rest-activities/{activityId}/accept` | Aceita uma atividade |
+| `POST` | `/api/umamusume/careers/{id}/rest-activities/{activityId}/complete` | Conclui uma atividade |
+| `POST` | `/api/umamusume/careers/{id}/full-rest` | Realiza descanso completo |
+| `POST` | `/api/umamusume/careers/{id}/abandon` | Encerra a carreira |
 
 Exemplo de treino com estatísticas padrão e livres:
 
@@ -179,6 +189,11 @@ depender de uma quantidade fixa documentada.
 - Sessões guardam snapshots do nome e configuração dos exercícios; mudanças futuras na ficha não alteram o histórico.
 - Volume de musculação é calculado somente para séries concluídas: `carga × repetições`.
 - Não são inventadas calorias para sessões do novo domínio.
+- A carreira do Modo Umamusume persiste no backend, aplica progressão pelos
+  eventos de conclusão/abandono da sessão e não depende de armazenamento local.
+- Nesta primeira versão, a carreira consulta a ficha atual diretamente. Alterar
+  a ficha durante uma carreira muda os próximos dias; o snapshot completo fica
+  para uma etapa futura.
 
 Não há comando separado de migration: ela roda automaticamente com
 `mvn spring-boot:run`. O APK depende da API Java e ainda não possui banco

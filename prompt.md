@@ -1,291 +1,684 @@
-Continue o hardening incremental do repositório `training-app` a partir do commit:
+Continue o desenvolvimento do repositório `training-app` a partir do commit:
 
-a76ae785bd5d371173aaa9aa61f942978e184b27
+e1d09254030de51bdc3cc3d21d5b3ecc91d83426
 
-Esta etapa é um patch de estabilidade e usabilidade. Não extraia novas features e não implemente o Modo Umamusume.
+Implemente a primeira versão jogável do **Modo Umamusume**.
 
-O APK React Native/Expo continua sendo o produto principal. A web serve apenas para debugging.
+O APK React Native/Expo é o produto principal. A web continua sendo apenas uma interface de debugging.
 
-==================================================
-1. OBJETIVO
-==================================================
-
-Corrigir problemas residuais da feature `training-plan`, tornar os testes mobile reproduzíveis, garantir integridade dos sete dias e adicionar CI básico.
-
-Não fazer redesign amplo.
+Esta etapa deve criar o loop central do modo, sem implementar corridas, personagens oficiais, gacha, skills ou eventos aleatórios complexos.
 
 ==================================================
-2. PROTEGER FORMULÁRIOS NÃO SALVOS
+1. OBJETIVO DA ETAPA
 ==================================================
 
-Criar um hook reutilizável, por exemplo:
+O usuário deve conseguir:
 
-src/core/navigation/useUnsavedChangesGuard.ts
+1. abrir o Modo Umamusume;
+2. criar uma carreira usando uma ficha semanal existente;
+3. começar na segunda-feira da primeira semana;
+4. executar o treino real configurado para o dia;
+5. receber evolução de atributos ao concluir a sessão;
+6. realizar ou recusar atividades em dias de descanso;
+7. avançar de segunda a domingo;
+8. avançar semanas;
+9. concluir uma carreira após 8, 12 ou 16 semanas;
+10. fechar e reabrir o app sem perder o progresso.
 
-Aplicar em:
-
-- TrainingPlanEditorScreen
-- TrainingPlanDayScreen
-- DayExerciseEditorScreen
-- RestActivityEditorScreen
-
-Regras:
-
-- comparar o formulário atual com um snapshot inicial normalizado;
-- considerar `dirty` somente quando houver alteração real;
-- interceptar botão voltar do Android, gesto de voltar e navegação programática;
-- exibir confirmação:
-  - continuar editando;
-  - descartar alterações;
-- não exibir confirmação quando nada mudou;
-- após salvar com sucesso, atualizar o snapshot antes de sair;
-- evitar alertas duplicados;
-- não bloquear navegação após uma operação concluída.
+O modo deve usar os treinos reais do aplicativo. Não criar sessões falsas ou simuladas.
 
 ==================================================
-3. CORRIGIR ESTADO DO DIA
+2. NOMENCLATURA E DIREITOS AUTORAIS
 ==================================================
 
-Em `TrainingPlanDayScreen`, a interface atualmente usa o valor persistido `day.restDay` para decidir se mostra exercícios ou atividades, embora o checkbox use o estado local `restDay`.
+O nome da funcionalidade deve permanecer:
 
-Corrigir para que:
+Modo Umamusume
 
-- a interface reaja imediatamente ao estado local `restDay`;
-- ao marcar descanso, os exercícios sejam escondidos e as atividades apareçam;
-- ao desmarcar, os exercícios reapareçam;
-- nenhuma informação seja apagada;
-- iniciar treino continue permitido somente após o estado ter sido salvo no backend;
-- alterações não salvas sejam protegidas pelo guard.
+Porém:
 
-Após salvar, sincronizar o formulário e o snapshot com a resposta atualizada.
+- não usar personagens oficiais;
+- não usar nomes de personagens oficiais;
+- não copiar textos, artes, músicas, ícones ou assets oficiais;
+- usar avatar neutro ou placeholder original;
+- usar apenas o design e a paleta já existentes no projeto.
 
-==================================================
-4. FICHAS ARQUIVADAS
-==================================================
-
-Adicionar uma rota/tela simples:
-
-ArchivedTrainingPlansScreen
-
-Permitir:
-
-- listar fichas arquivadas;
-- visualizar nome, categoria e última atualização;
-- restaurar ficha usando `archive(id, false)`;
-- editar ou ativar somente depois de restaurar;
-- mostrar estado vazio quando não houver arquivadas.
-
-Adicionar acesso pela tela de edição/gestão de fichas.
-
-A aba principal deve continuar escondendo fichas arquivadas.
-
-Ao arquivar a ficha selecionada:
-
-- selecionar outra ficha não arquivada;
-- não chamar `setSelectedTrainingPlanId` dentro do callback de `setTrainingPlans`;
-- manter os setters de estado puros;
-- usar uma função de reconciliação ou efeito separado.
+O projeto é open source, portanto não incorporar material protegido de terceiros.
 
 ==================================================
-5. AÇÕES DESTRUTIVAS
+3. ARQUITETURA BACKEND POR FEATURE
 ==================================================
 
-Adicionar confirmação antes de remover atividade de descanso.
+Criar uma feature isolada:
 
-Texto deve informar claramente:
+backend/src/main/java/com/trainingapp/umamusume/
+├── controller/
+├── dto/
+├── model/
+├── repository/
+├── service/
+├── rules/
+└── listener/
 
-- nome da atividade;
-- que a remoção não poderá ser desfeita.
+Não colocar regras do modo em:
 
-Também impedir múltiplos toques durante a remoção.
+- WorkoutSessionController;
+- WorkoutSessionService;
+- TrainingPlanService;
+- controllers mobile;
+- componentes visuais.
 
-Manter a confirmação já existente para exercícios.
-
-==================================================
-6. SELETOR DE EXERCÍCIOS ESCALÁVEL
-==================================================
-
-Remover a renderização da biblioteca inteira dentro do `ScrollView` de `TrainingPlanDayScreen`.
-
-Criar uma tela ou componente dedicado:
-
-ExercisePickerScreen
-
-Requisitos:
-
-- usar `FlatList`;
-- busca por nome, grupo muscular e equipamento;
-- filtro opcional por categoria;
-- excluir exercícios arquivados;
-- mostrar estado vazio;
-- preservar a confirmação quando o exercício já existe no dia;
-- abrir `DayExerciseEditorScreen` somente após a seleção.
-
-Reutilizar uma versão pesquisável para escolher exercício alternativo.
-
-Não renderizar centenas de exercícios como chips horizontais.
-
-Não extrair ainda a feature `exercise-library`.
+A integração com sessões deve ocorrer por serviço e pelos eventos de domínio já existentes.
 
 ==================================================
-7. TESTE REAL DO CRONÔMETRO
+4. MODELO DA CARREIRA
 ==================================================
 
-O arquivo atual `workoutSession.test.ts` contém asserts, mas não é executado por nenhum script.
+Criar a entidade `UmaCareer`.
 
-Adicionar uma suíte de testes mobile mínima e reproduzível.
+Campos mínimos:
 
-Preferência:
+- id;
+- name;
+- trainingPlan;
+- status;
+- totalWeeks;
+- currentWeek;
+- currentWeekday;
+- strength;
+- endurance;
+- agility;
+- technique;
+- discipline;
+- energy;
+- fatigue;
+- mood;
+- confidence;
+- createdAt;
+- updatedAt;
+- completedAt;
+- version para optimistic locking.
 
-- Vitest;
-- somente testes de funções puras nesta etapa;
-- sem testes de UI.
+Enums:
 
-Converter o teste atual para uma suíte real cobrindo:
+CareerStatus:
+- ACTIVE
+- COMPLETED
+- ABANDONED
 
-- +15 segundos em timer ativo;
-- -15 segundos em timer ativo sem ficar negativo;
-- +15 segundos em timer pausado usando `pausedAt`;
-- -15 segundos em timer pausado respeitando o limite congelado;
-- retomar preservando o tempo restante.
+Atributos iniciais:
 
-Adicionar ao `package.json`:
+- strength: 10
+- endurance: 10
+- agility: 10
+- technique: 10
+- discipline: 10
+- energy: 100
+- fatigue: 0
+- mood: 60
+- confidence: 50
+- currentWeek: 1
+- currentWeekday: MONDAY
 
-npm run test
+Limites:
 
-O comando deve executar os testes e retornar código diferente de zero em falha.
+- atributos principais: 0–999;
+- energy: 0–100;
+- fatigue: 0–100;
+- mood: 0–100;
+- confidence: 0–100.
 
-==================================================
-8. INTEGRIDADE DOS SETE DIAS
-==================================================
+Permitir somente uma carreira ACTIVE nesta etapa.
 
-Garantir no banco que uma ficha não possa possuir dois registros para o mesmo weekday.
+`totalWeeks` deve aceitar apenas:
 
-Adicionar constraint única para:
-
-(training_plan_id, weekday)
-
-Requisitos:
-
-- atualizar a entidade JPA;
-- criar migração compatível com o H2 atual;
-- não apagar silenciosamente dias duplicados que contenham exercícios ou atividades;
-- se existirem duplicatas com dados, interromper a migração com mensagem clara;
-- duplicatas vazias podem ser consolidadas de forma segura, caso necessário;
-- validar a migração com testes.
-
-Remover reparos durante endpoints GET.
-
-Atualmente `findAll` e `findById` podem completar dias ausentes e escrever no banco. Leituras devem ser puras.
-
-Mover a correção de bases antigas para:
-
-- inicialização/migração controlada; ou
-- serviço específico de reparo executado uma vez.
-
-Criação e duplicação de ficha devem continuar gerando exatamente sete dias.
-
-Adicionar testes para:
-
-- rejeitar weekday duplicado;
-- completar dias ausentes em base antiga;
-- não duplicar dias ao executar reparo mais de uma vez;
-- ficha criada possuir exatamente sete weekdays únicos;
-- endpoints GET não modificarem dados.
-
-==================================================
-9. ERROS E CHAVES DE OPERAÇÃO
-==================================================
-
-Substituir chaves genéricas como:
-
-day:{id}
-
-por chaves contextuais:
-
-- day:update:{id}
-- day:exercise:add:{id}
-- day:exercise:reorder:{id}
-- day:activity:add:{id}
-- day:activity:reorder:{id}
-- exercise:update:{id}
-- exercise:remove:{id}
-- activity:update:{id}
-- activity:remove:{id}
-
-Cada erro deve aparecer próximo à ação correspondente.
-
-Não permitir que erro de ordenação apareça como erro do formulário do dia.
+- 8;
+- 12;
+- 16.
 
 ==================================================
-10. DOCUMENTAÇÃO
+5. REGISTRO DOS TURNOS
 ==================================================
 
-Atualizar README e ARCHITECTURE.md:
+Criar `UmaCareerTurn`.
 
-- arquitetura MVC por feature no mobile;
-- novos endpoints da ficha;
-- comandos reais de teste mobile;
-- quantidade atual de testes sem fixar número que ficará obsoleto;
-- deixar claro que o fluxo legado `Workout` ainda existe;
-- não chamar o aplicativo inteiro de “completo”;
-- documentar que o APK ainda depende da API e não possui offline.
+Cada turno representa um dia da carreira.
 
-Não documentar funcionalidades não implementadas.
+Campos mínimos:
+
+- id;
+- career;
+- weekNumber;
+- weekday;
+- actionType;
+- status;
+- trainingPlanDay;
+- workoutSessionId opcional;
+- restActivityId opcional;
+- actionTitleSnapshot;
+- resultText;
+- efeitos aplicados;
+- createdAt;
+- completedAt.
+
+Enums:
+
+TurnActionType:
+- TRAINING
+- REST_ACTIVITY
+- FULL_REST
+
+TurnStatus:
+- IN_PROGRESS
+- COMPLETED
+- ABANDONED
+
+Criar constraint única para:
+
+(career_id, week_number, weekday)
+
+Não permitir executar duas ações para o mesmo turno.
+
+Persistir os efeitos aplicados ao turno para que o histórico explique por que cada atributo mudou.
+
+Os efeitos podem ser armazenados com um `@Embeddable` contendo os deltas de cada atributo.
 
 ==================================================
-11. CI NO GITHUB
+6. CALENDÁRIO DA CARREIRA
+==================================================
+
+A carreira começa sempre em:
+
+Semana 1 · Segunda-feira
+
+O dia atual deve utilizar o dia correspondente da ficha associada:
+
+- MONDAY usa o TrainingPlanDay de segunda;
+- TUESDAY usa o de terça;
+- e assim por diante.
+
+Ao concluir uma ação:
+
+- segunda avança para terça;
+- terça avança para quarta;
+- domingo avança para segunda e incrementa a semana.
+
+Ao concluir o domingo da última semana:
+
+- status passa para COMPLETED;
+- completedAt é preenchido;
+- nenhuma nova ação pode ser iniciada.
+
+Nesta etapa, a carreira pode usar a ficha atual diretamente.
+
+Não implementar snapshot completo da ficha ainda, mas documentar essa limitação.
+
+==================================================
+7. DIAS DE TREINO
+==================================================
+
+Quando o dia atual não for descanso:
+
+- exibir o treino correspondente;
+- permitir iniciar a sessão real;
+- usar os exercícios configurados no TrainingPlanDay;
+- criar um UmaCareerTurn com tipo TRAINING e status IN_PROGRESS;
+- associar o ID da WorkoutSession criada ao turno;
+- abrir a tela normal de execução de sessão.
+
+Criar endpoint semelhante a:
+
+POST /api/umamusume/careers/{careerId}/start-training
+
+O backend deve:
+
+1. validar que a carreira está ativa;
+2. validar que o dia atual é de treino;
+3. validar que ainda não há turno para o dia;
+4. iniciar a sessão usando WorkoutSessionService;
+5. criar o turno ligado à sessão;
+6. retornar carreira e sessão.
+
+Se a sessão não puder ser iniciada, não deixar turno incompleto salvo.
+
+==================================================
+8. CONCLUSÃO E ABANDONO DA SESSÃO
+==================================================
+
+Criar listener para:
+
+- TrainingDomainEvent.SessionCompleted;
+- TrainingDomainEvent.SessionAbandoned.
+
+Ao receber o evento:
+
+- localizar um UmaCareerTurn pelo workoutSessionId;
+- ignorar sessões que não pertençam ao modo;
+- impedir aplicação duplicada;
+- aplicar os efeitos;
+- completar ou abandonar o turno;
+- avançar o dia da carreira.
+
+Sessão concluída:
+
+- aplica ganhos conforme os exercícios realmente concluídos;
+- usa somente séries marcadas como concluídas;
+- avança o dia.
+
+Sessão abandonada:
+
+- não concede ganhos positivos de treino;
+- aplica penalidade;
+- marca o turno como ABANDONED;
+- avança o dia.
+
+Penalidade inicial de abandono:
+
+- discipline: -2
+- mood: -4
+- confidence: -3
+- energy: -5
+- fatigue: +2
+
+Centralizar esses valores em uma classe de regras, não espalhá-los pelo listener.
+
+==================================================
+9. REGRAS DE PROGRESSÃO DO TREINO
+==================================================
+
+Criar uma classe pura:
+
+UmaProgressionRules
+
+Ela deve receber uma WorkoutSession concluída e retornar os deltas.
+
+Regras iniciais por exercício concluído:
+
+STRENGTH ou HYPERTROPHY:
+- strength +2
+
+ENDURANCE ou CARDIO:
+- endurance +2
+- agility +1
+
+MOBILITY ou STRETCHING:
+- technique +2
+- fatigue -2
+
+TECHNIQUE:
+- technique +2
+- confidence +1
+
+RECOVERY:
+- energy +4
+- fatigue -5
+
+Ganhos gerais por sessão concluída:
+
+- discipline +2
+- mood +2
+- confidence +2
+
+Custos da sessão:
+
+- energy diminui em `8 + quantidade de séries concluídas`;
+- limitar a perda máxima de energy a 30;
+- fatigue aumenta em:
+  - 5;
+  - mais o RPE geral arredondado, usando 5 quando não informado;
+  - mais metade das séries concluídas;
+- limitar o ganho máximo de fatigue a 25.
+
+Aplicar clamp após todos os efeitos.
+
+Esses números são regras iniciais de balanceamento e devem ficar centralizados para ajuste futuro.
+
+==================================================
+10. DIAS DE DESCANSO
+==================================================
+
+Quando o dia atual for descanso:
+
+- não permitir iniciar sessão convencional;
+- listar as atividades opcionais configuradas no TrainingPlanDay;
+- oferecer também “Descanso completo”.
+
+Atividade opcional deve possuir dois passos:
+
+1. aceitar;
+2. concluir depois de realizar.
+
+Endpoints sugeridos:
+
+POST /api/umamusume/careers/{careerId}/rest-activities/{activityId}/accept
+
+POST /api/umamusume/careers/{careerId}/rest-activities/{activityId}/complete
+
+Ao aceitar:
+
+- criar turno IN_PROGRESS;
+- salvar nome, categoria e duração como snapshot;
+- não aplicar efeitos;
+- não avançar o dia.
+
+Ao concluir:
+
+- aplicar efeitos;
+- marcar turno COMPLETED;
+- avançar o dia.
+
+Se o aplicativo for fechado após aceitar, a atividade deve continuar pendente ao reabrir.
+
+==================================================
+11. REGRAS DE ATIVIDADES DE DESCANSO
+==================================================
+
+Centralizar em `UmaProgressionRules`.
+
+Normalizar categoria ignorando maiúsculas, minúsculas e acentos quando necessário.
+
+Caminhada:
+
+- endurance +2
+- discipline +2
+- mood +3
+- energy -5
+- fatigue -1
+
+Mobilidade ou alongamento:
+
+- technique +2
+- discipline +1
+- energy -2
+- fatigue -5
+
+Recuperação ativa:
+
+- energy +5
+- fatigue -8
+- mood +1
+
+Descanso completo:
+
+- energy +18
+- fatigue -12
+- discipline -1
+
+Categoria personalizada:
+
+- discipline +1
+- mood +1
+- energy -3
+
+Criar endpoint:
+
+POST /api/umamusume/careers/{careerId}/full-rest
+
+Esse endpoint representa recusar as atividades opcionais e descansar.
+
+Ele deve:
+
+- criar e completar o turno;
+- aplicar os efeitos de descanso completo;
+- avançar o dia.
+
+==================================================
+12. API
+==================================================
+
+Criar endpoints mínimos:
+
+GET /api/umamusume/careers
+GET /api/umamusume/careers/active
+GET /api/umamusume/careers/{id}
+GET /api/umamusume/careers/{id}/turns
+
+POST /api/umamusume/careers
+POST /api/umamusume/careers/{id}/start-training
+POST /api/umamusume/careers/{id}/rest-activities/{activityId}/accept
+POST /api/umamusume/careers/{id}/rest-activities/{activityId}/complete
+POST /api/umamusume/careers/{id}/full-rest
+POST /api/umamusume/careers/{id}/abandon
+
+As respostas da carreira devem incluir:
+
+- atributos;
+- semana atual;
+- weekday atual;
+- ficha associada;
+- dados resumidos do dia atual;
+- turno atual pendente;
+- progresso percentual da carreira;
+- últimos resultados.
+
+Controllers devem permanecer finos.
+
+==================================================
+13. ARQUITETURA MOBILE
 ==================================================
 
 Criar:
 
-.github/workflows/ci.yml
+mobile/src/features/umamusume/
+├── model/
+├── repository/
+├── service/
+├── controller/
+└── views/
 
-Usar:
+Criar `UmaCareerRepository` e implementação HTTP.
 
-- Java 21;
-- Maven;
-- Node compatível com `>=20.19.4`;
-- cache de Maven e npm.
+Criar controller próprio, sem adicionar estado ao `useTrainingController`.
 
-Jobs:
+Operações mínimas:
 
-Backend:
-- mvn test
-
-Mobile:
-- npm ci
-- npm run typecheck
-- npm run test
-- npx expo install --check
-- EXPO_NO_TELEMETRY=1 npx expo export --platform android --output-dir dist
-
-Web:
-- npm ci
-- npm run build
-
-Não exigir secrets.
+- refresh;
+- createCareer;
+- startTraining;
+- acceptRestActivity;
+- completeRestActivity;
+- fullRest;
+- abandonCareer.
 
 ==================================================
-12. FORA DO ESCOPO
+14. NAVEGAÇÃO MOBILE
 ==================================================
 
-Não implementar:
+Adicionar “Modo Umamusume” à tela `More`.
 
-- Modo Umamusume;
-- extração de exercise-library;
-- remoção do domínio legado Workout;
-- SQLite;
+A tela `MoreScreen` atualmente contém apenas os atalhos legados e biblioteca; ampliar o contrato sem misturar regras nela.
+
+Adicionar rotas tipadas:
+
+- UmaCareer
+- UmaCareerCreate
+- UmaCareerHistory
+
+Fluxo:
+
+Mais
+→ Modo Umamusume
+→ carreira ativa ou criação
+
+Ao iniciar treino pelo modo:
+
+- navegar para a tela Session já existente;
+- marcar a origem da navegação como UMAMUSUME.
+
+Atualizar a rota Session para aceitar:
+
+origin?: NORMAL | UMAMUSUME
+
+Ao concluir ou abandonar uma sessão:
+
+- NORMAL retorna ao Histórico;
+- UMAMUSUME retorna à tela da carreira;
+- atualizar a carreira ao retornar.
+
+Não duplicar a tela de execução de treino.
+
+==================================================
+15. INTEGRAÇÃO COM O CONTROLLER DE SESSÃO
+==================================================
+
+O endpoint de início da carreira deve retornar a WorkoutSession criada.
+
+Adicionar ao `useWorkoutSessionController` uma operação explícita, por exemplo:
+
+adoptSession(session)
+
+Ela deve:
+
+- definir a sessão retornada como ativa;
+- atualizar a lista local;
+- não iniciar uma segunda requisição;
+- não duplicar regras de sessão.
+
+Não expor setters React diretamente.
+
+==================================================
+16. TELA PRINCIPAL DO MODO
+==================================================
+
+Criar uma tela mobile-first para 360–430 px.
+
+Exibir:
+
+- nome da carreira;
+- semana atual e total;
+- dia atual;
+- progresso da temporada;
+- ficha associada;
+- status principais;
+- energy;
+- fatigue;
+- mood;
+- confidence;
+- ação disponível para o dia;
+- resultado do último turno.
+
+Atributos principais:
+
+- Força
+- Resistência
+- Agilidade
+- Técnica
+- Disciplina
+
+Usar barras compactas para:
+
+- energia;
+- fadiga;
+- humor;
+- confiança.
+
+Não usar gráficos complexos.
+
+Não copiar a interface oficial. Criar uma interface original coerente com o aplicativo atual.
+
+==================================================
+17. AÇÃO DO DIA
+==================================================
+
+Dia de treino:
+
+- mostrar nome;
+- quantidade de exercícios;
+- duração estimada;
+- botão “Iniciar treino”.
+
+Se já existir uma sessão ativa do modo:
+
+- mostrar “Continuar treino”.
+
+Dia de descanso sem atividade aceita:
+
+- listar atividades opcionais;
+- botão para aceitar cada atividade;
+- botão “Descanso completo”.
+
+Atividade aceita:
+
+- mostrar nome e duração;
+- botão “Concluir atividade”;
+- não permitir escolher outra ação.
+
+Carreira concluída:
+
+- mostrar resumo final;
+- bloquear novas ações.
+
+==================================================
+18. TESTES BACKEND
+==================================================
+
+Adicionar testes para:
+
+- criar carreira com ficha válida;
+- rejeitar duração diferente de 8, 12 ou 16;
+- impedir duas carreiras ativas;
+- iniciar na segunda da semana 1;
+- impedir treino em dia de descanso;
+- impedir atividade de descanso em dia de treino;
+- concluir sessão de força e aplicar ganhos;
+- concluir sessão de cardio e aplicar ganhos;
+- abandonar sessão, aplicar penalidade e avançar;
+- ignorar sessão não vinculada a uma carreira;
+- aceitar atividade sem avançar;
+- concluir atividade e avançar;
+- descanso completo;
+- impedir duas ações no mesmo turno;
+- domingo avançar para próxima semana;
+- último domingo concluir a carreira;
+- atributos respeitarem limites;
+- listener não aplicar efeitos duas vezes.
+
+Testar `UmaProgressionRules` separadamente como regra pura.
+
+==================================================
+19. TESTES MOBILE
+==================================================
+
+Usar Vitest somente para regras puras nesta etapa.
+
+Adicionar testes para:
+
+- cálculo de progresso da carreira;
+- formatação de semana e dia;
+- clamp visual dos atributos;
+- identificação de ação disponível pelo estado recebido.
+
+Não adicionar testes de componentes React Native agora.
+
+==================================================
+20. FORA DO ESCOPO
+==================================================
+
+Não implementar nesta etapa:
+
+- corridas;
+- provas;
+- ranking;
+- skills;
+- árvore de habilidades;
+- eventos aleatórios narrativos;
+- escolhas aleatórias;
+- personagens oficiais;
+- criação de personagem;
+- roupas;
+- gacha;
+- moedas;
+- loja;
+- achievements;
+- notificações;
 - offline;
+- SQLite;
 - sincronização;
-- autenticação;
-- gráficos;
-- drag-and-drop;
-- redesign amplo;
-- testes de componentes React Native.
+- snapshot completo da ficha;
+- redesign das telas normais.
 
 ==================================================
-13. VALIDAÇÃO FINAL
+21. VALIDAÇÃO
 ==================================================
 
 Executar:
@@ -310,21 +703,22 @@ npm run build
 Geral:
 git diff --check
 
-Não declarar conclusão se algum comando falhar.
+Não declarar conclusão se qualquer comando falhar.
 
 ==================================================
-14. ENTREGA
+22. ENTREGA
 ==================================================
 
 Ao finalizar, informar:
 
-1. bugs corrigidos;
-2. arquivos criados e alterados;
-3. comportamento dos guards de formulário;
-4. estratégia usada para integridade dos sete dias;
-5. testes adicionados;
-6. resultado de cada comando;
-7. workflow de CI criado;
-8. limitações restantes.
+1. entidades e enums criados;
+2. regras de progressão;
+3. endpoints;
+4. integração com eventos de sessão;
+5. estrutura mobile criada;
+6. fluxo de navegação;
+7. testes adicionados;
+8. resultados das validações;
+9. limitações restantes.
 
-Não avançar para outra feature.
+Não avançar para corridas ou eventos narrativos nesta etapa.
