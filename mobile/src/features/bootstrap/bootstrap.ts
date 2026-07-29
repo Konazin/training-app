@@ -1,8 +1,6 @@
 export async function bootstrapApp(
-  health: () => Promise<unknown>,
   refreshers: Array<() => Promise<boolean>>,
 ) {
-  await health()
   const results = await Promise.all(refreshers.map((refresh) => refresh()))
   if (results.some((result) => !result)) {
     throw new Error('Não foi possível carregar todos os dados iniciais.')

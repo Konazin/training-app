@@ -1,0 +1,20 @@
+{
+  "name": "@training/training-local-db",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",
+  "types": "index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@training/training-domain": "*",
+    "expo-sqlite": "~56.0.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.10"
+  }
+}

@@ -1,27 +1,40 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import type { BootstrapState } from './useAppBootstrap'
 import { useTheme } from '../../theme'
 
-export function BootstrapScreen({ state, message, onRetry }: {
-  state: Exclude<BootstrapState, 'ready'>
+export function BootstrapScreen({ state, message, onRetry, migrationName, onExportDiagnostic }: {
+  state: string
   message: string
   onRetry: () => void
+  migrationName?: string
+  onExportDiagnostic?: () => void
 }) {
   const { colors } = useTheme()
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <Text style={[styles.mark, { color: colors.ink }]}>TRAINING</Text>
       <Text style={[styles.title, { color: colors.ink }]}>
-        {state === 'loading' ? 'Preparando seus treinos…' : 'Não foi possível conectar'}
+        {state === 'migrating_data'
+          ? 'Atualizando seus dados…'
+          : state === 'error'
+            ? 'Não foi possível abrir os dados locais'
+            : 'Preparando seus treinos…'}
       </Text>
+      {state === 'migrating_data' && !!migrationName && (
+        <Text style={[styles.address, { color: colors.gray500 }]}>{migrationName}</Text>
+      )}
       {state === 'error' && <>
         <Text style={[styles.message, { color: colors.gray500 }]}>{message}</Text>
         <Text style={[styles.address, { color: colors.gray500 }]}>
-          API: {process.env.EXPO_PUBLIC_API_URL || 'não configurada'}
+          Seus dados não serão apagados automaticamente.
         </Text>
         <Pressable accessibilityRole="button" onPress={onRetry} style={[styles.button, { backgroundColor: colors.primary }]}>
           <Text style={{ color: colors.onPrimary, fontWeight: '800' }}>Tentar novamente</Text>
         </Pressable>
+        {!!onExportDiagnostic && (
+          <Pressable accessibilityRole="button" onPress={onExportDiagnostic}>
+            <Text style={[styles.diagnostic, { color: colors.ink }]}>Exportar diagnóstico</Text>
+          </Pressable>
+        )}
       </>}
     </View>
   )
@@ -34,4 +47,5 @@ const styles = StyleSheet.create({
   message: { lineHeight: 20, marginTop: 12, textAlign: 'center' },
   address: { fontSize: 11, marginTop: 8, textAlign: 'center' },
   button: { borderRadius: 14, marginTop: 22, paddingHorizontal: 22, paddingVertical: 15 },
+  diagnostic: { fontSize: 12, fontWeight: '700', marginTop: 18 },
 })

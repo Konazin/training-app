@@ -1,44 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AppState } from 'react-native'
-import { trainingApi } from '../../services/trainingApi'
 import { bootstrapApp, singleFlight } from './bootstrap'
 
 export type BootstrapState = 'loading' | 'ready' | 'error'
 
-export function useAppBootstrap(
-  refreshTraining: () => Promise<boolean>,
-  refreshPlans: () => Promise<boolean>,
-  refreshSession: () => Promise<boolean>,
-) {
+export function useAppBootstrap(refreshers: Array<() => Promise<boolean>>) {
   const [state, setState] = useState<BootstrapState>('loading')
   const [message, setMessage] = useState('')
-  const operationRef = useRef<(background: boolean) => Promise<void>>(async () => {})
+  const refreshersRef = useRef(refreshers)
+  refreshersRef.current = refreshers
 
-  operationRef.current = async (background: boolean) => {
-    if (!background) {
-      setState('loading')
-      setMessage('')
-    }
+  const operation = useRef(singleFlight(async () => {
+    setState('loading')
+    setMessage('')
     try {
-      await bootstrapApp(trainingApi.getHealth, [refreshSession, refreshPlans, refreshTraining])
+      await bootstrapApp(refreshersRef.current)
       setState('ready')
-      setMessage('')
     } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : 'Não foi possível iniciar o aplicativo.')
-      if (!background) setState('error')
+      setMessage(cause instanceof Error ? cause.message : 'Não foi possível carregar os dados locais.')
+      setState('error')
     }
-  }
-
-  const runnerRef = useRef(singleFlight((background: boolean) => operationRef.current(background)))
-  const run = useCallback((background = false) => runnerRef.current(background), [])
-
-  useEffect(() => { void run(false) }, [run])
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (next) => {
-      if (next === 'active' && state === 'ready') void run(true)
-    })
-    return () => subscription.remove()
-  }, [run, state])
-
-  return { state, message, retry: () => run(false) }
+  }))
+  const retry = useCallback(() => operation.current(), [])
+  useEffect(() => { void retry() }, [retry])
+  return { state, message, retry }
 }

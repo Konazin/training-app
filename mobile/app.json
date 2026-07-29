@@ -27,14 +27,9 @@
     },
     "plugins": [
       "expo-video",
-      [
-        "expo-build-properties",
-        {
-          "android": {
-            "usesCleartextTraffic": true
-          }
-        }
-      ]
+      "expo-sqlite",
+      "expo-sharing",
+      "expo-secure-store"
     ],
     "extra": {
       "eas": {

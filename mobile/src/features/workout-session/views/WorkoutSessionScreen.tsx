@@ -13,15 +13,15 @@ import {
 } from 'react-native'
 import { useNavigation, usePreventRemove } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
-import type { RootStackParamList } from '../../../core/navigation/types'
+import type { RootStackParamList } from '../../../navigation/types'
 import type {
-  RestTimerState,
   SessionExercise,
   SessionExerciseStatus,
   SetLog,
   SetLogInput,
   WorkoutSession,
-} from '@training/workout-session-core'
+} from '@training/training-domain'
+import type { RestTimerState } from '../model/restTimer'
 import { shared, type ThemeColors, useTheme } from '../../../theme'
 import { ExerciseVideo } from '../../exercise-library/ExerciseVideo'
 import { attributionLabel, resolveMediaAttribution } from '../../exercise-library/libraryState'

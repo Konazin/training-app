@@ -8,10 +8,10 @@ import type {
   TrainingPlanInput,
 } from '../model/trainingPlan'
 import type { TrainingPlanRepository } from '../repository/TrainingPlanRepository'
-import { httpTrainingPlanRepository } from '../service/httpTrainingPlanRepository'
 
 export function useTrainingPlanController(
-  repository: TrainingPlanRepository = httpTrainingPlanRepository,
+  repository: TrainingPlanRepository,
+  onChanged?: () => Promise<unknown>,
 ) {
   const [trainingPlans, setTrainingPlans] = useState<TrainingPlan[]>([])
   const [selectedTrainingPlanId, setSelectedTrainingPlanId] = useState<number | null>(null)
@@ -69,6 +69,7 @@ export function useTrainingPlanController(
         return next
       })
       if (options?.select) setSelectedTrainingPlanId(updated.id)
+      await onChanged?.()
       return true
     } catch (cause) {
       setErrors((current) => ({ ...current, [key]: messageFrom(cause) }))
@@ -77,7 +78,7 @@ export function useTrainingPlanController(
       busyRef.current.delete(key)
       setBusyKeys(new Set(busyRef.current))
     }
-  }, [])
+  }, [onChanged])
 
   const create = useCallback(
     (input: TrainingPlanInput) =>
@@ -111,24 +112,24 @@ export function useTrainingPlanController(
   )
   const addDayExercise = useCallback(
     (planId: number, dayId: number, input: DayExerciseInput) =>
-      mutate(`day:exercise:add:${dayId}`, () => repository.addDayExercise(planId, dayId, input)),
+      mutate(`day:exercise:add:${dayId}`, () => repository.addExercise(planId, dayId, input)),
     [mutate, repository],
   )
   const updateDayExercise = useCallback(
     (planId: number, dayId: number, exerciseId: number, input: DayExerciseConfigInput) =>
       mutate(`exercise:update:${exerciseId}`, () =>
-        repository.updateDayExercise(planId, dayId, exerciseId, input)),
+        repository.updateExercise(planId, dayId, exerciseId, input)),
     [mutate, repository],
   )
   const removeDayExercise = useCallback(
     (planId: number, dayId: number, exerciseId: number) =>
       mutate(`exercise:remove:${exerciseId}`, () =>
-        repository.removeDayExercise(planId, dayId, exerciseId)),
+        repository.removeExercise(planId, dayId, exerciseId)),
     [mutate, repository],
   )
   const reorderDayExercises = useCallback(
     (planId: number, dayId: number, exerciseIds: number[]) =>
-      mutate(`day:exercise:reorder:${dayId}`, () => repository.reorderDayExercises(planId, dayId, exerciseIds)),
+      mutate(`day:exercise:reorder:${dayId}`, () => repository.reorderExercise(planId, dayId, exerciseIds)),
     [mutate, repository],
   )
   const addRestActivity = useCallback(

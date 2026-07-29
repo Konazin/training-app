@@ -2,7 +2,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { ScreenHeader } from '../../../components/ScreenHeader'
-import type { RootStackParamList } from '../../../core/navigation/types'
+import type { RootStackParamList } from '../../../navigation/types'
 import type { TrainingPlan } from '../model/trainingPlan'
 import { shared, type ThemeColors, useTheme } from '../../../theme'
 

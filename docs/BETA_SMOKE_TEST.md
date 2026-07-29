@@ -1,5 +1,9 @@
 # Smoke test do preview privado
 
+> Relatório histórico do servidor beta opcional. As verificações mobile e EAS
+> abaixo são anteriores ao runtime local-only e não definem os requisitos do
+> aplicativo padrão. Use `LOCAL_ONLY_SMOKE_TEST.md` para o fluxo atual.
+
 ## Resultado da validação de 29/07/2026
 
 Código aprovado, build EAS bloqueado.

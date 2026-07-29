@@ -1,0 +1,130 @@
+import { describe, expect, it } from 'vitest'
+import {
+  WEEKDAYS,
+  applyMedia,
+  activateTrainingPlan,
+  archiveTrainingPlan,
+  calculateDashboard,
+  createSessionSnapshot,
+  createTrainingPlan,
+  duplicateTrainingPlan,
+  finishWorkoutSession,
+  historyStats,
+  normalizeName,
+  pauseWorkoutSession,
+  reorder,
+  resumeWorkoutSession,
+  sessionDuration,
+  sessionVolume,
+  validatePlan,
+  type ExerciseDefinition,
+  type TrainingDayExercise,
+  type WorkoutSession,
+} from '..'
+
+const now = new Date('2026-07-29T12:00:00.000Z')
+let id = 1
+const nextId = () => id++
+
+describe('training-domain', () => {
+  it('normaliza nomes, cria sete dias e duplica sem compartilhar IDs', () => {
+    id = 1
+    expect(normalizeName('  Elevação   PÉLVICA ')).toBe('elevacao pelvica')
+    const plan = createTrainingPlan({
+      name: 'Calistenia', description: '', category: 'Força', difficulty: 'Iniciante',
+    }, nextId(), nextId, now)
+    expect(plan.days.map((day) => day.weekday)).toEqual(WEEKDAYS)
+    expect(() => validatePlan({ ...plan, days: plan.days.slice(0, 6) })).toThrow('segunda a domingo')
+    const copy = duplicateTrainingPlan(plan, nextId(), nextId, nextId, nextId, now)
+    expect(copy.name).toBe('Calistenia (cópia)')
+    expect(copy.days[0]?.id).not.toBe(plan.days[0]?.id)
+  })
+
+  it('ordena com validação e seleciona mídia local principal', () => {
+    const base = [{ id: 1, sortOrder: 0 }, { id: 2, sortOrder: 1 }]
+    expect(reorder(base, [2, 1]).map((item) => item.id)).toEqual([2, 1])
+    expect(() => reorder(base, [1, 1])).toThrow('ordem')
+    const exercise = applyMedia({
+      ...exerciseDefinition(),
+      media: [{
+        id: 1, exerciseDefinitionId: 1, type: 'VIDEO', source: 'SYSTEM', externalId: null,
+        remoteUrl: 'https://example.test/video.mp4', localUri: 'file:///video.mp4',
+        thumbnailRemoteUrl: null, thumbnailLocalUri: null, mimeType: 'video/mp4',
+        width: null, height: null, durationSeconds: 10, main: true, sortOrder: 0,
+        licenseName: null, licenseUrl: null, author: null, sourceUrl: null,
+        downloadedAt: null, createdAt: now.toISOString(), updatedAt: now.toISOString(),
+        url: 'file:///video.mp4', thumbnailUrl: null,
+      }],
+    })
+    expect(exercise.primaryVideoUrl).toBe('file:///video.mp4')
+  })
+
+  it('cria snapshots imutáveis e calcula sessão e dashboard', () => {
+    id = 20
+    const plan = createTrainingPlan({
+      name: 'Calistenia', description: '', category: 'Força', difficulty: 'Iniciante',
+    }, 1, nextId, now)
+    const configured: TrainingDayExercise = {
+      id: 9, exercise: exerciseDefinition(), sortOrder: 0, sets: 2, minReps: 8, maxReps: 12,
+      plannedLoad: 10, plannedDurationSeconds: null, plannedDistance: null, restSeconds: 60,
+      plannedRpe: 7, setType: 'NORMAL', notes: '', alternativeExerciseId: null,
+    }
+    plan.days[0]!.exercises = [configured]
+    const session = createSessionSnapshot(plan, plan.days[0]!, 1, nextId, nextId, now)
+    configured.exercise.name = 'Nome editado'
+    expect(session.exercises[0]?.name).toBe('Flexão')
+    session.exercises[0]!.sets[0] = {
+      ...session.exercises[0]!.sets[0]!, completed: true, reps: 10, load: 10, volume: 100,
+    }
+    session.status = 'COMPLETED'
+    session.completedAt = '2026-07-29T12:10:00.000Z'
+    session.totalDurationSeconds = sessionDuration(session, now)
+    session.totalVolume = sessionVolume(session)
+    session.completedSets = 1
+    expect(session.totalDurationSeconds).toBe(600)
+    expect(session.totalVolume).toBe(100)
+    expect(historyStats([session], now).completedSessions).toBe(1)
+    expect(calculateDashboard([session], plan, now).totalVolume).toBe(100)
+  })
+
+  it('ativa, arquiva, pausa, retoma, conclui e abandona com transições estáveis', () => {
+    id = 200
+    const first = createTrainingPlan({
+      name: 'A', description: '', category: 'Força', difficulty: 'Inicial',
+    }, 1, nextId, now)
+    const second = createTrainingPlan({
+      name: 'B', description: '', category: 'Força', difficulty: 'Inicial',
+    }, 2, nextId, now)
+    const active = activateTrainingPlan([first, second], 2, now)
+    expect(active.map((plan) => plan.active)).toEqual([false, true])
+    expect(archiveTrainingPlan(active[1]!, true, now)).toMatchObject({ archived: true, active: false })
+
+    const session = {
+      id: 1, trainingPlanId: 1, planDayId: 1, workoutName: 'A', dayName: 'Segunda',
+      scheduledDate: '2026-07-29', startedAt: '2026-07-29T12:00:00.000Z',
+      completedAt: null, pausedAt: null, pausedDurationSeconds: 0,
+      status: 'IN_PROGRESS' as const, totalDurationSeconds: 0, overallRpe: null,
+      notes: '', completedSets: 0, totalPlannedSets: 0, totalVolume: 0, exercises: [],
+    }
+    const paused = pauseWorkoutSession(session, new Date('2026-07-29T12:01:00.000Z'))
+    const resumed = resumeWorkoutSession(paused, new Date('2026-07-29T12:02:00.000Z'))
+    expect(resumed.pausedDurationSeconds).toBe(60)
+    expect(finishWorkoutSession(resumed, 'COMPLETED', 8, 'ok', new Date('2026-07-29T12:05:00.000Z')))
+      .toMatchObject({ status: 'COMPLETED', totalDurationSeconds: 240, overallRpe: 8 })
+    expect(finishWorkoutSession(session, 'ABANDONED', null, '', new Date('2026-07-29T12:01:00.000Z')).status)
+      .toBe('ABANDONED')
+    expect(() => pauseWorkoutSession(paused, now)).toThrow('Transição')
+  })
+})
+
+function exerciseDefinition(): ExerciseDefinition {
+  return {
+    id: 1, name: 'Flexão', normalizedName: 'flexao', description: '', primaryMuscleGroup: 'Peitoral',
+    secondaryMuscleGroups: ['Tríceps'], equipment: 'Peso corporal', category: 'STRENGTH',
+    difficulty: 'Iniciante', instructions: '', notes: '', unilateral: false, timed: false,
+    source: 'SYSTEM', externalId: null, sourceUrl: null, licenseName: null, licenseUrl: null,
+    author: null, archived: false, createdAt: now.toISOString(), updatedAt: now.toISOString(),
+    media: [], primaryVideo: null, primaryImage: null, hasVideo: false, primaryVideoUrl: null,
+    primaryImageUrl: null, custom: false, mediaUrl: '',
+  }
+}

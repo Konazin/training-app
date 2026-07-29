@@ -1,0 +1,152 @@
+{
+  "version": 1,
+  "exercises": [
+    {
+      "key": "push_up",
+      "name": "Flexão de braços",
+      "description": "Movimento de empurrar no solo usando o peso do corpo.",
+      "primaryMuscleGroup": "Peitoral",
+      "secondaryMuscleGroups": ["Tríceps", "Ombros", "Core"],
+      "equipment": "Peso corporal",
+      "category": "STRENGTH",
+      "difficulty": "Iniciante",
+      "instructions": "Mantenha o corpo alinhado, desça o peito com controle e empurre o chão.",
+      "notes": "",
+      "unilateral": false,
+      "timed": false
+    },
+    {
+      "key": "squat",
+      "name": "Agachamento livre",
+      "description": "Agachamento sem carga externa para pernas e quadris.",
+      "primaryMuscleGroup": "Quadríceps",
+      "secondaryMuscleGroups": ["Glúteos", "Posteriores", "Core"],
+      "equipment": "Peso corporal",
+      "category": "STRENGTH",
+      "difficulty": "Iniciante",
+      "instructions": "Afaste os pés, leve o quadril para baixo e mantenha os joelhos alinhados aos pés.",
+      "notes": "",
+      "unilateral": false,
+      "timed": false
+    },
+    {
+      "key": "plank",
+      "name": "Prancha frontal",
+      "description": "Sustentação isométrica para estabilidade do tronco.",
+      "primaryMuscleGroup": "Core",
+      "secondaryMuscleGroups": ["Ombros", "Glúteos"],
+      "equipment": "Peso corporal",
+      "category": "ENDURANCE",
+      "difficulty": "Iniciante",
+      "instructions": "Apoie antebraços e pés, alinhe o corpo e mantenha o abdômen firme.",
+      "notes": "",
+      "unilateral": false,
+      "timed": true
+    },
+    {
+      "key": "lunge",
+      "name": "Avanço alternado",
+      "description": "Passada alternada para força unilateral das pernas.",
+      "primaryMuscleGroup": "Quadríceps",
+      "secondaryMuscleGroups": ["Glúteos", "Posteriores"],
+      "equipment": "Peso corporal",
+      "category": "STRENGTH",
+      "difficulty": "Iniciante",
+      "instructions": "Dê um passo à frente, desça os dois joelhos e retorne com controle.",
+      "notes": "",
+      "unilateral": true,
+      "timed": false
+    },
+    {
+      "key": "glute_bridge",
+      "name": "Ponte de glúteos",
+      "description": "Extensão de quadril realizada no chão.",
+      "primaryMuscleGroup": "Glúteos",
+      "secondaryMuscleGroups": ["Posteriores", "Core"],
+      "equipment": "Peso corporal",
+      "category": "STRENGTH",
+      "difficulty": "Iniciante",
+      "instructions": "Deite com joelhos flexionados, eleve o quadril e contraia os glúteos.",
+      "notes": "",
+      "unilateral": false,
+      "timed": false
+    },
+    {
+      "key": "calf_raise",
+      "name": "Elevação de panturrilhas",
+      "description": "Elevação dos calcanhares em pé.",
+      "primaryMuscleGroup": "Panturrilhas",
+      "secondaryMuscleGroups": [],
+      "equipment": "Peso corporal",
+      "category": "STRENGTH",
+      "difficulty": "Iniciante",
+      "instructions": "Eleve os calcanhares, pause no alto e desça devagar.",
+      "notes": "",
+      "unilateral": false,
+      "timed": false
+    },
+    {
+      "key": "bird_dog",
+      "name": "Bird dog",
+      "description": "Extensão alternada para estabilidade do tronco.",
+      "primaryMuscleGroup": "Core",
+      "secondaryMuscleGroups": ["Lombar", "Glúteos"],
+      "equipment": "Peso corporal",
+      "category": "MOBILITY",
+      "difficulty": "Iniciante",
+      "instructions": "Em quatro apoios, estenda braço e perna opostos sem girar o tronco.",
+      "notes": "",
+      "unilateral": true,
+      "timed": false
+    },
+    {
+      "key": "mountain_climber",
+      "name": "Escalador",
+      "description": "Movimento dinâmico em prancha para condicionamento.",
+      "primaryMuscleGroup": "Core",
+      "secondaryMuscleGroups": ["Ombros", "Quadríceps"],
+      "equipment": "Peso corporal",
+      "category": "CARDIO",
+      "difficulty": "Intermediário",
+      "instructions": "Na posição de prancha, alterne os joelhos em direção ao peito.",
+      "notes": "",
+      "unilateral": false,
+      "timed": true
+    }
+  ],
+  "demoPlan": {
+    "name": "Calistenia inicial",
+    "description": "Ficha demonstrativa totalmente local e editável.",
+    "category": "Calistenia",
+    "difficulty": "Iniciante",
+    "days": {
+      "MONDAY": {
+        "title": "Corpo inteiro A",
+        "exercises": [
+          { "exerciseKey": "push_up", "sets": 3, "minReps": 6, "maxReps": 12, "restSeconds": 60 },
+          { "exerciseKey": "squat", "sets": 3, "minReps": 10, "maxReps": 15, "restSeconds": 60 },
+          { "exerciseKey": "plank", "sets": 3, "minReps": 0, "maxReps": 0, "restSeconds": 45 }
+        ]
+      },
+      "WEDNESDAY": {
+        "title": "Corpo inteiro B",
+        "exercises": [
+          { "exerciseKey": "lunge", "sets": 3, "minReps": 8, "maxReps": 12, "restSeconds": 60 },
+          { "exerciseKey": "glute_bridge", "sets": 3, "minReps": 10, "maxReps": 15, "restSeconds": 45 },
+          { "exerciseKey": "bird_dog", "sets": 3, "minReps": 8, "maxReps": 12, "restSeconds": 45 }
+        ]
+      },
+      "FRIDAY": {
+        "title": "Condicionamento",
+        "exercises": [
+          { "exerciseKey": "mountain_climber", "sets": 4, "minReps": 0, "maxReps": 0, "restSeconds": 45 },
+          { "exerciseKey": "calf_raise", "sets": 3, "minReps": 12, "maxReps": 20, "restSeconds": 45 }
+        ]
+      },
+      "SUNDAY": {
+        "title": "Descanso",
+        "restDay": true
+      }
+    }
+  }
+}

@@ -1,21 +1,24 @@
 # Arquitetura do aplicativo principal
 
-`mobile/` gera o APK de treino e não contém rotas, telas, controllers ou
-imports do Modo Umamusume.
+`mobile/` é o composition root do Training App local-only.
 
-## Responsabilidades
+## Fluxo
 
-- dashboard, biblioteca e fluxo legado de `Workout`;
-- criação e edição de fichas semanais;
-- execução e histórico de sessões de origem normal;
-- navegação e apresentação próprias.
+1. `useLocalRuntime` abre `training.db`;
+2. ativa foreign keys e WAL;
+3. executa migrations ordenadas e verificadas por checksum;
+4. instala o seed apenas no primeiro banco vazio;
+5. cria repositories SQLite;
+6. controllers carregam sessão ativa, fichas, biblioteca e dashboard;
+7. a navegação é liberada.
 
-As fichas seguem MVC em `src/features/training-plan`. A tela de sessão permanece
-local porque é apresentação; model, timer, repository HTTP, storage e
-`useWorkoutSessionController` vêm de `@training/workout-session-core`.
+As telas e controllers React dependem das portas de `training-domain`.
+`training-local-db` faz mapeamento explícito entre rows e modelos. Nenhum dado
+principal usa HTTP ou AsyncStorage.
 
-O app cria `@training/mobile-api` com `EXPO_PUBLIC_API_URL`. Contratos de ficha,
-categoria, sessão, exercício e séries vêm de `@training/training-contracts`.
+O cronômetro de descanso usa AsyncStorage apenas como estado transitório
+associado ao ID local da sessão. Snapshots completos preservam o histórico
+quando ficha ou exercício são alterados.
 
-O domínio legado continua nas pastas globais e não deve receber novas
-funcionalidades. Não há persistência offline.
+O app não importa `mobile-api`, `trainingApi`, repositories HTTP ou o domínio
+legado `Workout`.

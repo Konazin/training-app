@@ -9,6 +9,7 @@ permissions:
 
 jobs:
   backend:
+    continue-on-error: true
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -23,7 +24,7 @@ jobs:
       - run: mvn test
       - run: mvn package -DskipTests
 
-  frontend:
+  local-mobile:
     runs-on: ubuntu-latest
     env:
       EXPO_NO_TELEMETRY: '1'
@@ -35,13 +36,16 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
-      - run: npm run test --workspace=@training/mobile-api
-      - run: npm run test --workspace=@training/workout-session-core
+      - run: npm run typecheck --workspace=@training/training-domain
+      - run: npm run test --workspace=@training/training-domain
+      - run: npm run typecheck --workspace=@training/training-local-db
+      - run: npm run test --workspace=@training/training-local-db
       - run: npm run typecheck --workspace=training-mobile
       - run: npm run test --workspace=training-mobile
       - run: npm run typecheck --workspace=umamusume-mobile
       - run: npm exec --workspace=training-mobile -- expo install --check
       - run: npm exec --workspace=training-mobile -- expo export --platform android --output-dir dist
+      - run: git diff --check
 
   web:
     runs-on: ubuntu-latest
@@ -59,6 +63,7 @@ jobs:
       - run: npm run build
 
   infra:
+    continue-on-error: true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

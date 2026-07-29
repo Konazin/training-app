@@ -1,39 +1,31 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useState } from 'react'
 import type {
   Dashboard,
-  ExerciseInput,
+  DashboardRepository,
   ExerciseDefinition,
   ExerciseDefinitionInput,
-  Workout,
-  WorkoutInput,
-} from '../models/training'
-import { trainingApi } from '../services/trainingApi'
+  ExerciseLibraryRepository,
+} from '@training/training-domain'
 
-export function useTrainingController() {
-  const [workouts, setWorkouts] = useState<Workout[]>([])
+export function useTrainingController(
+  exercises: ExerciseLibraryRepository,
+  dashboardRepository: DashboardRepository,
+) {
   const [exerciseLibrary, setExerciseLibrary] = useState<ExerciseDefinition[]>([])
   const [dashboard, setDashboard] = useState<Dashboard | null>(null)
-  const [selectedWorkoutId, setSelectedWorkoutId] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
 
-  const selectedWorkout = useMemo(
-    () => workouts.find((workout) => workout.id === selectedWorkoutId),
-    [selectedWorkoutId, workouts],
-  )
   const refresh = useCallback(async () => {
     setLoading(true)
     setMessage('')
     try {
-      const [workoutData, dashboardData, libraryData] = await Promise.all([
-        trainingApi.getWorkouts(),
-        trainingApi.getDashboard(),
-        trainingApi.getExerciseLibrary(),
+      const [library, dashboard] = await Promise.all([
+        exercises.list(),
+        dashboardRepository.get(),
       ])
-      setWorkouts(workoutData)
-      setDashboard(dashboardData)
-      setExerciseLibrary(libraryData.content)
-      setSelectedWorkoutId((current) => current ?? workoutData[0]?.id ?? null)
+      setExerciseLibrary(library)
+      setDashboard(dashboard)
       return true
     } catch (cause) {
       setMessage(messageFrom(cause))
@@ -41,24 +33,14 @@ export function useTrainingController() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [dashboardRepository, exercises])
 
-  const mutate = useCallback(async (operation: () => Promise<void>) => {
+  const createExerciseDefinition = useCallback(async (input: ExerciseDefinitionInput) => {
     setLoading(true)
     setMessage('')
     try {
-      await operation()
-      const [workoutData, dashboardData, libraryData] = await Promise.all([
-        trainingApi.getWorkouts(),
-        trainingApi.getDashboard(),
-        trainingApi.getExerciseLibrary(),
-      ])
-      setWorkouts(workoutData)
-      setDashboard(dashboardData)
-      setExerciseLibrary(libraryData.content)
-      setSelectedWorkoutId((current) =>
-        workoutData.some((item) => item.id === current) ? current : workoutData[0]?.id ?? null,
-      )
+      await exercises.create(input)
+      setExerciseLibrary(await exercises.list())
       return true
     } catch (cause) {
       setMessage(messageFrom(cause))
@@ -66,57 +48,43 @@ export function useTrainingController() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [exercises])
 
-  const createWorkout = useCallback(
-    (payload: WorkoutInput) =>
-      mutate(async () => {
-        const created = await trainingApi.createWorkout(payload)
-        setSelectedWorkoutId(created.id)
-      }),
-    [mutate],
-  )
+  const updateExerciseDefinition = useCallback(async (id: number, input: ExerciseDefinitionInput) => {
+    setLoading(true)
+    setMessage('')
+    try {
+      await exercises.update(id, input)
+      setExerciseLibrary(await exercises.list())
+      return true
+    } catch (cause) {
+      setMessage(messageFrom(cause))
+      return false
+    } finally {
+      setLoading(false)
+    }
+  }, [exercises])
 
-  const removeWorkout = useCallback(
-    (id: number) => mutate(() => trainingApi.deleteWorkout(id)),
-    [mutate],
-  )
-
-  const addExercise = useCallback(
-    (payload: ExerciseInput) => {
-      if (!selectedWorkoutId) {
-        setMessage('Selecione um treino antes de adicionar o exercício.')
-        return Promise.resolve(false)
-      }
-      return mutate(() => trainingApi.addExercise(selectedWorkoutId, payload).then(() => undefined))
-    },
-    [mutate, selectedWorkoutId],
-  )
-
-  const removeExercise = useCallback(
-    (workoutId: number, exerciseId: number) =>
-      mutate(() => trainingApi.deleteExercise(workoutId, exerciseId)),
-    [mutate],
-  )
-
-  const createExerciseDefinition = useCallback((payload: ExerciseDefinitionInput) =>
-    mutate(() => trainingApi.createExerciseDefinition(payload).then(() => undefined)), [mutate])
+  const archiveExerciseDefinition = useCallback(async (id: number) => {
+    try {
+      await exercises.archive(id)
+      setExerciseLibrary(await exercises.list())
+      return true
+    } catch (cause) {
+      setMessage(messageFrom(cause))
+      return false
+    }
+  }, [exercises])
 
   return {
-    workouts,
     exerciseLibrary,
     dashboard,
-    selectedWorkout,
-    selectedWorkoutId,
-    setSelectedWorkoutId,
     loading,
     message,
     refresh,
-    createWorkout,
-    removeWorkout,
-    addExercise,
-    removeExercise,
     createExerciseDefinition,
+    updateExerciseDefinition,
+    archiveExerciseDefinition,
   }
 }
 

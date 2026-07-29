@@ -1,46 +1,47 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useRoute, type RouteProp } from '@react-navigation/native'
-import type { RootStackParamList } from '../../core/navigation/types'
-import type { ExerciseDefinition } from '../../models/training'
-import { trainingApi } from '../../services/trainingApi'
+import type { ExerciseDefinition } from '@training/training-domain'
+import type { RootStackParamList } from '../../navigation/types'
 import { shared, type ThemeColors, useTheme } from '../../theme'
 import { ExerciseVideo } from './ExerciseVideo'
 import { attributionLabel, resolveMediaAttribution } from './libraryState'
 
-export function ExerciseDetailScreen() {
+export function ExerciseDetailScreen({ exercises }: { exercises: ExerciseDefinition[] }) {
   const route = useRoute<RouteProp<RootStackParamList, 'ExerciseDetail'>>()
   const { colors } = useTheme()
   const styles = createStyles(colors)
-  const [exercise, setExercise] = useState<ExerciseDefinition | null>(null)
-  const [error, setError] = useState('')
+  const [showVideo, setShowVideo] = useState(false)
   const [retryKey, setRetryKey] = useState(0)
+  const exercise = exercises.find((item) => item.id === route.params.exerciseId)
 
-  const load = () => {
-    setError('')
-    setExercise(null)
-    setRetryKey(0)
-    void trainingApi.getExerciseDefinition(route.params.exerciseId)
-      .then(setExercise).catch((cause) => setError(cause instanceof Error ? cause.message : 'Falha ao carregar exercício.'))
+  if (!exercise) {
+    return <View style={styles.center}><Text style={styles.muted}>Exercício não encontrado.</Text></View>
   }
-  useEffect(load, [route.params.exerciseId])
-
-  if (error) return <View style={styles.center}><Text style={styles.error}>{error}</Text><Pressable onPress={load}><Text style={styles.link}>Tentar novamente</Text></Pressable></View>
-  if (!exercise) return <View style={styles.center}><Text style={styles.muted}>Carregando exercício…</Text></View>
-
   const displayedMedia = exercise.primaryVideo ?? exercise.primaryImage
   const attribution = resolveMediaAttribution(displayedMedia, exercise)
   return (
     <ScrollView contentContainerStyle={styles.content}>
-      <Text style={styles.eyebrow}>{exercise.source === 'WGER' ? 'WGER' : 'BIBLIOTECA'}</Text>
+      <Text style={styles.eyebrow}>{exercise.source}</Text>
       <Text style={styles.title}>{exercise.name}</Text>
       <Text style={styles.meta}>{exercise.primaryMuscleGroup} · {exercise.equipment}</Text>
-      {exercise.primaryVideoUrl ? (
-        <ExerciseVideo key={retryKey} url={exercise.primaryVideoUrl} posterUrl={exercise.primaryImageUrl} onRetry={() => setRetryKey((value) => value + 1)} />
+      {exercise.primaryVideoUrl && showVideo ? (
+        <ExerciseVideo
+          key={retryKey}
+          url={exercise.primaryVideoUrl}
+          posterUrl={exercise.primaryImageUrl}
+          onRetry={() => setRetryKey((value) => value + 1)}
+        />
       ) : exercise.primaryImageUrl ? (
         <Image accessibilityLabel={`Demonstração de ${exercise.name}`} source={{ uri: exercise.primaryImageUrl }} style={styles.image} />
       ) : (
-        <View style={styles.empty}><Text style={styles.muted}>Este exercício ainda não possui demonstração.</Text></View>
+        <View style={styles.empty}><Text style={styles.muted}>Este exercício não precisa de mídia para funcionar.</Text></View>
+      )}
+      {!!exercise.primaryVideoUrl && !showVideo && (
+        <Pressable style={styles.videoButton} onPress={() => setShowVideo(true)}>
+          <Text style={styles.videoButtonText}>▶ Reproduzir vídeo</Text>
+          <Text style={styles.videoHint}>Pode exigir internet se não estiver salvo no aparelho.</Text>
+        </Pressable>
       )}
       {!!exercise.description && <Text style={styles.body}>{exercise.description}</Text>}
       {!!exercise.instructions && <><Text style={styles.heading}>Como executar</Text><Text style={styles.body}>{exercise.instructions}</Text></>}
@@ -64,5 +65,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   muted: { color: colors.gray500, textAlign: 'center' },
   attribution: { color: colors.gray500, fontSize: 11, lineHeight: 17 },
   link: { color: colors.primary, fontSize: 13, fontWeight: '800', paddingVertical: 4 },
-  error: { color: colors.danger, marginBottom: 12, textAlign: 'center' },
+  videoButton: { backgroundColor: colors.nearBlack, borderRadius: 16, padding: 15 },
+  videoButtonText: { color: '#fff', fontSize: 12, fontWeight: '800' },
+  videoHint: { color: colors.gray400, fontSize: 9, marginTop: 5 },
 })
