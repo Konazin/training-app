@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { FormField } from '../../../components/FormField'
 import { PrimaryButton } from '../../../components/PrimaryButton'
+import { Screen, ScreenScrollView } from '../../../components/Screen'
 import { ScreenHeader } from '../../../components/ScreenHeader'
 import type { RootStackParamList } from '../../../navigation/types'
 import { useUnsavedChangesGuard } from '../../../navigation/useUnsavedChangesGuard'
@@ -68,7 +69,7 @@ export function TrainingPlanDayScreen({
   const { dirty, commit } = useUnsavedChangesGuard(form)
 
   if (!plan || !day) {
-    return <View style={styles.empty}><Text style={styles.title}>Dia não encontrado</Text></View>
+    return <Screen><View style={styles.empty}><Text style={styles.title}>Dia não encontrado</Text></View></Screen>
   }
 
   const planId = plan.id
@@ -98,7 +99,7 @@ export function TrainingPlanDayScreen({
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScreenScrollView>
       <ScreenHeader
         eyebrow={plan.name}
         title={labels[day.weekday]}
@@ -114,7 +115,7 @@ export function TrainingPlanDayScreen({
           keyboardType="number-pad"
         />
         <FormField label="Observações" value={notes} onChangeText={setNotes} multiline />
-        <TouchableOpacity style={styles.checkboxRow} onPress={() => setRestDay((current) => !current)}>
+        <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{ checked: restDay }} style={styles.checkboxRow} onPress={() => setRestDay((current) => !current)}>
           <View style={[styles.checkbox, restDay && styles.checkboxActive]}>
             <Text style={styles.checkboxText}>{restDay ? '✓' : ''}</Text>
           </View>
@@ -133,6 +134,8 @@ export function TrainingPlanDayScreen({
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Atividades opcionais</Text>
             <TouchableOpacity
+              accessibilityLabel="Adicionar atividade"
+              accessibilityRole="button"
               style={styles.add}
               onPress={() => navigation.navigate('RestActivityEditor', {
                 planId: plan.id,
@@ -155,7 +158,7 @@ export function TrainingPlanDayScreen({
                 onUp={() => void moveActivity(index, -1)}
                 onDown={() => void moveActivity(index, 1)}
               />
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button" style={styles.itemAction}
                 onPress={() => navigation.navigate('RestActivityEditor', {
                   planId: plan.id,
                   dayId: day.id,
@@ -164,7 +167,7 @@ export function TrainingPlanDayScreen({
               >
                 <Text style={styles.link}>Editar</Text>
               </TouchableOpacity>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityLabel={`Remover ${activity.name}`} accessibilityRole="button" style={styles.itemAction}
                 disabled={busyKeys.has(`activity:remove:${activity.id}`)}
                 onPress={() => Alert.alert(
                   'Remover atividade?',
@@ -209,7 +212,7 @@ export function TrainingPlanDayScreen({
                   onUp={() => void moveExercise(index, -1)}
                   onDown={() => void moveExercise(index, 1)}
                 />
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button" style={styles.itemAction}
                   onPress={() => navigation.navigate('DayExerciseEditor', {
                     planId: plan.id,
                     dayId: day.id,
@@ -218,7 +221,7 @@ export function TrainingPlanDayScreen({
                 >
                   <Text style={styles.link}>Editar</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityLabel={`Remover ${exercise.exercise.name}`} accessibilityRole="button" style={styles.itemAction}
                   disabled={busyKeys.has(`exercise:remove:${exercise.id}`)}
                   onPress={() => Alert.alert(
                     'Remover exercício?',
@@ -248,6 +251,7 @@ export function TrainingPlanDayScreen({
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Adicionar da biblioteca</Text>
             <TouchableOpacity
+              accessibilityRole="button"
               style={styles.libraryItem}
               onPress={() => navigation.navigate('ExercisePicker', { planId, dayId })}
             >
@@ -257,6 +261,7 @@ export function TrainingPlanDayScreen({
           </View>
           {!!exercises.length && !day.restDay && !dirty && (
             <TouchableOpacity
+              accessibilityRole="button"
               style={styles.start}
               onPress={() => void onStart(plan.id, day.id)}
             >
@@ -268,7 +273,7 @@ export function TrainingPlanDayScreen({
           )}
         </>
       )}
-    </ScrollView>
+    </ScreenScrollView>
   )
 }
 
@@ -287,36 +292,36 @@ function OrderButtons({
 }) {
   return (
     <View style={{ flexDirection: 'row' }}>
-      <TouchableOpacity disabled={!up || busy} onPress={onUp}><Text style={{ opacity: up && !busy ? 1 : 0.2, padding: 6 }}>↑</Text></TouchableOpacity>
-      <TouchableOpacity disabled={!down || busy} onPress={onDown}><Text style={{ opacity: down && !busy ? 1 : 0.2, padding: 6 }}>↓</Text></TouchableOpacity>
+      <TouchableOpacity accessibilityLabel="Mover para cima" accessibilityRole="button" disabled={!up || busy} onPress={onUp} style={{ alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 }}><Text style={{ opacity: up && !busy ? 1 : 0.2 }}>↑</Text></TouchableOpacity>
+      <TouchableOpacity accessibilityLabel="Mover para baixo" accessibilityRole="button" disabled={!down || busy} onPress={onDown} style={{ alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 }}><Text style={{ opacity: down && !busy ? 1 : 0.2 }}>↓</Text></TouchableOpacity>
     </View>
   )
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  content: { padding: shared.pagePadding, paddingBottom: 45 },
-  form: { backgroundColor: colors.card, borderRadius: 20, marginBottom: 12, padding: 14 },
-  checkboxRow: { alignItems: 'center', flexDirection: 'row', gap: 10, marginBottom: 14 },
-  checkbox: { alignItems: 'center', borderColor: colors.gray300, borderRadius: 6, borderWidth: 1, height: 24, justifyContent: 'center', width: 24 },
+  form: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 20, borderWidth: 1, marginBottom: 12, padding: 16 },
+  checkboxRow: { alignItems: 'center', flexDirection: 'row', gap: 12, marginBottom: 14, minHeight: 48 },
+  checkbox: { alignItems: 'center', borderColor: colors.border, borderRadius: 6, borderWidth: 1, height: 28, justifyContent: 'center', width: 28 },
   checkboxActive: { backgroundColor: colors.primary },
   checkboxText: { color: colors.onPrimary, fontSize: 12, fontWeight: '800' },
-  checkboxLabel: { color: colors.ink, fontSize: 10, fontWeight: '700' },
-  section: { backgroundColor: colors.card, borderRadius: 20, marginBottom: 12, padding: 14 },
+  checkboxLabel: { color: colors.textPrimary, fontSize: 14, fontWeight: '700' },
+  section: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 20, borderWidth: 1, marginBottom: 12, padding: 16 },
   sectionHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  sectionTitle: { color: colors.ink, fontSize: 13, fontWeight: '800', marginBottom: 10 },
-  add: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 11, height: 35, justifyContent: 'center', width: 35 },
+  sectionTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: '800', lineHeight: 24, marginBottom: 10 },
+  add: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 12, height: 48, justifyContent: 'center', width: 48 },
   addText: { color: colors.onPrimary, fontSize: 17 },
-  item: { alignItems: 'center', borderTopColor: colors.gray100, borderTopWidth: 1, flexDirection: 'row', gap: 6, minHeight: 65 },
-  libraryItem: { alignItems: 'center', borderTopColor: colors.gray100, borderTopWidth: 1, flexDirection: 'row', minHeight: 60 },
-  itemTitle: { color: colors.ink, fontSize: 10, fontWeight: '800' },
-  meta: { color: colors.gray500, fontSize: 8, marginTop: 4 },
-  link: { color: colors.ink, fontSize: 8, fontWeight: '800', padding: 6 },
-  remove: { color: colors.danger, fontSize: 17, padding: 6 },
-  rowError: { color: colors.danger, fontSize: 7, maxWidth: 90 },
-  error: { color: colors.danger, fontSize: 9, marginBottom: 8 },
-  start: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 16, minHeight: 52, justifyContent: 'center' },
-  startText: { color: colors.onPrimary, fontSize: 11, fontWeight: '800' },
-  saveHint: { color: colors.gray500, fontSize: 9, textAlign: 'center' },
+  item: { alignItems: 'center', borderTopColor: colors.border, borderTopWidth: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 6, minHeight: 72 },
+  libraryItem: { alignItems: 'center', borderTopColor: colors.border, borderTopWidth: 1, flexDirection: 'row', minHeight: 64 },
+  itemTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '800', lineHeight: 22 },
+  meta: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, marginTop: 4 },
+  itemAction: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 },
+  link: { color: colors.primary, fontSize: 14, fontWeight: '800' },
+  remove: { color: colors.danger, fontSize: 20 },
+  rowError: { color: colors.danger, fontSize: 12, lineHeight: 16, width: '100%' },
+  error: { color: colors.danger, fontSize: 14, lineHeight: 20, marginBottom: 8 },
+  start: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 16, minHeight: 56, justifyContent: 'center' },
+  startText: { color: colors.onPrimary, fontSize: 16, fontWeight: '800' },
+  saveHint: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, textAlign: 'center' },
   empty: { alignItems: 'center', flex: 1, justifyContent: 'center' },
   title: { color: colors.ink, fontSize: 18, fontWeight: '800' },
 })

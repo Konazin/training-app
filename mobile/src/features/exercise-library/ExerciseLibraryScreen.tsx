@@ -16,7 +16,9 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import type { ExerciseDefinition, ExerciseDefinitionInput } from '@training/training-domain'
 import { FormField } from '../../components/FormField'
 import { PrimaryButton } from '../../components/PrimaryButton'
+import { Screen } from '../../components/Screen'
 import { ScreenHeader } from '../../components/ScreenHeader'
+import { SelectableChip } from '../../components/SelectableChip'
 import type { RootStackParamList } from '../../navigation/types'
 import { shared, type ThemeColors, useTheme } from '../../theme'
 
@@ -49,7 +51,7 @@ export function ExerciseLibraryScreen({
   }, [category, exercises, query])
 
   return (
-    <View style={styles.screen}>
+    <Screen style={styles.screen}>
       <FlatList
         contentContainerStyle={styles.content}
         data={filtered}
@@ -70,15 +72,12 @@ export function ExerciseLibraryScreen({
           />
           <View style={styles.filters}>
             {['', 'STRENGTH', 'CARDIO', 'MOBILITY', 'ENDURANCE'].map((value) => (
-              <Pressable
+              <SelectableChip
                 key={value || 'all'}
+                label={value || 'Todos'}
+                selected={category === value}
                 onPress={() => setCategory(value)}
-                style={[styles.chip, category === value && styles.chipActive]}
-              >
-                <Text style={[styles.chipText, category === value && styles.chipTextActive]}>
-                  {value || 'Todos'}
-                </Text>
-              </Pressable>
+              />
             ))}
           </View>
         </>}
@@ -88,7 +87,7 @@ export function ExerciseLibraryScreen({
             accessibilityRole="button"
             onPress={() => navigation.navigate('ExerciseDetail', { exerciseId: item.id })}
             onLongPress={() => setEditing(item)}
-            style={styles.card}
+            style={({ pressed }) => [styles.card, pressed && styles.pressed]}
           >
             {item.primaryImageUrl
               ? <Image source={{ uri: item.primaryImageUrl }} style={styles.icon} />
@@ -99,7 +98,7 @@ export function ExerciseLibraryScreen({
               <Text style={styles.source}>{item.source}</Text>
             </View>
             {item.custom && (
-              <TouchableOpacity accessibilityLabel={`Editar ${item.name}`} onPress={() => setEditing(item)}>
+              <TouchableOpacity accessibilityLabel={`Editar ${item.name}`} accessibilityRole="button" onPress={() => setEditing(item)} style={styles.editButton}>
                 <Text style={styles.edit}>Editar</Text>
               </TouchableOpacity>
             )}
@@ -109,6 +108,7 @@ export function ExerciseLibraryScreen({
       />
       <TouchableOpacity
         accessibilityLabel="Criar exercício personalizado"
+        accessibilityRole="button"
         style={styles.fab}
         onPress={() => setEditing('new')}
       >
@@ -137,7 +137,7 @@ export function ExerciseLibraryScreen({
           ])
           : undefined}
       />
-    </View>
+    </Screen>
   )
 }
 
@@ -204,8 +204,8 @@ function ExerciseForm({
               timed: exercise?.timed ?? false,
             })
           }} />
-          {!!onArchive && <TouchableOpacity onPress={onArchive}><Text style={styles.archive}>Arquivar</Text></TouchableOpacity>}
-          <TouchableOpacity onPress={onClose}><Text style={styles.cancel}>Cancelar</Text></TouchableOpacity>
+          {!!onArchive && <TouchableOpacity accessibilityRole="button" onPress={onArchive}><Text style={styles.archive}>Arquivar</Text></TouchableOpacity>}
+          <TouchableOpacity accessibilityRole="button" onPress={onClose}><Text style={styles.cancel}>Cancelar</Text></TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -214,22 +214,19 @@ function ExerciseForm({
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   screen: { flex: 1 },
-  content: { padding: shared.pagePadding, paddingBottom: 125 },
-  search: { backgroundColor: colors.card, borderColor: colors.gray200, borderRadius: 16, borderWidth: 1, color: colors.ink, marginBottom: 10, minHeight: 52, paddingHorizontal: 14 },
-  filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 14 },
-  chip: { borderColor: colors.gray200, borderRadius: 99, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
-  chipActive: { backgroundColor: colors.nearBlack, borderColor: colors.nearBlack },
-  chipText: { color: colors.gray500, fontSize: 9, fontWeight: '700' },
-  chipTextActive: { color: '#fff' },
-  card: { alignItems: 'center', backgroundColor: colors.card, borderColor: colors.gray200, borderRadius: 19, borderWidth: 1, flexDirection: 'row', gap: 11, marginBottom: 9, padding: 11 },
+  content: { paddingHorizontal: shared.pagePadding, paddingBottom: 72 },
+  search: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, color: colors.textPrimary, fontSize: 16, marginBottom: 10, minHeight: 56, paddingHorizontal: 16 },
+  filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
+  card: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 19, borderWidth: 1, flexDirection: 'row', gap: 12, marginBottom: 9, minHeight: 76, padding: 12 },
   icon: { backgroundColor: colors.gray200, borderRadius: 14, height: 52, width: 52 },
   iconFallback: { alignItems: 'center', backgroundColor: colors.nearBlack, borderRadius: 14, height: 52, justifyContent: 'center', width: 52 },
   iconText: { color: '#fff', fontSize: 18 },
   cardBody: { flex: 1 },
   name: { color: colors.ink, fontSize: 13, fontWeight: '800' },
-  meta: { color: colors.gray500, fontSize: 10, marginTop: 4 },
-  source: { color: colors.gray400, fontSize: 8, marginTop: 5 },
-  edit: { color: colors.primary, fontSize: 9, fontWeight: '800', padding: 8 },
+  meta: { color: colors.gray500, fontSize: 12, marginTop: 4 },
+  source: { color: colors.gray400, fontSize: 12, marginTop: 5 },
+  edit: { color: colors.primary, fontSize: 12, fontWeight: '800', padding: 8 },
+  editButton: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 },
   arrow: { color: colors.gray400, fontSize: 25 },
   empty: { color: colors.gray500, padding: 30, textAlign: 'center' },
   fab: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 19, bottom: 24, height: 56, justifyContent: 'center', position: 'absolute', right: 20, width: 56 },
@@ -237,7 +234,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   backdrop: { backgroundColor: 'rgba(0,0,0,.6)', flex: 1, justifyContent: 'flex-end' },
   sheet: { backgroundColor: colors.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 20, paddingBottom: 30 },
   sheetTitle: { color: colors.ink, fontSize: 22, fontWeight: '700', marginBottom: 20 },
-  cancel: { color: colors.gray500, fontSize: 11, fontWeight: '700', padding: 15, textAlign: 'center' },
-  archive: { color: colors.danger, fontSize: 11, fontWeight: '700', paddingTop: 18, textAlign: 'center' },
-  error: { color: colors.danger, fontSize: 10, marginBottom: 10 },
+  cancel: { color: colors.gray500, fontSize: 12, fontWeight: '700', padding: 15, textAlign: 'center' },
+  archive: { color: colors.danger, fontSize: 12, fontWeight: '700', paddingTop: 18, textAlign: 'center' },
+  error: { color: colors.danger, fontSize: 12, marginBottom: 10 },
+  pressed: { opacity: 0.72 },
 })

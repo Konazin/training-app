@@ -22,7 +22,8 @@ import type {
   WorkoutSession,
 } from '@training/training-domain'
 import type { RestTimerState } from '../model/restTimer'
-import { shared, type ThemeColors, useTheme } from '../../../theme'
+import { Screen, ScreenScrollView } from '../../../components/Screen'
+import { type ThemeColors, useTheme } from '../../../theme'
 import { ExerciseVideo } from '../../exercise-library/ExerciseVideo'
 import { attributionLabel, resolveMediaAttribution } from '../../exercise-library/libraryState'
 
@@ -142,16 +143,17 @@ export function WorkoutSessionScreen(props: Props) {
 
   if (!session) {
     return (
-      <View style={styles.empty}>
+      <Screen><View style={styles.empty}>
         <Text style={styles.emptyTitle}>Nenhuma sessão ativa</Text>
         <Text style={styles.muted}>Escolha um treino na ficha semanal.</Text>
         <TouchableOpacity
+          accessibilityRole="button"
           style={styles.primary}
           onPress={() => navigation.navigate('MainTabs', { screen: 'Plan' })}
         >
           <Text style={styles.primaryText}>Abrir ficha</Text>
         </TouchableOpacity>
-      </View>
+      </View></Screen>
     )
   }
 
@@ -163,12 +165,10 @@ export function WorkoutSessionScreen(props: Props) {
   }
 
   return (<>
-    <ScrollView
-      contentContainerStyle={styles.content}
-      keyboardShouldPersistTaps="handled"
+    <ScreenScrollView
       showsVerticalScrollIndicator={false}
     >
-      <View style={styles.sessionHeader}>
+      <View style={[styles.sessionHeader, session.status === 'PAUSED' && styles.pausedHeader]}>
         <View style={{ flex: 1 }}>
           <Text style={styles.eyebrow}>
             {session.status === 'PAUSED' ? 'SESSÃO PAUSADA' : 'SESSÃO EM ANDAMENTO'}
@@ -176,6 +176,8 @@ export function WorkoutSessionScreen(props: Props) {
           <Text style={styles.title}>{session.workoutName}</Text>
         </View>
         <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityState={{ disabled: busyKeys.has('session') }}
           disabled={busyKeys.has('session')}
           onPress={() => void (session.status === 'PAUSED' ? onResume() : onPause())}
           style={styles.secondary}
@@ -228,12 +230,14 @@ export function WorkoutSessionScreen(props: Props) {
                 {' · '}{exercise.restSeconds}s descanso
               </Text>
               {!!exercise.primaryVideoUrl && (
-                <TouchableOpacity accessibilityLabel={`Ver execução de ${exercise.name}`} onPress={() => openVideo(exercise)}>
+                <TouchableOpacity accessibilityLabel={`Ver execução de ${exercise.name}`} accessibilityRole="button" onPress={() => openVideo(exercise)} style={styles.textAction}>
                   <Text style={styles.videoLink}>▶ Ver execução</Text>
                 </TouchableOpacity>
               )}
             </View>
             <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityState={{ disabled: busyKeys.has(`exercise:${exercise.id}`), selected: exercise.status === 'SKIPPED' }}
               disabled={busyKeys.has(`exercise:${exercise.id}`)}
               onPress={() => void onSetExerciseStatus(
                 exercise.id,
@@ -263,6 +267,7 @@ export function WorkoutSessionScreen(props: Props) {
             <Text style={styles.error}>{errors[`exercise:${exercise.id}`]}</Text>
           )}
           <TouchableOpacity
+            accessibilityRole="button"
             disabled={busyKeys.has(`exercise:${exercise.id}`)}
             style={styles.addSet}
             onPress={() => void onAddSet(exercise.id)}
@@ -274,6 +279,9 @@ export function WorkoutSessionScreen(props: Props) {
 
       <View style={styles.finish}>
         <TextInput
+          accessibilityLabel="RPE geral"
+          cursorColor={colors.primary}
+          selectionColor={colors.focus}
           value={rpe}
           onChangeText={setRpe}
           keyboardType="decimal-pad"
@@ -282,6 +290,9 @@ export function WorkoutSessionScreen(props: Props) {
           style={styles.input}
         />
         <TextInput
+          accessibilityLabel="Observações da sessão"
+          cursorColor={colors.primary}
+          selectionColor={colors.focus}
           value={notes}
           onChangeText={setNotes}
           placeholder="Observações da sessão"
@@ -290,6 +301,7 @@ export function WorkoutSessionScreen(props: Props) {
         />
         {!!errors.session && <Text style={styles.error}>{errors.session}</Text>}
         <TouchableOpacity
+          accessibilityRole="button"
           disabled={busyKeys.has('session')}
           style={styles.primary}
           onPress={() => void completeSession()}
@@ -297,6 +309,8 @@ export function WorkoutSessionScreen(props: Props) {
           <Text style={styles.primaryText}>Concluir e salvar</Text>
         </TouchableOpacity>
         <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityState={{ disabled: busyKeys.has('session') }}
           disabled={busyKeys.has('session')}
           onPress={() => Alert.alert(
             'Abandonar sessão?',
@@ -319,18 +333,18 @@ export function WorkoutSessionScreen(props: Props) {
           <Text style={styles.abandon}>Abandonar sessão</Text>
         </TouchableOpacity>
       </View>
-    </ScrollView>
+    </ScreenScrollView>
     {videoExercise && <Modal visible transparent animationType="fade" onRequestClose={closeVideo}>
-      <View style={styles.videoBackdrop}>
+      <Screen style={styles.videoBackdrop}>
         <View style={styles.videoSheet}>
           <Text style={styles.videoTitle}>{videoExercise.name}</Text>
           {!!videoExercise.primaryVideoUrl && <ExerciseVideo key={videoRetryKey} url={videoExercise.primaryVideoUrl} posterUrl={videoExercise.primaryImageUrl} onRetry={() => setVideoRetryKey((value) => value + 1)} />}
           <Text style={styles.videoAttribution}>{videoAttribution}</Text>
-          {!!videoMetadata?.sourceUrl && <TouchableOpacity onPress={() => void Linking.openURL(videoMetadata.sourceUrl!)}><Text style={styles.videoLink}>Abrir fonte original</Text></TouchableOpacity>}
-          {!!videoMetadata?.licenseUrl && <TouchableOpacity onPress={() => void Linking.openURL(videoMetadata.licenseUrl!)}><Text style={styles.videoLink}>Consultar licença</Text></TouchableOpacity>}
-          <TouchableOpacity onPress={closeVideo}><Text style={styles.videoClose}>Fechar</Text></TouchableOpacity>
+          {!!videoMetadata?.sourceUrl && <TouchableOpacity accessibilityRole="link" onPress={() => void Linking.openURL(videoMetadata.sourceUrl!)} style={styles.textAction}><Text style={styles.videoLink}>Abrir fonte original</Text></TouchableOpacity>}
+          {!!videoMetadata?.licenseUrl && <TouchableOpacity accessibilityRole="link" onPress={() => void Linking.openURL(videoMetadata.licenseUrl!)} style={styles.textAction}><Text style={styles.videoLink}>Consultar licença</Text></TouchableOpacity>}
+          <TouchableOpacity accessibilityRole="button" onPress={closeVideo} style={styles.textAction}><Text style={styles.videoClose}>Fechar</Text></TouchableOpacity>
         </View>
-      </View>
+      </Screen>
     </Modal>}
   </>)
 }
@@ -385,7 +399,7 @@ function SetEditor({
       <View style={styles.setTitle}>
         <Text style={styles.setNumber}>SÉRIE {set.setNumber}</Text>
         {set.manuallyAdded && (
-          <TouchableOpacity disabled={busy} onPress={() => void onRemove()}>
+          <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={() => void onRemove()} style={styles.textAction}>
             <Text style={styles.removeSet}>Remover</Text>
           </TouchableOpacity>
         )}
@@ -402,6 +416,9 @@ function SetEditor({
         <SetField label="RPE" value={rpe} onChange={setRpe} decimal />
       </View>
       <TextInput
+        accessibilityLabel="Observação da série"
+        cursorColor={colors.primary}
+        selectionColor={colors.focus}
         value={notes}
         onChangeText={setNotes}
         placeholder="Observação opcional"
@@ -411,6 +428,8 @@ function SetEditor({
       {!!error && <Text style={styles.error}>{error}</Text>}
       <View style={styles.setActions}>
         <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityState={{ disabled: busy }}
           disabled={busy}
           style={styles.saveSet}
           onPress={() => void onSave(input(set.completed))}
@@ -418,6 +437,8 @@ function SetEditor({
           <Text style={styles.saveSetText}>{busy ? 'Salvando…' : 'Salvar'}</Text>
         </TouchableOpacity>
         <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityState={{ disabled: busy, selected: set.completed }}
           disabled={busy}
           style={[styles.check, set.completed && styles.checked]}
           onPress={() => void toggle()}
@@ -448,6 +469,9 @@ function SetField({
     <View style={styles.field}>
       <Text style={styles.setLabel}>{label}</Text>
       <TextInput
+        accessibilityLabel={label}
+        cursorColor={colors.primary}
+        selectionColor={colors.focus}
         value={value}
         onChangeText={onChange}
         keyboardType={decimal ? 'decimal-pad' : 'number-pad'}
@@ -459,9 +483,11 @@ function SetField({
 }
 
 function TimerAction({ label, onPress }: { label: string; onPress: () => void }) {
+  const { colors } = useTheme()
+  const styles = createStyles(colors)
   return (
-    <TouchableOpacity onPress={onPress}>
-      <Text style={timerActionStyle}>{label}</Text>
+    <TouchableOpacity accessibilityRole="button" onPress={onPress} style={styles.timerAction}>
+      <Text style={[timerActionStyle, { color: colors.background }]}>{label}</Text>
     </TouchableOpacity>
   )
 }
@@ -476,63 +502,63 @@ function formatTime(value: number) {
 }
 
 const timerActionStyle = {
-  color: '#fff',
-  fontSize: 10,
+  fontSize: 14,
   fontWeight: '700' as const,
-  padding: 8,
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  content: { padding: shared.pagePadding, paddingBottom: 45 },
-  sessionHeader: { alignItems: 'center', flexDirection: 'row', gap: 12 },
-  eyebrow: { color: colors.gray400, fontSize: 9, fontWeight: '800', letterSpacing: 1.5, marginTop: 10 },
-  title: { color: colors.ink, fontSize: 28, fontWeight: '700', letterSpacing: -1, marginBottom: 18, marginTop: 7 },
-  metrics: { flexDirection: 'row', gap: 8, marginBottom: 10 },
-  metric: { backgroundColor: colors.card, borderRadius: 18, flex: 1, padding: 14 },
-  metricLabel: { color: colors.gray400, fontSize: 8 },
-  metricValue: { color: colors.ink, fontSize: 20, fontWeight: '800', marginTop: 6 },
-  timer: { alignItems: 'center', backgroundColor: colors.nearBlack, borderRadius: 22, flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10, padding: 17 },
-  timerLabel: { color: '#858585', fontSize: 8, fontWeight: '800' },
-  timerValue: { color: '#fff', fontSize: 30, fontWeight: '700', marginTop: 3 },
-  timerActions: { flexDirection: 'row', gap: 8 },
-  card: { backgroundColor: colors.card, borderColor: colors.gray200, borderRadius: 21, borderWidth: 1, marginBottom: 10, overflow: 'hidden' },
-  exerciseHeader: { alignItems: 'center', flexDirection: 'row', gap: 10, padding: 14 },
-  index: { backgroundColor: colors.nearBlack, borderRadius: 13, color: '#fff', fontSize: 10, fontWeight: '800', overflow: 'hidden', padding: 12 },
-  exerciseName: { color: colors.ink, fontSize: 12, fontWeight: '700' },
-  muted: { color: colors.gray500, fontSize: 9, marginTop: 4 },
-  videoLink: { color: colors.primary, fontSize: 10, fontWeight: '800', marginTop: 7 },
-  skip: { color: colors.gray500, fontSize: 9, fontWeight: '700', padding: 8 },
-  setEditor: { borderTopColor: colors.gray100, borderTopWidth: 1, gap: 9, padding: 12 },
+  sessionHeader: { alignItems: 'center', borderRadius: 18, flexDirection: 'row', gap: 12, marginBottom: 12, padding: 12 },
+  pausedHeader: { backgroundColor: colors.surfaceSecondary, borderColor: colors.warning, borderWidth: 1 },
+  eyebrow: { color: colors.textSecondary, fontSize: 12, fontWeight: '800', letterSpacing: 1.5, marginTop: 10 },
+  title: { color: colors.textPrimary, fontSize: 30, fontWeight: '700', letterSpacing: -1, lineHeight: 37, marginTop: 7 },
+  metrics: { flexDirection: 'row', gap: 12, marginBottom: 12 },
+  metric: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 18, borderWidth: 1, flex: 1, padding: 16 },
+  metricLabel: { color: colors.gray400, fontSize: 12 },
+  metricValue: { color: colors.textPrimary, fontSize: 24, fontWeight: '800', lineHeight: 30, marginTop: 6 },
+  timer: { alignItems: 'center', backgroundColor: colors.textPrimary, borderRadius: 22, flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', marginBottom: 12, padding: 18 },
+  timerLabel: { color: colors.background, fontSize: 14, fontWeight: '800' },
+  timerValue: { color: colors.background, fontSize: 36, fontWeight: '700', lineHeight: 43, marginTop: 3 },
+  timerActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  timerAction: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 },
+  card: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 21, borderWidth: 1, marginBottom: 12, overflow: 'hidden' },
+  exerciseHeader: { alignItems: 'center', flexDirection: 'row', gap: 12, padding: 16 },
+  index: { backgroundColor: colors.primary, borderRadius: 13, color: colors.onPrimary, fontSize: 16, fontWeight: '800', minWidth: 48, overflow: 'hidden', padding: 14, textAlign: 'center' },
+  exerciseName: { color: colors.textPrimary, fontSize: 20, fontWeight: '700', lineHeight: 26 },
+  muted: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, marginTop: 4 },
+  videoLink: { color: colors.primary, fontSize: 14, fontWeight: '800', marginTop: 7 },
+  textAction: { justifyContent: 'center', minHeight: 48 },
+  skip: { color: colors.textSecondary, fontSize: 14, fontWeight: '700', padding: 8 },
+  setEditor: { borderTopColor: colors.border, borderTopWidth: 1, gap: 12, padding: 16 },
   setTitle: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  setNumber: { color: colors.gray500, fontSize: 8, fontWeight: '800' },
-  removeSet: { color: colors.danger, fontSize: 9, fontWeight: '700', padding: 4 },
-  fields: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-  field: { flexGrow: 1, minWidth: 72 },
-  setLabel: { color: colors.gray400, fontSize: 7, marginBottom: 4 },
-  setInput: { backgroundColor: colors.surface, borderRadius: 11, color: colors.ink, fontSize: 13, fontWeight: '700', minHeight: 42, paddingHorizontal: 10 },
-  setNotes: { backgroundColor: colors.surface, borderRadius: 11, color: colors.ink, minHeight: 42, paddingHorizontal: 10 },
-  setActions: { flexDirection: 'row', gap: 8 },
-  saveSet: { alignItems: 'center', borderColor: colors.gray200, borderRadius: 12, borderWidth: 1, flex: 1, justifyContent: 'center', minHeight: 44 },
-  saveSetText: { color: colors.ink, fontSize: 10, fontWeight: '800' },
-  check: { alignItems: 'center', backgroundColor: colors.surface, borderRadius: 12, flex: 1.4, justifyContent: 'center', minHeight: 44 },
-  checked: { backgroundColor: '#059669' },
-  checkText: { color: colors.ink, fontSize: 10, fontWeight: '800' },
-  checkedText: { color: '#fff' },
-  addSet: { alignItems: 'center', borderTopColor: colors.gray100, borderTopWidth: 1, padding: 14 },
-  addSetText: { color: colors.ink, fontSize: 10, fontWeight: '800' },
-  finish: { backgroundColor: colors.card, borderRadius: 22, gap: 9, marginTop: 5, padding: 14 },
-  input: { backgroundColor: colors.surface, borderRadius: 14, color: colors.ink, minHeight: 48, paddingHorizontal: 13 },
-  primary: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 16, justifyContent: 'center', minHeight: 52, paddingHorizontal: 20 },
-  primaryText: { color: colors.onPrimary, fontSize: 12, fontWeight: '800' },
-  secondary: { alignItems: 'center', borderColor: colors.gray200, borderRadius: 14, borderWidth: 1, justifyContent: 'center', minHeight: 44, paddingHorizontal: 14 },
-  secondaryText: { color: colors.ink, fontSize: 10, fontWeight: '800' },
-  abandon: { color: colors.danger, fontSize: 10, fontWeight: '700', padding: 12, textAlign: 'center' },
-  error: { color: colors.danger, fontSize: 9, paddingHorizontal: 2 },
+  setNumber: { color: colors.textSecondary, fontSize: 14, fontWeight: '800' },
+  removeSet: { color: colors.danger, fontSize: 14, fontWeight: '700' },
+  fields: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  field: { flexGrow: 1, minWidth: 108 },
+  setLabel: { color: colors.textSecondary, fontSize: 12, marginBottom: 4 },
+  setInput: { backgroundColor: colors.surfaceSecondary, borderColor: colors.border, borderRadius: 11, borderWidth: 1, color: colors.textPrimary, fontSize: 18, fontWeight: '700', minHeight: 56, paddingHorizontal: 12 },
+  setNotes: { backgroundColor: colors.surfaceSecondary, borderColor: colors.border, borderRadius: 11, borderWidth: 1, color: colors.textPrimary, fontSize: 16, minHeight: 56, paddingHorizontal: 12 },
+  setActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  saveSet: { alignItems: 'center', borderColor: colors.border, borderRadius: 12, borderWidth: 1, flex: 1, justifyContent: 'center', minHeight: 52, minWidth: 100 },
+  saveSetText: { color: colors.textPrimary, fontSize: 14, fontWeight: '800' },
+  check: { alignItems: 'center', backgroundColor: colors.surfaceSecondary, borderColor: colors.border, borderRadius: 12, borderWidth: 1, flex: 1.4, justifyContent: 'center', minHeight: 52, minWidth: 130 },
+  checked: { backgroundColor: colors.success, borderColor: colors.success },
+  checkText: { color: colors.textPrimary, fontSize: 14, fontWeight: '800' },
+  checkedText: { color: colors.background },
+  addSet: { alignItems: 'center', borderTopColor: colors.border, borderTopWidth: 1, justifyContent: 'center', minHeight: 56 },
+  addSetText: { color: colors.primary, fontSize: 14, fontWeight: '800' },
+  finish: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 22, borderWidth: 1, gap: 12, marginTop: 5, padding: 16 },
+  input: { backgroundColor: colors.surfaceSecondary, borderColor: colors.border, borderRadius: 14, borderWidth: 1, color: colors.textPrimary, fontSize: 16, minHeight: 56, paddingHorizontal: 14 },
+  primary: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 16, justifyContent: 'center', minHeight: 56, paddingHorizontal: 20 },
+  primaryText: { color: colors.onPrimary, fontSize: 16, fontWeight: '800' },
+  secondary: { alignItems: 'center', borderColor: colors.border, borderRadius: 14, borderWidth: 1, justifyContent: 'center', minHeight: 48, paddingHorizontal: 14 },
+  secondaryText: { color: colors.textPrimary, fontSize: 14, fontWeight: '800' },
+  abandon: { color: colors.danger, fontSize: 14, fontWeight: '700', minHeight: 48, padding: 12, textAlign: 'center' },
+  error: { color: colors.danger, fontSize: 14, lineHeight: 20, paddingHorizontal: 2 },
   empty: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: 30 },
   emptyTitle: { color: colors.ink, fontSize: 21, fontWeight: '700', marginBottom: 6 },
-  videoBackdrop: { backgroundColor: 'rgba(0,0,0,.72)', flex: 1, justifyContent: 'center', padding: 18 },
-  videoSheet: { backgroundColor: colors.card, borderRadius: 24, padding: 16 },
+  videoBackdrop: { backgroundColor: colors.scrim, justifyContent: 'center', paddingHorizontal: 18 },
+  videoSheet: { backgroundColor: colors.surface, borderRadius: 24, padding: 16 },
   videoTitle: { color: colors.ink, fontSize: 18, fontWeight: '800', marginBottom: 14 },
-  videoAttribution: { color: colors.gray500, fontSize: 10, lineHeight: 16, marginTop: 4 },
+  videoAttribution: { color: colors.gray500, fontSize: 12, lineHeight: 16, marginTop: 4 },
   videoClose: { color: colors.primary, fontSize: 12, fontWeight: '800', padding: 14, textAlign: 'center' },
 })

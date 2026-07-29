@@ -1,11 +1,13 @@
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
+import { ScreenScrollView } from '../components/Screen'
 import { ScreenHeader } from '../components/ScreenHeader'
-import { shared, type ThemeColors, useTheme } from '../theme'
+import { SelectableChip } from '../components/SelectableChip'
+import { shared, type ThemeColors, type ThemePreference, useTheme } from '../theme'
+import { typography } from '../theme/typography'
 import type { AutomaticBackupInfo } from '@training/training-domain'
 
 export function MoreScreen({
   busy,
-  message,
   onLibrary,
   onExport,
   onImport,
@@ -18,7 +20,6 @@ export function MoreScreen({
   onDeleteAllAutomatic,
 }: {
   busy: boolean
-  message: string
   onLibrary: () => void
   onExport: () => void
   onImport: () => void
@@ -30,7 +31,7 @@ export function MoreScreen({
   onDeleteAutomatic: (uri: string) => void
   onDeleteAllAutomatic: () => void
 }) {
-  const { colors } = useTheme()
+  const { colors, preference, setPreference } = useTheme()
   const styles = createStyles(colors)
   const confirmErase = () => Alert.alert(
     'Apagar todos os dados?',
@@ -49,13 +50,22 @@ export function MoreScreen({
     ],
   )
   return (
-    <ScrollView contentContainerStyle={styles.content}>
+    <ScreenScrollView includeBottomInset={false}>
       <ScreenHeader
         eyebrow="Local e privado"
         title="Mais"
         description="Backup e dados do aparelho. Nenhuma destas ações usa servidor."
       />
-      {!!message && <View style={styles.message}><Text style={styles.messageText}>{message}</Text></View>}
+      <Text style={styles.section}>APARÊNCIA</Text>
+      <View style={styles.themeOptions}>
+        {([
+          ['system', 'Sistema'],
+          ['light', 'Claro'],
+          ['dark', 'Escuro'],
+        ] as [ThemePreference, string][]).map(([value, label]) => (
+          <SelectableChip key={value} label={label} selected={preference === value} onPress={() => setPreference(value)} />
+        ))}
+      </View>
       <Text style={styles.section}>CONTEÚDO</Text>
       <MenuItem label="Biblioteca de exercícios" detail="Criar e editar" onPress={onLibrary} disabled={busy} />
       <Text style={styles.section}>BACKUP</Text>
@@ -112,7 +122,7 @@ export function MoreScreen({
       <Text style={styles.note}>
         Os dados principais ficam no SQLite. Ao desinstalar o aplicativo, eles são apagados; exporte backups regularmente.
       </Text>
-    </ScrollView>
+    </ScreenScrollView>
   )
 }
 
@@ -125,9 +135,9 @@ function SmallAction({ label, disabled, danger, onPress }: {
   const { colors } = useTheme()
   const styles = createStyles(colors)
   return (
-    <TouchableOpacity disabled={disabled} onPress={onPress} style={styles.smallAction}>
+    <Pressable accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.smallAction, pressed && styles.pressed]}>
       <Text style={[styles.smallActionText, danger && styles.danger]}>{label}</Text>
-    </TouchableOpacity>
+    </Pressable>
   )
 }
 
@@ -161,30 +171,30 @@ function MenuItem({
   const { colors } = useTheme()
   const styles = createStyles(colors)
   return (
-    <TouchableOpacity disabled={disabled} style={[styles.item, disabled && styles.disabled]} onPress={onPress}>
-      <View>
+    <Pressable accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} style={({ pressed }) => [styles.item, disabled && styles.disabled, pressed && styles.pressed]} onPress={onPress}>
+      <View style={styles.itemCopy}>
         <Text style={[styles.label, danger && styles.danger]}>{label}</Text>
         <Text style={styles.detail}>{detail}</Text>
       </View>
       <Text style={styles.arrow}>→</Text>
-    </TouchableOpacity>
+    </Pressable>
   )
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  content: { padding: shared.pagePadding, paddingBottom: 110 },
-  section: { color: colors.gray400, fontSize: 8, fontWeight: '800', letterSpacing: 1.5, marginBottom: 8, marginTop: 16 },
-  item: { alignItems: 'center', backgroundColor: colors.card, borderColor: colors.gray200, borderRadius: 17, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8, minHeight: 64, paddingHorizontal: 16 },
+  section: { ...typography.caption, color: colors.textSecondary, fontWeight: '800', letterSpacing: 1.5, marginBottom: 8, marginTop: 20 },
+  themeOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
+  item: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 17, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8, minHeight: 68, paddingHorizontal: 16, paddingVertical: 10 },
+  itemCopy: { flex: 1, minWidth: 0 },
   disabled: { opacity: 0.55 },
-  label: { color: colors.ink, fontSize: 11, fontWeight: '800' },
-  detail: { color: colors.gray500, fontSize: 8, marginTop: 4 },
+  label: { ...typography.body, color: colors.textPrimary, flexShrink: 1, fontWeight: '800' },
+  detail: { ...typography.caption, color: colors.textSecondary, flexShrink: 1, marginTop: 4 },
   danger: { color: colors.danger },
   arrow: { color: colors.gray500, fontSize: 17 },
-  message: { backgroundColor: colors.nearBlack, borderRadius: 14, marginBottom: 8, padding: 13 },
-  messageText: { color: '#fff', fontSize: 9, fontWeight: '700', textAlign: 'center' },
-  note: { color: colors.gray500, fontSize: 9, lineHeight: 15, marginTop: 18 },
-  backup: { backgroundColor: colors.card, borderColor: colors.gray200, borderRadius: 17, borderWidth: 1, marginBottom: 8, padding: 14 },
+  note: { ...typography.bodySmall, color: colors.textSecondary, marginTop: 18 },
+  backup: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 17, borderWidth: 1, marginBottom: 8, padding: 16 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 10 },
-  smallAction: { borderColor: colors.gray200, borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8 },
-  smallActionText: { color: colors.ink, fontSize: 8, fontWeight: '800' },
+  smallAction: { alignItems: 'center', borderColor: colors.border, borderRadius: 10, borderWidth: 1, justifyContent: 'center', minHeight: shared.touchTarget.minimum, paddingHorizontal: 12 },
+  smallActionText: { ...typography.labelSmall, color: colors.textPrimary, fontWeight: '800' },
+  pressed: { opacity: 0.72 },
 })

@@ -4,7 +4,9 @@ import { useNavigation, useRoute, type RouteProp } from '@react-navigation/nativ
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { FormField } from '../../../components/FormField'
 import { PrimaryButton } from '../../../components/PrimaryButton'
+import { Screen, ScreenScrollView } from '../../../components/Screen'
 import { ScreenHeader } from '../../../components/ScreenHeader'
+import { SelectableChip } from '../../../components/SelectableChip'
 import type { RootStackParamList } from '../../../navigation/types'
 import { useUnsavedChangesGuard } from '../../../navigation/useUnsavedChangesGuard'
 import type { RestActivityInput, TrainingPlan } from '../model/trainingPlan'
@@ -60,7 +62,7 @@ export function RestActivityEditorScreen({
   const { commit } = useUnsavedChangesGuard(form)
 
   if (!plan || !day) {
-    return <View style={styles.empty}><Text style={styles.title}>Dia não encontrado</Text></View>
+    return <Screen><View style={styles.empty}><Text style={styles.title}>Dia não encontrado</Text></View></Screen>
   }
 
   const planId = plan.id
@@ -79,7 +81,7 @@ export function RestActivityEditorScreen({
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScreenScrollView>
       <ScreenHeader
         eyebrow={activity ? 'Editar atividade' : 'Nova atividade'}
         title={activity?.name ?? 'Descanso ativo'}
@@ -91,13 +93,12 @@ export function RestActivityEditorScreen({
         <FormField label="Categoria" value={category} onChangeText={setCategory} />
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chips}>
           {categories.map((item) => (
-            <TouchableOpacity
+            <SelectableChip
               key={item}
-              style={[styles.chip, category === item && styles.chipActive]}
+              label={item}
+              selected={category === item}
               onPress={() => setCategory(item)}
-            >
-              <Text style={[styles.chipText, category === item && styles.chipTextActive]}>{item}</Text>
-            </TouchableOpacity>
+            />
           ))}
         </ScrollView>
         <FormField
@@ -106,7 +107,7 @@ export function RestActivityEditorScreen({
           onChangeText={setDuration}
           keyboardType="number-pad"
         />
-        <TouchableOpacity style={styles.checkboxRow} onPress={() => setOptional((current) => !current)}>
+        <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{ checked: optional }} style={styles.checkboxRow} onPress={() => setOptional((current) => !current)}>
           <View style={[styles.checkbox, optional && styles.checkboxActive]}>
             <Text style={styles.checkboxText}>{optional ? '✓' : ''}</Text>
           </View>
@@ -119,24 +120,19 @@ export function RestActivityEditorScreen({
           onPress={() => void save()}
         />
       </View>
-    </ScrollView>
+    </ScreenScrollView>
   )
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  content: { padding: shared.pagePadding, paddingBottom: 45 },
-  form: { backgroundColor: colors.card, borderRadius: 20, padding: 14 },
+  form: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 20, borderWidth: 1, padding: 16 },
   chips: { marginBottom: 14 },
-  chip: { backgroundColor: colors.gray100, borderRadius: 12, marginRight: 6, paddingHorizontal: 10, paddingVertical: 9 },
-  chipActive: { backgroundColor: colors.primary },
-  chipText: { color: colors.gray500, fontSize: 8, fontWeight: '700' },
-  chipTextActive: { color: colors.onPrimary },
-  checkboxRow: { alignItems: 'center', flexDirection: 'row', gap: 10, marginBottom: 14 },
-  checkbox: { alignItems: 'center', borderColor: colors.gray300, borderRadius: 6, borderWidth: 1, height: 24, justifyContent: 'center', width: 24 },
+  checkboxRow: { alignItems: 'center', flexDirection: 'row', gap: 12, marginBottom: 14, minHeight: 48 },
+  checkbox: { alignItems: 'center', borderColor: colors.border, borderRadius: 6, borderWidth: 1, height: 28, justifyContent: 'center', width: 28 },
   checkboxActive: { backgroundColor: colors.primary },
   checkboxText: { color: colors.onPrimary, fontSize: 12, fontWeight: '800' },
-  checkboxLabel: { color: colors.ink, fontSize: 10, fontWeight: '700' },
-  error: { color: colors.danger, fontSize: 9, marginBottom: 9 },
+  checkboxLabel: { color: colors.textPrimary, fontSize: 14, fontWeight: '700' },
+  error: { color: colors.danger, fontSize: 14, lineHeight: 20, marginBottom: 9 },
   empty: { alignItems: 'center', flex: 1, justifyContent: 'center' },
   title: { color: colors.ink, fontSize: 18, fontWeight: '800' },
 })

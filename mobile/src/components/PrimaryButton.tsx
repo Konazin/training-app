@@ -1,29 +1,33 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native'
-import { type ThemeColors, useTheme } from '../theme'
+import { shared, type ThemeColors, useTheme } from '../theme'
+import { typography } from '../theme/typography'
 
 interface Props {
   label: string
   onPress: () => void
   loading?: boolean
   secondary?: boolean
+  disabled?: boolean
 }
 
-export function PrimaryButton({ label, onPress, loading, secondary }: Props) {
+export function PrimaryButton({ label, onPress, loading, secondary, disabled = false }: Props) {
   const { colors } = useTheme()
   const styles = createStyles(colors)
   return (
     <Pressable
-      disabled={loading}
+      accessibilityRole="button"
+      accessibilityState={{ busy: loading, disabled: disabled || loading }}
+      disabled={disabled || loading}
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
         secondary && styles.secondary,
         pressed && styles.pressed,
-        loading && styles.disabled,
+        (disabled || loading) && styles.disabled,
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={secondary ? colors.black : colors.white} />
+        <ActivityIndicator color={secondary ? colors.textPrimary : colors.onPrimary} />
       ) : (
         <Text style={[styles.label, secondary && styles.secondaryLabel]}>{label}</Text>
       )}
@@ -37,17 +41,17 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     backgroundColor: colors.primary,
     borderRadius: 16,
     justifyContent: 'center',
-    minHeight: 54,
+    minHeight: shared.touchTarget.minimum,
     paddingHorizontal: 18,
   },
   secondary: {
     backgroundColor: colors.card,
-    borderColor: colors.gray200,
+    borderColor: colors.border,
     borderWidth: 1,
   },
   label: {
     color: colors.onPrimary,
-    fontSize: 14,
+    ...typography.label,
     fontWeight: '700',
   },
   secondaryLabel: {

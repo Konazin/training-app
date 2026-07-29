@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Screen } from '../../components/Screen'
 import { useTheme } from '../../theme'
 
 export function BootstrapScreen({ state, message, onRetry, migrationName, onExportDiagnostic }: {
@@ -10,7 +11,7 @@ export function BootstrapScreen({ state, message, onRetry, migrationName, onExpo
 }) {
   const { colors } = useTheme()
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+    <Screen style={styles.screen}>
       <Text style={[styles.mark, { color: colors.ink }]}>TRAINING</Text>
       <Text style={[styles.title, { color: colors.ink }]}>
         {state === 'migrating_data'
@@ -36,16 +37,16 @@ export function BootstrapScreen({ state, message, onRetry, migrationName, onExpo
           </Pressable>
         )}
       </>}
-    </View>
+    </Screen>
   )
 }
 
 const styles = StyleSheet.create({
-  screen: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: 28 },
-  mark: { fontSize: 11, fontWeight: '900', letterSpacing: 3, marginBottom: 18 },
+  screen: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28 },
+  mark: { fontSize: 12, fontWeight: '900', letterSpacing: 3, marginBottom: 18 },
   title: { fontSize: 24, fontWeight: '800', textAlign: 'center' },
   message: { lineHeight: 20, marginTop: 12, textAlign: 'center' },
-  address: { fontSize: 11, marginTop: 8, textAlign: 'center' },
-  button: { borderRadius: 14, marginTop: 22, paddingHorizontal: 22, paddingVertical: 15 },
-  diagnostic: { fontSize: 12, fontWeight: '700', marginTop: 18 },
+  address: { fontSize: 12, marginTop: 8, textAlign: 'center' },
+  button: { alignItems: 'center', borderRadius: 14, justifyContent: 'center', marginTop: 22, minHeight: 48, paddingHorizontal: 22 },
+  diagnostic: { fontSize: 14, fontWeight: '700' },
 })

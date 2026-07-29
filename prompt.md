@@ -1,651 +1,740 @@
 Continue o desenvolvimento do repositório `training-app` a partir do commit:
 
-8e20b5e106122b5133cf7dcdd3ff041178e552c6
+63ac4463495e266d85dc8c28ca4299ed68967f64
 
-Esta é a sprint final antes do primeiro APK local-only para teste de sete dias.
+Esta etapa é uma sprint de usabilidade e interface do aplicativo padrão
+local-only.
 
-Trabalhe apenas no aplicativo padrão:
+Trabalhe apenas em:
 
 mobile/
-packages/training-domain/
-packages/training-local-db/
 
-Não altere funcionalmente:
+Não alterar:
 
-- backend/
-- web/
-- umamusume-mobile/
+- regras de domínio;
+- schema SQLite;
+- migrations;
+- repositories;
+- backup;
+- backend;
+- web;
+- umamusume-mobile.
 
-Ao final, se todas as validações passarem, gere um APK preview instalável pelo
-EAS.
+O objetivo é corrigir problemas observados em aparelho Android real:
 
-Não implementar Wger online, IA, Health Connect, download de vídeo, contas,
-sincronização em nuvem ou novas funcionalidades de treino.
+- interface pequena demais;
+- textos difíceis de ler;
+- conteúdo encostando ou entrando sob a barra superior;
+- elementos desaparecendo ao rolar para o topo;
+- contraste ruim;
+- seleção preta sobre fundo preto;
+- estados selecionados pouco distinguíveis;
+- áreas de toque pequenas.
 
-==================================================
-1. OBJETIVO
-==================================================
+Ao final, gerar uma nova versão preview:
 
-Ao final:
-
-- apagar dados deve permanecer apagado após reiniciar;
-- seed deve rodar somente na primeira instalação ou por ação explícita;
-- falhas do bootstrap não podem deixar conexões SQLite abertas;
-- backups automáticos devem ser visíveis e restauráveis;
-- operações compostas devem possuir testes com transação SQLite real;
-- data da sessão deve respeitar o calendário local;
-- validações de domínio devem ser consistentes;
-- a versão do app deve possuir fonte única;
-- testes e export Android devem passar;
-- APK preview deve ser gerado;
-- smoke test em modo avião deve ser iniciado ou documentado como pendente.
+- version: 0.2.1
+- android.versionCode: 4
 
 ==================================================
-2. METADADOS DE INSTALAÇÃO E SEED
+1. SAFE AREA GLOBAL
 ==================================================
 
-Criar tabela local separada:
+Mover `SafeAreaProvider` para o topo absoluto do aplicativo, envolvendo:
 
-app_metadata
+- ErrorBoundary;
+- ThemeProvider;
+- bootstrap;
+- runtime;
+- navegação.
 
-Campos:
+Não criar SafeAreaProvider apenas depois do bootstrap.
 
-- key TEXT PRIMARY KEY;
-- value_json TEXT NOT NULL;
-- updated_at TEXT NOT NULL.
+Criar componente reutilizável:
 
-Criar migration nova, sem alterar migrations já publicadas.
+mobile/src/components/Screen.tsx
 
-Usar chaves:
+Responsabilidades:
 
-- installation.initialized;
-- seed.version;
-- seed.suppressed;
-- last.automatic.backup;
-- last.successful.startup.
+- respeitar safe area superior;
+- respeitar safe area inferior quando não houver tab bar;
+- fundo do tema;
+- flex: 1;
+- comportamento consistente Android/iOS;
+- suporte a ScrollView e conteúdo fixo;
+- suporte a teclado.
+
+Usar `useSafeAreaInsets`.
+
+Não depender somente de um SafeAreaView externo envolvendo toda a navegação.
+
+Cada tela principal deve usar `Screen` ou `ScreenScrollView`.
+
+==================================================
+2. EDGE-TO-EDGE E STATUS BAR
+==================================================
+
+Configurar corretamente Android edge-to-edge.
 
 Regras:
 
-1. Em uma instalação nova:
-   - `installation.initialized` ainda não existe;
-   - executar seed;
-   - gravar installation.initialized = true;
-   - gravar seed.version;
-   - seed.suppressed = false.
+- conteúdo nunca fica atrás da barra de status;
+- conteúdo nunca fica atrás da barra de navegação;
+- status bar deve combinar com o tema;
+- barra de navegação Android deve combinar com o fundo ou tab bar;
+- mudar tema deve atualizar ambas.
 
-2. Em banco existente vazio, mas já inicializado:
-   - não recriar seed automaticamente.
+Usar APIs Expo compatíveis com SDK atual.
 
-3. Ao executar “Apagar todos os dados”:
-   - apagar dados do usuário;
-   - preservar app_metadata;
-   - gravar seed.suppressed = true;
-   - não recriar seed ao reabrir.
+Não aplicar padding superior duplicado.
 
-4. Ao executar “Recriar dados iniciais”:
-   - apagar dados do usuário;
-   - executar seed explicitamente;
-   - gravar seed.suppressed = false;
-   - atualizar seed.version.
+Testar em aparelhos com:
 
-5. Restore de backup:
-   - não deve apagar metadados técnicos da instalação;
-   - deve atualizar last.successful.startup apenas após bootstrap completo.
-
-Não usar apenas a contagem de exercícios ou fichas para decidir se o seed roda.
+- notch;
+- câmera central;
+- barra de status alta;
+- navegação por gestos;
+- navegação por três botões.
 
 ==================================================
-3. RESET SEPARADO
+3. REMOVER ELEMENTOS ABSOLUTOS DO TOPO
 ==================================================
 
-Separar operações:
+Remover o botão de tema absoluto com:
 
-clearUserData()
-resetToSeed()
-initializeFirstInstallation()
+top: 7
 
-`BackupRepository.reset()` deve apagar somente dados do usuário.
+Remover mensagens absolutas com:
 
-Não deve apagar:
+top: 8
 
-- schema_migrations;
-- app_metadata.
+O botão de tema deve ficar em:
 
-Adicionar operação explícita ao repository local para recriar seed.
+- tela “Mais”;
+- ou ação explícita de um header que tenha espaço reservado.
 
-Não depender de `seedEmptyDatabase()` após um reset comum.
+Não manter botão flutuante sobre títulos ou conteúdo.
 
-==================================================
-4. BOOTSTRAP E CONEXÃO SQLITE
-==================================================
+Mensagens globais devem usar um componente Toast/Snackbar:
 
-Corrigir `useLocalRuntime`.
-
-Regras:
-
-- antes de abrir uma nova conexão, fechar conexão residual;
-- se migration falhar, fechar banco;
-- se seed falhar, fechar banco;
-- se criação de repositories falhar, fechar banco;
-- `databaseRef.current` deve ser null após qualquer falha;
-- retry deve iniciar com estado limpo;
-- duas tentativas simultâneas devem compartilhar a mesma Promise;
-- unmount deve fechar a conexão somente uma vez.
-
-Estrutura recomendada:
-
-let openedDatabase: SqlDatabase | null = null
-
-try {
-  openedDatabase = await openTrainingDatabase(...)
-  await initializeInstallation(...)
-  const repositories = createLocalRepositories(openedDatabase)
-  databaseRef.current = openedDatabase
-  setRepositories(repositories)
-  setState('ready')
-} catch (cause) {
-  if (openedDatabase) await openedDatabase.close()
-  databaseRef.current = null
-  setRepositories(null)
-  ...
-}
-
-Não guardar a conexão em databaseRef antes de toda a inicialização terminar.
-
-Adicionar testes para:
-
-- falha em migration;
-- falha em seed;
-- retry após falha;
-- duas chamadas simultâneas;
-- unmount durante inicialização;
-- conexão fechada exatamente uma vez.
+- posicionado usando safe area;
+- abaixo da barra superior;
+- sem cobrir títulos;
+- desaparecimento automático;
+- botão fechar;
+- suporte a sucesso, erro e informação;
+- contraste adequado;
+- texto mínimo de 14 px.
 
 ==================================================
-5. BACKUPS AUTOMÁTICOS
+4. ESCALA TIPOGRÁFICA
 ==================================================
 
-Criar modelo:
+Criar tokens centralizados:
 
-AutomaticBackupInfo
+mobile/src/theme/typography.ts
 
-Campos:
+Escala mínima:
 
-- uri;
-- fileName;
-- createdAt;
-- sizeBytes;
-- reason.
+- caption: 12
+- labelSmall: 13
+- label: 14
+- bodySmall: 14
+- body: 16
+- bodyLarge: 18
+- titleSmall: 20
+- title: 26
+- display: 34
 
-Reasons:
+Nenhum texto informativo deve usar menos de 12 px.
 
-- BEFORE_IMPORT;
-- BEFORE_ERASE;
-- BEFORE_RESET_SEED.
+Exceções:
 
-Ao criar backup automático:
+- nenhuma para labels da tab bar;
+- nenhuma para metadados importantes;
+- nenhuma para botões.
 
-- salvar o arquivo em Paths.document;
-- obter tamanho do arquivo;
-- armazenar metadados em app_metadata;
-- manter no máximo os 5 backups automáticos mais recentes;
-- excluir o mais antigo ao exceder o limite.
+Remover fontSize espalhado de:
 
-Criar serviço mobile:
+- 7;
+- 8;
+- 9;
+- 10;
+- 11;
 
-automaticBackupService
+salvo casos extremamente justificados e documentados.
 
-Operações:
+Usar lineHeight coerente:
 
-- list();
-- create(reason);
-- restore(uri);
-- share(uri);
-- delete(uri);
-- deleteAll();
-
-Não guardar conteúdo do backup dentro do SQLite.
-
-==================================================
-6. INTERFACE DE BACKUPS
-==================================================
-
-Na tela “Mais”, adicionar seção:
-
-BACKUPS AUTOMÁTICOS
-
-Mostrar para cada item:
-
-- data e hora;
-- motivo;
-- tamanho formatado;
-- Restaurar;
-- Compartilhar;
-- Excluir.
-
-Antes de restaurar backup automático:
-
-- pedir confirmação;
-- criar um novo backup automático do estado atual;
-- validar arquivo;
-- restaurar transacionalmente;
-- atualizar controllers;
-- mostrar sucesso ou erro.
-
-Depois de apagar ou recriar seed, mostrar:
-
-“Backup de segurança criado em <data>.”
-
-Não exibir URI interna longa para o usuário.
+- body 16 → lineHeight mínimo 22;
+- body 14 → lineHeight mínimo 20;
+- títulos sem corte vertical.
 
 ==================================================
-7. BACKUP E RESTAURAÇÃO
+5. FONT SCALING
 ==================================================
 
-Endurecer validação do backup.
-
-Validar:
-
-- IDs positivos e únicos por coleção;
-- referências;
-- enums;
-- datas ISO válidas;
-- valores numéricos finitos;
-- valores não negativos onde necessário;
-- no máximo uma ficha ativa;
-- no máximo uma sessão ativa;
-- status compatível com active_slot;
-- sete dias únicos para cada ficha;
-- sort_order sem duplicação por proprietário;
-- set_number sem duplicação por exercício;
-- nenhum secret.* em settings;
-- app_metadata não deve ser importado.
-
-Não aceitar:
-
-- NaN;
-- Infinity;
-- números convertidos implicitamente de strings;
-- objetos com prototype inesperado;
-- collections excessivamente grandes sem limite.
-
-Limites iniciais:
-
-- 10.000 exercícios;
-- 20.000 mídias;
-- 1.000 fichas;
-- 20.000 sessões;
-- 500.000 séries;
-- arquivo máximo de 25 MB.
-
-Documentar esses limites.
-
-==================================================
-8. TRANSAÇÃO REAL NOS TESTES
-==================================================
-
-Substituir o adapter de teste que executa:
-
-transaction: operation(database)
-
-por uma implementação realmente transacional.
-
-Pode usar:
-
-- sqlite3 com processo persistente;
-- better-sqlite3 somente como dependência de desenvolvimento;
-- ou outro adapter Node compatível.
-
-A transação deve executar:
-
-BEGIN IMMEDIATE;
-COMMIT;
-ROLLBACK;
-
-Não simular transação apenas com callbacks.
-
-Adicionar testes:
-
-1. restore falha depois de inserir exercícios:
-   - banco anterior permanece intacto.
-
-2. criação de ficha falha no quarto dia:
-   - nenhuma ficha parcial permanece.
-
-3. início de sessão falha ao inserir uma série:
-   - nenhuma sessão ou snapshot parcial permanece.
-
-4. duplicação falha ao copiar atividade:
-   - nenhuma cópia parcial permanece.
-
-5. reset falha:
-   - dados anteriores permanecem.
-
-==================================================
-9. DATA LOCAL
-==================================================
-
-Criar função pura em training-domain:
-
-localDateKey(date: Date): string
-
-Formato:
-
-YYYY-MM-DD
-
-Usar:
-
-- getFullYear();
-- getMonth();
-- getDate();
+Permitir escala de fonte do sistema.
 
 Não usar:
 
-- toISOString().slice(0, 10).
+allowFontScaling={false}
 
-Substituir na criação da sessão.
+Garantir funcionamento com:
 
-Adicionar testes:
+- escala 1.0;
+- escala 1.15;
+- escala 1.30.
 
-- 29/07/2026 22:30 em UTC-3;
-- 31/12 perto da meia-noite;
-- 01/01 perto da meia-noite;
-- meses com zero à esquerda;
-- dias com zero à esquerda.
+Textos não podem:
 
-Não alterar timestamps completos, que continuam ISO UTC.
-
-==================================================
-10. VALIDAÇÕES DE DOMÍNIO
-==================================================
-
-Criar e usar funções centralizadas:
-
-validateTrainingPlanInput
-validateTrainingPlanDayInput
-validateDayExerciseInput
-validateRestActivityInput
-validateSetLogInput
-validateRpe
-validateOptionalNonNegativeNumber
-
-Regras mínimas:
-
-Ficha:
-
-- nome obrigatório;
-- categoria obrigatória;
-- dificuldade obrigatória;
-- endDate não pode ser anterior a startDate.
-
-Dia:
-
-- título obrigatório;
-- duração estimada >= 0.
-
-Exercício da ficha:
-
-- sets >= 1;
-- minReps >= 0;
-- maxReps >= minReps;
-- plannedLoad >= 0 quando preenchido;
-- plannedDurationSeconds >= 0 quando preenchido;
-- plannedDistance >= 0 quando preenchido;
-- restSeconds >= 0;
-- RPE entre 0 e 10 quando preenchido.
-
-Atividade de descanso:
-
-- nome obrigatório;
-- duração estimada >= 0;
-- categoria obrigatória.
-
-Série:
-
-- reps >= 0;
-- load >= 0;
-- durationSeconds >= 0;
-- distance >= 0;
-- RPE entre 0 e 10 quando preenchido.
-
-Conclusão da sessão:
-
-- overallRpe entre 0 e 10 quando preenchido.
-
-Create e update devem usar as mesmas funções.
-
-Adicionar CHECK constraints numa migration apenas quando compatível com dados
-existentes.
-
-==================================================
-11. CORREÇÃO DE UPDATE DA FICHA
-==================================================
-
-`TrainingPlanRepository.update()` deve validar exatamente como create.
-
-Não permitir nome vazio ou datas inválidas.
-
-`updateDay`, `updateExercise`, `addRestActivity` e `updateRestActivity` também
-devem usar validações de domínio antes de executar SQL.
-
-Não duplicar regras dentro dos repositories.
-
-==================================================
-12. SESSÕES
-==================================================
-
-Endurecer operações de sessão.
-
-`resume` deve atualizar apenas:
-
-WHERE id = ? AND status = 'PAUSED' AND active_slot = 1
-
-`finishSession` deve verificar `changes`.
-
-Caso duas conclusões sejam disparadas:
-
-- uma conclui;
-- a segunda retorna transição inválida;
-- não duplica histórico.
-
-`updateSet`, `addSet`, `removeSet` e status de exercício devem rejeitar sessão
-PAUSED, salvo se a regra atual explicitamente permitir edição pausada.
-
-Escolher e documentar uma regra consistente.
-
-Recomendação:
-
-- sessão PAUSED não aceita alterações em séries;
-- usuário deve retomar antes de editar.
-
-Adicionar testes concorrentes ou sequenciais equivalentes.
-
-==================================================
-13. CÁLCULO DE DURAÇÃO
-==================================================
-
-Verificar sessão concluída enquanto estava pausada.
-
-A duração deve excluir:
-
-- pausas já acumuladas;
-- intervalo entre pausedAt e completedAt, caso concluída pausada.
-
-Adicionar testes:
-
-- concluir IN_PROGRESS;
-- concluir PAUSED;
-- várias pausas;
-- relógio anterior ao startedAt;
-- pausedAt inválido.
-
-Dados inválidos devem gerar erro de domínio, não duração negativa silenciosa.
-
-==================================================
-14. VERSÃO ÚNICA
-==================================================
-
-Remover versão hardcoded:
-
-'0.1.1'
-
-do App.tsx.
+- cortar;
+- sair dos cards;
+- sobrepor botões;
+- desaparecer.
 
 Usar:
 
-expo-constants
-
-Instalar com:
-
-npx expo install expo-constants
-
-Ler:
-
-Constants.expoConfig?.version
-
-Criar helper:
-
-getAppVersion()
-
-Fallback somente para desenvolvimento:
-
-'0.0.0-dev'
-
-Alinhar:
-
-- mobile/package.json version;
-- mobile/app.json expo.version;
-- backup appVersion.
-
-Usar versão:
-
-0.2.0
-
-Incrementar:
-
-android.versionCode: 3
-
-Motivo:
-
-- mudança arquitetural de cliente-servidor para local-only;
-- não é simples patch 0.1.2.
+- flexShrink;
+- numberOfLines somente quando realmente necessário;
+- minHeight em vez de height fixa para conteúdo textual.
 
 ==================================================
-15. APP.JSON
+6. TOKENS DE ESPAÇAMENTO
 ==================================================
 
-Confirmar:
+Expandir `shared` com tokens:
 
-- package: com.konazin.trainingapp;
-- slug: training-app;
-- scheme: trainingapp;
-- projectId preservado;
-- usesCleartextTraffic removido;
-- expo-sqlite configurado;
-- expo-secure-store configurado;
-- expo-video preservado;
-- nenhuma variável de API necessária.
+spacing:
+- xs: 4
+- sm: 8
+- md: 12
+- lg: 16
+- xl: 20
+- xxl: 24
+- xxxl: 32
 
-Não adicionar INTERNET manualmente.
+touchTarget:
+- minimum: 48
 
-A permissão padrão de rede pode permanecer devido a vídeos e APIs futuras.
+screen:
+- horizontalPadding: 20
+- topSpacing: 16
+- bottomSpacing: 120
 
-==================================================
-16. TESTES DE CONTROLLER
-==================================================
+Evitar números arbitrários espalhados.
 
-Adicionar testes para:
+Cards principais devem ter:
 
-- refresh local;
-- criação de exercício;
-- atualização inválida;
-- iniciar sessão duas vezes;
-- editar série;
-- pausar;
-- tentar editar pausada;
-- retomar;
-- concluir;
-- conclusão dupla;
-- abandonar;
-- recuperar cronômetro;
-- limpar cronômetro ao concluir;
-- backup automático antes de apagar;
-- restore atualizando todos os controllers.
-
-Não testar apenas funções puras.
+- padding mínimo 16;
+- gap mínimo 12;
+- borda ou contraste visível;
+- raio entre 16 e 22.
 
 ==================================================
-17. TESTE DE PROCESSO MORTO
+7. ÁREAS DE TOQUE
 ==================================================
 
-Endurecer o teste existente.
+Todos os elementos interativos devem possuir:
 
-Fluxo:
+- largura ou altura mínima de 48 dp;
+- `hitSlop` quando visualmente menores;
+- estado pressed;
+- estado disabled;
+- accessibilityRole;
+- accessibilityLabel quando necessário.
 
-1. abrir banco;
-2. inicializar instalação;
-3. criar ficha e exercício;
-4. iniciar sessão;
-5. completar uma série;
-6. iniciar cronômetro;
-7. pausar sessão;
-8. fechar repositories;
-9. fechar conexão;
-10. criar nova conexão real;
-11. recriar repositories;
-12. recuperar sessão;
-13. recuperar série;
-14. recuperar cronômetro;
-15. retomar;
-16. concluir;
-17. fechar novamente;
-18. reabrir;
-19. consultar histórico.
+Corrigir especialmente:
 
-Nenhuma instância de repository antiga pode ser reutilizada.
+- botão de tema;
+- links;
+- chips;
+- botões de editar;
+- setas;
+- controles da sessão;
+- abas;
+- ações de backup.
+
+Não usar apenas texto pequeno como área clicável.
 
 ==================================================
-18. CI
+8. PALETA
 ==================================================
 
-O job `local-mobile` deve ser obrigatório.
+Reformular a paleta mantendo estilo sóbrio.
 
-Não usar `continue-on-error` nele.
+Tema claro sugerido:
+
+- background: #F5F6F8
+- surface: #FFFFFF
+- surfaceSecondary: #ECEFF3
+- textPrimary: #16181D
+- textSecondary: #5F6673
+- border: #D9DEE7
+- primary: #2563EB
+- primaryPressed: #1D4ED8
+- onPrimary: #FFFFFF
+- success: #15803D
+- warning: #B45309
+- danger: #B91C1C
+- focus: #60A5FA
+
+Tema escuro sugerido:
+
+- background: #101216
+- surface: #181B21
+- surfaceSecondary: #232730
+- textPrimary: #F4F6F8
+- textSecondary: #AEB6C3
+- border: #343A46
+- primary: #60A5FA
+- primaryPressed: #3B82F6
+- onPrimary: #08111F
+- success: #4ADE80
+- warning: #FBBF24
+- danger: #F87171
+- focus: #93C5FD
+
+Não usar o mesmo `nearBlack` como solução universal para:
+
+- tab bar;
+- chips;
+- cards;
+- seleções;
+- badges;
+- mensagens.
+
+Criar tokens semânticos em vez de tons numerados genéricos.
+
+==================================================
+9. CONTRASTE
+==================================================
+
+Garantir contraste mínimo aproximado WCAG AA:
+
+- texto normal: 4.5:1;
+- texto grande: 3:1;
+- controles e bordas relevantes: 3:1.
+
+Criar testes unitários para calcular contraste dos pares principais:
+
+- texto/fundo;
+- texto secundário/fundo;
+- botão primário/texto;
+- chip selecionado/texto;
+- erro/fundo;
+- tab ativa/fundo.
+
+Não aceitar preto sobre preto, branco sobre branco ou cinza quase invisível.
+
+==================================================
+10. INPUTS
+==================================================
+
+Atualizar `FormField`.
+
+Adicionar:
+
+- `selectionColor={colors.focus}`;
+- `cursorColor={colors.primary}` no Android;
+- fundo claramente diferente da tela;
+- texto mínimo 16 px;
+- label mínimo 14 px;
+- placeholder com contraste legível;
+- borderWidth 1;
+- borda de foco destacada;
+- borda de erro;
+- mensagem de erro associada;
+- padding vertical suficiente;
+- minHeight 56.
+
+Criar estados:
+
+- default;
+- focused;
+- error;
+- disabled.
+
+Não usar seleção ou cursor preto no tema escuro.
+
+Para multiline:
+
+- minHeight 120;
+- padding superior 15;
+- textAlignVertical top.
+
+==================================================
+11. SELEÇÕES, CHIPS E FILTROS
+==================================================
+
+Criar componente reutilizável:
+
+SelectableChip
+
+Estados:
+
+default:
+- fundo surface;
+- texto textPrimary;
+- borda border.
+
+selected:
+- fundo primary;
+- texto onPrimary;
+- borda primary.
+
+pressed:
+- fundo primaryPressed.
+
+disabled:
+- opacidade reduzida;
+- ainda legível.
+
+Adicionar ícone ou check visual no estado selecionado.
+
+Não depender apenas da mudança de cor.
+
+Corrigir:
+
+- seleção de ficha;
+- filtros da biblioteca;
+- seleção de categoria;
+- seleção de dificuldade;
+- status de exercício;
+- qualquer chip horizontal.
+
+No chip de ficha selecionado:
+
+- nome;
+- categoria;
+- indicação “ativa”;
+
+todos devem mudar para cores compatíveis com o fundo selecionado.
+
+Hoje somente o nome recebe estilo inverso. Corrigir também os metadados.
+
+==================================================
+12. TAB BAR
+==================================================
+
+Redesenhar a tab bar.
+
+Requisitos:
+
+- altura deve considerar safe area inferior;
+- altura visual mínima 64, além do inset inferior;
+- label mínimo 12 px;
+- ícone mínimo 22 px;
+- item ativo claramente visível;
+- não usar texto em símbolo Unicode como ícone definitivo.
+
+Usar uma biblioteca já disponível ou ícones Expo compatíveis, preferencialmente:
+
+@expo/vector-icons
+
+Abas:
+
+- Hoje;
+- Ficha;
+- Histórico;
+- Mais.
+
+Estado ativo:
+
+- ícone e texto em primary;
+- fundo opcional discreto;
+- não usar texto branco sobre fundo quase preto sem distinção entre itens.
+
+Estado inativo:
+
+- textSecondary.
+
+==================================================
+13. HEADERS
+==================================================
+
+Atualizar `ScreenHeader`.
+
+Requisitos:
+
+- padding superior fornecido pelo Screen;
+- eyebrow mínimo 12 px;
+- título entre 28 e 34 px;
+- descrição mínima 15 px;
+- action com touch target 48;
+- action não pode apertar ou cortar título;
+- título deve suportar duas linhas;
+- espaço inferior mínimo 24.
+
+Não colocar controles flutuando sobre o header.
+
+==================================================
+14. SCROLL
+==================================================
+
+Corrigir todas as telas roláveis.
+
+Usar:
+
+- `contentInsetAdjustmentBehavior="automatic"` em iOS;
+- paddingBottom suficiente para tab bar;
+- `keyboardShouldPersistTaps="handled"` em formulários;
+- `keyboardDismissMode` apropriado;
+- `showsVerticalScrollIndicator={false}` somente quando não prejudicar uso.
+
+O primeiro conteúdo nunca pode começar atrás da status bar.
+
+Ao rolar para o topo:
+
+- header deve permanecer totalmente visível;
+- overscroll não deve revelar fundo de cor errada;
+- nenhum botão deve sumir atrás da câmera ou barra.
+
+==================================================
+15. COMPONENTE SCREENSCROLLVIEW
+==================================================
+
+Criar:
+
+ScreenScrollView
+
+Deve encapsular:
+
+- safe area;
+- ScrollView;
+- background;
+- padding horizontal;
+- padding superior;
+- padding inferior;
+- teclado;
+- refresh control opcional;
+- conteúdo acessível.
+
+Migrar telas principais:
+
+- HomeScreen;
+- TrainingPlanView;
+- HistoryScreen;
+- MoreScreen;
+- LibraryScreen;
+- TrainingPlanEditorScreen;
+- TrainingPlanDayScreen;
+- DayExerciseEditorScreen;
+- RestActivityEditorScreen;
+- WorkoutSessionScreen;
+- ExerciseDetailScreen;
+- ArchivedTrainingPlansScreen.
+
+Não deixar cada tela reinventar seu padding.
+
+==================================================
+16. TELA DE SESSÃO
+==================================================
+
+A sessão é a tela mais importante.
+
+Aumentar:
+
+- nome do exercício;
+- números das séries;
+- campos de carga e repetição;
+- botões;
+- cronômetro;
+- status.
+
+Requisitos:
+
+- campos numéricos mínimo 56 de altura;
+- texto mínimo 16;
+- botões concluir/salvar claros;
+- séries separadas visualmente;
+- sessão pausada claramente identificada;
+- cronômetro visível a distância;
+- área inferior não coberta pela barra de navegação;
+- modal de vídeo respeitando safe area.
+
+Não reduzir informação importante para caber em uma única tela.
+
+Rolagem é preferível a texto microscópico.
+
+==================================================
+17. HOME
+==================================================
+
+A Home atual possui diversas métricas pequenas.
+
+Redesenhar sem alterar dados:
+
+- saudação;
+- ficha ativa;
+- sessão ativa;
+- treino do dia;
+- métricas;
+- histórico recente.
+
+Métricas devem usar:
+
+- título mínimo 12;
+- valor mínimo 22;
+- card com padding 16.
+
+Evitar três cards apertados quando a largura for insuficiente.
+
+Em telas estreitas:
+
+- usar duas colunas;
+- ou lista horizontal acessível.
+
+==================================================
+18. RESPONSIVIDADE
+==================================================
+
+Testar layouts em larguras:
+
+- 320;
+- 360;
+- 375;
+- 390;
+- 412;
+- 430;
+- 480.
+
+Não assumir largura fixa.
+
+Usar:
+
+- flexWrap;
+- minWidth;
+- maxWidth;
+- useWindowDimensions quando necessário.
+
+Nenhum texto ou botão deve sair da tela em 320–360 px.
+
+==================================================
+19. TEMA
+==================================================
+
+Mover alternância de tema para a tela Mais.
+
+Opções:
+
+- Sistema;
+- Claro;
+- Escuro.
+
+Persistir escolha em SettingsRepository ou AsyncStorage de preferência.
+
+Não manter somente um toggle binário que esquece o valor ao fechar.
+
+O padrão deve ser:
+
+Sistema.
+
+A StatusBar e a navigation bar devem acompanhar a seleção.
+
+==================================================
+20. ACESSIBILIDADE
+==================================================
+
+Adicionar:
+
+- accessibilityRole;
+- accessibilityState selected/disabled;
+- accessibilityLabel;
+- accessibilityHint quando necessário.
+
+Chips selecionados devem expor:
+
+accessibilityState={{ selected: true }}
+
+Inputs devem possuir labels acessíveis.
+
+Botões com apenas ícone devem possuir nome legível.
+
+==================================================
+21. TESTES VISUAIS E DE ESTILO
+==================================================
+
+Adicionar testes para funções e componentes críticos:
+
+- paleta possui contraste mínimo;
+- SelectableChip muda fundo e texto;
+- FormField usa cursor/selection compatível;
+- tab ativa e inativa possuem cores diferentes;
+- textos não usam fontSize abaixo de 12;
+- touch targets importantes têm mínimo 48;
+- Screen aplica inset superior;
+- Screen aplica inset inferior;
+- tema sistema/claro/escuro;
+- estado selecionado possui indicador além da cor.
+
+Criar script que procure fontSize numérico abaixo de 12 em `mobile/src`.
+
+Permitir uma allowlist pequena e documentada somente quando estritamente
+necessário.
+
+==================================================
+22. SMOKE TEST EM APARELHO
+==================================================
+
+Executar no aparelho onde os problemas foram observados.
+
+Validar:
+
+- status bar;
+- câmera/notch;
+- topo de todas as telas;
+- tab bar;
+- teclado aberto;
+- modo claro;
+- modo escuro;
+- seleção de texto;
+- cursor;
+- chips selecionados;
+- formulários;
+- sessão;
+- rolagem;
+- navegação por gestos;
+- fonte padrão;
+- fonte aumentada.
+
+Registrar screenshots em:
+
+docs/ui-smoke/
+
+Não incluir informações pessoais.
+
+==================================================
+23. VERSÃO
+==================================================
+
+Atualizar:
+
+mobile/app.json:
+- version 0.2.1
+- android.versionCode 4
+
+mobile/package.json:
+- version 0.2.1
+
+Não alterar package, slug, scheme ou projectId.
+
+==================================================
+24. VALIDAÇÃO
+==================================================
 
 Executar:
 
 npm ci
-npm run typecheck --workspace=@training/training-domain
-npm run test --workspace=@training/training-domain
-npm run typecheck --workspace=@training/training-local-db
-npm run test --workspace=@training/training-local-db
+
 npm run typecheck --workspace=training-mobile
 npm run test --workspace=training-mobile
-npm run typecheck --workspace=umamusume-mobile
-npm exec --workspace=training-mobile -- expo install --check
-npm exec --workspace=training-mobile -- expo export --platform android --output-dir dist
-git diff --check
-
-Backend e infra podem continuar opcionais.
-
-Não chamar APIs externas.
-
-==================================================
-19. VALIDAÇÃO LOCAL
-==================================================
-
-Executar na raiz:
-
-npm ci
 
 npm run typecheck --workspace=@training/training-domain
 npm run test --workspace=@training/training-domain
 
 npm run typecheck --workspace=@training/training-local-db
 npm run test --workspace=@training/training-local-db
-
-npm run typecheck --workspace=training-mobile
-npm run test --workspace=training-mobile
 
 npm run typecheck --workspace=umamusume-mobile
 
@@ -657,49 +746,13 @@ EXPO_NO_TELEMETRY=1 npm exec --workspace=training-mobile -- expo export \
 
 git diff --check
 
-Não avançar para o APK se qualquer comando falhar.
+Não alterar regras ou dados para fazer testes visuais passarem.
 
 ==================================================
-20. INSPEÇÃO EAS
+25. BUILD
 ==================================================
 
-No diretório mobile:
-
-npx eas-cli@latest whoami
-npx eas-cli@latest project:info
-
-Executar:
-
-npx eas-cli@latest build:inspect \
-  --platform android \
-  --stage pre-build \
-  --profile preview \
-  --output .eas-inspect \
-  --force
-
-Validar:
-
-- applicationId com.konazin.trainingapp;
-- versionName 0.2.0;
-- versionCode 3;
-- expo-sqlite incluído;
-- expo-file-system incluído;
-- expo-document-picker incluído;
-- expo-sharing incluído;
-- expo-secure-store incluído;
-- expo-video incluído;
-- nenhuma URL de backend embutida;
-- nenhum token;
-- nenhum usesCleartextTraffic habilitado manualmente;
-- buildType APK.
-
-Adicionar `.eas-inspect/` ao gitignore se ainda não estiver.
-
-==================================================
-21. GERAR APK
-==================================================
-
-Somente após todas as validações:
+Somente após validação:
 
 cd mobile
 
@@ -709,134 +762,39 @@ npx eas-cli@latest build \
   --non-interactive \
   --json
 
-Capturar:
+Gerar APK:
+
+artifacts/training-app-local-0.2.1.apk
+
+Registrar:
 
 - build ID;
-- status;
 - URL;
-- commit;
-- versionName;
-- versionCode.
-
-Aguardar o status FINISHED.
-
-Baixar o artefato:
-
-mkdir -p ../artifacts
-
-npx eas-cli@latest build:download \
-  --build-id <BUILD_ID> \
-  --non-interactive \
-  --output ../artifacts/training-app-local-0.2.0.apk
-
-Caso `--output` não seja suportado pela versão atual:
-
-- baixar pelo URL do artefato;
-- salvar manualmente no mesmo caminho.
-
-Calcular:
-
-sha256sum ../artifacts/training-app-local-0.2.0.apk
-
-Não adicionar APK ao Git.
+- tamanho;
+- SHA-256.
 
 ==================================================
-22. SMOKE TEST RÁPIDO
-==================================================
-
-Caso exista aparelho ou emulador conectado:
-
-adb install -r artifacts/training-app-local-0.2.0.apk
-
-Ativar modo avião.
-
-Executar no mínimo:
-
-1. abrir app;
-2. confirmar seed;
-3. abrir ficha;
-4. iniciar sessão;
-5. completar série;
-6. iniciar cronômetro;
-7. pausar;
-8. fechar app;
-9. reabrir;
-10. recuperar sessão;
-11. retomar;
-12. concluir;
-13. consultar histórico;
-14. exportar backup;
-15. apagar dados;
-16. fechar e reabrir;
-17. confirmar que seed não reapareceu;
-18. restaurar backup;
-19. confirmar histórico restaurado.
-
-Atualizar:
-
-docs/LOCAL_ONLY_SMOKE_TEST.md
-
-Marcar apenas itens realmente executados.
-
-Se não houver Android conectado:
-
-- gerar o APK;
-- marcar smoke físico como pendente;
-- não declarar que ele passou.
-
-==================================================
-23. CRITÉRIOS DE CONCLUSÃO
-==================================================
-
-A sprint pode terminar em um destes estados:
-
-APROVADO:
-
-- testes passam;
-- export passa;
-- EAS inspect passa;
-- APK gerado;
-- hash registrado.
-
-CÓDIGO APROVADO, BUILD BLOQUEADO:
-
-- testes passam;
-- export passa;
-- mas falta login Expo, credencial ou acesso ao projeto.
-
-REPROVADO:
-
-- qualquer teste ou export falha;
-- migration falha;
-- restore não é atômico;
-- seed reaparece após apagar.
-
-Não declarar APK criado sem build ID e arquivo real.
-
-==================================================
-24. ENTREGA
+26. ENTREGA
 ==================================================
 
 Informar:
 
-1. commit final;
-2. migrations adicionadas;
-3. política de seed;
-4. política de reset;
-5. correção do bootstrap;
-6. backups automáticos;
-7. validações adicionadas;
-8. transações reais testadas;
-9. versão e versionCode;
-10. resultados dos testes;
-11. resultado do export;
-12. resultado do EAS inspect;
-13. build ID;
-14. URL do build;
-15. caminho do APK;
-16. tamanho;
-17. SHA-256;
-18. smoke executado ou pendente;
-19. limitações restantes.
+1. causa dos problemas de safe area;
+2. estrutura Screen criada;
+3. escala tipográfica;
+4. paleta nova;
+5. contraste validado;
+6. inputs corrigidos;
+7. seleções corrigidas;
+8. tab bar corrigida;
+9. telas migradas;
+10. responsividade testada;
+11. aparelhos/larguras testados;
+12. versão;
+13. resultados dos testes;
+14. build ID;
+15. APK;
+16. SHA-256;
+17. limitações restantes.
 
 Não implementar novas features.

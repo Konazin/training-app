@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native'
 import { type ThemeColors, useTheme } from '../theme'
+import { typography } from '../theme/typography'
 
 interface Props {
   eyebrow: string
@@ -25,33 +26,36 @@ export function ScreenHeader({ eyebrow, title, description, action }: Props) {
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 24,
   },
   copy: {
     flex: 1,
+    minWidth: 0,
+    paddingRight: 12,
   },
   eyebrow: {
-    color: colors.gray400,
-    fontSize: 10,
+    ...typography.caption,
+    color: colors.textSecondary,
     fontWeight: '800',
     letterSpacing: 2,
     marginBottom: 8,
     textTransform: 'uppercase',
   },
   title: {
-    color: colors.ink,
+    color: colors.textPrimary,
     fontSize: 32,
     fontWeight: '700',
     letterSpacing: -1.2,
-    lineHeight: 35,
+    lineHeight: 39,
+    flexShrink: 1,
   },
   description: {
-    color: colors.gray500,
-    fontSize: 13,
-    lineHeight: 19,
+    color: colors.textSecondary,
+    fontSize: 15,
+    lineHeight: 22,
     marginTop: 9,
     maxWidth: 310,
   },

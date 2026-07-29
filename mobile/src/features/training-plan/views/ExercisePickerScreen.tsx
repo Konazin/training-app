@@ -2,6 +2,7 @@ import { Alert, StyleSheet, Text, View } from 'react-native'
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { ScreenHeader } from '../../../components/ScreenHeader'
+import { Screen } from '../../../components/Screen'
 import type { RootStackParamList } from '../../../navigation/types'
 import type { ExerciseDefinition } from '../../../models/training'
 import type { TrainingPlan } from '../model/trainingPlan'
@@ -23,7 +24,7 @@ export function ExercisePickerScreen({
   const styles = createStyles(colors)
 
   if (!plan || !day) {
-    return <View style={styles.empty}><Text style={styles.title}>Dia não encontrado</Text></View>
+    return <Screen><View style={styles.empty}><Text style={styles.title}>Dia não encontrado</Text></View></Screen>
   }
   const planId = plan.id
   const dayId = day.id
@@ -50,7 +51,7 @@ export function ExercisePickerScreen({
   }
 
   return (
-    <View style={styles.container}>
+    <Screen style={styles.container}>
       <View style={styles.header}>
         <ScreenHeader
           eyebrow={plan.name}
@@ -59,7 +60,7 @@ export function ExercisePickerScreen({
         />
       </View>
       <ExercisePicker exercises={library} onSelect={select} />
-    </View>
+    </Screen>
   )
 }
 

@@ -4,7 +4,9 @@ import { useNavigation, useRoute, type RouteProp } from '@react-navigation/nativ
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { FormField } from '../../../components/FormField'
 import { PrimaryButton } from '../../../components/PrimaryButton'
+import { Screen, ScreenScrollView } from '../../../components/Screen'
 import { ScreenHeader } from '../../../components/ScreenHeader'
+import { SelectableChip } from '../../../components/SelectableChip'
 import type { RootStackParamList } from '../../../navigation/types'
 import { useUnsavedChangesGuard } from '../../../navigation/useUnsavedChangesGuard'
 import type { ExerciseDefinition } from '../../../models/training'
@@ -93,7 +95,7 @@ export function DayExerciseEditorScreen({
   const { commit } = useUnsavedChangesGuard(form)
 
   if (!plan || !day || !definition) {
-    return <View style={styles.empty}><Text style={styles.title}>Exercício não encontrado</Text></View>
+    return <Screen><View style={styles.empty}><Text style={styles.title}>Exercício não encontrado</Text></View></Screen>
   }
 
   const planId = plan.id
@@ -114,7 +116,7 @@ export function DayExerciseEditorScreen({
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScreenScrollView>
       <ScreenHeader
         eyebrow={configured ? 'Editar exercício do dia' : 'Configurar antes de adicionar'}
         title={definition.name}
@@ -148,25 +150,24 @@ export function DayExerciseEditorScreen({
         <Text style={styles.label}>TIPO DE SÉRIE</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chips}>
           {setTypes.map((item) => (
-            <TouchableOpacity
+            <SelectableChip
               key={item}
-              style={[styles.chip, setType === item && styles.chipActive]}
+              label={item}
+              selected={setType === item}
               onPress={() => setSetType(item)}
-            >
-              <Text style={[styles.chipText, setType === item && styles.chipTextActive]}>{item}</Text>
-            </TouchableOpacity>
+            />
           ))}
         </ScrollView>
 
         <Text style={styles.label}>EXERCÍCIO ALTERNATIVO</Text>
         <View style={styles.alternativeRow}>
-          <TouchableOpacity style={styles.alternative} onPress={() => setShowAlternativePicker(true)}>
+          <TouchableOpacity accessibilityRole="button" style={styles.alternative} onPress={() => setShowAlternativePicker(true)}>
             <Text style={styles.alternativeText}>
               {library.find((item) => item.id === alternativeId)?.name ?? 'Nenhum'}
             </Text>
           </TouchableOpacity>
           {alternativeId != null && (
-            <TouchableOpacity onPress={() => setAlternativeId(null)}>
+            <TouchableOpacity accessibilityRole="button" onPress={() => setAlternativeId(null)} style={styles.clearButton}>
               <Text style={styles.clear}>Limpar</Text>
             </TouchableOpacity>
           )}
@@ -186,7 +187,7 @@ export function DayExerciseEditorScreen({
         <View style={[styles.modal, { backgroundColor: colors.background }]}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Exercício alternativo</Text>
-            <TouchableOpacity onPress={() => setShowAlternativePicker(false)}>
+            <TouchableOpacity accessibilityRole="button" onPress={() => setShowAlternativePicker(false)} style={styles.clearButton}>
               <Text style={styles.clear}>Fechar</Text>
             </TouchableOpacity>
           </View>
@@ -200,7 +201,7 @@ export function DayExerciseEditorScreen({
           />
         </View>
       </Modal>
-    </ScrollView>
+    </ScreenScrollView>
   )
 }
 
@@ -210,24 +211,20 @@ function number(value: string) {
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  content: { padding: shared.pagePadding, paddingBottom: 45 },
-  form: { backgroundColor: colors.card, borderRadius: 20, padding: 14 },
-  row: { flexDirection: 'row', gap: 8 },
-  half: { flex: 1 },
-  label: { color: colors.gray400, fontSize: 8, fontWeight: '800', letterSpacing: 1.1, marginBottom: 7, marginTop: 5 },
+  form: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 20, borderWidth: 1, padding: 16 },
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  half: { flex: 1, minWidth: 130 },
+  label: { color: colors.textSecondary, fontSize: 14, fontWeight: '800', letterSpacing: 0.6, marginBottom: 7, marginTop: 5 },
   chips: { marginBottom: 14 },
-  chip: { backgroundColor: colors.gray100, borderRadius: 12, marginRight: 6, paddingHorizontal: 10, paddingVertical: 9 },
-  chipActive: { backgroundColor: colors.primary },
-  chipText: { color: colors.gray500, fontSize: 8, fontWeight: '700' },
-  chipTextActive: { color: colors.onPrimary },
   alternativeRow: { alignItems: 'center', flexDirection: 'row', gap: 9, marginBottom: 14 },
-  alternative: { backgroundColor: colors.gray100, borderRadius: 12, flex: 1, minHeight: 42, justifyContent: 'center', paddingHorizontal: 11 },
-  alternativeText: { color: colors.ink, fontSize: 9, fontWeight: '700' },
-  clear: { color: colors.ink, fontSize: 9, fontWeight: '800', padding: 8 },
+  alternative: { backgroundColor: colors.surfaceSecondary, borderRadius: 12, flex: 1, minHeight: 48, justifyContent: 'center', paddingHorizontal: 12 },
+  alternativeText: { color: colors.textPrimary, fontSize: 14, fontWeight: '700' },
+  clear: { color: colors.primary, fontSize: 14, fontWeight: '800' },
+  clearButton: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 },
   modal: { flex: 1, paddingTop: 45 },
   modalHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: shared.pagePadding, paddingVertical: 12 },
   modalTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
-  error: { color: colors.danger, fontSize: 9, marginBottom: 9 },
+  error: { color: colors.danger, fontSize: 14, lineHeight: 20, marginBottom: 9 },
   empty: { alignItems: 'center', flex: 1, justifyContent: 'center' },
   title: { color: colors.ink, fontSize: 18, fontWeight: '800' },
 })

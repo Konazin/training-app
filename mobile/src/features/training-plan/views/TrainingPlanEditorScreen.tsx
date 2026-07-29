@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity } from 'react-native'
+import { Alert, StyleSheet, Text, TouchableOpacity } from 'react-native'
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { FormField } from '../../../components/FormField'
 import { PrimaryButton } from '../../../components/PrimaryButton'
 import { ScreenHeader } from '../../../components/ScreenHeader'
+import { ScreenScrollView } from '../../../components/Screen'
 import type { RootStackParamList } from '../../../navigation/types'
 import { useUnsavedChangesGuard } from '../../../navigation/useUnsavedChangesGuard'
 import type { TrainingPlan, TrainingPlanInput } from '../model/trainingPlan'
@@ -61,7 +62,7 @@ export function TrainingPlanEditorScreen({
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScreenScrollView>
       <ScreenHeader
         eyebrow={plan ? 'Editar ficha' : 'Nova ficha'}
         title={plan ? plan.name : 'Montar ficha'}
@@ -79,6 +80,8 @@ export function TrainingPlanEditorScreen({
           {!plan.active && (
             <>
               <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityState={{ disabled: dirty || busyKeys.has(`plan:activate:${plan.id}`) }}
                 style={styles.secondary}
                 disabled={dirty || busyKeys.has(`plan:activate:${plan.id}`)}
                 onPress={() => void onActivate(plan.id)}
@@ -91,6 +94,8 @@ export function TrainingPlanEditorScreen({
             </>
           )}
           <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityState={{ disabled: dirty || busyKeys.has(`plan:duplicate:${plan.id}`) }}
             style={styles.secondary}
             disabled={dirty || busyKeys.has(`plan:duplicate:${plan.id}`)}
             onPress={() => void (async () => {
@@ -103,6 +108,8 @@ export function TrainingPlanEditorScreen({
             <Text style={styles.error}>{errors[`plan:duplicate:${plan.id}`]}</Text>
           )}
           <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityState={{ disabled: dirty || busyKeys.has(`plan:archive:${plan.id}`) }}
             disabled={dirty || busyKeys.has(`plan:archive:${plan.id}`)}
             onPress={() => Alert.alert(
               'Arquivar ficha?',
@@ -127,15 +134,14 @@ export function TrainingPlanEditorScreen({
           {dirty && <Text style={styles.hint}>Salve ou descarte as alterações para usar estas ações.</Text>}
         </>
       )}
-    </ScrollView>
+    </ScreenScrollView>
   )
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  content: { padding: shared.pagePadding, paddingBottom: 50 },
-  error: { color: colors.danger, fontSize: 10, marginBottom: 10 },
-  secondary: { alignItems: 'center', borderColor: colors.gray200, borderRadius: 15, borderWidth: 1, marginTop: 9, minHeight: 49, justifyContent: 'center' },
-  secondaryText: { color: colors.ink, fontSize: 10, fontWeight: '800' },
-  archive: { color: colors.danger, fontSize: 10, fontWeight: '700', padding: 16, textAlign: 'center' },
-  hint: { color: colors.gray500, fontSize: 8, textAlign: 'center' },
+  error: { color: colors.danger, fontSize: 14, lineHeight: 20, marginBottom: 10 },
+  secondary: { alignItems: 'center', borderColor: colors.border, borderRadius: 15, borderWidth: 1, justifyContent: 'center', marginTop: 9, minHeight: 48 },
+  secondaryText: { color: colors.textPrimary, fontSize: 14, fontWeight: '800' },
+  archive: { color: colors.danger, fontSize: 14, fontWeight: '700', minHeight: 48, padding: 16, textAlign: 'center' },
+  hint: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, textAlign: 'center' },
 })

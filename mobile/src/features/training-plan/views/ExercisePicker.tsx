@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import type { ExerciseDefinition } from '../../../models/training'
+import { SelectableChip } from '../../../components/SelectableChip'
 import { shared, type ThemeColors, useTheme } from '../../../theme'
 
 export function ExercisePicker({
@@ -70,7 +71,7 @@ export function ExercisePicker({
         </View>
       )}
       renderItem={({ item }) => (
-        <TouchableOpacity style={styles.item} onPress={() => onSelect(item)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.item} onPress={() => onSelect(item)}>
           <View style={{ flex: 1 }}>
             <Text style={styles.name}>{item.name}</Text>
             <Text style={styles.meta}>{item.primaryMuscleGroup} · {item.equipment}</Text>
@@ -91,29 +92,19 @@ function Filter({
   active: boolean
   onPress: () => void
 }) {
-  const { colors } = useTheme()
-  const styles = createStyles(colors)
-  return (
-    <TouchableOpacity style={[styles.filter, active && styles.filterActive]} onPress={onPress}>
-      <Text style={[styles.filterText, active && styles.filterTextActive]}>{label}</Text>
-    </TouchableOpacity>
-  )
+  return <SelectableChip label={label} selected={active} onPress={onPress} />
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   content: { paddingHorizontal: shared.pagePadding, paddingBottom: 45 },
   emptyContent: { flexGrow: 1 },
-  search: { backgroundColor: colors.card, borderColor: colors.gray200, borderRadius: 15, borderWidth: 1, color: colors.ink, fontSize: 11, marginBottom: 10, minHeight: 48, paddingHorizontal: 14 },
+  search: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 15, borderWidth: 1, color: colors.textPrimary, fontSize: 16, marginBottom: 10, minHeight: 56, paddingHorizontal: 16 },
   categories: { marginBottom: 12 },
-  filter: { backgroundColor: colors.gray100, borderRadius: 12, marginRight: 7, paddingHorizontal: 11, paddingVertical: 9 },
-  filterActive: { backgroundColor: colors.primary },
-  filterText: { color: colors.gray500, fontSize: 8, fontWeight: '700' },
-  filterTextActive: { color: colors.onPrimary },
-  item: { alignItems: 'center', backgroundColor: colors.card, borderColor: colors.gray200, borderRadius: 16, borderWidth: 1, flexDirection: 'row', marginBottom: 7, minHeight: 64, padding: 13 },
-  name: { color: colors.ink, fontSize: 11, fontWeight: '800' },
-  meta: { color: colors.gray500, fontSize: 8, marginTop: 4 },
+  item: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, flexDirection: 'row', marginBottom: 7, minHeight: 68, padding: 13 },
+  name: { color: colors.textPrimary, fontSize: 16, fontWeight: '800', lineHeight: 22 },
+  meta: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, marginTop: 4 },
   arrow: { color: colors.gray400, fontSize: 17 },
   empty: { alignItems: 'center', flex: 1, justifyContent: 'center', minHeight: 230 },
   emptyTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
-  emptyText: { color: colors.gray500, fontSize: 9, marginTop: 5 },
+  emptyText: { color: colors.gray500, fontSize: 12, marginTop: 5 },
 })

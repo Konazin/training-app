@@ -2,6 +2,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { ScreenHeader } from '../../../components/ScreenHeader'
+import { ScreenScrollView } from '../../../components/Screen'
 import type { RootStackParamList } from '../../../navigation/types'
 import type { TrainingPlan } from '../model/trainingPlan'
 import { shared, type ThemeColors, useTheme } from '../../../theme'
@@ -35,13 +36,15 @@ export function TrainingPlanView({
   const visiblePlans = plans.filter((plan) => !plan.archived)
 
   return (
-    <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <ScreenScrollView includeBottomInset={false} showsVerticalScrollIndicator={false}>
       <ScreenHeader
         eyebrow="Planejamento semanal"
         title={'Sua ficha\nde treino'}
         description="Escolha uma ficha e configure cada dia separadamente."
         action={(
           <TouchableOpacity
+            accessibilityLabel="Criar ficha"
+            accessibilityRole="button"
             style={styles.headerButton}
             onPress={() => navigation.navigate('TrainingPlanEditor')}
           >
@@ -50,6 +53,7 @@ export function TrainingPlanView({
         )}
       />
       <TouchableOpacity
+        accessibilityRole="button"
         style={styles.archivedLink}
         onPress={() => navigation.navigate('ArchivedTrainingPlans')}
       >
@@ -58,6 +62,8 @@ export function TrainingPlanView({
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.planScroll}>
         {visiblePlans.map((plan) => (
           <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityState={{ selected: selectedPlan?.id === plan.id }}
             key={plan.id}
             style={[styles.planChip, selectedPlan?.id === plan.id && styles.planChipActive]}
             onPress={() => onSelect(plan.id)}
@@ -65,7 +71,9 @@ export function TrainingPlanView({
             <Text style={[styles.planName, selectedPlan?.id === plan.id && styles.inverse]}>
               {plan.name}
             </Text>
-            <Text style={styles.planMeta}>{plan.active ? '● ativa' : plan.category}</Text>
+            <Text style={[styles.planMeta, selectedPlan?.id === plan.id && styles.inverse]}>
+              {selectedPlan?.id === plan.id ? '✓ ' : ''}{plan.active ? 'ativa' : plan.category}
+            </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -74,7 +82,7 @@ export function TrainingPlanView({
         <View style={styles.empty}>
           <Text style={styles.emptyTitle}>{loading ? 'Carregando fichas…' : 'Nenhuma ficha disponível'}</Text>
           {!loading && (
-            <TouchableOpacity style={styles.primary} onPress={() => navigation.navigate('TrainingPlanEditor')}>
+            <TouchableOpacity accessibilityRole="button" style={styles.primary} onPress={() => navigation.navigate('TrainingPlanEditor')}>
               <Text style={styles.primaryText}>Criar ficha</Text>
             </TouchableOpacity>
           )}
@@ -88,6 +96,7 @@ export function TrainingPlanView({
               {!!selectedPlan.description && <Text style={styles.description}>{selectedPlan.description}</Text>}
             </View>
             <TouchableOpacity
+              accessibilityRole="button"
               style={styles.secondary}
               onPress={() => navigation.navigate('TrainingPlanEditor', { planId: selectedPlan.id })}
             >
@@ -98,6 +107,7 @@ export function TrainingPlanView({
           {selectedPlan.days.map((day) => (
             <View key={day.id} style={styles.dayCard}>
               <TouchableOpacity
+                accessibilityRole="button"
                 style={styles.dayBody}
                 onPress={() => navigation.navigate('TrainingPlanDay', {
                   planId: selectedPlan.id,
@@ -121,6 +131,7 @@ export function TrainingPlanView({
               </TouchableOpacity>
               {!day.restDay && day.exercises.length > 0 && (
                 <TouchableOpacity
+                  accessibilityRole="button"
                   style={styles.start}
                   onPress={() => void onStart(selectedPlan.id, day.id)}
                 >
@@ -131,40 +142,39 @@ export function TrainingPlanView({
           ))}
         </>
       )}
-    </ScrollView>
+    </ScreenScrollView>
   )
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  content: { padding: shared.pagePadding, paddingBottom: 110 },
-  headerButton: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 15, height: 44, justifyContent: 'center', width: 44 },
+  headerButton: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 15, height: 48, justifyContent: 'center', width: 48 },
   headerButtonText: { color: colors.onPrimary, fontSize: 20 },
-  archivedLink: { alignSelf: 'flex-start', marginBottom: 12 },
-  archivedLinkText: { color: colors.gray500, fontSize: 9, fontWeight: '700' },
+  archivedLink: { alignSelf: 'flex-start', justifyContent: 'center', marginBottom: 12, minHeight: 48 },
+  archivedLinkText: { color: colors.gray500, fontSize: 12, fontWeight: '700' },
   planScroll: { marginBottom: 14 },
-  planChip: { backgroundColor: colors.card, borderColor: colors.gray200, borderRadius: 16, borderWidth: 1, marginRight: 8, minWidth: 145, padding: 12 },
-  planChipActive: { backgroundColor: colors.nearBlack },
-  planName: { color: colors.ink, fontSize: 10, fontWeight: '800' },
-  planMeta: { color: colors.gray500, fontSize: 8, marginTop: 5 },
-  inverse: { color: '#fff' },
-  planHeader: { alignItems: 'flex-start', backgroundColor: colors.card, borderRadius: 21, flexDirection: 'row', gap: 10, marginBottom: 10, padding: 16 },
-  eyebrow: { color: colors.gray400, fontSize: 8, fontWeight: '800', textTransform: 'uppercase' },
+  planChip: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, justifyContent: 'center', marginRight: 8, minHeight: 64, minWidth: 145, padding: 12 },
+  planChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  planName: { color: colors.ink, fontSize: 12, fontWeight: '800' },
+  planMeta: { color: colors.gray500, fontSize: 12, marginTop: 5 },
+  inverse: { color: colors.onPrimary },
+  planHeader: { alignItems: 'flex-start', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 21, borderWidth: 1, flexDirection: 'row', gap: 12, marginBottom: 10, padding: 16 },
+  eyebrow: { color: colors.gray400, fontSize: 12, fontWeight: '800', textTransform: 'uppercase' },
   title: { color: colors.ink, fontSize: 21, fontWeight: '800', marginTop: 5 },
-  description: { color: colors.gray500, fontSize: 10, lineHeight: 15, marginTop: 6 },
-  secondary: { borderColor: colors.gray200, borderRadius: 13, borderWidth: 1, padding: 10 },
-  secondaryText: { color: colors.ink, fontSize: 9, fontWeight: '800' },
-  dayCard: { backgroundColor: colors.card, borderColor: colors.gray200, borderRadius: 18, borderWidth: 1, marginBottom: 8, overflow: 'hidden' },
-  dayBody: { alignItems: 'center', flexDirection: 'row', gap: 11, padding: 12 },
-  dayBadge: { alignItems: 'center', backgroundColor: colors.nearBlack, borderRadius: 13, height: 43, justifyContent: 'center', width: 43 },
+  description: { color: colors.gray500, fontSize: 14, lineHeight: 20, marginTop: 6 },
+  secondary: { alignItems: 'center', borderColor: colors.border, borderRadius: 13, borderWidth: 1, justifyContent: 'center', minHeight: 48, paddingHorizontal: 12 },
+  secondaryText: { color: colors.ink, fontSize: 12, fontWeight: '800' },
+  dayCard: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 18, borderWidth: 1, marginBottom: 8, overflow: 'hidden' },
+  dayBody: { alignItems: 'center', flexDirection: 'row', gap: 12, minHeight: 72, padding: 12 },
+  dayBadge: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 13, height: 48, justifyContent: 'center', width: 48 },
   restBadge: { backgroundColor: colors.gray500 },
-  dayBadgeText: { color: '#fff', fontSize: 8, fontWeight: '800' },
-  dayTitle: { color: colors.ink, fontSize: 11, fontWeight: '800' },
-  dayMeta: { color: colors.gray500, fontSize: 8, marginTop: 4 },
+  dayBadgeText: { color: colors.onPrimary, fontSize: 12, fontWeight: '800' },
+  dayTitle: { color: colors.ink, fontSize: 16, fontWeight: '800', lineHeight: 22 },
+  dayMeta: { color: colors.gray500, fontSize: 14, lineHeight: 20, marginTop: 4 },
   arrow: { color: colors.gray400, fontSize: 17 },
-  start: { alignItems: 'center', borderTopColor: colors.gray100, borderTopWidth: 1, padding: 10 },
-  startText: { color: colors.ink, fontSize: 9, fontWeight: '800' },
+  start: { alignItems: 'center', borderTopColor: colors.border, borderTopWidth: 1, justifyContent: 'center', minHeight: 48 },
+  startText: { color: colors.primary, fontSize: 14, fontWeight: '800' },
   empty: { alignItems: 'center', minHeight: 280, justifyContent: 'center' },
   emptyTitle: { color: colors.ink, fontSize: 16, fontWeight: '700', marginBottom: 15 },
-  primary: { backgroundColor: colors.primary, borderRadius: 14, paddingHorizontal: 18, paddingVertical: 13 },
-  primaryText: { color: colors.onPrimary, fontSize: 10, fontWeight: '800' },
+  primary: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 14, justifyContent: 'center', minHeight: 48, paddingHorizontal: 18 },
+  primaryText: { color: colors.onPrimary, fontSize: 14, fontWeight: '800' },
 })

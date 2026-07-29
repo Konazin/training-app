@@ -1,6 +1,7 @@
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import type { TrainingPlan } from '../model/trainingPlan'
 import { shared, type ThemeColors, useTheme } from '../../../theme'
+import { Screen } from '../../../components/Screen'
 import { ScreenHeader } from '../../../components/ScreenHeader'
 
 export function ArchivedTrainingPlansScreen({
@@ -19,7 +20,8 @@ export function ArchivedTrainingPlansScreen({
   const archived = plans.filter((plan) => plan.archived)
 
   return (
-    <FlatList
+    <Screen>
+      <FlatList
       data={archived}
       keyExtractor={(item) => String(item.id)}
       contentContainerStyle={[styles.content, !archived.length && styles.emptyContent]}
@@ -47,6 +49,8 @@ export function ArchivedTrainingPlansScreen({
               {!!errors[key] && <Text style={styles.error}>{errors[key]}</Text>}
             </View>
             <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityState={{ disabled: busyKeys.has(key) }}
               disabled={busyKeys.has(key)}
               style={styles.restore}
               onPress={() => void onRestore(item.id, false)}
@@ -56,19 +60,20 @@ export function ArchivedTrainingPlansScreen({
           </View>
         )
       }}
-    />
+      />
+    </Screen>
   )
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  content: { padding: shared.pagePadding, paddingBottom: 45 },
+  content: { paddingHorizontal: shared.pagePadding, paddingBottom: 45 },
   emptyContent: { flexGrow: 1 },
-  card: { alignItems: 'center', backgroundColor: colors.card, borderColor: colors.gray200, borderRadius: 17, borderWidth: 1, flexDirection: 'row', gap: 10, marginBottom: 8, padding: 14 },
-  name: { color: colors.ink, fontSize: 11, fontWeight: '800' },
-  meta: { color: colors.gray500, fontSize: 8, marginTop: 5 },
-  restore: { backgroundColor: colors.primary, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 },
-  restoreText: { color: colors.onPrimary, fontSize: 8, fontWeight: '800' },
-  error: { color: colors.danger, fontSize: 8, marginTop: 5 },
+  card: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 17, borderWidth: 1, flexDirection: 'row', gap: 12, marginBottom: 8, minHeight: 76, padding: 16 },
+  name: { color: colors.textPrimary, fontSize: 16, fontWeight: '800', lineHeight: 22 },
+  meta: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, marginTop: 5 },
+  restore: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 12, justifyContent: 'center', minHeight: 48, paddingHorizontal: 12 },
+  restoreText: { color: colors.onPrimary, fontSize: 14, fontWeight: '800' },
+  error: { color: colors.danger, fontSize: 12, lineHeight: 16, marginTop: 5 },
   empty: { alignItems: 'center', flex: 1, justifyContent: 'center', minHeight: 250 },
   emptyTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
 })

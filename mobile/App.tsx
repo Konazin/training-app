@@ -1,9 +1,10 @@
-import { useCallback, useMemo, useState } from 'react'
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
+import { useCallback, useMemo } from 'react'
 import { DefaultTheme, NavigationContainer, type Theme as NavigationTheme } from '@react-navigation/native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator, type NativeStackNavigationProp } from '@react-navigation/native-stack'
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
+import { NavigationBar } from 'expo-navigation-bar'
 import { StatusBar } from 'expo-status-bar'
 import { type LocalRepositories, type SeedData } from '@training/training-local-db'
 import seed from './assets/seeds/exercises.v1.json'
@@ -25,24 +26,38 @@ import { LibraryScreen } from './src/screens/LibraryScreen'
 import { HomeScreen } from './src/screens/HomeScreen'
 import { HistoryScreen } from './src/screens/HistoryScreen'
 import { MoreScreen } from './src/screens/MoreScreen'
-import { ThemeProvider, type ThemeColors, useTheme } from './src/theme'
+import { ThemeProvider, useTheme } from './src/theme'
 import { useAppBootstrap } from './src/features/bootstrap/useAppBootstrap'
 import { useLocalRuntime } from './src/features/bootstrap/useLocalRuntime'
 import { BootstrapScreen } from './src/features/bootstrap/BootstrapScreen'
 import { AppErrorBoundary } from './src/features/bootstrap/AppErrorBoundary'
 import { exportDiagnostic } from './src/integrations/backupFiles'
 import { getAppVersion } from './src/config/version'
+import { Toast } from './src/components/Toast'
 
 const Stack = createNativeStackNavigator<RootStackParamList>()
 const Tabs = createBottomTabNavigator<MainTabParamList>()
 
 export default function App() {
   return (
-    <AppErrorBoundary>
+    <SafeAreaProvider>
       <ThemeProvider>
-        <RuntimeApp />
+        <SystemBars />
+        <AppErrorBoundary>
+          <RuntimeApp />
+        </AppErrorBoundary>
       </ThemeProvider>
-    </AppErrorBoundary>
+    </SafeAreaProvider>
+  )
+}
+
+function SystemBars() {
+  const { isDark } = useTheme()
+  return (
+    <>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <NavigationBar style={isDark ? 'light' : 'dark'} />
+    </>
   )
 }
 
@@ -67,8 +82,7 @@ function LocalApp({
 }: {
   repositories: LocalRepositories
 }) {
-  const { colors, isDark, toggleTheme } = useTheme()
-  const styles = createStyles(colors)
+  const { colors, isDark } = useTheme()
   const controller = useTrainingController(repositories.exercises, repositories.dashboard)
   const trainingPlan = useTrainingPlanController(repositories.plans, controller.refresh)
   const workoutSession = useWorkoutSessionController(repositories.sessions, controller.refresh)
@@ -92,8 +106,7 @@ function LocalApp({
     () => repositories.maintenance.resetToSeed(seed as SeedData),
     refreshAll,
   )
-  const [currentRoute, setCurrentRoute] = useState('MainTabs')
-  const message = workoutSession.message || trainingPlan.message || controller.message
+  const message = workoutSession.message || trainingPlan.message || controller.message || backup.message
   const navigationTheme = useMemo<NavigationTheme>(() => ({
     ...DefaultTheme,
     dark: isDark,
@@ -101,8 +114,8 @@ function LocalApp({
       ...DefaultTheme.colors,
       background: colors.background,
       card: colors.card,
-      border: colors.gray200,
-      text: colors.ink,
+      border: colors.border,
+      text: colors.textPrimary,
       primary: colors.primary,
       notification: colors.danger,
     },
@@ -120,18 +133,8 @@ function LocalApp({
   }
 
   return (
-    <SafeAreaProvider>
-      <StatusBar style={isDark ? 'light' : 'dark'} />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
-        <SafeAreaView edges={['top']} style={styles.container}>
-          <NavigationContainer
-            theme={navigationTheme}
-            onReady={() => setCurrentRoute('MainTabs')}
-            onStateChange={(state) => {
-              const route = state?.routes[state.index ?? 0]
-              if (route?.name) setCurrentRoute(route.name)
-            }}
-          >
+    <>
+      <NavigationContainer theme={navigationTheme}>
             <Stack.Navigator screenOptions={{
               animation: 'slide_from_right',
               contentStyle: { backgroundColor: colors.background },
@@ -253,16 +256,9 @@ function LocalApp({
                 )}
               </Stack.Screen>
             </Stack.Navigator>
-          </NavigationContainer>
-          {currentRoute !== 'Session' && (
-            <Pressable accessibilityLabel="Alternar tema" onPress={toggleTheme} style={styles.themeButton}>
-              <Text style={styles.themeButtonText}>{isDark ? '☀' : '◐'}</Text>
-            </Pressable>
-          )}
-          {!!message && <View style={styles.message}><Text style={styles.messageText}>{message}</Text></View>}
-        </SafeAreaView>
-      </KeyboardAvoidingView>
-    </SafeAreaProvider>
+      </NavigationContainer>
+      <Toast message={message} />
+    </>
   )
 }
 
@@ -280,17 +276,32 @@ function MainTabs({
   backup: ReturnType<typeof useBackupController>
 }) {
   const { colors } = useTheme()
-  const symbols: Record<keyof MainTabParamList, string> = { Today: '⌂', Plan: '▥', History: '◷', More: '•••' }
+  const insets = useSafeAreaInsets()
+  const icons: Record<keyof MainTabParamList, keyof typeof Ionicons.glyphMap> = {
+    Today: 'home-outline',
+    Plan: 'clipboard-outline',
+    History: 'time-outline',
+    More: 'ellipsis-horizontal-circle-outline',
+  }
   const labels: Record<keyof MainTabParamList, string> = { Today: 'Hoje', Plan: 'Ficha', History: 'Histórico', More: 'Mais' }
   return (
     <Tabs.Navigator screenOptions={({ route }) => ({
       headerShown: false,
-      tabBarActiveTintColor: colors.onPrimary,
-      tabBarInactiveTintColor: colors.gray500,
+      tabBarActiveBackgroundColor: colors.surfaceSecondary,
+      tabBarActiveTintColor: colors.primary,
+      tabBarInactiveTintColor: colors.textSecondary,
       tabBarLabel: labels[route.name],
-      tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 17 }}>{symbols[route.name]}</Text>,
-      tabBarStyle: { backgroundColor: colors.nearBlack, borderTopColor: colors.gray200, height: 72, paddingBottom: 9, paddingTop: 7 },
-      tabBarLabelStyle: { fontSize: 9, fontWeight: '700' },
+      tabBarIcon: ({ color, focused }) => <Ionicons color={color} name={focused ? icons[route.name].replace('-outline', '') as keyof typeof Ionicons.glyphMap : icons[route.name]} size={24} />,
+      tabBarItemStyle: { borderRadius: 14, marginHorizontal: 3, minHeight: 56 },
+      tabBarStyle: {
+        backgroundColor: colors.tabBar,
+        borderTopColor: colors.border,
+        height: 64 + insets.bottom,
+        paddingBottom: insets.bottom + 4,
+        paddingHorizontal: 6,
+        paddingTop: 4,
+      },
+      tabBarLabelStyle: { fontSize: 12, fontWeight: '700', lineHeight: 16 },
     })}>
       <Tabs.Screen name="Today">
         {({ navigation: tabNavigation }) => (
@@ -327,7 +338,6 @@ function MainTabs({
         {() => (
           <MoreScreen
             busy={backup.busy}
-            message={backup.message}
             onLibrary={() => navigation.navigate('Library')}
             onExport={() => void backup.exportBackup()}
             onImport={() => void backup.importBackup()}
@@ -344,11 +354,3 @@ function MainTabs({
     </Tabs.Navigator>
   )
 }
-
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  container: { backgroundColor: colors.background, flex: 1 },
-  themeButton: { alignItems: 'center', backgroundColor: colors.card, borderColor: colors.gray200, borderRadius: 15, borderWidth: 1, height: 44, justifyContent: 'center', position: 'absolute', right: 20, top: 7, width: 44, zIndex: 15 },
-  themeButtonText: { color: colors.ink, fontSize: 19 },
-  message: { backgroundColor: colors.nearBlack, borderRadius: 16, borderWidth: 1, left: 20, paddingHorizontal: 16, paddingVertical: 13, position: 'absolute', right: 20, top: 8, zIndex: 20 },
-  messageText: { color: colors.white, fontSize: 10, fontWeight: '700', textAlign: 'center' },
-})
