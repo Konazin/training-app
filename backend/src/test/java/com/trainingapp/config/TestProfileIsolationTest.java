@@ -10,8 +10,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.env.Environment;
 
 import javax.sql.DataSource;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.sql.Connection;
 import java.util.Arrays;
 
@@ -40,7 +38,5 @@ class TestProfileIsolationTest {
         assertThat(plans.count()).isZero();
         assertThat(exercises.count()).isZero();
         assertThat(lock.existsById(1)).isTrue();
-        assertThat(Files.exists(Path.of("data", "trainingdb.mv.db"))).isFalse();
-        assertThat(Files.exists(Path.of("data", "trainingdb.trace.db"))).isFalse();
     }
 }

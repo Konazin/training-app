@@ -21,7 +21,6 @@ jobs:
           java-version: '21'
           cache: maven
       - run: mvn test
-      - run: mvn -Dtest=PostgresFlywayIntegrationTest test
       - run: mvn package -DskipTests
 
   frontend:
@@ -65,3 +64,9 @@ jobs:
       - uses: actions/checkout@v6
       - run: docker compose -f compose.beta.yml config
       - run: docker compose -f compose.beta.yml build
+
+  whitespace:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - run: git diff --check HEAD^ HEAD

@@ -325,10 +325,20 @@ eas env:create --environment preview --name EXPO_PUBLIC_API_TOKEN --value troque
 eas env:list --environment preview
 ```
 
-Depois valide com `eas build:inspect -p android -s pre-build -e preview` antes
-do futuro `eas build -p android --profile preview`. Não gere o APK nesta etapa.
+Valide com `eas build:inspect -p android -s pre-build -e preview` antes de
+`eas build -p android --profile preview`. O perfil `preview` gera APK para
+distribuição interna; o artefato continua ignorado pelo Git.
 
 Variáveis `EXPO_PUBLIC_*` são incorporadas ao bundle do aplicativo. Portanto,
 o token beta limita acesso casual, mas não é um segredo forte: pode ser extraído
 do APK e deve ser rotacionável, restrito ao ambiente beta e substituído por
 autenticação por usuário antes de uma distribuição ampla.
+
+## Preview 0.1.1
+
+- biblioteca de exercícios sincronizada com a Wger;
+- imagens, vídeos e atribuição específica por mídia;
+- demonstração em vídeo preservada no snapshot da sessão;
+- PostgreSQL com migrations Flyway e teste de upgrade;
+- bootstrap protegido contra indisponibilidade e configuração inválida;
+- distribuição limitada ao beta privado.

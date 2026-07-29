@@ -75,6 +75,9 @@ mobile/*.jks
 mobile/*.keystore
 mobile/google-services.json
 mobile/GoogleService-Info.plist
+.eas-inspect/
+*.apk
+artifacts/
 umamusume-mobile/.expo/
 umamusume-mobile/.expo-shared/
 umamusume-mobile/.cache/

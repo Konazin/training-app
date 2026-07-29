@@ -7,6 +7,7 @@ import com.trainingapp.dto.PageResponse;
 import com.trainingapp.exception.ResourceNotFoundException;
 import com.trainingapp.model.ExerciseDefinition;
 import com.trainingapp.model.ExerciseMedia;
+import com.trainingapp.model.ExerciseMediaSelector;
 import com.trainingapp.model.ExerciseMediaType;
 import com.trainingapp.model.ExerciseSource;
 import com.trainingapp.repository.ExerciseDefinitionRepository;
@@ -166,21 +167,18 @@ public class ExerciseLibraryService {
         List<String> secondary = item.getSecondaryMuscleGroups().isBlank() ? List.of()
                 : Arrays.stream(item.getSecondaryMuscleGroups().split("\\|")).toList();
         List<ExerciseMediaResponse> media = item.getMedia().stream().map(this::toMediaResponse).toList();
-        String primaryVideo = primary(item.getMedia(), ExerciseMediaType.VIDEO);
-        String primaryImage = primary(item.getMedia(), ExerciseMediaType.IMAGE);
+        ExerciseMediaResponse primaryVideo = ExerciseMediaSelector.primary(item.getMedia(), ExerciseMediaType.VIDEO)
+                .map(this::toMediaResponse).orElse(null);
+        ExerciseMediaResponse primaryImage = ExerciseMediaSelector.primary(item.getMedia(), ExerciseMediaType.IMAGE)
+                .map(this::toMediaResponse).orElse(null);
         return new ExerciseDefinitionResponse(
                 item.getId(), item.getName(), item.getDescription(), item.getPrimaryMuscleGroup(), secondary,
                 item.getEquipment(), item.getCategory(), item.getDifficulty(), item.getInstructions(),
                 item.getNotes(), item.getMediaUrl(), item.getSource(), item.getExternalId(), item.getSourceUrl(),
-                item.getLicenseName(), item.getLicenseUrl(), item.getAuthor(), media, primaryVideo != null,
-                primaryVideo, primaryImage, item.isUnilateral(), item.isTimed(), item.isCustom(),
+                item.getLicenseName(), item.getLicenseUrl(), item.getAuthor(), media, primaryVideo, primaryImage,
+                primaryVideo != null, primaryVideo == null ? null : primaryVideo.url(),
+                primaryImage == null ? null : primaryImage.url(), item.isUnilateral(), item.isTimed(), item.isCustom(),
                 item.isArchived(), item.getCreatedAt(), item.getUpdatedAt());
-    }
-
-    private String primary(List<ExerciseMedia> media, ExerciseMediaType type) {
-        return media.stream().filter(item -> item.getType() == type && item.isMain()).findFirst()
-                .or(() -> media.stream().filter(item -> item.getType() == type).findFirst())
-                .map(ExerciseMedia::getUrl).orElse(null);
     }
 
     private ExerciseMediaResponse toMediaResponse(ExerciseMedia item) {

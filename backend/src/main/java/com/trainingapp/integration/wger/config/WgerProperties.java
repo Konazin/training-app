@@ -10,5 +10,6 @@ public record WgerProperties(
         String fallbackLanguage,
         int requestTimeoutSeconds,
         int pageSize,
-        int syncMaxPages
+        int syncMaxPages,
+        int syncLockTimeoutMinutes
 ) {}

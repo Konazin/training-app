@@ -20,6 +20,7 @@ import com.trainingapp.repository.WorkoutSessionRepository;
 import com.trainingapp.repository.WorkoutSessionLockRepository;
 import com.trainingapp.exception.DomainConflictException;
 import com.trainingapp.model.ExerciseMedia;
+import com.trainingapp.model.ExerciseMediaSelector;
 import com.trainingapp.model.ExerciseMediaType;
 import jakarta.transaction.Transactional;
 import org.springframework.context.ApplicationEventPublisher;
@@ -80,9 +81,21 @@ public class WorkoutSessionService {
             exercise.setMuscleGroupSnapshot(planned.getExercise().getPrimaryMuscleGroup());
             exercise.setCategorySnapshot(planned.getExercise().getCategory());
             exercise.setTimedSnapshot(planned.getExercise().isTimed());
-            exercise.setPrimaryVideoUrl(primaryMedia(planned.getExercise().getMedia(), ExerciseMediaType.VIDEO));
-            exercise.setPrimaryImageUrl(primaryMedia(planned.getExercise().getMedia(), ExerciseMediaType.IMAGE));
-            exercise.setAttribution(attribution(planned.getExercise()));
+            ExerciseMedia primaryVideo = ExerciseMediaSelector
+                    .primary(planned.getExercise().getMedia(), ExerciseMediaType.VIDEO).orElse(null);
+            ExerciseMedia primaryImage = ExerciseMediaSelector
+                    .primary(planned.getExercise().getMedia(), ExerciseMediaType.IMAGE).orElse(null);
+            exercise.setPrimaryVideoUrl(primaryVideo == null ? null : primaryVideo.getUrl());
+            exercise.setPrimaryImageUrl(primaryImage == null ? null : primaryImage.getUrl());
+            exercise.setPrimaryVideoSourceUrl(value(primaryVideo, ExerciseMedia::getSourceUrl,
+                    planned.getExercise().getSourceUrl()));
+            exercise.setPrimaryVideoLicenseName(value(primaryVideo, ExerciseMedia::getLicenseName,
+                    planned.getExercise().getLicenseName()));
+            exercise.setPrimaryVideoLicenseUrl(value(primaryVideo, ExerciseMedia::getLicenseUrl,
+                    planned.getExercise().getLicenseUrl()));
+            exercise.setPrimaryVideoAuthor(value(primaryVideo, ExerciseMedia::getAuthor,
+                    planned.getExercise().getAuthor()));
+            exercise.setAttribution(attribution(exercise));
             exercise.setSortOrder(planned.getSortOrder());
             exercise.setPlannedSets(planned.getSets());
             exercise.setPlannedMinReps(planned.getMinReps());
@@ -280,6 +293,8 @@ public class WorkoutSessionService {
                         exercise.getMuscleGroupSnapshot(),
                         exercise.getCategorySnapshot() == null ? ExerciseCategory.STRENGTH : exercise.getCategorySnapshot(),
                         exercise.isTimedSnapshot(), exercise.getPrimaryVideoUrl(), exercise.getPrimaryImageUrl(),
+                        exercise.getPrimaryVideoSourceUrl(), exercise.getPrimaryVideoLicenseName(),
+                        exercise.getPrimaryVideoLicenseUrl(), exercise.getPrimaryVideoAuthor(),
                         exercise.getAttribution(), exercise.getSortOrder(), exercise.getPlannedSets(),
                         exercise.getPlannedMinReps(), exercise.getPlannedMaxReps(), exercise.getRestSeconds(),
                         exercise.getStatus(), exercise.getNotes(), exercise.getSets().stream().map(set ->
@@ -294,14 +309,21 @@ public class WorkoutSessionService {
         if (sessionLock.lock() == null) throw new IllegalStateException("Controle de sessão ativa não inicializado");
     }
 
-    private String primaryMedia(List<ExerciseMedia> media, ExerciseMediaType type) {
-        return media.stream().filter(item -> item.getType() == type && item.isMain()).findFirst()
-                .or(() -> media.stream().filter(item -> item.getType() == type).findFirst())
-                .map(ExerciseMedia::getUrl).orElse(null);
+    private String value(
+            ExerciseMedia media,
+            java.util.function.Function<ExerciseMedia, String> getter,
+            String fallback
+    ) {
+        if (media == null) return fallback;
+        String value = getter.apply(media);
+        return value == null || value.isBlank() ? fallback : value;
     }
 
-    private String attribution(com.trainingapp.model.ExerciseDefinition exercise) {
-        return java.util.stream.Stream.of(exercise.getAuthor(), exercise.getLicenseName(), exercise.getSourceUrl())
+    private String attribution(WorkoutSessionExercise exercise) {
+        return java.util.stream.Stream.of(
+                        exercise.getPrimaryVideoAuthor(),
+                        exercise.getPrimaryVideoLicenseName(),
+                        exercise.getPrimaryVideoSourceUrl())
                 .filter(value -> value != null && !value.isBlank()).reduce((a, b) -> a + " • " + b).orElse(null);
     }
 }

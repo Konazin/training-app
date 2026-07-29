@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 
 import java.net.URI;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -53,20 +54,47 @@ public class WgerExerciseMapper {
     }
 
     public List<ExerciseMedia> media(WgerExerciseInfo source, String apiBaseUrl, ExerciseDefinition exercise) {
-        var images = source.images() == null ? List.<ExerciseMedia>of() : source.images().stream()
-                .map(item -> media(exercise, ExerciseMediaType.IMAGE, item.id(), item.image(), thumbnail(item.thumbnails()),
-                        null, null, null, null, item.main(), item.licenseTitle(), item.licenseObjectUrl(),
-                        item.licenseAuthor(), apiBaseUrl)).filter(item -> item != null).toList();
-        var videos = source.videos() == null ? List.<ExerciseMedia>of() : source.videos().stream()
-                .map(item -> media(exercise, ExerciseMediaType.VIDEO, item.id(), item.video(), null,
-                        mime(item.codec()), item.width(), item.height(), seconds(item.duration()), item.main(),
-                        item.licenseTitle(), item.licenseObjectUrl(), item.licenseAuthor(), apiBaseUrl))
-                .filter(item -> item != null).toList();
-        var all = new java.util.ArrayList<ExerciseMedia>(videos.size() + images.size());
-        all.addAll(videos);
-        all.addAll(images);
-        for (int index = 0; index < all.size(); index++) all.get(index).setSortOrder(index);
-        return all;
+        return media(source, apiBaseUrl, exercise, mediaContext(source, apiBaseUrl, exercise)).media();
+    }
+
+    public WgerMediaMappingResult media(
+            WgerExerciseInfo source,
+            String apiBaseUrl,
+            ExerciseDefinition exercise,
+            WgerMediaContext context
+    ) {
+        List<ExerciseMedia> mapped = new ArrayList<>();
+        List<String> errors = new ArrayList<>();
+        for (WgerExerciseInfo.WgerVideo item : safe(source.videos())) {
+            Integer duration = seconds(item.duration());
+            addMedia(mapped, errors, exercise, ExerciseMediaType.VIDEO, item.id(), item.video(), null,
+                    mime(item.codec()), item.width(), item.height(), duration, item.main(),
+                    item.licenseTitle(), item.licenseObjectUrl(), item.licenseAuthor(), apiBaseUrl, context);
+        }
+        for (WgerExerciseInfo.WgerImage item : safe(source.images())) {
+            addMedia(mapped, errors, exercise, ExerciseMediaType.IMAGE, item.id(), item.image(),
+                    thumbnail(item.thumbnails()), null, null, null, null, item.main(),
+                    item.licenseTitle(), item.licenseObjectUrl(), item.licenseAuthor(), apiBaseUrl, context);
+        }
+        for (int index = 0; index < mapped.size(); index++) mapped.get(index).setSortOrder(index);
+        return new WgerMediaMappingResult(List.copyOf(mapped), List.copyOf(errors));
+    }
+
+    public WgerMediaContext mediaContext(
+            WgerExerciseInfo source,
+            String apiBaseUrl,
+            ExerciseDefinition exercise
+    ) {
+        String suppliedPublicUrl = https(source.publicUrl(), apiBaseUrl);
+        String publicUrl = suppliedPublicUrl != null && !suppliedPublicUrl.contains("/api/")
+                ? suppliedPublicUrl : humanExerciseUrl(apiBaseUrl, source.id());
+        return new WgerMediaContext(
+                publicUrl,
+                exercise.getSourceUrl(),
+                exercise.getLicenseName(),
+                exercise.getLicenseUrl(),
+                exercise.getAuthor()
+        );
     }
 
     public WgerExerciseInfo.WgerTranslation selectTranslation(
@@ -111,16 +139,44 @@ public class WgerExerciseMapper {
                 .replaceAll("[\\t\\x0B\\f\\r ]+", " ").replaceAll("\\n{3,}", "\n\n").trim();
     }
 
-    private ExerciseMedia media(ExerciseDefinition exercise, ExerciseMediaType type, Integer id, String url,
-                                String thumbnail, String mime, Integer width, Integer height, Integer duration,
-                                boolean main, String license, String licenseUrl, String author, String baseUrl) {
+    private void addMedia(
+            List<ExerciseMedia> mapped,
+            List<String> errors,
+            ExerciseDefinition exercise,
+            ExerciseMediaType type,
+            Integer id,
+            String url,
+            String thumbnail,
+            String mime,
+            Integer width,
+            Integer height,
+            Integer duration,
+            boolean main,
+            String licenseTitle,
+            String licenseObjectUrl,
+            String author,
+            String baseUrl,
+            WgerMediaContext context
+    ) {
+        String label = type.name().toLowerCase();
+        if (id == null) {
+            errors.add(label + " sem ID externo");
+            return;
+        }
         String secureUrl = https(url, baseUrl);
-        if (secureUrl == null) return null;
+        if (secureUrl == null) {
+            errors.add(label + ":" + id + " com URL ausente ou não HTTPS");
+            return;
+        }
+        if (negative(width) || negative(height) || negative(duration)) {
+            errors.add(label + ":" + id + " com dimensão ou duração negativa");
+            return;
+        }
         var media = new ExerciseMedia();
         media.setExerciseDefinition(exercise);
         media.setType(type);
         media.setSource(ExerciseMediaSource.WGER);
-        media.setExternalId(type.name().toLowerCase() + ":" + id);
+        media.setExternalId(label + ":" + id);
         media.setUrl(secureUrl);
         media.setThumbnailUrl(https(thumbnail, baseUrl));
         media.setMimeType(mime);
@@ -128,14 +184,17 @@ public class WgerExerciseMapper {
         media.setHeight(height);
         media.setDurationSeconds(duration);
         media.setMain(main);
-        media.setLicenseName(license);
-        media.setLicenseUrl(https(licenseUrl, baseUrl));
-        media.setAuthor(author);
-        media.setSourceUrl(secureUrl);
+        media.setLicenseName(firstNonBlank(licenseTitle, context.licenseName()));
+        media.setLicenseUrl(context.licenseUrl());
+        media.setAuthor(firstNonBlank(author, context.author()));
+        media.setSourceUrl(firstNonBlank(
+                https(licenseObjectUrl, baseUrl),
+                firstNonBlank(context.publicExerciseUrl(), context.exerciseSourceUrl())
+        ));
         OffsetDateTime now = OffsetDateTime.now();
         media.setCreatedAt(now);
         media.setUpdatedAt(now);
-        return media;
+        mapped.add(media);
     }
 
     private String publicSourceUrl(String baseUrl, Integer id) {
@@ -163,8 +222,13 @@ public class WgerExerciseMapper {
         return values.stream().map(item -> firstNonBlank(item.nameEn(), item.name())).filter(value -> !blank(value))
                 .map(value -> limit(value, 80)).distinct().reduce((a, b) -> a + "|" + b).orElse("");
     }
-    private int seconds(String value) {
-        try { return (int) Math.round(Double.parseDouble(value)); } catch (Exception ignored) { return 0; }
+    private String humanExerciseUrl(String baseUrl, Integer id) {
+        URI base = URI.create(baseUrl);
+        return base.getScheme() + "://" + base.getAuthority() + "/exercise/" + id + "/view";
+    }
+    private Integer seconds(String value) {
+        if (blank(value)) return null;
+        try { return (int) Math.round(Double.parseDouble(value)); } catch (Exception ignored) { return null; }
     }
     private String mime(String codec) { return blank(codec) ? "video/mp4" : "video/" + codec; }
     private String thumbnail(WgerExerciseInfo.WgerThumbnails thumbnails) {
@@ -176,5 +240,7 @@ public class WgerExerciseMapper {
     }
     private String firstNonBlank(String first, String second) { return blank(first) ? second : first; }
     private boolean blank(String value) { return value == null || value.isBlank(); }
+    private boolean negative(Integer value) { return value != null && value < 0; }
+    private <T> List<T> safe(List<T> value) { return value == null ? List.of() : value; }
     private String limit(String value, int max) { return value == null ? "" : value.substring(0, Math.min(value.length(), max)); }
 }

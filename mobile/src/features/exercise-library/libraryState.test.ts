@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest'
-import { mergeExercisePages, videoPresentation } from './libraryState'
+import {
+  attributionLabel,
+  mergeExercisePages,
+  resolveMediaAttribution,
+  videoPresentation,
+} from './libraryState'
 import type { ExerciseDefinition } from '../../models/training'
 
 describe('estado da biblioteca', () => {
@@ -17,5 +22,20 @@ describe('estado da biblioteca', () => {
     expect(videoPresentation('readyToPlay', false)).toBe('player')
     expect(videoPresentation('loading', true)).toBe('loading-poster')
     expect(videoPresentation('idle', false)).toBe('loading-placeholder')
+  })
+
+  test('atribuição acompanha a mídia e usa metadados gerais somente como fallback', () => {
+    const resolved = resolveMediaAttribution(
+      { author: 'Autor do vídeo', licenseName: null, sourceUrl: 'https://media.test' },
+      { author: 'Autor geral', licenseName: 'CC', licenseUrl: 'https://license.test', sourceUrl: 'https://exercise.test' },
+    )
+    expect(resolved).toEqual({
+      author: 'Autor do vídeo',
+      licenseName: 'CC',
+      licenseUrl: 'https://license.test',
+      sourceUrl: 'https://media.test',
+    })
+    expect(attributionLabel(resolved)).toBe('Autor do vídeo • CC')
+    expect(attributionLabel({})).toBe('Informação não fornecida pela fonte')
   })
 })

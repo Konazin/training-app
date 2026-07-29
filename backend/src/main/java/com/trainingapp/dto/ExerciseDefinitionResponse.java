@@ -25,6 +25,8 @@ public record ExerciseDefinitionResponse(
         String licenseUrl,
         String author,
         List<ExerciseMediaResponse> media,
+        ExerciseMediaResponse primaryVideo,
+        ExerciseMediaResponse primaryImage,
         boolean hasVideo,
         String primaryVideoUrl,
         String primaryImageUrl,

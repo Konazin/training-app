@@ -38,6 +38,14 @@ public class WorkoutSessionExercise {
     @Column(length = 1000)
     private String primaryVideoUrl;
     @Column(length = 1000)
+    private String primaryVideoSourceUrl;
+    @Column(length = 200)
+    private String primaryVideoLicenseName;
+    @Column(length = 1000)
+    private String primaryVideoLicenseUrl;
+    @Column(length = 500)
+    private String primaryVideoAuthor;
+    @Column(length = 1000)
     private String primaryImageUrl;
     @Column(length = 1000)
     private String attribution;
@@ -74,6 +82,14 @@ public class WorkoutSessionExercise {
     public void setTimedSnapshot(boolean value) { timedSnapshot = value; }
     public String getPrimaryVideoUrl() { return primaryVideoUrl; }
     public void setPrimaryVideoUrl(String value) { primaryVideoUrl = value; }
+    public String getPrimaryVideoSourceUrl() { return primaryVideoSourceUrl; }
+    public void setPrimaryVideoSourceUrl(String value) { primaryVideoSourceUrl = value; }
+    public String getPrimaryVideoLicenseName() { return primaryVideoLicenseName; }
+    public void setPrimaryVideoLicenseName(String value) { primaryVideoLicenseName = value; }
+    public String getPrimaryVideoLicenseUrl() { return primaryVideoLicenseUrl; }
+    public void setPrimaryVideoLicenseUrl(String value) { primaryVideoLicenseUrl = value; }
+    public String getPrimaryVideoAuthor() { return primaryVideoAuthor; }
+    public void setPrimaryVideoAuthor(String value) { primaryVideoAuthor = value; }
     public String getPrimaryImageUrl() { return primaryImageUrl; }
     public void setPrimaryImageUrl(String value) { primaryImageUrl = value; }
     public String getAttribution() { return attribution; }

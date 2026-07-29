@@ -1,384 +1,508 @@
 Continue o desenvolvimento do repositório `training-app` a partir do commit:
 
+d9ecdd96956fec7be6ff8dd675f23ee4d0b8adb3
+
+Esta é a sprint final de preparação e geração do primeiro APK preview do
+aplicativo padrão.
+
+Trabalhe prioritariamente em:
+
+mobile/
+backend/
+packages/
+
+Não evolua o aplicativo `umamusume-mobile` além de manter seu typecheck
+compatível com os packages compartilhados.
+
+Ao final desta sprint:
+
+1. os erros residuais da integração Wger devem estar corrigidos;
+2. migrations publicadas devem permanecer imutáveis;
+3. o backend beta deve ser validado;
+4. o app padrão deve ter versão incrementada;
+5. um APK preview instalável deve ser gerado pelo EAS;
+6. o artefato ou URL do build deve ser registrado na entrega;
+7. nenhuma credencial deve entrar no Git.
+
+Não implementar IA, Health Connect, calorias ou novas features de treino.
+
+==================================================
+1. ATRIBUIÇÃO CORRETA POR MÍDIA
+==================================================
+
+Separar corretamente os conceitos:
+
+- `url`: URL direta do arquivo de imagem ou vídeo;
+- `sourceUrl`: página ou objeto original relacionado à mídia;
+- `licenseUrl`: URL jurídica da licença;
+- `licenseName`: nome da licença;
+- `author`: autor específico da mídia.
+
+Não usar a URL direta do MP4 como `sourceUrl`.
+
+Para mídias Wger:
+
+1. `url` deve receber `image` ou `video`;
+2. `sourceUrl` deve preferir:
+   - `license_object_url` da mídia, quando HTTPS;
+   - URL pública humana do exercício;
+   - sourceUrl geral do exercício;
+3. `licenseName` deve preferir `license_title` da mídia;
+4. `licenseUrl` deve usar a URL real da licença recebida no objeto geral da
+   licença do exercício;
+5. `author` deve preferir `license_author` da mídia e usar o autor geral apenas
+   como fallback.
+
+Não tratar `license_object_url` como URL da licença.
+
+Adicionar ao mapper um contexto explícito para passar os metadados gerais da
+licença às mídias, sem acessar estado global.
+
+==================================================
+2. MÍDIA PRINCIPAL E ATRIBUIÇÃO EXIBIDA
+==================================================
+
+Criar uma função centralizada para selecionar a mídia principal:
+
+- mídia `main` primeiro;
+- depois menor `sortOrder`;
+- depois menor ID local;
+- somente do tipo solicitado.
+
+O backend deve retornar:
+
+- `primaryVideo`;
+- `primaryImage`;
+
+como DTOs completos de mídia, não apenas URLs.
+
+Manter temporariamente:
+
+- `primaryVideoUrl`;
+- `primaryImageUrl`;
+
+para compatibilidade, derivados dos DTOs principais.
+
+No mobile:
+
+- ExerciseDetail deve usar autor, licença e sourceUrl da mídia exibida;
+- caso não existam, usar os metadados gerais do exercício;
+- ao trocar ou exibir outra mídia, a atribuição deve acompanhar aquela mídia;
+- mostrar “Informação não fornecida pela fonte” quando necessário;
+- não inventar autor ou licença.
+
+Na sessão:
+
+- o snapshot deve usar os metadados da mídia principal selecionada;
+- a atribuição exibida no modal deve pertencer ao vídeo exibido;
+- preservar compatibilidade com sessões antigas.
+
+Adicionar ao snapshot, se necessário:
+
+- primaryVideoSourceUrl;
+- primaryVideoLicenseName;
+- primaryVideoLicenseUrl;
+- primaryVideoAuthor.
+
+Criar migration separada para novos campos.
+
+==================================================
+3. CONGELAR A MIGRATION V1
+==================================================
+
+A migration V1 já existia antes deste commit e não deve mais ser alterada.
+
+Restaurar exatamente a versão original de:
+
+backend/src/main/resources/db/migration/V1__initial_schema.sql
+
+usando o conteúdo existente no commit:
+
 72274a1ffe1d350c70f039b96fc5315121e3a454
 
-Nesta etapa, corrija somente os bloqueadores encontrados na verificação da
-fundação do beta do aplicativo padrão.
+Criar:
 
-Não implemente IA, novas features de treino, redesign, Health Connect, calorias
-ou alterações funcionais no app Umamusume.
+V2__wger_sync_error_details.sql
 
-Não gere o APK ainda. O APK será gerado somente depois desta validação.
+para adicionar:
 
-==================================================
-1. PERFIL DE TESTE
-==================================================
+error_details VARCHAR(4000)
 
-Garantir que toda execução padrão de:
+em `wger_sync_runs`.
 
-mvn test
+Caso os novos snapshots de atribuição da sessão exijam colunas, criar:
 
-use automaticamente o perfil `test`.
+V3__session_media_attribution.sql
 
-Não depender de variável externa ou configuração manual.
-
-Pode usar:
-
-- backend/src/test/resources/application.properties;
-- configuração do Maven Surefire;
-- ou anotação de teste compartilhada.
-
-Adicionar um teste que confirme:
-
-- perfil `test` ativo;
-- datasource H2 em memória;
-- console H2 desabilitado;
-- Flyway desabilitado nesse perfil;
-- nenhum arquivo `data/trainingdb` criado pelos testes.
-
-Os testes não podem tocar o banco persistente de desenvolvimento.
-
-==================================================
-2. ISOLAR SEED DE DEMONSTRAÇÃO
-==================================================
-
-O seed de treinos, exercícios e fichas demonstrativas deve rodar somente em
-desenvolvimento.
-
-Separar:
-
-- inicialização técnica obrigatória;
-- dados demonstrativos.
+Não juntar V2 e V3 apenas para economizar um arquivo.
 
 Regras:
 
-- `WorkoutSessionLock` deve existir em todos os ambientes por migration ou
-  inicialização técnica idempotente;
-- dados de demonstração devem usar `@Profile("dev")` ou propriedade
-  `app.seed-demo.enabled`;
-- produção deve iniciar sem treino ou ficha demonstrativa;
-- testes devem criar seus próprios fixtures, sem depender do seed dev.
+- nunca editar V1 novamente;
+- migrations devem ser idempotentes no histórico do Flyway, não via
+  `IF NOT EXISTS` usado para esconder inconsistências;
+- banco vazio deve executar V1, V2 e V3 em sequência;
+- banco criado pela V1 original deve atualizar normalmente;
+- segunda inicialização não deve alterar schema ou checksums.
 
-Adicionar teste com perfil prod/test verificando ausência do conteúdo demo.
-
-==================================================
-3. VALIDAR POSTGRESQL E FLYWAY
-==================================================
-
-Adicionar teste de integração real com PostgreSQL, preferencialmente usando
-Testcontainers.
-
-O teste deve:
-
-1. iniciar PostgreSQL limpo;
-2. ativar configurações equivalentes ao perfil prod;
-3. executar Flyway V1;
-4. inicializar Hibernate com `ddl-auto=validate`;
-5. confirmar as tabelas principais;
-6. confirmar a linha `workout_session_lock`;
-7. reiniciar o contexto no mesmo banco;
-8. confirmar que a segunda inicialização não altera nem recria o schema.
-
-Cobrir pelo menos:
-
-- exercise_definitions;
-- exercise_media;
-- training_plans;
-- training_plan_days;
-- workout_sessions;
-- workout_session_lock;
-- wger_sync_runs;
-- uma_careers;
-- uma_career_turns.
-
-O CI deve executar esse teste em PostgreSQL real.
+Atualizar o teste PostgreSQL/Flyway para esperar todas as migrations atuais.
 
 ==================================================
-4. CONTRATO DE IDIOMA WGER
+4. TESTE DE UPGRADE DO BANCO
 ==================================================
 
-Corrigir a resolução de idioma.
+Adicionar teste Testcontainers que simule upgrade:
 
-Ordem:
+1. iniciar PostgreSQL vazio;
+2. aplicar somente V1 original;
+3. inserir dados mínimos em:
+   - wger_sync_runs;
+   - workout_sessions;
+   - workout_session_exercises;
+4. executar o Flyway completo;
+5. confirmar aplicação de V2 e V3;
+6. confirmar preservação dos dados existentes;
+7. iniciar Hibernate com `ddl-auto=validate`;
+8. confirmar que uma segunda execução não altera checksums.
 
-1. código exato normalizado, por exemplo `pt-br`;
-2. código base, por exemplo `pt`;
-3. fallback exato configurado;
-4. código base do fallback;
-5. primeira tradução válida somente como último recurso.
+Não testar apenas criação de banco vazio.
 
-Atualizar fixtures para representar códigos regionais reais.
+==================================================
+5. LOCK DA SINCRONIZAÇÃO WGER
+==================================================
 
-Adicionar testes:
+Garantir que `running` seja liberado em absolutamente todos os caminhos.
 
-- pt-br exato;
-- pt-br caindo para pt;
-- português ausente e fallback inglês;
-- nenhum idioma conhecido.
+Problemas a cobrir:
+
+- falha no primeiro `runs.save`;
+- falha ao buscar idiomas;
+- falha durante uma página;
+- falha ao persistir o resumo final;
+- falha inesperada antes da criação do run.
+
+Estruturar com `try/finally` externo:
+
+if (!running.compareAndSet(false, true)) {
+    throw conflict;
+}
+
+try {
+    // toda a execução
+} finally {
+    running.set(false);
+}
+
+Nenhuma operação de banco pode ocorrer depois do ponto que impediria a execução
+do `running.set(false)`.
+
+Se o save final falhar:
+
+- preservar a exceção original quando houver;
+- registrar log sanitizado;
+- liberar o lock;
+- permitir uma nova tentativa posterior.
+
+Adicionar testes para falha inicial e falha final de persistência.
+
+==================================================
+6. LOCK DISTRIBUÍDO DA SINCRONIZAÇÃO
+==================================================
+
+O `AtomicBoolean` protege apenas uma instância do backend.
+
+Para o beta atual, criar uma garantia no banco para impedir dois containers de
+sincronizarem simultaneamente.
+
+Escolher uma estratégia simples e portável:
+
+- tabela sentinela `wger_sync_lock`;
+- linha única;
+- lock pessimista durante a aquisição;
+- estado com timestamp e owner identificável;
+- liberação ao final.
+
+Não manter uma transação aberta durante chamadas HTTP ao Wger.
+
+Estratégia sugerida:
+
+1. transação curta adquire a linha;
+2. verifica se existe execução RUNNING não expirada;
+3. registra owner e startedAt;
+4. commit;
+5. executa sync;
+6. transação curta libera;
+7. recuperação na inicialização limpa lock expirado.
+
+Definir timeout configurável:
+
+WGER_SYNC_LOCK_TIMEOUT_MINUTES=60
+
+O `AtomicBoolean` pode permanecer como proteção local rápida, mas não deve ser a
+única garantia.
+
+Adicionar teste simulando duas instâncias de service usando o mesmo banco.
+
+==================================================
+7. REJEITAR MÍDIA WGER INVÁLIDA
+==================================================
+
+Não criar external IDs como:
+
+video:null
+image:null
+
+Quando a mídia não possuir ID externo:
+
+- ignorar a mídia;
+- registrar erro sanitizado no item;
+- continuar sincronizando o restante do exercício;
+- não impedir a persistência do exercício;
+- não criar colisões na constraint.
+
+Também rejeitar:
+
+- URL vazia;
+- URL não HTTPS;
+- duração negativa;
+- largura ou altura negativa.
+
+Valores opcionais ausentes podem permanecer nulos.
+
+Adicionar testes para:
+
+- vídeo sem ID;
+- imagem sem ID;
+- URL HTTP;
+- duas mídias inválidas no mesmo exercício;
+- exercício válido persistido apesar da mídia inválida.
+
+==================================================
+8. REMOÇÃO DE MÍDIA OBSOLETA
+==================================================
+
+Não apagar mídia Wger que esteja sendo usada como snapshot de uma sessão.
+
+Como sessões já armazenam URLs e metadados em snapshot, a mídia da biblioteca
+pode ser removida sem quebrar o histórico, mas a remoção deve ocorrer apenas
+quando:
+
+- sync completo;
+- sem filtro `onlyWithVideo`;
+- todas as páginas foram processadas;
+- zero falhas de página;
+- externalId não apareceu no catálogo atual.
+
+Não limpar mídia após:
+
+- sync limitado por `maxPages`;
+- dry run;
+- PARTIAL;
+- FAILED;
+- sync filtrado.
+
+Adicionar testes explícitos para todos esses casos.
+
+==================================================
+9. FILTROS DA BIBLIOTECA
+==================================================
+
+Aplicar debounce separado de 350 ms para:
+
+- busca;
+- músculo;
+- equipamento.
+
+Não disparar requisição a cada caractere.
+
+Adicionar categorias ausentes:
+
+- STRETCHING;
+- RECOVERY;
+- TECHNIQUE.
+
+Exibir nomes em português:
+
+- Força;
+- Hipertrofia;
+- Resistência;
+- Cardio;
+- Mobilidade;
+- Alongamento;
+- Recuperação;
+- Técnica.
+
+Adicionar ação “Limpar filtros”.
+
+Ao limpar:
+
+- resetar página;
+- cancelar ou invalidar requisições antigas;
+- carregar página zero uma única vez.
+
+==================================================
+10. MELHORAR EXPERIÊNCIA DE VÍDEO
+==================================================
+
+Manter retry por remount usando `key`, sem alterar a URL remota.
+
+Corrigir:
+
+- poster visível durante loading;
+- placeholder quando não houver poster;
+- retry somente em erro;
+- player pausado ao perder foco;
+- player pausado ao desmontar;
+- modal fechado deve remover o player;
+- ao trocar de exercício, resetar retryKey;
+- não manter estado de erro do vídeo anterior.
+
+Na sessão:
+
+- fechar o modal não pode alterar:
+  - séries;
+  - RPE;
+  - observações;
+  - cronômetro;
+  - status da sessão.
+
+Adicionar testes das regras puras e, quando viável, teste do controller/estado
+do modal sem depender de reprodução nativa real.
+
+==================================================
+11. ISOLAMENTO DO TESTE DE PERFIL
+==================================================
+
+Não exigir que:
+
+data/trainingdb.mv.db
+
+não exista na máquina do desenvolvedor.
+
+O teste deve confirmar:
+
+- URL ativa começa com `jdbc:h2:mem:`;
+- nenhuma conexão foi aberta para o caminho persistente;
+- perfil test ativo;
+- seed demonstrativo ausente;
+- lock técnico presente.
+
+Remover assertions que falhem somente porque o desenvolvedor já possui um banco
+dev legítimo.
+
+==================================================
+12. CI
+==================================================
+
+No job backend:
+
+- executar `mvn test` uma única vez;
+- não repetir `PostgresFlywayIntegrationTest` isoladamente se ele já estiver
+  incluído no conjunto;
+- executar `mvn package -DskipTests`.
+
+O teste Testcontainers deve rodar no GitHub Actions.
+
+Manter:
+
+- frontend;
+- web;
+- infra.
+
+Adicionar verificação:
+
+git diff --check
 
 Não chamar Wger real no CI.
 
-==================================================
-5. ENDPOINT DE SINCRONIZAÇÃO
-==================================================
-
-Criar DTO:
-
-WgerSyncRequest
-
-Campos:
-
-- dryRun;
-- maxPages;
-- onlyWithVideo.
-
-Aceitar JSON em:
-
-POST /api/integrations/wger/sync
-
-Regras:
-
-- `maxPages` da requisição sobrescreve a configuração somente naquela execução;
-- zero significa todas;
-- `onlyWithVideo` ignora exercícios sem vídeo;
-- dry run não persiste;
-- manter proteção contra execução simultânea.
-
-Preservar compatibilidade temporária com o query param `dryRun`, caso seja
-simples, mas documentar o corpo JSON como contrato principal.
+Não executar EAS Build automaticamente no GitHub Actions nesta etapa.
 
 ==================================================
-6. DIAGNÓSTICO DA SINCRONIZAÇÃO
+13. VERSÃO DO APLICATIVO
 ==================================================
 
-Não ignorar exceções silenciosamente.
+Incrementar somente o app padrão:
 
-O resumo deve conter no máximo 10 erros sanitizados:
+mobile/app.json
 
-- externalId;
-- etapa;
-- mensagem curta.
+De:
 
-Nunca incluir stack trace ou resposta completa do upstream.
+- version: 0.1.0
+- android.versionCode: 1
 
-Comportamento HTTP:
+Para:
 
-- nenhuma página processada por indisponibilidade do Wger: 503;
-- algumas páginas processadas e falha posterior: resposta com status PARTIAL;
-- itens individuais inválidos: continuar lote e retornar PARTIAL;
-- execução completa sem erros: COMPLETED.
+- version: 0.1.1
+- android.versionCode: 2
 
-Persistir o resultado da execução.
+Não alterar a versão do app Umamusume.
 
-Ao iniciar o backend, runs antigas presas em RUNNING devem ser marcadas como
-INTERRUPTED.
+Adicionar ao README um changelog resumido do preview 0.1.1:
 
-==================================================
-7. UPSERT DE MÍDIA
-==================================================
-
-Não apagar e recriar todas as mídias a cada sincronização.
-
-Fazer upsert por:
-
-(source, externalId)
-
-Regras:
-
-- preservar ID local da mídia existente;
-- atualizar URL, thumbnail, dimensões, duração, licença e autoria;
-- criar mídia nova;
-- remover ou arquivar somente mídia WGER ausente numa sincronização completa;
-- nunca alterar mídia CUSTOM ou LEGACY;
-- dry run não alterar dados.
-
-Adicionar teste comprovando que duas sincronizações mantêm os mesmos IDs locais.
+- biblioteca Wger;
+- imagens e vídeos;
+- sessão com demonstração;
+- PostgreSQL/Flyway;
+- bootstrap protegido;
+- beta privado.
 
 ==================================================
-8. FONTE E ATRIBUIÇÃO
+14. IDENTIDADE E ASSETS
 ==================================================
 
-Para `ExerciseDefinition.sourceUrl`, preferir:
+Validar antes do build:
 
-1. `translation.licenseObjectUrl`, quando HTTPS;
-2. URL pública humana válida fornecida pelo Wger;
-3. endpoint API apenas como último fallback.
+- ícone existe;
+- splash existe;
+- adaptive icon é válido;
+- package permanece `com.konazin.trainingapp`;
+- slug permanece `training-app`;
+- scheme permanece `trainingapp`;
+- orientação portrait;
+- nenhum asset Wger é empacotado no APK;
+- nenhum asset oficial Umamusume aparece no app padrão.
 
-Cada mídia continua usando a própria licença, autoria e sourceUrl.
-
-Adicionar testes para:
-
-- URL do objeto da tradução;
-- fallback;
-- URL HTTP rejeitada;
-- metadados ausentes.
-
-==================================================
-9. BOOTSTRAP VERDADEIRO
-==================================================
-
-Os refreshers usados pelo bootstrap não podem engolir falhas.
-
-Escolher uma estratégia explícita:
-
-- `refresh()` retorna boolean;
-- ou `refreshOrThrow()` separado.
-
-O bootstrap deve ficar em `error` quando:
-
-- health falhar;
-- sessão ativa falhar;
-- ficha falhar;
-- dashboard falhar;
-- biblioteca inicial falhar.
-
-As telas normais não devem ser liberadas parcialmente.
-
-Refresh de background pode preservar os dados anteriores, mas deve informar
-falha sem limpar o estado válido.
-
-Adicionar testes para:
-
-- health 200 e dashboard 500;
-- health 200 e token inválido nos dados;
-- todas as cargas aprovadas;
-- duas chamadas simultâneas de bootstrap;
-- retorno do background.
+Não fazer redesign amplo.
 
 ==================================================
-10. PLAYER DE VÍDEO
+15. VALIDAÇÃO DO BACKEND
 ==================================================
 
-Corrigir o retry sem modificar a URL remota.
-
-Não adicionar `?retry=`.
-
-Usar remount controlado, `replace`/`replaceAsync` ou mecanismo equivalente do
-expo-video mantendo a URL original.
-
-Mostrar:
-
-- poster ou placeholder durante loading;
-- retry somente em erro;
-- controles somente quando player disponível;
-- mensagem de erro legível.
-
-Ao fechar detalhe ou modal:
-
-- pausar;
-- liberar o player;
-- não alterar séries ou cronômetro.
-
-Adicionar testes das regras puras de apresentação.
-
-==================================================
-11. BIBLIOTECA E CONSULTAS
-==================================================
-
-Completar os filtros mobile já suportados pelo backend:
-
-- músculo;
-- equipamento;
-- categoria;
-- origem;
-- com vídeo.
-
-Evitar N+1 de mídias na listagem.
-
-Usar uma destas estratégias:
-
-- batch fetching;
-- entity graph adequado para paginação;
-- projeção específica;
-- consulta separada em lote pelos IDs da página.
-
-Não tornar `media` EAGER globalmente.
-
-Adicionar teste de repository ou métrica de consulta que evite uma consulta de
-mídia por exercício.
-
-==================================================
-12. DOCUMENTAÇÃO
-==================================================
-
-Atualizar README e documentos do beta.
-
-Remover afirmações de que Wger e Flyway não foram implementados.
-
-Documentar:
-
-- Wger e vídeos;
-- perfis;
-- seed somente dev;
-- PostgreSQL e Flyway;
-- sincronização;
-- token beta;
-- Docker;
-- EAS preview;
-- limitações do token embutido no APK;
-- passos para configurar ambiente preview no EAS.
-
-Marcar o checklist manual como executado somente para itens realmente testados.
-
-==================================================
-13. CI
-==================================================
-
-Backend:
-
-- mvn test;
-- teste PostgreSQL/Flyway;
-- mvn package -DskipTests.
-
-Frontend:
-
-- npm ci na raiz;
-- testes dos packages;
-- typecheck e testes do app padrão;
-- typecheck do Umamusume;
-- export Android do app padrão.
-
-Infra:
-
-- docker compose -f compose.beta.yml config;
-- docker compose -f compose.beta.yml build.
-
-Não chamar o Wger real no CI.
-
-==================================================
-14. SMOKE TEST REAL
-==================================================
-
-Após os testes automatizados:
-
-1. subir compose com PostgreSQL vazio;
-2. confirmar primeira e segunda inicialização;
-3. habilitar Wger;
-4. sincronizar uma página real;
-5. confirmar tradução escolhida;
-6. abrir exercício com vídeo;
-7. repetir sync e confirmar IDs de mídia preservados;
-8. iniciar sessão;
-9. abrir e fechar vídeo;
-10. concluir sessão;
-11. confirmar token correto e incorreto;
-12. interromper backend e conferir tela de erro.
-
-Registrar o resultado em `docs/BETA_SMOKE_TEST.md`.
-
-Não inserir token ou senha reais no documento.
-
-==================================================
-15. VALIDAÇÃO FINAL
-==================================================
-
-Backend:
+Executar:
 
 cd backend
 mvn test
 mvn package -DskipTests
 
-Raiz:
+Executar também o compose com banco novo:
+
+docker compose --env-file .env.beta -f compose.beta.yml down -v
+docker compose --env-file .env.beta -f compose.beta.yml up -d --build
+
+Validar:
+
+- health;
+- migrations V1, V2 e V3;
+- segunda inicialização;
+- token incorreto;
+- token correto;
+- sync Wger de uma página;
+- sync repetido;
+- IDs de mídia preservados;
+- atribuição da mídia principal;
+- sessão criada com atribuição correta.
+
+Não apagar volumes de beta reais.
+
+Usar nome de projeto Docker isolado para smoke:
+
+docker compose -p training-release-smoke ...
+
+==================================================
+16. VALIDAÇÃO DO FRONTEND
+==================================================
+
+Na raiz:
 
 npm ci
 npm run test --workspace=@training/mobile-api
@@ -390,7 +514,9 @@ npm run typecheck --workspace=umamusume-mobile
 Expo:
 
 EXPO_NO_TELEMETRY=1 npm exec --workspace=training-mobile -- expo install --check
-EXPO_NO_TELEMETRY=1 npm exec --workspace=training-mobile -- expo export --platform android --output-dir dist
+EXPO_NO_TELEMETRY=1 npm exec --workspace=training-mobile -- expo export \
+  --platform android \
+  --output-dir dist
 
 Web:
 
@@ -398,32 +524,246 @@ cd web
 npm ci
 npm run build
 
-Docker:
-
-docker compose -f compose.beta.yml config
-docker compose -f compose.beta.yml build
-
 Geral:
 
 git diff --check
 
-Não declarar conclusão se qualquer comando falhar.
+Não avançar ao EAS caso qualquer validação falhe.
 
 ==================================================
-16. ENTREGA
+17. CONFIGURAÇÃO DO AMBIENTE PREVIEW
+==================================================
+
+Antes do build, executar a partir de `mobile/`:
+
+eas whoami
+eas project:info
+eas env:list --environment preview
+
+Confirmar que existem:
+
+EXPO_PUBLIC_API_URL
+EXPO_PUBLIC_API_TOKEN
+
+Regras:
+
+- API_URL deve ser HTTPS;
+- API_URL deve terminar em `/api` ou ser normalizada corretamente pelo cliente;
+- não aceitar localhost;
+- não aceitar 10.0.2.2;
+- não aceitar IP privado para um APK destinado a teste externo;
+- não imprimir o valor do token no relatório;
+- não criar valores fictícios;
+- não gravar token em app.json, eas.json, README ou Git.
+
+Caso as variáveis não existam:
+
+- não inventar valores;
+- interromper somente a etapa EAS;
+- informar exatamente qual variável falta;
+- manter todas as correções e validações concluídas.
+
+==================================================
+18. INSPEÇÃO EAS
+==================================================
+
+Com ambiente preview configurado, executar:
+
+cd mobile
+
+eas build:inspect \
+  --platform android \
+  --stage pre-build \
+  --profile preview \
+  --output .eas-inspect \
+  --force
+
+Verificar no projeto gerado:
+
+- package Android;
+- versionName;
+- versionCode;
+- permissões;
+- configuração de rede;
+- expo-video incluído;
+- URL preview presente;
+- nenhuma credencial sensível adicional;
+- buildType APK.
+
+Apagar `.eas-inspect` após a validação ou mantê-lo ignorado pelo Git.
+
+Adicionar ao `.gitignore`:
+
+- `.eas-inspect/`;
+- `*.apk`;
+- `artifacts/`.
+
+==================================================
+19. GERAR O APK PREVIEW
+==================================================
+
+Após todas as validações, executar:
+
+eas build \
+  --platform android \
+  --profile preview \
+  --non-interactive \
+  --json
+
+Capturar:
+
+- build ID;
+- status;
+- URL da página do build;
+- commit;
+- versão;
+- versionCode.
+
+Aguardar a conclusão do build.
+
+Se aprovado, baixar:
+
+mkdir -p ../artifacts
+
+eas build:download \
+  --build-id <BUILD_ID> \
+  --non-interactive
+
+Salvar ou renomear para:
+
+artifacts/training-app-preview-0.1.1.apk
+
+Não adicionar o APK ao Git.
+
+Calcular:
+
+sha256sum artifacts/training-app-preview-0.1.1.apk
+
+Registrar o SHA-256 na entrega.
+
+Caso o EAS solicite configuração interativa inicial de credencial Android:
+
+- concluir usando a conta Expo autenticada, quando permitido;
+- não exportar keystore para o repositório;
+- não registrar senhas;
+- se a execução estiver sem credenciais ou autenticação, não declarar que o APK
+  foi gerado.
+
+==================================================
+20. SMOKE TEST DO APK
+==================================================
+
+Caso exista emulador Android disponível:
+
+- instalar com adb;
+- executar o checklist automatizável.
+
+Comando:
+
+adb install -r artifacts/training-app-preview-0.1.1.apk
+
+Validar:
+
+1. splash;
+2. bootstrap;
+3. token correto;
+4. biblioteca;
+5. busca e filtros;
+6. exercício com vídeo;
+7. exercício sem vídeo;
+8. poster;
+9. controles;
+10. atribuição;
+11. iniciar sessão;
+12. abrir e fechar vídeo;
+13. editar série;
+14. cronômetro;
+15. pausar;
+16. retomar;
+17. concluir;
+18. backend indisponível;
+19. retry;
+20. retorno do background.
+
+Se não houver emulador ou aparelho acessível:
+
+- gerar o APK normalmente;
+- marcar o smoke físico como pendente;
+- não fingir que foi executado.
+
+Atualizar:
+
+docs/BETA_SMOKE_TEST.md
+
+com evidência real e itens ainda pendentes.
+
+==================================================
+21. FORA DO ESCOPO
+==================================================
+
+Não implementar:
+
+- IA;
+- Groq;
+- Health Connect;
+- calorias;
+- contas;
+- JWT por usuário;
+- multi-tenancy;
+- modo offline;
+- SQLite;
+- redesign amplo;
+- novas features de treino;
+- alterações funcionais no app Umamusume;
+- APK do Umamusume;
+- publicação na Play Store;
+- AAB;
+- EAS Submit.
+
+==================================================
+22. CRITÉRIOS DE CONCLUSÃO
+==================================================
+
+A sprint somente pode ser considerada concluída quando:
+
+- testes backend passam;
+- migrations antigas permanecem imutáveis;
+- upgrade V1 → V2/V3 passa;
+- Docker smoke passa;
+- testes mobile passam;
+- export Android passa;
+- EAS inspect passa;
+- EAS Build termina com sucesso;
+- APK é baixado;
+- SHA-256 é registrado.
+
+Caso o único bloqueio seja autenticação, credencial ou variável EAS ausente:
+
+- declarar “código aprovado, build EAS bloqueado”;
+- indicar exatamente o bloqueador;
+- não declarar que existe APK.
+
+==================================================
+23. ENTREGA
 ==================================================
 
 Informar:
 
-1. perfil de teste ativado;
-2. seed isolado;
-3. resultado do teste PostgreSQL/Flyway;
-4. correções no contrato Wger;
-5. estratégia de upsert de mídia;
-6. correção do bootstrap;
-7. correção do player;
-8. resultado do smoke real;
-9. resultado de todos os comandos;
-10. bloqueadores restantes.
+1. correções realizadas;
+2. migrations criadas;
+3. estratégia de atribuição por mídia;
+4. estratégia de lock Wger;
+5. testes adicionados;
+6. resultado do PostgreSQL/Flyway;
+7. resultado do Docker smoke;
+8. versão e versionCode;
+9. resultado do EAS inspect;
+10. build ID;
+11. URL do build;
+12. caminho do APK;
+13. tamanho do APK;
+14. SHA-256;
+15. smoke Android executado ou pendente;
+16. limitações restantes.
 
-Não gerar o APK ainda.
+Não avançar para IA ou redesign nesta sprint.

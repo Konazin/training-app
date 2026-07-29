@@ -8,6 +8,8 @@ import com.trainingapp.integration.wger.dto.WgerLanguage;
 import com.trainingapp.integration.wger.dto.WgerPage;
 import com.trainingapp.integration.wger.dto.WgerSyncRequest;
 import com.trainingapp.integration.wger.mapper.WgerExerciseMapper;
+import com.trainingapp.integration.wger.mapper.WgerMediaContext;
+import com.trainingapp.integration.wger.mapper.WgerMediaMappingResult;
 import com.trainingapp.integration.wger.service.*;
 import com.trainingapp.model.ExerciseDefinition;
 import com.trainingapp.model.ExerciseMedia;
@@ -44,6 +46,7 @@ class WgerExerciseSyncServiceTest {
     @Mock ExerciseDefinitionRepository exercises;
     @Mock ExerciseMediaRepository media;
     @Mock WgerSyncRunRepository runs;
+    @Mock WgerSyncLockManager lockManager;
     @Mock PlatformTransactionManager transactionManager;
     @Mock TransactionStatus transactionStatus;
     private WgerExerciseSyncService service;
@@ -53,8 +56,8 @@ class WgerExerciseSyncServiceTest {
         when(runs.save(any())).thenAnswer(call -> call.getArgument(0));
         lenient().when(transactionManager.getTransaction(any(TransactionDefinition.class))).thenReturn(transactionStatus);
         service = new WgerExerciseSyncService(client, mapper,
-                new WgerProperties(true, "https://wger.de/api/v2", "pt-br", "en", 15, 100, 0),
-                exercises, media, runs, transactionManager);
+                new WgerProperties(true, "https://wger.de/api/v2", "pt-br", "en", 15, 100, 0, 60),
+                exercises, media, runs, lockManager, transactionManager);
     }
 
     @Test
@@ -68,6 +71,7 @@ class WgerExerciseSyncServiceTest {
         assertThat(result.status()).isEqualTo("PARTIAL");
         assertThat(result.created()).isEqualTo(2);
         verify(exercises, never()).save(any());
+        verify(media, never()).findAllBySource(any());
     }
 
     @Test
@@ -82,7 +86,7 @@ class WgerExerciseSyncServiceTest {
         when(mapper.map(eq(item(1)), anyList(), anyString(), any())).thenThrow(new IllegalArgumentException("bad item"));
         when(mapper.map(eq(item(2)), anyList(), anyString(), any())).thenAnswer(call -> call.getArgument(3));
         when(exercises.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
-        when(mapper.media(any(), anyString(), any())).thenReturn(List.of());
+        mediaMapping(List.of(), List.of());
 
         var first = service.sync(false);
         var second = service.sync(false);
@@ -123,6 +127,7 @@ class WgerExerciseSyncServiceTest {
         assertThat(result.pages()).isOne();
         assertThat(result.skipped()).isOne();
         verify(client, never()).exercises(100);
+        verify(media, never()).findAllBySource(any());
     }
 
     @Test
@@ -142,6 +147,7 @@ class WgerExerciseSyncServiceTest {
         assertThat(result.failed()).isEqualTo(12);
         assertThat(result.errors()).hasSize(10);
         assertThat(result.errors()).allMatch(error -> !error.message().contains("\n"));
+        verify(media, never()).findAllBySource(any());
     }
 
     @Test
@@ -159,8 +165,7 @@ class WgerExerciseSyncServiceTest {
                 .thenReturn(Optional.of(exercise));
         when(mapper.map(eq(source), anyList(), anyString(), same(exercise))).thenReturn(exercise);
         when(exercises.saveAndFlush(exercise)).thenReturn(exercise);
-        when(mapper.media(eq(source), anyString(), same(exercise)))
-                .thenAnswer(call -> List.of(media("video:41", "https://new.test/video.mp4")));
+        mediaMapping(List.of(media("video:41", "https://new.test/video.mp4")), List.of());
         when(media.findAllBySource(ExerciseMediaSource.WGER)).thenReturn(List.of(existingMedia));
 
         service.sync(false);
@@ -190,8 +195,7 @@ class WgerExerciseSyncServiceTest {
                 .thenReturn(Optional.of(exercise));
         when(mapper.map(eq(source), anyList(), anyString(), same(exercise))).thenReturn(exercise);
         when(exercises.saveAndFlush(exercise)).thenReturn(exercise);
-        when(mapper.media(eq(source), anyString(), same(exercise)))
-                .thenAnswer(call -> List.of(media("video:41", "https://wger.test/video.mp4")));
+        mediaMapping(List.of(media("video:41", "https://wger.test/video.mp4")), List.of());
 
         service.sync(false);
 
@@ -201,6 +205,93 @@ class WgerExerciseSyncServiceTest {
         verify(media).findAllBySource(ExerciseMediaSource.WGER);
         verify(media, never()).findAllBySource(ExerciseMediaSource.CUSTOM);
         verify(media, never()).findAllBySource(ExerciseMediaSource.LEGACY);
+    }
+
+    @Test
+    void persistsValidExerciseAndReportsEachInvalidMedia() {
+        languages();
+        WgerExerciseInfo source = item(2);
+        ExerciseDefinition exercise = new ExerciseDefinition();
+        when(client.exercises(0)).thenReturn(new WgerPage<>(1, null, null, List.of(source)));
+        when(exercises.findBySourceAndExternalId(ExerciseSource.WGER, "2")).thenReturn(Optional.empty());
+        when(mapper.map(eq(source), anyList(), anyString(), any()))
+                .thenAnswer(call -> call.getArgument(3));
+        when(exercises.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
+        mediaMapping(List.of(), List.of("video sem ID externo", "image com URL não HTTPS"));
+
+        var result = service.sync(false);
+
+        assertThat(result.created()).as(result.errors().toString()).isOne();
+        assertThat(result.failed()).isEqualTo(2);
+        assertThat(result.status()).isEqualTo("PARTIAL");
+        verify(exercises).save(any());
+    }
+
+    @Test
+    void initialRunSaveFailureAlwaysReleasesLocalAndDistributedLocks() {
+        when(runs.save(any())).thenThrow(new IllegalStateException("initial save failed"))
+                .thenAnswer(call -> call.getArgument(0));
+
+        assertThatThrownBy(() -> service.sync(true))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("initial save failed");
+
+        languages();
+        when(client.exercises(0)).thenReturn(new WgerPage<>(0, null, null, List.of()));
+        assertThat(service.sync(true).status()).isEqualTo("COMPLETED");
+        verify(lockManager, times(2)).acquire(anyString());
+        verify(lockManager, times(2)).release(anyString());
+    }
+
+    @Test
+    void finalSaveFailurePreservesProcessingFailureAndAllowsRetry() {
+        languages();
+        when(client.languages()).thenThrow(new IllegalStateException("language failure"))
+                .thenReturn(new WgerPage<>(2, null, null,
+                        List.of(new WgerLanguage(7, "pt"), new WgerLanguage(2, "en"))));
+        when(client.exercises(0)).thenReturn(new WgerPage<>(0, null, null, List.of()));
+        java.util.concurrent.atomic.AtomicBoolean failFinal = new java.util.concurrent.atomic.AtomicBoolean(true);
+        when(runs.save(any())).thenAnswer(call -> {
+            WgerSyncRun run = call.getArgument(0);
+            if (run.getFinishedAt() != null && failFinal.getAndSet(false)) {
+                throw new IllegalStateException("final save failure");
+            }
+            return run;
+        });
+
+        assertThatThrownBy(() -> service.sync(true))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("language failure")
+                .satisfies(error -> assertThat(error.getSuppressed())
+                        .singleElement()
+                        .satisfies(suppressed -> assertThat(suppressed.getMessage())
+                                .contains("final save failure")));
+
+        assertThat(service.sync(true).status()).isEqualTo("COMPLETED");
+    }
+
+    @Test
+    void completeUnfilteredFullSyncRemovesOnlyUnseenWgerMedia() {
+        languages();
+        ExerciseMedia stale = media("video:stale", "https://wger.test/stale.mp4");
+        when(client.exercises(0)).thenReturn(new WgerPage<>(0, null, null, List.of()));
+        when(media.findAllBySource(ExerciseMediaSource.WGER)).thenReturn(List.of(stale));
+
+        assertThat(service.sync(false).status()).isEqualTo("COMPLETED");
+
+        verify(media).deleteAll(List.of(stale));
+    }
+
+    @Test
+    void filteredFullSyncNeverRemovesStaleMedia() {
+        languages();
+        when(client.exercises(0)).thenReturn(new WgerPage<>(0, null, null, List.of()));
+
+        assertThat(service.sync(new WgerSyncRequest(false, null, true)).status())
+                .isEqualTo("COMPLETED");
+
+        verify(media, never()).findAllBySource(any());
+        verify(media, never()).deleteAll(any());
     }
 
     private void languages() {
@@ -223,5 +314,14 @@ class WgerExerciseSyncServiceTest {
         value.setCreatedAt(java.time.OffsetDateTime.now());
         value.setUpdatedAt(java.time.OffsetDateTime.now());
         return value;
+    }
+
+    private void mediaMapping(List<ExerciseMedia> values, List<String> errors) {
+        lenient().when(mapper.mediaContext(any(), anyString(), any()))
+                .thenReturn(new WgerMediaContext(
+                        "https://wger.test/exercise", "https://wger.test/source",
+                        "CC", "https://license.test", "Author"));
+        lenient().when(mapper.media(any(), anyString(), any(), any()))
+                .thenAnswer(call -> new WgerMediaMappingResult(values, errors));
     }
 }

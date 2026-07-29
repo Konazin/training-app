@@ -22,7 +22,9 @@ export function ExerciseLibraryScreen({ onCreate }: {
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [filterMuscle, setFilterMuscle] = useState('')
+  const [debouncedMuscle, setDebouncedMuscle] = useState('')
   const [filterEquipment, setFilterEquipment] = useState('')
+  const [debouncedEquipment, setDebouncedEquipment] = useState('')
   const [category, setCategory] = useState('')
   const [source, setSource] = useState('')
   const [hasVideo, setHasVideo] = useState(false)
@@ -36,11 +38,20 @@ export function ExerciseLibraryScreen({ onCreate }: {
   const [name, setName] = useState('')
   const [muscle, setMuscle] = useState('')
   const [equipment, setEquipment] = useState('')
+  const [filterReset, setFilterReset] = useState(0)
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query.trim()), 350)
     return () => clearTimeout(timer)
   }, [query])
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedMuscle(filterMuscle.trim()), 350)
+    return () => clearTimeout(timer)
+  }, [filterMuscle])
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedEquipment(filterEquipment.trim()), 350)
+    return () => clearTimeout(timer)
+  }, [filterEquipment])
 
   const load = useCallback(async (nextPage = 0) => {
     if (nextPage > 0 && loadingRef.current) return
@@ -50,8 +61,8 @@ export function ExerciseLibraryScreen({ onCreate }: {
     setError('')
     try {
       const result = await trainingApi.getExerciseLibrary({
-        page: nextPage, size: 20, query: debouncedQuery, muscle: filterMuscle.trim(),
-        equipment: filterEquipment.trim(), category, source, hasVideo: hasVideo || undefined,
+        page: nextPage, size: 20, query: debouncedQuery, muscle: debouncedMuscle,
+        equipment: debouncedEquipment, category, source, hasVideo: hasVideo || undefined,
       })
       if (requestId !== requestRef.current) return
       setItems((current) => mergeExercisePages(current, result.content, nextPage === 0))
@@ -67,9 +78,28 @@ export function ExerciseLibraryScreen({ onCreate }: {
         loadingRef.current = false
       }
     }
-  }, [category, debouncedQuery, filterEquipment, filterMuscle, hasVideo, source])
+  }, [category, debouncedEquipment, debouncedMuscle, debouncedQuery, hasVideo, source])
 
-  useEffect(() => { void load(0) }, [debouncedQuery, filterMuscle, filterEquipment, category, source, hasVideo])
+  useEffect(() => { void load(0) }, [
+    debouncedQuery, debouncedMuscle, debouncedEquipment, category, source, hasVideo, filterReset,
+  ])
+
+  function clearFilters() {
+    requestRef.current += 1
+    loadingRef.current = false
+    setQuery('')
+    setDebouncedQuery('')
+    setFilterMuscle('')
+    setDebouncedMuscle('')
+    setFilterEquipment('')
+    setDebouncedEquipment('')
+    setCategory('')
+    setSource('')
+    setHasVideo(false)
+    setPage(0)
+    setItems([])
+    setFilterReset((value) => value + 1)
+  }
 
   async function submit() {
     if (!name.trim() || !muscle.trim() || !equipment.trim()) return
@@ -100,11 +130,16 @@ export function ExerciseLibraryScreen({ onCreate }: {
             <TextInput accessibilityLabel="Filtrar por equipamento" value={filterEquipment} onChangeText={setFilterEquipment} placeholder="Equipamento" placeholderTextColor={colors.gray400} style={styles.filterInput} />
           </View>
           <View style={styles.filters}>
-            {['', 'STRENGTH', 'HYPERTROPHY', 'ENDURANCE', 'CARDIO', 'MOBILITY'].map((value) => <Pressable key={value || 'all-categories'} onPress={() => setCategory(value)} style={[styles.chip, category === value && styles.chipActive]}><Text style={[styles.chipText, category === value && styles.chipTextActive]}>{value || 'Categorias'}</Text></Pressable>)}
+            {[
+              ['', 'Categorias'], ['STRENGTH', 'Força'], ['HYPERTROPHY', 'Hipertrofia'],
+              ['ENDURANCE', 'Resistência'], ['CARDIO', 'Cardio'], ['MOBILITY', 'Mobilidade'],
+              ['STRETCHING', 'Alongamento'], ['RECOVERY', 'Recuperação'], ['TECHNIQUE', 'Técnica'],
+            ].map(([value = '', label = '']) => <Pressable key={value || 'all-categories'} onPress={() => setCategory(value)} style={[styles.chip, category === value && styles.chipActive]}><Text style={[styles.chipText, category === value && styles.chipTextActive]}>{label}</Text></Pressable>)}
           </View>
           <View style={styles.filters}>
             {['', 'WGER', 'CUSTOM'].map((value) => <Pressable key={value || 'all'} onPress={() => setSource(value)} style={[styles.chip, source === value && styles.chipActive]}><Text style={[styles.chipText, source === value && styles.chipTextActive]}>{value || 'Todos'}</Text></Pressable>)}
             <Pressable onPress={() => setHasVideo((value) => !value)} style={[styles.chip, hasVideo && styles.chipActive]}><Text style={[styles.chipText, hasVideo && styles.chipTextActive]}>Com vídeo</Text></Pressable>
+            <Pressable accessibilityRole="button" onPress={clearFilters} style={styles.clearFilters}><Text style={styles.clearFiltersText}>Limpar filtros</Text></Pressable>
           </View>
           {!!error && <Pressable onPress={() => void load(0)}><Text style={styles.error}>{error} Toque para tentar novamente.</Text></Pressable>}
         </>}
@@ -132,6 +167,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   chip: { borderColor: colors.gray200, borderRadius: 99, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
   chipActive: { backgroundColor: colors.nearBlack, borderColor: colors.nearBlack },
   chipText: { color: colors.gray500, fontSize: 10, fontWeight: '700' }, chipTextActive: { color: '#fff' },
+  clearFilters: { justifyContent: 'center', paddingHorizontal: 8, paddingVertical: 8 },
+  clearFiltersText: { color: colors.primary, fontSize: 10, fontWeight: '800' },
   card: { alignItems: 'center', backgroundColor: colors.card, borderColor: colors.gray200, borderRadius: 19, borderWidth: 1, flexDirection: 'row', gap: 11, marginBottom: 9, padding: 11 },
   icon: { backgroundColor: colors.gray200, borderRadius: 14, height: 52, width: 52 },
   iconFallback: { alignItems: 'center', backgroundColor: colors.nearBlack, borderRadius: 14, height: 52, justifyContent: 'center', width: 52 },

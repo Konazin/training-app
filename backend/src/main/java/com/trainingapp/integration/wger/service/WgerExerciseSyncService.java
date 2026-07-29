@@ -6,6 +6,7 @@ import com.trainingapp.integration.wger.config.WgerProperties;
 import com.trainingapp.integration.wger.dto.WgerExerciseInfo;
 import com.trainingapp.integration.wger.dto.WgerSyncRequest;
 import com.trainingapp.integration.wger.mapper.WgerExerciseMapper;
+import com.trainingapp.integration.wger.mapper.WgerMediaMappingResult;
 import com.trainingapp.model.ExerciseDefinition;
 import com.trainingapp.model.ExerciseMedia;
 import com.trainingapp.model.ExerciseMediaSource;
@@ -15,6 +16,8 @@ import com.trainingapp.repository.ExerciseMediaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -24,15 +27,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.UUID;
 
 @Service
 public class WgerExerciseSyncService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(WgerExerciseSyncService.class);
     private final WgerExerciseClient client;
     private final WgerExerciseMapper mapper;
     private final WgerProperties properties;
     private final ExerciseDefinitionRepository exercises;
     private final ExerciseMediaRepository media;
     private final WgerSyncRunRepository runs;
+    private final WgerSyncLockManager lockManager;
     private final TransactionTemplate transactions;
     private final AtomicBoolean running = new AtomicBoolean();
 
@@ -43,6 +49,7 @@ public class WgerExerciseSyncService {
             ExerciseDefinitionRepository exercises,
             ExerciseMediaRepository media,
             WgerSyncRunRepository runs,
+            WgerSyncLockManager lockManager,
             PlatformTransactionManager transactionManager
     ) {
         this.client = client;
@@ -51,6 +58,7 @@ public class WgerExerciseSyncService {
         this.exercises = exercises;
         this.media = media;
         this.runs = runs;
+        this.lockManager = lockManager;
         this.transactions = new TransactionTemplate(transactionManager);
     }
 
@@ -66,6 +74,26 @@ public class WgerExerciseSyncService {
             throw new DomainConflictException("Sincronização Wger já está em execução");
         }
 
+        String owner = UUID.randomUUID().toString();
+        boolean distributedLockAcquired = false;
+        try {
+            lockManager.acquire(owner);
+            distributedLockAcquired = true;
+            return execute(request);
+        } finally {
+            if (distributedLockAcquired) {
+                try {
+                    lockManager.release(owner);
+                } catch (RuntimeException exception) {
+                    LOGGER.error("Falha sanitizada ao liberar lock Wger: {}",
+                            shortMessage(exception));
+                }
+            }
+            running.set(false);
+        }
+    }
+
+    private WgerSyncSummary execute(WgerSyncRequest request) {
         WgerSyncRun run = new WgerSyncRun();
         run.setStatus("RUNNING");
         run.setDryRun(request.dryRun());
@@ -76,6 +104,7 @@ public class WgerExerciseSyncService {
         Set<String> seenMedia = new HashSet<>();
         boolean reachedLastPage = false;
         int maxPages = request.maxPages() == null ? properties.syncMaxPages() : request.maxPages();
+        RuntimeException processingFailure = null;
 
         try {
             List<Integer> languagePriority = WgerLanguageResolver.resolve(
@@ -111,14 +140,24 @@ public class WgerExerciseSyncService {
                     ? "Simulação concluída sem persistência"
                     : "Sincronização concluída");
         } catch (RuntimeException exception) {
+            processingFailure = exception;
             addErrors(errors, List.of(error(null, "page", exception)));
             run.setStatus(run.getPages() > 0 ? "PARTIAL" : "FAILED");
             run.setMessage(shortMessage(exception));
         } finally {
             run.setErrorDetails(WgerSyncSummary.encode(errors));
             run.setFinishedAt(OffsetDateTime.now());
-            run = runs.save(run);
-            running.set(false);
+            try {
+                run = runs.save(run);
+            } catch (RuntimeException finalSaveFailure) {
+                LOGGER.error("Falha sanitizada ao persistir resumo final Wger: {}",
+                        shortMessage(finalSaveFailure));
+                if (processingFailure != null) {
+                    processingFailure.addSuppressed(finalSaveFailure);
+                    throw processingFailure;
+                }
+                throw finalSaveFailure;
+            }
         }
         return WgerSyncSummary.from(run);
     }
@@ -146,8 +185,15 @@ public class WgerExerciseSyncService {
             try {
                 ItemResult itemResult = transactions.execute(status ->
                         persistItem(item, languagePriority, seenMedia));
-                if (itemResult != null && itemResult.created()) result.created++;
-                else result.updated++;
+                if (itemResult != null) {
+                    if (itemResult.created()) result.created++;
+                    else result.updated++;
+                    for (String issue : itemResult.mediaErrors()) {
+                        result.failed++;
+                        result.errors.add(error(item.id(), "media-validation",
+                                new IllegalArgumentException(issue)));
+                    }
+                }
             } catch (RuntimeException exception) {
                 result.failed++;
                 String stage = exception instanceof ItemSyncException itemException
@@ -181,12 +227,15 @@ public class WgerExerciseSyncService {
             throw new ItemSyncException("exercise-persistence", exception);
         }
         try {
-            upsertMedia(exercise, mapper.media(item, properties.apiBaseUrl(), exercise), seenMedia);
+            var context = mapper.mediaContext(item, properties.apiBaseUrl(), exercise);
+            WgerMediaMappingResult mappedMedia =
+                    mapper.media(item, properties.apiBaseUrl(), exercise, context);
+            upsertMedia(exercise, mappedMedia.media(), seenMedia);
             exercises.save(exercise);
+            return new ItemResult(existing.isEmpty(), mappedMedia.errors());
         } catch (RuntimeException exception) {
             throw new ItemSyncException("media-upsert", exception);
         }
-        return new ItemResult(existing.isEmpty());
     }
 
     private void upsertMedia(
@@ -296,7 +345,7 @@ public class WgerExerciseSyncService {
         return source == null ? List.of() : source;
     }
 
-    private record ItemResult(boolean created) {}
+    private record ItemResult(boolean created, List<String> mediaErrors) {}
 
     private static final class ItemSyncException extends RuntimeException {
         private final String stage;

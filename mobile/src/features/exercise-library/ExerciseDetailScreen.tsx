@@ -6,6 +6,7 @@ import type { ExerciseDefinition } from '../../models/training'
 import { trainingApi } from '../../services/trainingApi'
 import { shared, type ThemeColors, useTheme } from '../../theme'
 import { ExerciseVideo } from './ExerciseVideo'
+import { attributionLabel, resolveMediaAttribution } from './libraryState'
 
 export function ExerciseDetailScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'ExerciseDetail'>>()
@@ -17,6 +18,8 @@ export function ExerciseDetailScreen() {
 
   const load = () => {
     setError('')
+    setExercise(null)
+    setRetryKey(0)
     void trainingApi.getExerciseDefinition(route.params.exerciseId)
       .then(setExercise).catch((cause) => setError(cause instanceof Error ? cause.message : 'Falha ao carregar exercício.'))
   }
@@ -25,7 +28,8 @@ export function ExerciseDetailScreen() {
   if (error) return <View style={styles.center}><Text style={styles.error}>{error}</Text><Pressable onPress={load}><Text style={styles.link}>Tentar novamente</Text></Pressable></View>
   if (!exercise) return <View style={styles.center}><Text style={styles.muted}>Carregando exercício…</Text></View>
 
-  const attribution = [exercise.author, exercise.licenseName].filter(Boolean).join(' • ')
+  const displayedMedia = exercise.primaryVideo ?? exercise.primaryImage
+  const attribution = resolveMediaAttribution(displayedMedia, exercise)
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <Text style={styles.eyebrow}>{exercise.source === 'WGER' ? 'WGER' : 'BIBLIOTECA'}</Text>
@@ -40,9 +44,9 @@ export function ExerciseDetailScreen() {
       )}
       {!!exercise.description && <Text style={styles.body}>{exercise.description}</Text>}
       {!!exercise.instructions && <><Text style={styles.heading}>Como executar</Text><Text style={styles.body}>{exercise.instructions}</Text></>}
-      {!!attribution && <Text style={styles.attribution}>Fonte: {attribution}</Text>}
-      {!!exercise.sourceUrl && <Pressable onPress={() => void Linking.openURL(exercise.sourceUrl!)}><Text style={styles.link}>Abrir fonte original</Text></Pressable>}
-      {!!exercise.licenseUrl && <Pressable onPress={() => void Linking.openURL(exercise.licenseUrl!)}><Text style={styles.link}>Consultar licença</Text></Pressable>}
+      <Text style={styles.attribution}>Fonte: {attributionLabel(attribution)}</Text>
+      {!!attribution.sourceUrl && <Pressable onPress={() => void Linking.openURL(attribution.sourceUrl!)}><Text style={styles.link}>Abrir fonte original</Text></Pressable>}
+      {!!attribution.licenseUrl && <Pressable onPress={() => void Linking.openURL(attribution.licenseUrl!)}><Text style={styles.link}>Consultar licença</Text></Pressable>}
     </ScrollView>
   )
 }

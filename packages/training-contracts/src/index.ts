@@ -76,6 +76,10 @@ export interface SessionExercise {
   timed: boolean
   primaryVideoUrl: string | null
   primaryImageUrl: string | null
+  primaryVideoSourceUrl: string | null
+  primaryVideoLicenseName: string | null
+  primaryVideoLicenseUrl: string | null
+  primaryVideoAuthor: string | null
   attribution: string | null
   sortOrder: number
   plannedSets: number

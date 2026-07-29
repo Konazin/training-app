@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   Alert,
+  Linking,
   Modal,
   ScrollView,
   StyleSheet,
@@ -23,6 +24,7 @@ import type {
 } from '@training/workout-session-core'
 import { shared, type ThemeColors, useTheme } from '../../../theme'
 import { ExerciseVideo } from '../../exercise-library/ExerciseVideo'
+import { attributionLabel, resolveMediaAttribution } from '../../exercise-library/libraryState'
 
 interface Props {
   session: WorkoutSession | null
@@ -70,6 +72,25 @@ export function WorkoutSessionScreen(props: Props) {
   const [videoExercise, setVideoExercise] = useState<SessionExercise | null>(null)
   const [videoRetryKey, setVideoRetryKey] = useState(0)
   const notifiedTimer = useRef('')
+  const closeVideo = () => {
+    setVideoExercise(null)
+    setVideoRetryKey(0)
+  }
+  const openVideo = (exercise: SessionExercise) => {
+    setVideoRetryKey(0)
+    setVideoExercise(exercise)
+  }
+  const videoMetadata = videoExercise ? resolveMediaAttribution({
+    author: videoExercise.primaryVideoAuthor,
+    licenseName: videoExercise.primaryVideoLicenseName,
+    licenseUrl: videoExercise.primaryVideoLicenseUrl,
+    sourceUrl: videoExercise.primaryVideoSourceUrl,
+  }, {}) : null
+  const videoAttribution = videoMetadata
+    ? (Object.values(videoMetadata).some(Boolean)
+      ? attributionLabel(videoMetadata)
+      : videoExercise?.attribution || attributionLabel({}))
+    : ''
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000)
@@ -207,7 +228,7 @@ export function WorkoutSessionScreen(props: Props) {
                 {' · '}{exercise.restSeconds}s descanso
               </Text>
               {!!exercise.primaryVideoUrl && (
-                <TouchableOpacity accessibilityLabel={`Ver execução de ${exercise.name}`} onPress={() => setVideoExercise(exercise)}>
+                <TouchableOpacity accessibilityLabel={`Ver execução de ${exercise.name}`} onPress={() => openVideo(exercise)}>
                   <Text style={styles.videoLink}>▶ Ver execução</Text>
                 </TouchableOpacity>
               )}
@@ -299,16 +320,18 @@ export function WorkoutSessionScreen(props: Props) {
         </TouchableOpacity>
       </View>
     </ScrollView>
-    <Modal visible={Boolean(videoExercise)} transparent animationType="fade" onRequestClose={() => setVideoExercise(null)}>
+    {videoExercise && <Modal visible transparent animationType="fade" onRequestClose={closeVideo}>
       <View style={styles.videoBackdrop}>
         <View style={styles.videoSheet}>
-          <Text style={styles.videoTitle}>{videoExercise?.name}</Text>
-          {!!videoExercise?.primaryVideoUrl && <ExerciseVideo key={videoRetryKey} url={videoExercise.primaryVideoUrl} posterUrl={videoExercise.primaryImageUrl} onRetry={() => setVideoRetryKey((value) => value + 1)} />}
-          {!!videoExercise?.attribution && <Text style={styles.videoAttribution}>{videoExercise.attribution}</Text>}
-          <TouchableOpacity onPress={() => setVideoExercise(null)}><Text style={styles.videoClose}>Fechar</Text></TouchableOpacity>
+          <Text style={styles.videoTitle}>{videoExercise.name}</Text>
+          {!!videoExercise.primaryVideoUrl && <ExerciseVideo key={videoRetryKey} url={videoExercise.primaryVideoUrl} posterUrl={videoExercise.primaryImageUrl} onRetry={() => setVideoRetryKey((value) => value + 1)} />}
+          <Text style={styles.videoAttribution}>{videoAttribution}</Text>
+          {!!videoMetadata?.sourceUrl && <TouchableOpacity onPress={() => void Linking.openURL(videoMetadata.sourceUrl!)}><Text style={styles.videoLink}>Abrir fonte original</Text></TouchableOpacity>}
+          {!!videoMetadata?.licenseUrl && <TouchableOpacity onPress={() => void Linking.openURL(videoMetadata.licenseUrl!)}><Text style={styles.videoLink}>Consultar licença</Text></TouchableOpacity>}
+          <TouchableOpacity onPress={closeVideo}><Text style={styles.videoClose}>Fechar</Text></TouchableOpacity>
         </View>
       </View>
-    </Modal>
+    </Modal>}
   </>)
 }
 

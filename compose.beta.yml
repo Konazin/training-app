@@ -35,6 +35,7 @@ services:
       WGER_REQUEST_TIMEOUT_SECONDS: ${WGER_REQUEST_TIMEOUT_SECONDS:-15}
       WGER_PAGE_SIZE: ${WGER_PAGE_SIZE:-100}
       WGER_SYNC_MAX_PAGES: ${WGER_SYNC_MAX_PAGES:-0}
+      WGER_SYNC_LOCK_TIMEOUT_MINUTES: ${WGER_SYNC_LOCK_TIMEOUT_MINUTES:-60}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/health"]
       interval: 15s

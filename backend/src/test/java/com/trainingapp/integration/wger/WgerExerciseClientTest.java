@@ -23,7 +23,7 @@ class WgerExerciseClientTest {
                 getClass().getResourceAsStream("/fixtures/wger/exercise-page.json"), StandardCharsets.UTF_8);
         server.expect(requestTo("https://wger.de/api/v2/exerciseinfo/?limit=2&offset=0"))
                 .andRespond(withSuccess(fixture, MediaType.APPLICATION_JSON));
-        var properties = new WgerProperties(true, "https://wger.de/api/v2", "pt-br", "en", 15, 2, 0);
+        var properties = new WgerProperties(true, "https://wger.de/api/v2", "pt-br", "en", 15, 2, 0, 60);
 
         var page = new WgerExerciseClient(builder.build(), properties).exercises(0);
 
@@ -44,7 +44,7 @@ class WgerExerciseClientTest {
                 getClass().getResourceAsStream("/fixtures/wger/language-page.json"), StandardCharsets.UTF_8);
         server.expect(requestTo("https://wger.de/api/v2/language/?limit=100"))
                 .andRespond(withSuccess(fixture, MediaType.APPLICATION_JSON));
-        var properties = new WgerProperties(true, "https://wger.de/api/v2", "pt-br", "en", 15, 2, 0);
+        var properties = new WgerProperties(true, "https://wger.de/api/v2", "pt-br", "en", 15, 2, 0, 60);
 
         var languages = new WgerExerciseClient(builder.build(), properties).languages();
 

@@ -53,7 +53,8 @@ export interface ExerciseDefinition {
   instructions: string; notes: string; mediaUrl: string; unilateral: boolean; timed: boolean
   source: 'SYSTEM' | 'CUSTOM' | 'WGER'; externalId: string | null; sourceUrl: string | null
   licenseName: string | null; licenseUrl: string | null; author: string | null
-  media: ExerciseMedia[]; hasVideo: boolean; primaryVideoUrl: string | null; primaryImageUrl: string | null
+  media: ExerciseMedia[]; primaryVideo: ExerciseMedia | null; primaryImage: ExerciseMedia | null
+  hasVideo: boolean; primaryVideoUrl: string | null; primaryImageUrl: string | null
   custom: boolean; archived: boolean; createdAt: string; updatedAt: string
 }
 export interface ExerciseMedia {
