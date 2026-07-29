@@ -6,37 +6,41 @@ import { useIsFocused } from '@react-navigation/native'
 import { useTheme } from '../../theme'
 import { videoPresentation } from './libraryState'
 
-export function ExerciseVideo({ url, posterUrl, retryKey, onRetry }: {
+export function ExerciseVideo({ url, posterUrl, onRetry }: {
   url: string
   posterUrl?: string | null
-  retryKey: number
   onRetry: () => void
 }) {
   const { colors } = useTheme()
   const focused = useIsFocused()
-  const player = useVideoPlayer(`${url}${url.includes('?') ? '&' : '?'}retry=${retryKey}`)
+  const player = useVideoPlayer(url)
   const { status, error } = useEvent(player, 'statusChange', { status: player.status })
   const presentation = videoPresentation(status, Boolean(posterUrl))
 
   useEffect(() => {
     if (!focused) player.pause()
+    return () => player.pause()
   }, [focused, player])
 
   return (
     <View>
-      {presentation.startsWith('error') ? <View style={styles.failure}>
-        {!!posterUrl && <Image accessibilityLabel="Imagem de demonstração" source={{ uri: posterUrl }} style={styles.poster} />}
-        <Text style={styles.failureText}>{error?.message || 'Não foi possível reproduzir o vídeo.'}</Text>
-      </View> : <VideoView
+      {presentation === 'player' ? <VideoView
         accessibilityLabel="Vídeo de demonstração do exercício"
         contentFit="contain"
         nativeControls
         player={player}
         style={styles.video}
-      />}
-      <Pressable accessibilityRole="button" onPress={onRetry}>
-        <Text style={[styles.retry, { color: colors.primary }]}>Recarregar vídeo</Text>
-      </Pressable>
+      /> : <View style={styles.failure}>
+        {!!posterUrl && <Image accessibilityLabel="Imagem de demonstração" source={{ uri: posterUrl }} style={styles.poster} />}
+        <Text style={styles.failureText}>
+          {presentation.startsWith('error')
+            ? error?.message || 'Não foi possível reproduzir o vídeo.'
+            : 'Carregando vídeo…'}
+        </Text>
+      </View>}
+      {presentation.startsWith('error') && <Pressable accessibilityRole="button" onPress={onRetry}>
+          <Text style={[styles.retry, { color: colors.primary }]}>Recarregar vídeo</Text>
+        </Pressable>}
     </View>
   )
 }

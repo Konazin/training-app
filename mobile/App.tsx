@@ -62,7 +62,7 @@ function TrainingApp() {
   const workoutSession = useWorkoutSessionController(workoutSessionRepository)
   const bootstrap = useAppBootstrap(controller.refresh, trainingPlan.refresh, workoutSession.refresh)
   const [currentRoute, setCurrentRoute] = useState('MainTabs')
-  const message = workoutSession.message || trainingPlan.message || controller.message
+  const message = bootstrap.message || workoutSession.message || trainingPlan.message || controller.message
   const navigationTheme = useMemo<NavigationTheme>(() => ({
     ...DefaultTheme,
     dark: isDark,

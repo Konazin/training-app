@@ -21,9 +21,13 @@ jobs:
           java-version: '21'
           cache: maven
       - run: mvn test
+      - run: mvn -Dtest=PostgresFlywayIntegrationTest test
+      - run: mvn package -DskipTests
 
   frontend:
     runs-on: ubuntu-latest
+    env:
+      EXPO_NO_TELEMETRY: '1'
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -39,8 +43,6 @@ jobs:
       - run: npm run typecheck --workspace=umamusume-mobile
       - run: npm exec --workspace=training-mobile -- expo install --check
       - run: npm exec --workspace=training-mobile -- expo export --platform android --output-dir dist
-        env:
-          EXPO_NO_TELEMETRY: '1'
 
   web:
     runs-on: ubuntu-latest
@@ -56,3 +58,10 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: npm ci
       - run: npm run build
+
+  infra:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - run: docker compose -f compose.beta.yml config
+      - run: docker compose -f compose.beta.yml build

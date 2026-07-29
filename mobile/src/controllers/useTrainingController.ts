@@ -34,8 +34,10 @@ export function useTrainingController() {
       setDashboard(dashboardData)
       setExerciseLibrary(libraryData.content)
       setSelectedWorkoutId((current) => current ?? workoutData[0]?.id ?? null)
+      return true
     } catch (cause) {
       setMessage(messageFrom(cause))
+      return false
     } finally {
       setLoading(false)
     }

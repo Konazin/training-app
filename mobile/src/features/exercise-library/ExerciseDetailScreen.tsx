@@ -32,7 +32,7 @@ export function ExerciseDetailScreen() {
       <Text style={styles.title}>{exercise.name}</Text>
       <Text style={styles.meta}>{exercise.primaryMuscleGroup} · {exercise.equipment}</Text>
       {exercise.primaryVideoUrl ? (
-        <ExerciseVideo url={exercise.primaryVideoUrl} posterUrl={exercise.primaryImageUrl} retryKey={retryKey} onRetry={() => setRetryKey((value) => value + 1)} />
+        <ExerciseVideo key={retryKey} url={exercise.primaryVideoUrl} posterUrl={exercise.primaryImageUrl} onRetry={() => setRetryKey((value) => value + 1)} />
       ) : exercise.primaryImageUrl ? (
         <Image accessibilityLabel={`Demonstração de ${exercise.name}`} source={{ uri: exercise.primaryImageUrl }} style={styles.image} />
       ) : (

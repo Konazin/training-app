@@ -35,4 +35,21 @@ class WgerExerciseClientTest {
         });
         server.verify();
     }
+
+    @Test
+    void parsesRealRegionalLanguageCodesWithoutCallingWger() throws Exception {
+        var builder = RestClient.builder().baseUrl("https://wger.de/api/v2");
+        var server = MockRestServiceServer.bindTo(builder).build();
+        String fixture = StreamUtils.copyToString(
+                getClass().getResourceAsStream("/fixtures/wger/language-page.json"), StandardCharsets.UTF_8);
+        server.expect(requestTo("https://wger.de/api/v2/language/?limit=100"))
+                .andRespond(withSuccess(fixture, MediaType.APPLICATION_JSON));
+        var properties = new WgerProperties(true, "https://wger.de/api/v2", "pt-br", "en", 15, 2, 0);
+
+        var languages = new WgerExerciseClient(builder.build(), properties).languages();
+
+        assertThat(languages.results()).extracting(language -> language.shortName())
+                .containsExactly("pt-br", "pt", "en");
+        server.verify();
+    }
 }

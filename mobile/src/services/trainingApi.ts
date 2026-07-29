@@ -27,7 +27,8 @@ export const trainingApi = {
       method: 'DELETE',
     }),
   getExerciseLibrary: (params: {
-    page?: number; size?: number; query?: string; source?: string; hasVideo?: boolean
+    page?: number; size?: number; query?: string; muscle?: string; equipment?: string
+    category?: string; source?: string; hasVideo?: boolean
   } = {}) => {
     const query = new URLSearchParams()
     Object.entries(params).forEach(([key, value]) => {

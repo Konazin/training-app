@@ -1,0 +1,10 @@
+{
+  "count": 3,
+  "next": null,
+  "previous": null,
+  "results": [
+    { "id": 13, "short_name": "pt-br" },
+    { "id": 7, "short_name": "pt" },
+    { "id": 2, "short_name": "en" }
+  ]
+}

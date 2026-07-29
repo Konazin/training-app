@@ -40,8 +40,10 @@ export function useWorkoutSessionController(repository: WorkoutSessionRepository
         setRestTimer(null)
         await workoutSessionStorage.clearRestTimer()
       }
+      return true
     } catch (cause) {
       setMessage(messageFrom(cause))
+      return false
     } finally {
       setLoading(false)
     }

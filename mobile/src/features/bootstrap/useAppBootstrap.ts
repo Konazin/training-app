@@ -1,42 +1,44 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AppState } from 'react-native'
 import { trainingApi } from '../../services/trainingApi'
-import { bootstrapApp } from './bootstrap'
+import { bootstrapApp, singleFlight } from './bootstrap'
 
 export type BootstrapState = 'loading' | 'ready' | 'error'
 
 export function useAppBootstrap(
-  refreshTraining: () => Promise<void>,
-  refreshPlans: () => Promise<void>,
-  refreshSession: () => Promise<void>,
+  refreshTraining: () => Promise<boolean>,
+  refreshPlans: () => Promise<boolean>,
+  refreshSession: () => Promise<boolean>,
 ) {
   const [state, setState] = useState<BootstrapState>('loading')
   const [message, setMessage] = useState('')
-  const running = useRef(false)
+  const operationRef = useRef<(background: boolean) => Promise<void>>(async () => {})
 
-  const run = useCallback(async () => {
-    if (running.current) return
-    running.current = true
-    setState('loading')
-    setMessage('')
+  operationRef.current = async (background: boolean) => {
+    if (!background) {
+      setState('loading')
+      setMessage('')
+    }
     try {
       await bootstrapApp(trainingApi.getHealth, [refreshSession, refreshPlans, refreshTraining])
       setState('ready')
+      setMessage('')
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : 'Não foi possível iniciar o aplicativo.')
-      setState('error')
-    } finally {
-      running.current = false
+      if (!background) setState('error')
     }
-  }, [refreshPlans, refreshSession, refreshTraining])
+  }
 
-  useEffect(() => { void run() }, [run])
+  const runnerRef = useRef(singleFlight((background: boolean) => operationRef.current(background)))
+  const run = useCallback((background = false) => runnerRef.current(background), [])
+
+  useEffect(() => { void run(false) }, [run])
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (next) => {
-      if (next === 'active' && state === 'ready') void run()
+      if (next === 'active' && state === 'ready') void run(true)
     })
     return () => subscription.remove()
   }, [run, state])
 
-  return { state, message, retry: run }
+  return { state, message, retry: () => run(false) }
 }

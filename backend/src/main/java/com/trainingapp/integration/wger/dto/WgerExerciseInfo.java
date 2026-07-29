@@ -19,7 +19,8 @@ public record WgerExerciseInfo(
         @JsonProperty("license_author") String licenseAuthor,
         List<WgerImage> images,
         List<WgerTranslation> translations,
-        List<WgerVideo> videos
+        List<WgerVideo> videos,
+        @JsonProperty("url") String publicUrl
 ) {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record WgerNamed(Integer id, String name) {}

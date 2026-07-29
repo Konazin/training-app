@@ -303,7 +303,7 @@ export function WorkoutSessionScreen(props: Props) {
       <View style={styles.videoBackdrop}>
         <View style={styles.videoSheet}>
           <Text style={styles.videoTitle}>{videoExercise?.name}</Text>
-          {!!videoExercise?.primaryVideoUrl && <ExerciseVideo url={videoExercise.primaryVideoUrl} posterUrl={videoExercise.primaryImageUrl} retryKey={videoRetryKey} onRetry={() => setVideoRetryKey((value) => value + 1)} />}
+          {!!videoExercise?.primaryVideoUrl && <ExerciseVideo key={videoRetryKey} url={videoExercise.primaryVideoUrl} posterUrl={videoExercise.primaryImageUrl} onRetry={() => setVideoRetryKey((value) => value + 1)} />}
           {!!videoExercise?.attribution && <Text style={styles.videoAttribution}>{videoExercise.attribution}</Text>}
           <TouchableOpacity onPress={() => setVideoExercise(null)}><Text style={styles.videoClose}>Fechar</Text></TouchableOpacity>
         </View>

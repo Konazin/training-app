@@ -7,7 +7,7 @@ para teste e debug e uma única API Java compartilhada.
 
 ```text
 training-app/
-├── backend/             # Java 21, Spring Boot 4.1, Spring MVC, JPA e H2
+├── backend/             # Java 21, Spring Boot 4.1, JPA, H2 e PostgreSQL/Flyway
 ├── mobile/              # Aplicativo principal de treino
 ├── umamusume-mobile/    # Aplicativo independente do modo de carreira
 ├── packages/
@@ -78,7 +78,12 @@ cd backend
 mvn spring-boot:run
 ```
 
-A API fica em `http://localhost:8080`. O banco H2 é persistido em `backend/data/`. A inicialização executa `schema.sql` antes do JPA para migrar fichas antigas e cria a ficha demonstrativa “Base de força e condicionamento” sem duplicá-la.
+A API fica em `http://localhost:8080`. O perfil padrão é `dev`: ele usa H2
+persistente em `backend/data/`, executa a correção idempotente de fichas legadas
+e cria dados demonstrativos. O perfil `test` usa somente H2 em memória, sem
+Flyway, console H2 ou seed. O perfil `prod` exige PostgreSQL, executa a migration
+Flyway `V1` e valida o schema com `ddl-auto=validate`; não cria treinos ou fichas
+demonstrativas. A linha técnica `workout_session_lock` existe em todos os perfis.
 
 ### 2. Web
 
@@ -164,6 +169,8 @@ nomes, logotipos ou assets oficiais.
 | `GET/POST` | `/api/exercise-library` | Pesquisa ou cria exercício |
 | `PUT` | `/api/exercise-library/{id}` | Edita exercício personalizado |
 | `PATCH` | `/api/exercise-library/{id}/archive` | Arquiva exercício |
+| `POST` | `/api/integrations/wger/sync` | Sincroniza catálogo e vídeos Wger |
+| `GET` | `/api/integrations/wger/status` | Consulta a última sincronização Wger |
 | `GET/POST` | `/api/sessions` | Lista histórico ou inicia sessão |
 | `GET` | `/api/sessions/active` | Recupera a sessão ativa |
 | `PUT` | `/api/sessions/{id}/exercises/{exerciseId}/sets/{setId}` | Salva uma série imediatamente |
@@ -201,12 +208,32 @@ Exemplo de treino com estatísticas padrão e livres:
 
 `customStats` aceita qualquer objeto JSON, inclusive valores aninhados. O backend valida os campos padrão e conserva o conteúdo personalizado sem impor um esquema.
 
+O contrato principal da sincronização Wger é JSON:
+
+```json
+{
+  "dryRun": false,
+  "maxPages": 1,
+  "onlyWithVideo": true
+}
+```
+
+`maxPages: 0` percorre todas as páginas. O parâmetro legado
+`?dryRun=true` continua aceito quando não há corpo. O sync escolhe idioma por
+código regional exato, código base e fallback configurado, faz upsert de mídia
+por `(source, externalId)`, preserva IDs locais e nunca altera mídia `CUSTOM` ou
+`LEGACY`. Falhas individuais retornam `PARTIAL` com até dez erros sanitizados;
+indisponibilidade antes da primeira página retorna HTTP 503. O CI usa mocks e não
+chama o Wger real.
+
 ## Validação
 
 ```bash
 # Backend
 cd backend
 mvn test
+mvn -Dtest=PostgresFlywayIntegrationTest test
+mvn package -DskipTests
 
 # Web
 cd web
@@ -237,15 +264,22 @@ npm install
 Os testes Maven e Vitest descobrem automaticamente os casos disponíveis, sem
 depender de uma quantidade fixa documentada.
 
-## Persistência e migração
+## Perfis, persistência e migração
 
-- `schema.sql` mantém a compatibilidade das colunas da versão semanal.
+- `dev` é o perfil padrão local e é o único que executa o seed demonstrativo.
+- `test` é ativado automaticamente por `mvn test` e usa
+  `jdbc:h2:mem:training-test`.
+- `prod` usa `DATABASE_URL`, `DATABASE_USERNAME` e `DATABASE_PASSWORD`, Flyway e
+  validação do Hibernate.
+- `schema.sql` e `TrainingPlanWeekMigration` atendem somente a compatibilidade
+  do banco H2 legado de desenvolvimento.
 - `TrainingPlanWeekMigration` consolida somente dias duplicados vazios,
   completa weekdays ausentes de forma idempotente e cria a restrição única
   `(training_plan_id, weekday)` antes da inicialização do Hibernate.
 - Duplicatas em que mais de um dia contém exercícios ou atividades interrompem
   a inicialização com uma mensagem clara.
-- As novas tabelas são gerenciadas pelo JPA/Hibernate conforme o padrão que o projeto já utilizava.
+- Em produção, todas as tabelas são gerenciadas pelo Flyway e validadas pelo
+  Hibernate; o JPA não cria nem altera o schema.
 - Sessões guardam snapshots do nome e configuração dos exercícios; mudanças futuras na ficha não alteram o histórico.
 - Volume de musculação é calculado somente para séries concluídas: `carga × repetições`.
 - Não são inventadas calorias para sessões do novo domínio.
@@ -261,11 +295,40 @@ depender de uma quantidade fixa documentada.
   a ficha durante uma carreira muda os próximos dias; o snapshot completo fica
   para uma etapa futura.
 
-Não há comando separado de migration: ela roda automaticamente com
-`mvn spring-boot:run`. O APK depende da API Java e ainda não possui banco
-local, sincronização ou funcionamento offline. O fluxo legado `Workout`
-continua disponível para sessões avulsas.
+O Flyway roda automaticamente ao iniciar o perfil `prod`. O APK depende da API
+Java e não possui banco local nem funcionamento offline. O fluxo legado
+`Workout` continua disponível para sessões avulsas. Wger e vídeos estão
+implementados; Groq, Health Connect, API Ninjas, modo offline, geração por IA e
+redesign amplo permanecem fora do escopo.
 
-Integrações com wger, Groq, Health Connect e API Ninjas, autenticação, modo
-offline, cálculo de calorias, geração por IA e redesign amplo ainda não foram
-implementados.
+## Beta privado com Docker
+
+Copie `.env.beta.example` para `.env.beta`, defina senha e token próprios e
+execute:
+
+```bash
+docker compose --env-file .env.beta -f compose.beta.yml up -d --build
+```
+
+O compose sobe PostgreSQL e backend no perfil `prod`. A rota `/api/health` é
+pública; as demais rotas usam `Authorization: Bearer <APP_API_TOKEN>`. Consulte
+[docs/BETA_SMOKE_TEST.md](docs/BETA_SMOKE_TEST.md) para backup, restauração e
+smoke test.
+
+## Preview no EAS
+
+Cadastre no ambiente `preview` a URL pública HTTPS da API e o token beta:
+
+```bash
+eas env:create --environment preview --name EXPO_PUBLIC_API_URL --value https://api.example.com/api --visibility plaintext
+eas env:create --environment preview --name EXPO_PUBLIC_API_TOKEN --value troque-por-um-token-beta --visibility sensitive
+eas env:list --environment preview
+```
+
+Depois valide com `eas build:inspect -p android -s pre-build -e preview` antes
+do futuro `eas build -p android --profile preview`. Não gere o APK nesta etapa.
+
+Variáveis `EXPO_PUBLIC_*` são incorporadas ao bundle do aplicativo. Portanto,
+o token beta limita acesso casual, mas não é um segredo forte: pode ser extraído
+do APK e deve ser rotacionável, restrito ao ambiente beta e substituído por
+autenticação por usuário antes de uma distribuição ampla.

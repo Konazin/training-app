@@ -47,6 +47,39 @@ class WgerExerciseMapperTest {
         assertThat(WgerExerciseMapper.safeText("<b>Texto</b>&amp; mais")).isEqualTo("Texto& mais");
     }
 
+    @Test
+    void sourceUrlPrefersTranslationObjectUrl() {
+        var source = exercise(List.of(new WgerExerciseInfo.WgerTranslation(
+                1, "Flexão", "", 7, "Autor", "https://example.test/translation"
+        )), false);
+        assertThat(mapper.map(source, 7, 2, "https://wger.de/api/v2", new ExerciseDefinition()).getSourceUrl())
+                .isEqualTo("https://example.test/translation");
+    }
+
+    @Test
+    void sourceUrlFallsBackToPublicWgerUrl() {
+        var source = withPublicUrl(exercise(List.of(new WgerExerciseInfo.WgerTranslation(
+                1, "Flexão", "", 7, "Autor", null
+        )), false), "https://wger.de/exercise/454/view");
+        assertThat(mapper.map(source, 7, 2, "https://wger.de/api/v2", new ExerciseDefinition()).getSourceUrl())
+                .isEqualTo("https://wger.de/exercise/454/view");
+    }
+
+    @Test
+    void sourceUrlRejectsHttpAndUsesApiWhenMetadataIsMissing() {
+        var http = withPublicUrl(exercise(List.of(new WgerExerciseInfo.WgerTranslation(
+                1, "Flexão", "", 7, "Autor", "http://unsafe.test/object"
+        )), false), "http://unsafe.test/exercise");
+        assertThat(mapper.map(http, 7, 2, "https://wger.de/api/v2", new ExerciseDefinition()).getSourceUrl())
+                .isEqualTo("https://wger.de/api/v2/exerciseinfo/454/");
+
+        var absent = withPublicUrl(exercise(List.of(new WgerExerciseInfo.WgerTranslation(
+                1, "Flexão", "", 7, null, null
+        )), false), null);
+        assertThat(mapper.map(absent, 7, 2, "https://wger.de/api/v2", new ExerciseDefinition()).getSourceUrl())
+                .isEqualTo("https://wger.de/api/v2/exerciseinfo/454/");
+    }
+
     private WgerExerciseInfo exercise(List<WgerExerciseInfo.WgerTranslation> translations, boolean videos) {
         return new WgerExerciseInfo(454, "uuid", OffsetDateTime.now(),
                 new WgerExerciseInfo.WgerNamed(8, "Arms"),
@@ -60,10 +93,18 @@ class WgerExerciseMapperTest {
                 videos ? List.of(
                         new WgerExerciseInfo.WgerVideo(41, "https://wger.de/video.mp4", true, "12.4", 1280, 720, "mp4", "CC", "https://source.test", "Autor"),
                         new WgerExerciseInfo.WgerVideo(42, "/video-alt.mp4", false, "10", 720, 720, "mp4", null, null, null)
-                ) : List.of());
+                ) : List.of(), "https://wger.de/exercise/454/view");
     }
 
     private WgerExerciseInfo.WgerTranslation translation(int language, String name, String description) {
         return new WgerExerciseInfo.WgerTranslation(language, name, description, language, "Autor", "https://source.test");
+    }
+
+    private WgerExerciseInfo withPublicUrl(WgerExerciseInfo source, String publicUrl) {
+        return new WgerExerciseInfo(
+                source.id(), source.uuid(), source.lastUpdateGlobal(), source.category(), source.muscles(),
+                source.secondaryMuscles(), source.equipment(), source.license(), source.licenseAuthor(),
+                source.images(), source.translations(), source.videos(), publicUrl
+        );
     }
 }

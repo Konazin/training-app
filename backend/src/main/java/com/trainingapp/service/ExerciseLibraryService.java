@@ -21,6 +21,9 @@ import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -60,9 +63,20 @@ public class ExerciseLibraryService {
                 return hasVideo ? cb.exists(media) : cb.not(cb.exists(media));
             });
         }
-        return PageResponse.from(repository.findAll(spec,
-                        PageRequest.of(Math.max(0, page), Math.min(Math.max(size, 1), 100), Sort.by("name").ascending()))
-                .map(this::toResponse));
+        var result = repository.findAll(spec,
+                PageRequest.of(Math.max(0, page), Math.min(Math.max(size, 1), 100), Sort.by("name").ascending()));
+        List<Long> ids = result.getContent().stream().map(ExerciseDefinition::getId).toList();
+        Map<Long, ExerciseDefinition> withMedia = ids.isEmpty() ? Map.of()
+                : repository.findAllWithMediaByIdIn(ids).stream()
+                .collect(Collectors.toMap(ExerciseDefinition::getId, Function.identity()));
+        List<ExerciseDefinitionResponse> content = ids.stream()
+                .map(withMedia::get)
+                .map(this::toResponse)
+                .toList();
+        return new PageResponse<>(
+                content, result.getNumber(), result.getSize(), result.getTotalElements(),
+                result.getTotalPages(), result.isFirst(), result.isLast()
+        );
     }
 
     public ExerciseDefinitionResponse findById(Long id) { return toResponse(findEntity(id)); }

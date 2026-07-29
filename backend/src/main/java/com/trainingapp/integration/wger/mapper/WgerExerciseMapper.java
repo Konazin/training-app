@@ -7,7 +7,6 @@ import org.springframework.stereotype.Component;
 
 import java.net.URI;
 import java.time.OffsetDateTime;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
@@ -15,7 +14,13 @@ import java.util.Set;
 public class WgerExerciseMapper {
     public ExerciseDefinition map(WgerExerciseInfo source, Integer languageId, Integer fallbackLanguageId,
                                   String apiBaseUrl, ExerciseDefinition target) {
-        var translation = selectTranslation(source.translations(), languageId, fallbackLanguageId);
+        return map(source, java.util.stream.Stream.of(languageId, fallbackLanguageId)
+                .filter(java.util.Objects::nonNull).distinct().toList(), apiBaseUrl, target);
+    }
+
+    public ExerciseDefinition map(WgerExerciseInfo source, List<Integer> languagePriority,
+                                  String apiBaseUrl, ExerciseDefinition target) {
+        var translation = selectTranslation(source.translations(), languagePriority);
         String name = translation == null || blank(translation.name()) ? "Wger #" + source.id() : translation.name().trim();
         target.setName(name);
         target.setNormalizedName(ExerciseLibraryService.normalize(name) + " wger " + source.id());
@@ -38,7 +43,7 @@ public class WgerExerciseMapper {
         target.setSource(ExerciseSource.WGER);
         target.setExternalId(String.valueOf(source.id()));
         target.setExternalBaseId(source.uuid());
-        target.setSourceUrl(publicSourceUrl(apiBaseUrl, source.id()));
+        target.setSourceUrl(sourceUrl(translation, source, apiBaseUrl));
         target.setLicenseName(source.license() == null ? null : source.license().shortName());
         target.setLicenseUrl(source.license() == null ? null : https(source.license().url(), apiBaseUrl));
         target.setAuthor(firstNonBlank(translation == null ? null : translation.licenseAuthor(), source.licenseAuthor()));
@@ -67,10 +72,23 @@ public class WgerExerciseMapper {
     public WgerExerciseInfo.WgerTranslation selectTranslation(
             List<WgerExerciseInfo.WgerTranslation> translations, Integer languageId, Integer fallbackLanguageId
     ) {
+        return selectTranslation(translations, java.util.stream.Stream.of(languageId, fallbackLanguageId)
+                .filter(java.util.Objects::nonNull).distinct().toList());
+    }
+
+    public WgerExerciseInfo.WgerTranslation selectTranslation(
+            List<WgerExerciseInfo.WgerTranslation> translations, List<Integer> languagePriority
+    ) {
         if (translations == null) return null;
-        return translations.stream()
-                .min(Comparator.comparingInt(item -> item.language().equals(languageId) ? 0
-                        : item.language().equals(fallbackLanguageId) ? 1 : 2)).orElse(null);
+        List<WgerExerciseInfo.WgerTranslation> valid = translations.stream()
+                .filter(item -> item != null && !blank(item.name())).toList();
+        if (languagePriority != null) {
+            for (Integer language : languagePriority) {
+                var match = valid.stream().filter(item -> java.util.Objects.equals(item.language(), language)).findFirst();
+                if (match.isPresent()) return match.get();
+            }
+        }
+        return valid.stream().findFirst().orElse(null);
     }
 
     public ExerciseCategory category(String value) {
@@ -123,6 +141,12 @@ public class WgerExerciseMapper {
     private String publicSourceUrl(String baseUrl, Integer id) {
         URI base = URI.create(baseUrl);
         return base.getScheme() + "://" + base.getAuthority() + "/api/v2/exerciseinfo/" + id + "/";
+    }
+    private String sourceUrl(WgerExerciseInfo.WgerTranslation translation, WgerExerciseInfo source, String baseUrl) {
+        String translationUrl = https(translation == null ? null : translation.licenseObjectUrl(), baseUrl);
+        if (translationUrl != null) return translationUrl;
+        String publicUrl = https(source.publicUrl(), baseUrl);
+        return publicUrl != null ? publicUrl : publicSourceUrl(baseUrl, source.id());
     }
     private String https(String value, String baseUrl) {
         if (blank(value)) return null;

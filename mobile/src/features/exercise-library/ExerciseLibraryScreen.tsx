@@ -21,6 +21,9 @@ export function ExerciseLibraryScreen({ onCreate }: {
   const [items, setItems] = useState<ExerciseDefinition[]>([])
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
+  const [filterMuscle, setFilterMuscle] = useState('')
+  const [filterEquipment, setFilterEquipment] = useState('')
+  const [category, setCategory] = useState('')
   const [source, setSource] = useState('')
   const [hasVideo, setHasVideo] = useState(false)
   const [page, setPage] = useState(0)
@@ -47,7 +50,8 @@ export function ExerciseLibraryScreen({ onCreate }: {
     setError('')
     try {
       const result = await trainingApi.getExerciseLibrary({
-        page: nextPage, size: 20, query: debouncedQuery, source, hasVideo: hasVideo || undefined,
+        page: nextPage, size: 20, query: debouncedQuery, muscle: filterMuscle.trim(),
+        equipment: filterEquipment.trim(), category, source, hasVideo: hasVideo || undefined,
       })
       if (requestId !== requestRef.current) return
       setItems((current) => mergeExercisePages(current, result.content, nextPage === 0))
@@ -63,9 +67,9 @@ export function ExerciseLibraryScreen({ onCreate }: {
         loadingRef.current = false
       }
     }
-  }, [debouncedQuery, hasVideo, source])
+  }, [category, debouncedQuery, filterEquipment, filterMuscle, hasVideo, source])
 
-  useEffect(() => { void load(0) }, [debouncedQuery, source, hasVideo])
+  useEffect(() => { void load(0) }, [debouncedQuery, filterMuscle, filterEquipment, category, source, hasVideo])
 
   async function submit() {
     if (!name.trim() || !muscle.trim() || !equipment.trim()) return
@@ -91,6 +95,13 @@ export function ExerciseLibraryScreen({ onCreate }: {
         ListHeaderComponent={<>
           <ScreenHeader eyebrow="Catálogo reutilizável" title={'Biblioteca de\nexercícios'} description="Busque movimentos e veja a execução antes de treinar." />
           <TextInput accessibilityLabel="Buscar exercício" value={query} onChangeText={setQuery} placeholder="Buscar exercício..." placeholderTextColor={colors.gray400} style={styles.search} />
+          <View style={styles.filterFields}>
+            <TextInput accessibilityLabel="Filtrar por músculo" value={filterMuscle} onChangeText={setFilterMuscle} placeholder="Músculo" placeholderTextColor={colors.gray400} style={styles.filterInput} />
+            <TextInput accessibilityLabel="Filtrar por equipamento" value={filterEquipment} onChangeText={setFilterEquipment} placeholder="Equipamento" placeholderTextColor={colors.gray400} style={styles.filterInput} />
+          </View>
+          <View style={styles.filters}>
+            {['', 'STRENGTH', 'HYPERTROPHY', 'ENDURANCE', 'CARDIO', 'MOBILITY'].map((value) => <Pressable key={value || 'all-categories'} onPress={() => setCategory(value)} style={[styles.chip, category === value && styles.chipActive]}><Text style={[styles.chipText, category === value && styles.chipTextActive]}>{value || 'Categorias'}</Text></Pressable>)}
+          </View>
           <View style={styles.filters}>
             {['', 'WGER', 'CUSTOM'].map((value) => <Pressable key={value || 'all'} onPress={() => setSource(value)} style={[styles.chip, source === value && styles.chipActive]}><Text style={[styles.chipText, source === value && styles.chipTextActive]}>{value || 'Todos'}</Text></Pressable>)}
             <Pressable onPress={() => setHasVideo((value) => !value)} style={[styles.chip, hasVideo && styles.chipActive]}><Text style={[styles.chipText, hasVideo && styles.chipTextActive]}>Com vídeo</Text></Pressable>
@@ -115,6 +126,8 @@ export function ExerciseLibraryScreen({ onCreate }: {
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   screen: { flex: 1 }, content: { padding: shared.pagePadding, paddingBottom: 125 },
   search: { backgroundColor: colors.card, borderColor: colors.gray200, borderRadius: 16, borderWidth: 1, color: colors.ink, marginBottom: 10, minHeight: 52, paddingHorizontal: 14 },
+  filterFields: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  filterInput: { backgroundColor: colors.card, borderColor: colors.gray200, borderRadius: 14, borderWidth: 1, color: colors.ink, flex: 1, minHeight: 44, paddingHorizontal: 12 },
   filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 14 },
   chip: { borderColor: colors.gray200, borderRadius: 99, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
   chipActive: { backgroundColor: colors.nearBlack, borderColor: colors.nearBlack },

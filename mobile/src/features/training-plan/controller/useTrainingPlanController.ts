@@ -39,8 +39,10 @@ export function useTrainingPlanController(
       const plans = await repository.list()
       setTrainingPlans(plans)
       setSelectedTrainingPlanId(chooseInitialPlan(plans)?.id ?? null)
+      return true
     } catch (cause) {
       setErrors((current) => ({ ...current, general: messageFrom(cause) }))
+      return false
     } finally {
       setLoading(false)
     }

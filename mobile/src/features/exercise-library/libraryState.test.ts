@@ -15,5 +15,7 @@ describe('estado da biblioteca', () => {
     expect(videoPresentation('error', true)).toBe('error-poster')
     expect(videoPresentation('error', false)).toBe('error')
     expect(videoPresentation('readyToPlay', false)).toBe('player')
+    expect(videoPresentation('loading', true)).toBe('loading-poster')
+    expect(videoPresentation('idle', false)).toBe('loading-placeholder')
   })
 })

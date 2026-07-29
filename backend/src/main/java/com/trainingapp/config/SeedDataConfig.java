@@ -12,22 +12,22 @@ import com.trainingapp.dto.WorkoutRequest;
 import com.trainingapp.model.WorkoutStatus;
 import com.trainingapp.repository.TrainingPlanRepository;
 import com.trainingapp.repository.WorkoutRepository;
-import com.trainingapp.repository.WorkoutSessionLockRepository;
 import com.trainingapp.repository.ExerciseDefinitionRepository;
 import com.trainingapp.model.ExerciseSource;
-import com.trainingapp.model.WorkoutSessionLock;
 import com.trainingapp.service.TrainingPlanService;
 import com.trainingapp.service.ExerciseLibraryService;
 import com.trainingapp.service.WorkoutService;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Map;
 
 @Configuration
+@Profile("dev")
 public class SeedDataConfig {
 
     @Bean
@@ -37,11 +37,9 @@ public class SeedDataConfig {
             TrainingPlanRepository trainingPlanRepository,
             TrainingPlanService trainingPlanService,
             ExerciseLibraryService exerciseLibrary,
-            WorkoutSessionLockRepository sessionLockRepository,
             ExerciseDefinitionRepository exerciseDefinitionRepository
     ) {
         return args -> {
-            if (!sessionLockRepository.existsById(1)) sessionLockRepository.save(new WorkoutSessionLock(1));
             exerciseDefinitionRepository.findAll().stream()
                     .filter(item -> item.isCustom() && item.getSource() == ExerciseSource.SYSTEM)
                     .forEach(item -> {

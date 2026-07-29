@@ -6,5 +6,6 @@ export function mergeExercisePages(current: ExerciseDefinition[], next: Exercise
 
 export function videoPresentation(status: 'idle' | 'loading' | 'readyToPlay' | 'error', hasPoster: boolean) {
   if (status === 'error') return hasPoster ? 'error-poster' : 'error'
-  return status === 'readyToPlay' ? 'player' : 'loading'
+  if (status === 'readyToPlay') return 'player'
+  return hasPoster ? 'loading-poster' : 'loading-placeholder'
 }

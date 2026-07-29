@@ -2,6 +2,7 @@ package com.trainingapp.config;
 
 import org.springframework.boot.hibernate.autoconfigure.HibernatePropertiesCustomizer;
 import org.springframework.stereotype.Component;
+import org.springframework.context.annotation.Profile;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -18,6 +19,7 @@ import java.util.Map;
 import java.util.Set;
 
 @Component
+@Profile("dev")
 public class TrainingPlanWeekMigration implements HibernatePropertiesCustomizer {
     private final DataSource dataSource;
 

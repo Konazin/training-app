@@ -17,6 +17,7 @@ public class WgerSyncRun {
     private int skipped;
     private int failed;
     @Column(length = 500) private String message;
+    @Column(length = 4000) private String errorDetails;
 
     public Long getId() { return id; }
     public String getStatus() { return status; }
@@ -39,4 +40,6 @@ public class WgerSyncRun {
     public void setFailed(int value) { failed = value; }
     public String getMessage() { return message; }
     public void setMessage(String value) { message = value; }
+    public String getErrorDetails() { return errorDetails; }
+    public void setErrorDetails(String value) { errorDetails = value; }
 }
