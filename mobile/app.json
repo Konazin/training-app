@@ -26,7 +26,21 @@
       }
     },
     "plugins": [
-      "expo-video"
-    ]
+      "expo-video",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "fe460b9f-bb25-4c7c-b982-97d459d6702c"
+      }
+    },
+    "owner": "konaz"
   }
 }
