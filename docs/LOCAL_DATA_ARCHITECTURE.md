@@ -25,8 +25,11 @@ O app abre `training.db`, ativa `foreign_keys`, seleciona WAL, cria
 transações exclusivas. Uma falha mostra migration, repetição segura e
 exportação de diagnóstico; o banco nunca é apagado automaticamente.
 
-O seed `mobile/assets/seeds/exercises.v1.json` roda somente quando a biblioteca
-está vazia. Ele usa conteúdo próprio, cria sete weekdays e uma ficha editável.
+O seed `mobile/assets/seeds/exercises.v1.json` é controlado por `app_metadata`,
+não por contagem de linhas. `installation.initialized` separa primeira
+instalação de um banco que o usuário apagou; `seed.suppressed` impede o seed de
+reaparecer depois de **Apagar todos os dados**. Somente a primeira instalação
+ou **Recriar dados iniciais** executa o seed.
 
 ## Integridade
 
@@ -41,6 +44,11 @@ está vazia. Ele usa conteúdo próprio, cria sete weekdays e uma ficha editáve
 - operações compostas usam transação exclusiva;
 - sessões guardam snapshots e não possuem foreign key para ficha/exercício
   mutável no histórico.
+
+As migrations publicadas não são reescritas. A migration 3 adiciona
+`app_metadata(key, value_json, updated_at)`, preservada por reset e restore.
+Falhas de migration, seed, composição de repositories ou registro de startup
+fecham a conexão antes de permitir retry.
 
 ## Estado transitório
 

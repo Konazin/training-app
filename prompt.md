@@ -1,875 +1,618 @@
 Continue o desenvolvimento do repositório `training-app` a partir do commit:
 
-b22358dfa4d3d9336325e5f51b1b787456088f58
+8e20b5e106122b5133cf7dcdd3ff041178e552c6
 
-Esta etapa deve transformar o aplicativo padrão em um aplicativo local-only,
-autônomo e offline-first.
+Esta é a sprint final antes do primeiro APK local-only para teste de sete dias.
 
-O aplicativo deve funcionar integralmente no celular sem depender de:
-
-- backend Spring Boot;
-- VPS;
-- computador na rede local;
-- endereço IP;
-- PostgreSQL;
-- H2 externo;
-- API disponível durante a inicialização;
-- conexão com a internet.
-
-APIs externas, Wger, vídeos remotos, IA e integrações futuras poderão existir,
-mas somente como recursos opcionais iniciados explicitamente pelo usuário.
-
-O runtime principal do aplicativo padrão deve ser 100% TypeScript.
-
-Não reescrever o backend Spring em Node.js.
-
-O backend atual deve permanecer no repositório apenas como referência,
-ferramenta opcional de desenvolvimento e possível suporte futuro a sincronização.
-
-Não gerar APK nesta etapa.
-
-==================================================
-1. OBJETIVO FINAL
-==================================================
-
-Ao final desta etapa, o usuário deve conseguir, sem internet:
-
-1. abrir o aplicativo;
-2. criar e editar exercícios;
-3. criar, editar, duplicar, ativar e arquivar fichas;
-4. configurar segunda a domingo;
-5. configurar dias de descanso;
-6. iniciar uma sessão;
-7. editar e concluir séries;
-8. usar o cronômetro de descanso;
-9. pausar e retomar uma sessão;
-10. fechar e reabrir o aplicativo durante o treino;
-11. concluir ou abandonar uma sessão;
-12. consultar o histórico;
-13. consultar estatísticas;
-14. fechar e reabrir o aplicativo sem perder dados;
-15. exportar um backup;
-16. restaurar um backup.
-
-Nenhuma dessas operações pode chamar uma API HTTP.
-
-==================================================
-2. ARQUITETURA-ALVO
-==================================================
-
-Organizar o código assim:
-
-packages/
-├── training-domain/
-│   ├── model/
-│   ├── repositories/
-│   ├── services/
-│   ├── rules/
-│   ├── errors/
-│   └── tests/
-│
-├── training-local-db/
-│   ├── database/
-│   ├── migrations/
-│   ├── repositories/
-│   ├── mappers/
-│   ├── backup/
-│   └── tests/
-│
-├── mobile-api/
-│   └── infraestrutura opcional para APIs externas
-│
-└── training-contracts/
-    └── manter apenas durante a transição, com reexports quando necessário
+Trabalhe apenas no aplicativo padrão:
 
 mobile/
-├── src/
-│   ├── features/
-│   ├── controllers/
-│   ├── navigation/
-│   ├── integrations/
-│   ├── bootstrap/
-│   └── theme/
-└── assets/
-    └── seeds/
+packages/training-domain/
+packages/training-local-db/
 
-O package `training-domain` não pode depender de:
+Não altere funcionalmente:
 
-- React;
-- React Native;
-- Expo;
-- SQLite;
-- fetch;
-- Axios;
-- componentes visuais.
+- backend/
+- web/
+- umamusume-mobile/
 
-O package `training-local-db` pode depender de:
+Ao final, se todas as validações passarem, gere um APK preview instalável pelo
+EAS.
 
-- expo-sqlite;
-- training-domain.
-
-O app mobile compõe:
-
-- controllers React;
-- repositories SQLite;
-- serviços do domínio;
-- telas.
+Não implementar Wger online, IA, Health Connect, download de vídeo, contas,
+sincronização em nuvem ou novas funcionalidades de treino.
 
 ==================================================
-3. DESTINO DO BACKEND
+1. OBJETIVO
 ==================================================
 
-Não excluir:
+Ao final:
 
-backend/
-web/
-compose.beta.yml
-
-Porém:
-
-- o app padrão não deve importar nem depender deles;
-- o APK não deve precisar deles;
-- o CI do app padrão não deve exigir backend rodando;
-- o README deve marcar o backend como opcional e legado para o runtime mobile;
-- remover qualquer afirmação de que o backend é necessário para usar o app.
-
-Não migrar o backend Java para TypeScript.
-
-Portar para TypeScript apenas as regras necessárias ao funcionamento local do
-aplicativo.
+- apagar dados deve permanecer apagado após reiniciar;
+- seed deve rodar somente na primeira instalação ou por ação explícita;
+- falhas do bootstrap não podem deixar conexões SQLite abertas;
+- backups automáticos devem ser visíveis e restauráveis;
+- operações compostas devem possuir testes com transação SQLite real;
+- data da sessão deve respeitar o calendário local;
+- validações de domínio devem ser consistentes;
+- a versão do app deve possuir fonte única;
+- testes e export Android devem passar;
+- APK preview deve ser gerado;
+- smoke test em modo avião deve ser iniciado ou documentado como pendente.
 
 ==================================================
-4. DEPENDÊNCIAS MOBILE
+2. METADADOS DE INSTALAÇÃO E SEED
 ==================================================
 
-Instalar com Expo:
+Criar tabela local separada:
 
-npx expo install expo-sqlite
-npx expo install expo-file-system
-npx expo install expo-sharing
-npx expo install expo-document-picker
-npx expo install expo-secure-store
-
-Usar `expo-sqlite` diretamente.
-
-Não adicionar ORM pesado nesta etapa.
-
-Não adicionar servidor local embutido no APK.
-
-Não usar Realm, Firebase, Supabase ou serviço remoto.
-
-==================================================
-5. BANCO SQLITE
-==================================================
-
-Criar banco:
-
-training.db
-
-Na inicialização:
-
-- ativar foreign keys;
-- usar journal mode WAL;
-- executar migrations antes de montar as telas;
-- falhar de maneira visível caso uma migration não possa ser aplicada.
-
-Criar tabela:
-
-schema_migrations
+app_metadata
 
 Campos:
 
-- version;
-- name;
-- checksum;
-- applied_at.
+- key TEXT PRIMARY KEY;
+- value_json TEXT NOT NULL;
+- updated_at TEXT NOT NULL.
 
-Migrations devem ser:
+Criar migration nova, sem alterar migrations já publicadas.
 
-- ordenadas;
-- transacionais;
-- idempotentes apenas pelo controle de versão;
-- nunca reaplicadas silenciosamente;
-- testáveis em banco novo;
-- testáveis em upgrade.
+Usar chaves:
 
-==================================================
-6. SCHEMA LOCAL
-==================================================
-
-Criar tabelas locais para:
-
-exercise_definitions
-exercise_media
-training_plans
-training_plan_days
-training_day_exercises
-rest_activities
-workout_sessions
-workout_session_exercises
-workout_set_logs
-app_settings
-schema_migrations
-
-Usar IDs SQLite INTEGER PRIMARY KEY.
-
-Datas devem ser armazenadas como ISO-8601 UTC em TEXT.
-
-Booleans devem ser armazenados como INTEGER 0 ou 1.
-
-Enums devem possuir CHECK constraints quando viável.
-
-Campos JSON, como configurações e estatísticas livres, devem ser serializados
-de forma centralizada e validados ao carregar.
-
-==================================================
-7. EXERCÍCIOS
-==================================================
-
-ExerciseDefinition local deve possuir:
-
-- id;
-- name;
-- normalizedName;
-- description;
-- primaryMuscleGroup;
-- secondaryMuscleGroups;
-- equipment;
-- category;
-- difficulty;
-- instructions;
-- notes;
-- unilateral;
-- timed;
-- source;
-- externalId opcional;
-- sourceUrl opcional;
-- licenseName opcional;
-- licenseUrl opcional;
-- author opcional;
-- archived;
-- createdAt;
-- updatedAt.
-
-ExerciseSource:
-
-- SYSTEM;
-- CUSTOM;
-- WGER.
-
-ExerciseMedia local deve possuir:
-
-- id;
-- exerciseDefinitionId;
-- type;
-- source;
-- externalId opcional;
-- remoteUrl opcional;
-- localUri opcional;
-- thumbnailRemoteUrl opcional;
-- thumbnailLocalUri opcional;
-- mimeType;
-- width;
-- height;
-- durationSeconds;
-- main;
-- sortOrder;
-- licenseName;
-- licenseUrl;
-- author;
-- sourceUrl;
-- downloadedAt;
-- createdAt;
-- updatedAt.
-
-O app deve funcionar quando todas as URLs remotas estiverem indisponíveis.
-
-==================================================
-8. SEED LOCAL
-==================================================
-
-Criar:
-
-mobile/assets/seeds/exercises.v1.json
-
-Incluir apenas exercícios de sistema com textos próprios do projeto.
-
-Não embutir automaticamente:
-
-- catálogo completo Wger;
-- vídeos Wger;
-- imagens Wger;
-- conteúdo de terceiros sem atribuição.
-
-O seed deve:
-
-- rodar apenas no primeiro banco vazio;
-- ser idempotente;
-- possuir versão;
-- nunca sobrescrever dados do usuário;
-- criar quantidade suficiente para montar uma ficha inicial.
-
-Criar uma ficha demonstrativa local apenas na primeira instalação.
-
-A ficha deve poder ser apagada ou arquivada normalmente.
-
-==================================================
-9. PORTAR REGRAS PARA TYPESCRIPT
-==================================================
-
-Portar do backend Java para `training-domain` as regras necessárias:
-
-- normalização de nome;
-- validação de exercício;
-- sete dias obrigatórios na ficha;
-- somente um weekday por ficha;
-- criação de ficha;
-- duplicação;
-- ativação;
-- arquivamento;
-- ordenação de exercícios;
-- configuração de séries;
-- início de sessão;
-- pausa;
-- retomada;
-- conclusão;
-- abandono;
-- cálculo de duração;
-- cálculo de volume;
-- cálculo de estatísticas do histórico;
-- seleção de mídia principal;
-- snapshots de exercícios da sessão.
-
-Não portar controllers HTTP ou DTOs específicos de REST.
-
-As regras devem ser funções ou serviços TypeScript puros e testáveis.
-
-==================================================
-10. REMOVER DOMÍNIO LEGADO WORKOUT
-==================================================
-
-Não recriar o domínio legado `Workout` no SQLite.
-
-Remover do aplicativo padrão:
-
-- criação de Workout legado;
-- listagem de Workout legado;
-- dependências do dashboard em Workout legado;
-- modelos mobile usados somente por esse fluxo.
-
-O dashboard deve ser calculado exclusivamente a partir de:
-
-- fichas;
-- sessões;
-- exercícios realizados;
-- séries concluídas;
-- volume;
-- duração.
-
-Preservar backend legado somente dentro de `backend/`.
-
-==================================================
-11. REPOSITORIES DO DOMÍNIO
-==================================================
-
-Criar interfaces em `training-domain`:
-
-ExerciseLibraryRepository
-TrainingPlanRepository
-WorkoutSessionRepository
-DashboardRepository
-SettingsRepository
-BackupRepository
-
-Operações mínimas:
-
-ExerciseLibraryRepository:
-- list;
-- findById;
-- search;
-- create;
-- update;
-- archive;
-- restore.
-
-TrainingPlanRepository:
-- list;
-- findById;
-- create;
-- update;
-- duplicate;
-- activate;
-- archive;
-- updateDay;
-- addExercise;
-- updateExercise;
-- removeExercise;
-- reorderExercise;
-- addRestActivity;
-- updateRestActivity;
-- removeRestActivity.
-
-WorkoutSessionRepository:
-- getActive;
-- getHistory;
-- findById;
-- start;
-- updateSet;
-- addSet;
-- removeSet;
-- updateExerciseStatus;
-- pause;
-- resume;
-- complete;
-- abandon.
-
-Implementar todas em `training-local-db`.
-
-Nenhum repository SQLite deve retornar linhas cruas para a UI.
-
-Usar mappers explícitos entre:
-
-- database rows;
-- domain models.
-
-==================================================
-12. TRANSAÇÕES E INTEGRIDADE
-==================================================
-
-Usar transações SQLite nas operações compostas.
-
-Exemplos:
-
-- criar ficha e sete dias;
-- duplicar ficha;
-- iniciar sessão e copiar snapshots;
-- concluir sessão;
-- restaurar backup;
-- arquivar objetos relacionados.
-
-Garantir no banco somente uma sessão ativa.
-
-Usar campo:
-
-active_slot INTEGER UNIQUE
+- installation.initialized;
+- seed.version;
+- seed.suppressed;
+- last.automatic.backup;
+- last.successful.startup.
 
 Regras:
 
-- sessão IN_PROGRESS ou PAUSED usa active_slot = 1;
-- sessão COMPLETED ou ABANDONED usa active_slot = NULL.
+1. Em uma instalação nova:
+   - `installation.initialized` ainda não existe;
+   - executar seed;
+   - gravar installation.initialized = true;
+   - gravar seed.version;
+   - seed.suppressed = false.
 
-Duas chamadas rápidas para iniciar sessão devem resultar em:
+2. Em banco existente vazio, mas já inicializado:
+   - não recriar seed automaticamente.
 
-- uma sessão criada;
-- uma falha de domínio estável;
-- nenhum registro parcial.
+3. Ao executar “Apagar todos os dados”:
+   - apagar dados do usuário;
+   - preservar app_metadata;
+   - gravar seed.suppressed = true;
+   - não recriar seed ao reabrir.
 
-==================================================
-13. SNAPSHOT DAS SESSÕES
-==================================================
+4. Ao executar “Recriar dados iniciais”:
+   - apagar dados do usuário;
+   - executar seed explicitamente;
+   - gravar seed.suppressed = false;
+   - atualizar seed.version.
 
-Uma sessão não pode depender da ficha depois de iniciada.
+5. Restore de backup:
+   - não deve apagar metadados técnicos da instalação;
+   - deve atualizar last.successful.startup apenas após bootstrap completo.
 
-Persistir snapshot de:
-
-- nome da ficha;
-- nome do dia;
-- nome do exercício;
-- grupo muscular;
-- categoria;
-- configuração planejada;
-- quantidade de séries;
-- repetições;
-- carga;
-- duração;
-- distância;
-- descanso;
-- vídeo principal;
-- imagem principal;
-- autoria;
-- licença;
-- fonte.
-
-Editar ou excluir um exercício da biblioteca não pode alterar o histórico.
+Não usar apenas a contagem de exercícios ou fichas para decidir se o seed roda.
 
 ==================================================
-14. BOOTSTRAP LOCAL
+3. RESET SEPARADO
 ==================================================
 
-Remover do bootstrap:
+Separar operações:
 
-- `/api/health`;
-- validação de API URL;
-- token de backend;
-- tentativas de rede;
-- estado “backend indisponível”;
-- refresh HTTP ao voltar do background.
+clearUserData()
+resetToSeed()
+initializeFirstInstallation()
 
-Novo fluxo:
+`BackupRepository.reset()` deve apagar somente dados do usuário.
 
-1. abrir SQLite;
-2. ativar pragmas;
-3. executar migrations;
-4. executar seed se necessário;
-5. recuperar sessão ativa;
-6. recuperar ficha ativa;
-7. carregar dashboard local;
-8. liberar navegação.
+Não deve apagar:
 
-Estados:
+- schema_migrations;
+- app_metadata.
 
-- inicializando banco;
-- migrando dados;
-- restaurando backup;
-- pronto;
-- erro local.
+Adicionar operação explícita ao repository local para recriar seed.
 
-A mensagem de erro deve informar:
-
-- migration que falhou;
-- ação segura disponível;
-- opção de exportar diagnóstico;
-- opção de tentar novamente.
-
-Não apagar o banco automaticamente em caso de erro.
+Não depender de `seedEmptyDatabase()` após um reset comum.
 
 ==================================================
-15. CONTROLLERS MOBILE
+4. BOOTSTRAP E CONEXÃO SQLITE
 ==================================================
 
-Manter controllers React nas features.
+Corrigir `useLocalRuntime`.
 
-Eles devem depender apenas das interfaces do domínio.
+Regras:
 
-Remover imports de:
+- antes de abrir uma nova conexão, fechar conexão residual;
+- se migration falhar, fechar banco;
+- se seed falhar, fechar banco;
+- se criação de repositories falhar, fechar banco;
+- `databaseRef.current` deve ser null após qualquer falha;
+- retry deve iniciar com estado limpo;
+- duas tentativas simultâneas devem compartilhar a mesma Promise;
+- unmount deve fechar a conexão somente uma vez.
 
-- trainingApi;
-- apiClient;
-- HTTP repositories para dados principais.
+Estrutura recomendada:
 
-Composition root do app deve criar:
+let openedDatabase: SqlDatabase | null = null
 
-- database;
-- SQLite repositories;
-- domain services;
-- controllers.
+try {
+  openedDatabase = await openTrainingDatabase(...)
+  await initializeInstallation(...)
+  const repositories = createLocalRepositories(openedDatabase)
+  databaseRef.current = openedDatabase
+  setRepositories(repositories)
+  setState('ready')
+} catch (cause) {
+  if (openedDatabase) await openedDatabase.close()
+  databaseRef.current = null
+  setRepositories(null)
+  ...
+}
 
-Não usar service locator global escondido.
+Não guardar a conexão em databaseRef antes de toda a inicialização terminar.
 
-Não expor setters React diretamente.
+Adicionar testes para:
 
-==================================================
-16. CRONÔMETRO
-==================================================
-
-O cronômetro deve continuar funcionando sem servidor.
-
-Pode permanecer no AsyncStorage durante esta etapa, desde que:
-
-- seja associado ao ID local da sessão;
-- sobreviva ao fechamento do app;
-- seja descartado quando a sessão terminar;
-- não seja a fonte de verdade dos dados do treino.
-
-Documentar que AsyncStorage contém apenas estado transitório e preferências,
-não dados principais.
-
-==================================================
-17. BACKUP E RESTAURAÇÃO
-==================================================
-
-Criar formato:
-
-training-backup-v1.json
-
-Conteúdo mínimo:
-
-- schemaVersion;
-- appVersion;
-- exportedAt;
-- exercises;
-- media metadata;
-- trainingPlans;
-- trainingPlanDays;
-- trainingDayExercises;
-- restActivities;
-- sessions;
-- sessionExercises;
-- setLogs;
-- settings.
-
-Não incluir:
-
-- chaves de API;
-- tokens;
-- arquivos de vídeo;
-- caches;
-- dados temporários do player.
-
-Exportar usando:
-
-- expo-file-system;
-- expo-sharing.
-
-Importar usando:
-
-- expo-document-picker.
-
-Restauração deve:
-
-1. ler arquivo;
-2. validar JSON;
-3. validar versão;
-4. validar todas as referências;
-5. abrir transação;
-6. restaurar dados;
-7. fazer rollback completo em erro;
-8. preservar o banco atual caso a validação falhe.
-
-Antes de restaurar, criar backup automático do estado atual.
-
-Adicionar opções:
-
-- Exportar backup;
-- Importar backup;
-- Apagar todos os dados;
-- Recriar dados iniciais.
-
-“Apagar todos os dados” deve exigir confirmação explícita.
+- falha em migration;
+- falha em seed;
+- retry após falha;
+- duas chamadas simultâneas;
+- unmount durante inicialização;
+- conexão fechada exatamente uma vez.
 
 ==================================================
-18. APIS FUTURAS
+5. BACKUPS AUTOMÁTICOS
 ==================================================
 
-Criar portas em TypeScript:
+Criar modelo:
 
-ExternalExerciseCatalogProvider
-AiTrainingPlanProvider
-HealthDataProvider
-RemoteBackupProvider
+AutomaticBackupInfo
 
-Não implementar provedores reais nesta etapa.
+Campos:
 
-Regras obrigatórias:
+- uri;
+- fileName;
+- createdAt;
+- sizeBytes;
+- reason.
 
-- nenhuma integração executa no bootstrap;
-- nenhuma integração executa em background sem consentimento;
-- usuário inicia cada ação;
-- tela deve explicar quais dados serão enviados;
-- usuário pode revisar resultado antes de salvar;
-- falha externa não afeta dados locais;
-- resposta externa só entra no SQLite após validação;
-- integração pode ser desativada;
-- aplicativo principal continua funcional sem configuração externa.
+Reasons:
 
-==================================================
-19. SEGREDOS DE APIS
-==================================================
+- BEFORE_IMPORT;
+- BEFORE_ERASE;
+- BEFORE_RESET_SEED.
 
-Criar abstração:
+Ao criar backup automático:
 
-SecretsRepository
+- salvar o arquivo em Paths.document;
+- obter tamanho do arquivo;
+- armazenar metadados em app_metadata;
+- manter no máximo os 5 backups automáticos mais recentes;
+- excluir o mais antigo ao exceder o limite.
 
-Implementação futura baseada em `expo-secure-store`.
+Criar serviço mobile:
 
-Não armazenar segredos em:
+automaticBackupService
 
-- SQLite;
-- AsyncStorage;
-- app.json;
-- eas.json;
-- EXPO_PUBLIC_*;
-- backup JSON.
+Operações:
 
-Nesta etapa, apenas preparar a abstração e testes.
+- list();
+- create(reason);
+- restore(uri);
+- share(uri);
+- delete(uri);
+- deleteAll();
 
-Não adicionar chave real.
+Não guardar conteúdo do backup dentro do SQLite.
 
 ==================================================
-20. WGER
+6. INTERFACE DE BACKUPS
 ==================================================
 
-O Wger deixa de ser dependência estrutural.
+Na tela “Mais”, adicionar seção:
 
-Nesta etapa:
+BACKUPS AUTOMÁTICOS
 
-- remover sync automático;
-- remover dependência do backend para catálogo;
-- manter os campos WGER no modelo;
-- manter suporte para mídia remota;
-- não realizar chamadas Wger.
+Mostrar para cada item:
 
-Preparar futura ação explícita:
+- data e hora;
+- motivo;
+- tamanho formatado;
+- Restaurar;
+- Compartilhar;
+- Excluir.
 
-“Importar exercícios do Wger”
+Antes de restaurar backup automático:
 
-O fluxo futuro será:
+- pedir confirmação;
+- criar um novo backup automático do estado atual;
+- validar arquivo;
+- restaurar transacionalmente;
+- atualizar controllers;
+- mostrar sucesso ou erro.
 
-1. usuário abre integrações;
-2. escolhe filtros;
-3. aplicativo consulta Wger;
-4. mostra pré-visualização;
-5. usuário seleciona exercícios;
-6. dados são salvos localmente;
-7. aplicativo continua funcionando offline.
+Depois de apagar ou recriar seed, mostrar:
 
-Não implementar esse fluxo agora.
+“Backup de segurança criado em <data>.”
 
-==================================================
-21. VÍDEOS
-==================================================
-
-Exercícios sem vídeo devem funcionar completamente offline.
-
-Vídeo remoto:
-
-- não carregar na lista;
-- não carregar no bootstrap;
-- só tentar reproduzir depois de ação do usuário;
-- mostrar mensagem clara quando offline;
-- não impedir execução do treino.
-
-Preparar modelo para futuro download local com `localUri`.
-
-Não implementar download completo nesta etapa.
-
-Não remover `expo-video`.
+Não exibir URI interna longa para o usuário.
 
 ==================================================
-22. CONFIGURAÇÃO ANDROID
+7. BACKUP E RESTAURAÇÃO
 ==================================================
 
-Remover a dependência obrigatória de:
+Endurecer validação do backup.
 
-EXPO_PUBLIC_API_URL
-EXPO_PUBLIC_API_TOKEN
+Validar:
 
-Remover configuração criada apenas para HTTP local:
+- IDs positivos e únicos por coleção;
+- referências;
+- enums;
+- datas ISO válidas;
+- valores numéricos finitos;
+- valores não negativos onde necessário;
+- no máximo uma ficha ativa;
+- no máximo uma sessão ativa;
+- status compatível com active_slot;
+- sete dias únicos para cada ficha;
+- sort_order sem duplicação por proprietário;
+- set_number sem duplicação por exercício;
+- nenhum secret.* em settings;
+- app_metadata não deve ser importado.
 
-usesCleartextTraffic: true
+Não aceitar:
 
-Manter:
+- NaN;
+- Infinity;
+- números convertidos implicitamente de strings;
+- objetos com prototype inesperado;
+- collections excessivamente grandes sem limite.
 
-- package `com.konazin.trainingapp`;
-- slug `training-app`;
-- scheme `trainingapp`;
-- Expo project ID atual;
-- configuração de APK preview.
+Limites iniciais:
 
-O app não deve declarar permissões de rede além das exigidas por APIs opcionais
-e reprodução remota.
+- 10.000 exercícios;
+- 20.000 mídias;
+- 1.000 fichas;
+- 20.000 sessões;
+- 500.000 séries;
+- arquivo máximo de 25 MB.
 
-==================================================
-23. DOCUMENTAÇÃO
-==================================================
-
-Atualizar README.
-
-Deixar explícito:
-
-- app padrão é local-only;
-- SQLite é a fonte de verdade;
-- nenhuma VPS é necessária;
-- nenhum servidor é necessário;
-- internet é opcional;
-- vídeos remotos e futuras APIs podem exigir internet;
-- backend Java é opcional;
-- dados são apagados ao desinstalar o app, salvo backup externo;
-- usuário deve exportar backups regularmente.
-
-Mover a documentação do backend local para uma seção:
-
-docs/OPTIONAL_SERVER.md
-
-Marcar:
-
-docs/LOCAL_ANDROID_APK.md
-
-como obsoleto ou substituí-lo por documentação do APK local-only.
-
-Criar:
-
-docs/LOCAL_DATA_ARCHITECTURE.md
-docs/BACKUP_AND_RESTORE.md
-docs/LOCAL_ONLY_SMOKE_TEST.md
+Documentar esses limites.
 
 ==================================================
-24. TESTES DO DOMÍNIO
+8. TRANSAÇÃO REAL NOS TESTES
 ==================================================
 
-Adicionar testes puros para:
+Substituir o adapter de teste que executa:
 
-- normalização;
-- criação de ficha;
-- sete dias;
-- duplicação;
-- ativação;
-- arquivamento;
-- ordenação;
-- configuração de exercícios;
-- uma sessão ativa;
-- snapshots;
-- atualização de série;
-- pausa;
-- retomada;
-- conclusão;
-- abandono;
-- volume;
-- duração;
-- dashboard;
-- seleção de mídia principal.
+transaction: operation(database)
+
+por uma implementação realmente transacional.
+
+Pode usar:
+
+- sqlite3 com processo persistente;
+- better-sqlite3 somente como dependência de desenvolvimento;
+- ou outro adapter Node compatível.
+
+A transação deve executar:
+
+BEGIN IMMEDIATE;
+COMMIT;
+ROLLBACK;
+
+Não simular transação apenas com callbacks.
+
+Adicionar testes:
+
+1. restore falha depois de inserir exercícios:
+   - banco anterior permanece intacto.
+
+2. criação de ficha falha no quarto dia:
+   - nenhuma ficha parcial permanece.
+
+3. início de sessão falha ao inserir uma série:
+   - nenhuma sessão ou snapshot parcial permanece.
+
+4. duplicação falha ao copiar atividade:
+   - nenhuma cópia parcial permanece.
+
+5. reset falha:
+   - dados anteriores permanecem.
 
 ==================================================
-25. TESTES SQLITE
+9. DATA LOCAL
+==================================================
+
+Criar função pura em training-domain:
+
+localDateKey(date: Date): string
+
+Formato:
+
+YYYY-MM-DD
+
+Usar:
+
+- getFullYear();
+- getMonth();
+- getDate();
+
+Não usar:
+
+- toISOString().slice(0, 10).
+
+Substituir na criação da sessão.
+
+Adicionar testes:
+
+- 29/07/2026 22:30 em UTC-3;
+- 31/12 perto da meia-noite;
+- 01/01 perto da meia-noite;
+- meses com zero à esquerda;
+- dias com zero à esquerda.
+
+Não alterar timestamps completos, que continuam ISO UTC.
+
+==================================================
+10. VALIDAÇÕES DE DOMÍNIO
+==================================================
+
+Criar e usar funções centralizadas:
+
+validateTrainingPlanInput
+validateTrainingPlanDayInput
+validateDayExerciseInput
+validateRestActivityInput
+validateSetLogInput
+validateRpe
+validateOptionalNonNegativeNumber
+
+Regras mínimas:
+
+Ficha:
+
+- nome obrigatório;
+- categoria obrigatória;
+- dificuldade obrigatória;
+- endDate não pode ser anterior a startDate.
+
+Dia:
+
+- título obrigatório;
+- duração estimada >= 0.
+
+Exercício da ficha:
+
+- sets >= 1;
+- minReps >= 0;
+- maxReps >= minReps;
+- plannedLoad >= 0 quando preenchido;
+- plannedDurationSeconds >= 0 quando preenchido;
+- plannedDistance >= 0 quando preenchido;
+- restSeconds >= 0;
+- RPE entre 0 e 10 quando preenchido.
+
+Atividade de descanso:
+
+- nome obrigatório;
+- duração estimada >= 0;
+- categoria obrigatória.
+
+Série:
+
+- reps >= 0;
+- load >= 0;
+- durationSeconds >= 0;
+- distance >= 0;
+- RPE entre 0 e 10 quando preenchido.
+
+Conclusão da sessão:
+
+- overallRpe entre 0 e 10 quando preenchido.
+
+Create e update devem usar as mesmas funções.
+
+Adicionar CHECK constraints numa migration apenas quando compatível com dados
+existentes.
+
+==================================================
+11. CORREÇÃO DE UPDATE DA FICHA
+==================================================
+
+`TrainingPlanRepository.update()` deve validar exatamente como create.
+
+Não permitir nome vazio ou datas inválidas.
+
+`updateDay`, `updateExercise`, `addRestActivity` e `updateRestActivity` também
+devem usar validações de domínio antes de executar SQL.
+
+Não duplicar regras dentro dos repositories.
+
+==================================================
+12. SESSÕES
+==================================================
+
+Endurecer operações de sessão.
+
+`resume` deve atualizar apenas:
+
+WHERE id = ? AND status = 'PAUSED' AND active_slot = 1
+
+`finishSession` deve verificar `changes`.
+
+Caso duas conclusões sejam disparadas:
+
+- uma conclui;
+- a segunda retorna transição inválida;
+- não duplica histórico.
+
+`updateSet`, `addSet`, `removeSet` e status de exercício devem rejeitar sessão
+PAUSED, salvo se a regra atual explicitamente permitir edição pausada.
+
+Escolher e documentar uma regra consistente.
+
+Recomendação:
+
+- sessão PAUSED não aceita alterações em séries;
+- usuário deve retomar antes de editar.
+
+Adicionar testes concorrentes ou sequenciais equivalentes.
+
+==================================================
+13. CÁLCULO DE DURAÇÃO
+==================================================
+
+Verificar sessão concluída enquanto estava pausada.
+
+A duração deve excluir:
+
+- pausas já acumuladas;
+- intervalo entre pausedAt e completedAt, caso concluída pausada.
+
+Adicionar testes:
+
+- concluir IN_PROGRESS;
+- concluir PAUSED;
+- várias pausas;
+- relógio anterior ao startedAt;
+- pausedAt inválido.
+
+Dados inválidos devem gerar erro de domínio, não duração negativa silenciosa.
+
+==================================================
+14. VERSÃO ÚNICA
+==================================================
+
+Remover versão hardcoded:
+
+'0.1.1'
+
+do App.tsx.
+
+Usar:
+
+expo-constants
+
+Instalar com:
+
+npx expo install expo-constants
+
+Ler:
+
+Constants.expoConfig?.version
+
+Criar helper:
+
+getAppVersion()
+
+Fallback somente para desenvolvimento:
+
+'0.0.0-dev'
+
+Alinhar:
+
+- mobile/package.json version;
+- mobile/app.json expo.version;
+- backup appVersion.
+
+Usar versão:
+
+0.2.0
+
+Incrementar:
+
+android.versionCode: 3
+
+Motivo:
+
+- mudança arquitetural de cliente-servidor para local-only;
+- não é simples patch 0.1.2.
+
+==================================================
+15. APP.JSON
+==================================================
+
+Confirmar:
+
+- package: com.konazin.trainingapp;
+- slug: training-app;
+- scheme: trainingapp;
+- projectId preservado;
+- usesCleartextTraffic removido;
+- expo-sqlite configurado;
+- expo-secure-store configurado;
+- expo-video preservado;
+- nenhuma variável de API necessária.
+
+Não adicionar INTERNET manualmente.
+
+A permissão padrão de rede pode permanecer devido a vídeos e APIs futuras.
+
+==================================================
+16. TESTES DE CONTROLLER
 ==================================================
 
 Adicionar testes para:
 
-- banco vazio;
-- migrations;
-- segunda inicialização;
-- seed idempotente;
-- foreign keys;
-- rollback;
-- criação de ficha;
-- duplicação;
-- sessão completa;
-- recuperação de sessão ativa;
-- histórico preservado;
-- constraint de sessão ativa;
-- atualização após reiniciar database provider;
-- export;
-- import;
-- import inválido;
-- rollback da restauração;
-- reset local.
+- refresh local;
+- criação de exercício;
+- atualização inválida;
+- iniciar sessão duas vezes;
+- editar série;
+- pausar;
+- tentar editar pausada;
+- retomar;
+- concluir;
+- conclusão dupla;
+- abandonar;
+- recuperar cronômetro;
+- limpar cronômetro ao concluir;
+- backup automático antes de apagar;
+- restore atualizando todos os controllers.
 
-Os testes não podem depender de backend.
+Não testar apenas funções puras.
 
 ==================================================
-26. TESTE DE PROCESSO MORTO
+17. TESTE DE PROCESSO MORTO
 ==================================================
 
-Criar teste ou roteiro automatizado equivalente:
+Endurecer o teste existente.
 
-1. inicializar banco;
-2. criar ficha;
-3. iniciar sessão;
-4. editar séries;
-5. persistir cronômetro;
-6. destruir controllers;
-7. fechar database provider;
-8. reabrir database provider;
-9. reconstruir controllers;
-10. confirmar sessão, séries e cronômetro.
+Fluxo:
 
-Não considerar apenas hot reload.
+1. abrir banco;
+2. inicializar instalação;
+3. criar ficha e exercício;
+4. iniciar sessão;
+5. completar uma série;
+6. iniciar cronômetro;
+7. pausar sessão;
+8. fechar repositories;
+9. fechar conexão;
+10. criar nova conexão real;
+11. recriar repositories;
+12. recuperar sessão;
+13. recuperar série;
+14. recuperar cronômetro;
+15. retomar;
+16. concluir;
+17. fechar novamente;
+18. reabrir;
+19. consultar histórico.
+
+Nenhuma instância de repository antiga pode ser reutilizada.
 
 ==================================================
-27. CI
+18. CI
 ==================================================
 
-O job principal do app padrão deve executar:
+O job `local-mobile` deve ser obrigatório.
+
+Não usar `continue-on-error` nele.
+
+Executar:
 
 npm ci
 npm run typecheck --workspace=@training/training-domain
@@ -878,127 +621,222 @@ npm run typecheck --workspace=@training/training-local-db
 npm run test --workspace=@training/training-local-db
 npm run typecheck --workspace=training-mobile
 npm run test --workspace=training-mobile
+npm run typecheck --workspace=umamusume-mobile
 npm exec --workspace=training-mobile -- expo install --check
 npm exec --workspace=training-mobile -- expo export --platform android --output-dir dist
 git diff --check
 
-O backend pode continuar em job separado, mas sua falha não deve ser necessária
-para validar a arquitetura local-only do APK.
+Backend e infra podem continuar opcionais.
 
-Não chamar Wger, IA ou outras APIs no CI.
-
-==================================================
-28. SMOKE TEST LOCAL-ONLY
-==================================================
-
-Criar checklist:
-
-1. ativar modo avião;
-2. abrir app pela primeira vez;
-3. confirmar seed;
-4. criar exercício;
-5. criar ficha;
-6. editar todos os dias;
-7. iniciar sessão;
-8. editar séries;
-9. usar cronômetro;
-10. fechar app;
-11. reabrir;
-12. retomar sessão;
-13. concluir;
-14. consultar histórico;
-15. reiniciar celular;
-16. abrir novamente;
-17. exportar backup;
-18. apagar dados;
-19. importar backup;
-20. confirmar restauração.
-
-Todo esse roteiro deve funcionar em modo avião.
+Não chamar APIs externas.
 
 ==================================================
-29. FORA DO ESCOPO
+19. VALIDAÇÃO LOCAL
 ==================================================
 
-Não implementar nesta etapa:
-
-- IA;
-- Groq;
-- Wger online;
-- download de vídeo;
-- Health Connect;
-- sincronização em nuvem;
-- contas;
-- login;
-- servidor Node;
-- backend TypeScript;
-- VPS;
-- Firebase;
-- Supabase;
-- telemetria;
-- analytics;
-- push notifications;
-- alterações no app Umamusume;
-- APK final.
-
-==================================================
-30. VALIDAÇÃO
-==================================================
-
-Raiz:
+Executar na raiz:
 
 npm ci
-
-Domínio:
 
 npm run typecheck --workspace=@training/training-domain
 npm run test --workspace=@training/training-domain
 
-Banco local:
-
 npm run typecheck --workspace=@training/training-local-db
 npm run test --workspace=@training/training-local-db
-
-App padrão:
 
 npm run typecheck --workspace=training-mobile
 npm run test --workspace=training-mobile
 
-Compatibilidade:
-
 npm run typecheck --workspace=umamusume-mobile
 
-Expo:
-
 EXPO_NO_TELEMETRY=1 npm exec --workspace=training-mobile -- expo install --check
+
 EXPO_NO_TELEMETRY=1 npm exec --workspace=training-mobile -- expo export \
   --platform android \
   --output-dir dist
 
-Geral:
-
 git diff --check
 
-Não declarar conclusão se qualquer validação falhar.
+Não avançar para o APK se qualquer comando falhar.
 
 ==================================================
-31. ENTREGA
+20. INSPEÇÃO EAS
 ==================================================
 
-Ao finalizar, informar:
+No diretório mobile:
 
-1. estrutura criada;
-2. regras portadas do Java para TypeScript;
-3. tabelas e migrations SQLite;
-4. repositories locais;
-5. dependências HTTP removidas;
-6. fluxo de bootstrap local;
-7. seed local;
-8. backup e restauração;
-9. domínio legado removido;
-10. testes adicionados;
-11. resultado de todas as validações;
-12. pontos ainda dependentes de internet;
-13. limitações restantes.
+npx eas-cli@latest whoami
+npx eas-cli@latest project:info
 
-Não gerar o APK nesta etapa.
+Executar:
+
+npx eas-cli@latest build:inspect \
+  --platform android \
+  --stage pre-build \
+  --profile preview \
+  --output .eas-inspect \
+  --force
+
+Validar:
+
+- applicationId com.konazin.trainingapp;
+- versionName 0.2.0;
+- versionCode 3;
+- expo-sqlite incluído;
+- expo-file-system incluído;
+- expo-document-picker incluído;
+- expo-sharing incluído;
+- expo-secure-store incluído;
+- expo-video incluído;
+- nenhuma URL de backend embutida;
+- nenhum token;
+- nenhum usesCleartextTraffic habilitado manualmente;
+- buildType APK.
+
+Adicionar `.eas-inspect/` ao gitignore se ainda não estiver.
+
+==================================================
+21. GERAR APK
+==================================================
+
+Somente após todas as validações:
+
+cd mobile
+
+npx eas-cli@latest build \
+  --platform android \
+  --profile preview \
+  --non-interactive \
+  --json
+
+Capturar:
+
+- build ID;
+- status;
+- URL;
+- commit;
+- versionName;
+- versionCode.
+
+Aguardar o status FINISHED.
+
+Baixar o artefato:
+
+mkdir -p ../artifacts
+
+npx eas-cli@latest build:download \
+  --build-id <BUILD_ID> \
+  --non-interactive \
+  --output ../artifacts/training-app-local-0.2.0.apk
+
+Caso `--output` não seja suportado pela versão atual:
+
+- baixar pelo URL do artefato;
+- salvar manualmente no mesmo caminho.
+
+Calcular:
+
+sha256sum ../artifacts/training-app-local-0.2.0.apk
+
+Não adicionar APK ao Git.
+
+==================================================
+22. SMOKE TEST RÁPIDO
+==================================================
+
+Caso exista aparelho ou emulador conectado:
+
+adb install -r artifacts/training-app-local-0.2.0.apk
+
+Ativar modo avião.
+
+Executar no mínimo:
+
+1. abrir app;
+2. confirmar seed;
+3. abrir ficha;
+4. iniciar sessão;
+5. completar série;
+6. iniciar cronômetro;
+7. pausar;
+8. fechar app;
+9. reabrir;
+10. recuperar sessão;
+11. retomar;
+12. concluir;
+13. consultar histórico;
+14. exportar backup;
+15. apagar dados;
+16. fechar e reabrir;
+17. confirmar que seed não reapareceu;
+18. restaurar backup;
+19. confirmar histórico restaurado.
+
+Atualizar:
+
+docs/LOCAL_ONLY_SMOKE_TEST.md
+
+Marcar apenas itens realmente executados.
+
+Se não houver Android conectado:
+
+- gerar o APK;
+- marcar smoke físico como pendente;
+- não declarar que ele passou.
+
+==================================================
+23. CRITÉRIOS DE CONCLUSÃO
+==================================================
+
+A sprint pode terminar em um destes estados:
+
+APROVADO:
+
+- testes passam;
+- export passa;
+- EAS inspect passa;
+- APK gerado;
+- hash registrado.
+
+CÓDIGO APROVADO, BUILD BLOQUEADO:
+
+- testes passam;
+- export passa;
+- mas falta login Expo, credencial ou acesso ao projeto.
+
+REPROVADO:
+
+- qualquer teste ou export falha;
+- migration falha;
+- restore não é atômico;
+- seed reaparece após apagar.
+
+Não declarar APK criado sem build ID e arquivo real.
+
+==================================================
+24. ENTREGA
+==================================================
+
+Informar:
+
+1. commit final;
+2. migrations adicionadas;
+3. política de seed;
+4. política de reset;
+5. correção do bootstrap;
+6. backups automáticos;
+7. validações adicionadas;
+8. transações reais testadas;
+9. versão e versionCode;
+10. resultados dos testes;
+11. resultado do export;
+12. resultado do EAS inspect;
+13. build ID;
+14. URL do build;
+15. caminho do APK;
+16. tamanho;
+17. SHA-256;
+18. smoke executado ou pendente;
+19. limitações restantes.
+
+Não implementar novas features.

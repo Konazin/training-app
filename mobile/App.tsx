@@ -5,7 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator, type NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
-import { seedEmptyDatabase, type LocalRepositories, type SeedData, type SqlDatabase } from '@training/training-local-db'
+import { type LocalRepositories, type SeedData } from '@training/training-local-db'
 import seed from './assets/seeds/exercises.v1.json'
 import type { MainTabParamList, RootStackParamList } from './src/navigation/types'
 import { useTrainingController } from './src/controllers/useTrainingController'
@@ -31,6 +31,7 @@ import { useLocalRuntime } from './src/features/bootstrap/useLocalRuntime'
 import { BootstrapScreen } from './src/features/bootstrap/BootstrapScreen'
 import { AppErrorBoundary } from './src/features/bootstrap/AppErrorBoundary'
 import { exportDiagnostic } from './src/integrations/backupFiles'
+import { getAppVersion } from './src/config/version'
 
 const Stack = createNativeStackNavigator<RootStackParamList>()
 const Tabs = createBottomTabNavigator<MainTabParamList>()
@@ -58,15 +59,13 @@ function RuntimeApp() {
       />
     )
   }
-  return <LocalApp repositories={runtime.repositories} database={runtime.database} />
+  return <LocalApp repositories={runtime.repositories} />
 }
 
 function LocalApp({
   repositories,
-  database,
 }: {
   repositories: LocalRepositories
-  database: SqlDatabase
 }) {
   const { colors, isDark, toggleTheme } = useTheme()
   const styles = createStyles(colors)
@@ -88,11 +87,9 @@ function LocalApp({
   ])
   const backup = useBackupController(
     repositories.backup,
-    '0.1.1',
-    async () => {
-      await repositories.backup.reset()
-      await seedEmptyDatabase(database, seed as SeedData)
-    },
+    repositories.metadata,
+    getAppVersion(),
+    () => repositories.maintenance.resetToSeed(seed as SeedData),
     refreshAll,
   )
   const [currentRoute, setCurrentRoute] = useState('MainTabs')
@@ -336,6 +333,11 @@ function MainTabs({
             onImport={() => void backup.importBackup()}
             onErase={() => void backup.eraseAll()}
             onResetSeed={() => void backup.resetSeed()}
+            automaticBackups={backup.automaticBackups}
+            onRestoreAutomatic={(uri) => void backup.restoreAutomatic(uri)}
+            onShareAutomatic={(uri) => void backup.shareAutomatic(uri)}
+            onDeleteAutomatic={(uri) => void backup.deleteAutomatic(uri)}
+            onDeleteAllAutomatic={() => void backup.deleteAllAutomatic()}
           />
         )}
       </Tabs.Screen>

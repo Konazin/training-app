@@ -7,7 +7,7 @@
 1. `useLocalRuntime` abre `training.db`;
 2. ativa foreign keys e WAL;
 3. executa migrations ordenadas e verificadas por checksum;
-4. instala o seed apenas no primeiro banco vazio;
+4. usa `app_metadata` para instalar o seed somente na primeira instalação;
 5. cria repositories SQLite;
 6. controllers carregam sessão ativa, fichas, biblioteca e dashboard;
 7. a navegação é liberada.

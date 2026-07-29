@@ -206,9 +206,18 @@ CREATE INDEX session_exercise_owner ON workout_session_exercises(workout_session
 CREATE INDEX set_log_owner ON workout_set_logs(workout_session_exercise_id, set_number);
 `
 
+const appMetadata = `
+CREATE TABLE app_metadata (
+  key TEXT PRIMARY KEY,
+  value_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+`
+
 export const MIGRATIONS: Migration[] = [
   migration(1, 'local_training_schema', schema),
   migration(2, 'local_query_indexes', indexes),
+  migration(3, 'app_installation_metadata', appMetadata),
 ]
 
 export async function runMigrations(database: SqlDatabase, onProgress?: (progress: MigrationProgress) => void) {

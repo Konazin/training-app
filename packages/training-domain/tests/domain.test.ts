@@ -10,12 +10,18 @@ import {
   duplicateTrainingPlan,
   finishWorkoutSession,
   historyStats,
+  localDateKey,
   normalizeName,
   pauseWorkoutSession,
   reorder,
   resumeWorkoutSession,
   sessionDuration,
   sessionVolume,
+  validateDayExerciseInput,
+  validateRestActivityInput,
+  validateSetLogInput,
+  validateTrainingPlanDayInput,
+  validateTrainingPlanInput,
   validatePlan,
   type ExerciseDefinition,
   type TrainingDayExercise,
@@ -114,6 +120,65 @@ describe('training-domain', () => {
     expect(finishWorkoutSession(session, 'ABANDONED', null, '', new Date('2026-07-29T12:01:00.000Z')).status)
       .toBe('ABANDONED')
     expect(() => pauseWorkoutSession(paused, now)).toThrow('Transição')
+  })
+
+  it('usa a data do calendário local com zeros e viradas de ano', () => {
+    expect(localDateKey(new Date(2026, 6, 29, 22, 30))).toBe('2026-07-29')
+    expect(localDateKey(new Date(2026, 11, 31, 23, 59))).toBe('2026-12-31')
+    expect(localDateKey(new Date(2027, 0, 1, 0, 1))).toBe('2027-01-01')
+    expect(localDateKey(new Date(2026, 0, 2, 8, 0))).toBe('2026-01-02')
+  })
+
+  it('centraliza validações de ficha, dia, exercício, descanso e série', () => {
+    expect(() => validateTrainingPlanInput({
+      name: '', description: '', category: 'Força', difficulty: 'Inicial',
+    })).toThrow('nome')
+    expect(() => validateTrainingPlanInput({
+      name: 'A', description: '', category: 'Força', difficulty: 'Inicial',
+      startDate: '2026-08-01', endDate: '2026-07-01',
+    })).toThrow('data final')
+    expect(() => validateTrainingPlanInput({
+      name: 'A', description: '', category: 'Força', difficulty: 'Inicial',
+      startDate: '2026-99-99',
+    })).toThrow('datas válidas')
+    expect(() => validateTrainingPlanDayInput({
+      title: '', description: '', restDay: false, estimatedDurationMinutes: 0, notes: '',
+    })).toThrow('título')
+    expect(() => validateDayExerciseInput({
+      sets: 0, minReps: 0, maxReps: 0, plannedLoad: null,
+      plannedDurationSeconds: null, plannedDistance: null, restSeconds: 0,
+      plannedRpe: null, setType: 'NORMAL', notes: '', alternativeExerciseId: null,
+    })).toThrow('séries')
+    expect(() => validateRestActivityInput({
+      name: ' ', description: '', estimatedDurationMinutes: 0, category: 'Mobilidade', optional: false,
+    })).toThrow('nome')
+    expect(() => validateSetLogInput({
+      reps: 1, load: 0, durationSeconds: 0, distance: 0, rpe: 11, completed: false, notes: '',
+    })).toThrow('RPE')
+  })
+
+  it('calcula duração ativa, pausada e rejeita relógios inválidos', () => {
+    const session: WorkoutSession = {
+      id: 1, trainingPlanId: 1, planDayId: 1, workoutName: 'A', dayName: 'Segunda',
+      scheduledDate: '2026-07-29', startedAt: '2026-07-29T12:00:00.000Z',
+      completedAt: null, pausedAt: null, pausedDurationSeconds: 0,
+      status: 'IN_PROGRESS', totalDurationSeconds: 0, overallRpe: null, notes: '',
+      completedSets: 0, totalPlannedSets: 0, totalVolume: 0, exercises: [],
+    }
+    const paused = pauseWorkoutSession(session, new Date('2026-07-29T12:02:00.000Z'))
+    const completedPaused = finishWorkoutSession(
+      paused, 'COMPLETED', null, '', new Date('2026-07-29T12:05:00.000Z'),
+    )
+    expect(completedPaused.totalDurationSeconds).toBe(120)
+    const resumed = resumeWorkoutSession(paused, new Date('2026-07-29T12:03:00.000Z'))
+    const pausedAgain = pauseWorkoutSession(resumed, new Date('2026-07-29T12:04:00.000Z'))
+    expect(finishWorkoutSession(
+      pausedAgain, 'COMPLETED', null, '', new Date('2026-07-29T12:05:00.000Z'),
+    ).totalDurationSeconds).toBe(180)
+    expect(() => sessionDuration(session, new Date('2026-07-29T11:59:00.000Z'))).toThrow('duração')
+    expect(() => finishWorkoutSession(
+      { ...paused, pausedAt: 'inválido' }, 'COMPLETED', null, '', new Date('2026-07-29T12:05:00.000Z'),
+    )).toThrow('Transição')
   })
 })
 

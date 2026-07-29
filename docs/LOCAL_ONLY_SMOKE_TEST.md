@@ -1,26 +1,28 @@
 # Smoke test local-only
 
-Execute em aparelho físico, sem backend iniciado.
+Status desta sprint: **pendente de aparelho ou emulador Android conectado**.
+Nenhum item abaixo deve ser marcado sem execução física em modo avião.
+
+Em 29/07/2026, `adb devices` não listou nenhum dispositivo.
 
 - [ ] Ativar modo avião.
 - [ ] Abrir o app pela primeira vez.
 - [ ] Confirmar exercícios e ficha demonstrativa.
-- [ ] Criar e editar um exercício.
-- [ ] Criar, editar, duplicar e ativar uma ficha.
-- [ ] Abrir os sete dias e configurar treino ou descanso.
-- [ ] Adicionar exercícios da biblioteca e reordená-los.
+- [ ] Abrir a ficha.
 - [ ] Iniciar uma sessão.
-- [ ] Editar e concluir séries.
-- [ ] Iniciar, ajustar e encerrar o cronômetro.
-- [ ] Pausar a sessão e fechar o app pela tela de recentes.
-- [ ] Abrir novamente e confirmar sessão, séries e cronômetro.
+- [ ] Completar uma série.
+- [ ] Iniciar o cronômetro.
+- [ ] Pausar a sessão.
+- [ ] Fechar o app pela tela de recentes.
+- [ ] Abrir novamente e recuperar sessão, série e cronômetro.
 - [ ] Retomar e concluir a sessão.
-- [ ] Confirmar duração, volume e histórico.
-- [ ] Reiniciar o celular e confirmar os dados.
+- [ ] Consultar o histórico.
 - [ ] Exportar backup.
 - [ ] Apagar todos os dados com confirmação.
-- [ ] Importar o backup.
-- [ ] Confirmar exercícios, ficha, histórico e séries restaurados.
+- [ ] Fechar e reabrir o app.
+- [ ] Confirmar que o seed não reapareceu.
+- [ ] Restaurar o backup.
+- [ ] Confirmar o histórico restaurado.
 
 Vídeos remotos podem mostrar indisponibilidade no modo avião e não devem
 bloquear nenhuma etapa.

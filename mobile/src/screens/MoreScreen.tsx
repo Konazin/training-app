@@ -1,6 +1,7 @@
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { ScreenHeader } from '../components/ScreenHeader'
 import { shared, type ThemeColors, useTheme } from '../theme'
+import type { AutomaticBackupInfo } from '@training/training-domain'
 
 export function MoreScreen({
   busy,
@@ -10,6 +11,11 @@ export function MoreScreen({
   onImport,
   onErase,
   onResetSeed,
+  automaticBackups,
+  onRestoreAutomatic,
+  onShareAutomatic,
+  onDeleteAutomatic,
+  onDeleteAllAutomatic,
 }: {
   busy: boolean
   message: string
@@ -18,6 +24,11 @@ export function MoreScreen({
   onImport: () => void
   onErase: () => void
   onResetSeed: () => void
+  automaticBackups: AutomaticBackupInfo[]
+  onRestoreAutomatic: (uri: string) => void
+  onShareAutomatic: (uri: string) => void
+  onDeleteAutomatic: (uri: string) => void
+  onDeleteAllAutomatic: () => void
 }) {
   const { colors } = useTheme()
   const styles = createStyles(colors)
@@ -50,6 +61,51 @@ export function MoreScreen({
       <Text style={styles.section}>BACKUP</Text>
       <MenuItem label="Exportar backup" detail="training-backup-v1.json" onPress={onExport} disabled={busy} />
       <MenuItem label="Importar backup" detail="Validar e restaurar" onPress={onImport} disabled={busy} />
+      <Text style={styles.section}>BACKUPS AUTOMÁTICOS</Text>
+      {!automaticBackups.length && <Text style={styles.note}>Nenhum backup automático criado.</Text>}
+      {automaticBackups.map((backup) => (
+        <View key={backup.uri} style={styles.backup}>
+          <Text style={styles.label}>{reasonLabel(backup.reason)}</Text>
+          <Text style={styles.detail}>
+            {new Date(backup.createdAt).toLocaleString()} · {formatBytes(backup.sizeBytes)}
+          </Text>
+          <View style={styles.actions}>
+            <SmallAction label="Restaurar" disabled={busy} onPress={() => Alert.alert(
+              'Restaurar este backup?',
+              'Um novo backup de segurança será criado antes da restauração.',
+              [
+                { text: 'Cancelar', style: 'cancel' },
+                { text: 'Restaurar', onPress: () => onRestoreAutomatic(backup.uri) },
+              ],
+            )} />
+            <SmallAction label="Compartilhar" disabled={busy} onPress={() => onShareAutomatic(backup.uri)} />
+            <SmallAction label="Excluir" disabled={busy} danger onPress={() => Alert.alert(
+              'Excluir backup?',
+              'O arquivo deixará de estar disponível para restauração.',
+              [
+                { text: 'Cancelar', style: 'cancel' },
+                { text: 'Excluir', style: 'destructive', onPress: () => onDeleteAutomatic(backup.uri) },
+              ],
+            )} />
+          </View>
+        </View>
+      ))}
+      {!!automaticBackups.length && (
+        <MenuItem
+          label="Excluir backups automáticos"
+          detail="Remove todos os arquivos de segurança"
+          onPress={() => Alert.alert(
+            'Excluir todos os backups?',
+            'Esta ação não altera os treinos atuais.',
+            [
+              { text: 'Cancelar', style: 'cancel' },
+              { text: 'Excluir', style: 'destructive', onPress: onDeleteAllAutomatic },
+            ],
+          )}
+          disabled={busy}
+          danger
+        />
+      )}
       <Text style={styles.section}>MANUTENÇÃO</Text>
       <MenuItem label="Apagar todos os dados" detail="Exige confirmação" onPress={confirmErase} disabled={busy} danger />
       <MenuItem label="Recriar dados iniciais" detail="Catálogo e ficha demo" onPress={confirmSeed} disabled={busy} danger />
@@ -58,6 +114,35 @@ export function MoreScreen({
       </Text>
     </ScrollView>
   )
+}
+
+function SmallAction({ label, disabled, danger, onPress }: {
+  label: string
+  disabled: boolean
+  danger?: boolean
+  onPress: () => void
+}) {
+  const { colors } = useTheme()
+  const styles = createStyles(colors)
+  return (
+    <TouchableOpacity disabled={disabled} onPress={onPress} style={styles.smallAction}>
+      <Text style={[styles.smallActionText, danger && styles.danger]}>{label}</Text>
+    </TouchableOpacity>
+  )
+}
+
+function reasonLabel(reason: AutomaticBackupInfo['reason']) {
+  return {
+    BEFORE_IMPORT: 'Antes de restaurar',
+    BEFORE_ERASE: 'Antes de apagar',
+    BEFORE_RESET_SEED: 'Antes de recriar dados iniciais',
+  }[reason]
+}
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
 function MenuItem({
@@ -98,4 +183,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   message: { backgroundColor: colors.nearBlack, borderRadius: 14, marginBottom: 8, padding: 13 },
   messageText: { color: '#fff', fontSize: 9, fontWeight: '700', textAlign: 'center' },
   note: { color: colors.gray500, fontSize: 9, lineHeight: 15, marginTop: 18 },
+  backup: { backgroundColor: colors.card, borderColor: colors.gray200, borderRadius: 17, borderWidth: 1, marginBottom: 8, padding: 14 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 10 },
+  smallAction: { borderColor: colors.gray200, borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8 },
+  smallActionText: { color: colors.ink, fontSize: 8, fontWeight: '800' },
 })

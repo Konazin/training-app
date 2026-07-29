@@ -2,6 +2,7 @@ import { File, Paths } from 'expo-file-system'
 import * as DocumentPicker from 'expo-document-picker'
 import * as Sharing from 'expo-sharing'
 import type { BackupRepository, TrainingBackup } from '@training/training-domain'
+import { BACKUP_LIMITS } from '@training/training-local-db'
 
 export async function exportBackupFile(
   repository: BackupRepository,
@@ -36,7 +37,11 @@ export async function pickBackup(): Promise<TrainingBackup | null> {
     base64: false,
   })
   if (result.canceled) return null
-  const text = await new File(result.assets[0]!.uri).text()
+  const file = new File(result.assets[0]!.uri)
+  if ((result.assets[0]!.size ?? file.size ?? 0) > BACKUP_LIMITS.fileBytes) {
+    throw new Error('O backup excede o limite de 25 MB.')
+  }
+  const text = await file.text()
   try {
     return JSON.parse(text) as TrainingBackup
   } catch {

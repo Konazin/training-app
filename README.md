@@ -74,6 +74,10 @@ Em **Mais**:
 - **Apagar todos os dados** exige confirmação;
 - **Recriar dados iniciais** restaura seed e ficha demonstrativa.
 
+Os cinco backups automáticos mais recentes ficam visíveis em **Mais**, com
+restauração, compartilhamento e exclusão. **Apagar todos os dados** preserva os
+metadados técnicos e impede que o seed reapareça ao reabrir.
+
 Arquivos de backup não contêm tokens, chaves, mídia, cache ou estado do player.
 Veja [backup e restauração](docs/BACKUP_AND_RESTORE.md).
 

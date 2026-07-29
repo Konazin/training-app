@@ -6,6 +6,7 @@ import {
   createTrainingPlan,
   duplicateTrainingPlan,
   invalidTransition,
+  localDateKey,
   finishWorkoutSession,
   normalizeName,
   notFound,
@@ -13,7 +14,12 @@ import {
   reorder,
   resumeWorkoutSession,
   serializeJson,
+  validateDayExerciseInput,
   validateExercise,
+  validateRestActivityInput,
+  validateSetLogInput,
+  validateTrainingPlanDayInput,
+  validateTrainingPlanInput,
   type BackupRepository,
   type DashboardRepository,
   type DayExerciseConfigInput,
@@ -41,6 +47,13 @@ import {
   type Row,
 } from '../mappers'
 import { createBackupRepository } from '../backup'
+import {
+  clearUserData,
+  createAppMetadataRepository,
+  resetToSeed,
+  type AppMetadataRepository,
+} from '../database/installation'
+import type { SeedData } from '../database/seed'
 
 export interface LocalRepositories {
   exercises: ExerciseLibraryRepository
@@ -51,6 +64,11 @@ export interface LocalRepositories {
   dashboard: DashboardRepository
   settings: SettingsRepository
   backup: BackupRepository
+  metadata: AppMetadataRepository
+  maintenance: {
+    clearUserData(): Promise<void>
+    resetToSeed(seed: SeedData): Promise<void>
+  }
 }
 
 export function createLocalRepositories(database: SqlDatabase): LocalRepositories {
@@ -69,6 +87,11 @@ export function createLocalRepositories(database: SqlDatabase): LocalRepositorie
     },
     settings: settingsRepository(database),
     backup: createBackupRepository(database),
+    metadata: createAppMetadataRepository(database),
+    maintenance: {
+      clearUserData: () => clearUserData(database),
+      resetToSeed: (seed) => resetToSeed(database, seed),
+    },
   }
 }
 
@@ -215,11 +238,12 @@ function planRepository(database: SqlDatabase): LocalRepositories['plans'] {
       return (await loadPlan(transaction, result.lastInsertRowId))!
     }),
     update: async (id, input) => {
+      const valid = validateTrainingPlanInput(input)
       const result = await database.run(`
         UPDATE training_plans SET name = ?, description = ?, category = ?, difficulty = ?,
           start_date = ?, end_date = ?, updated_at = ? WHERE id = ?
-      `, input.name.trim(), input.description.trim(), input.category.trim(), input.difficulty.trim(),
-      input.startDate ?? null, input.endDate ?? null, new Date().toISOString(), id)
+      `, valid.name, valid.description, valid.category, valid.difficulty,
+      valid.startDate ?? null, valid.endDate ?? null, new Date().toISOString(), id)
       if (!result.changes) throw notFound('Ficha')
       return get(id)
     },
@@ -277,12 +301,13 @@ function planRepository(database: SqlDatabase): LocalRepositories['plans'] {
       return (await loadPlan(transaction, id))!
     }),
     updateDay: async (planId, dayId, input) => {
+      const valid = validateTrainingPlanDayInput(input)
       const result = await database.run(`
         UPDATE training_plan_days SET title = ?, description = ?, rest_day = ?,
           estimated_duration_minutes = ?, notes = ?
         WHERE id = ? AND training_plan_id = ?
-      `, input.title.trim(), input.description.trim(), Number(input.restDay),
-      input.estimatedDurationMinutes, input.notes.trim(), dayId, planId)
+      `, valid.title, valid.description, Number(valid.restDay),
+      valid.estimatedDurationMinutes, valid.notes, dayId, planId)
       if (!result.changes) throw notFound('Dia')
       return get(planId)
     },
@@ -302,15 +327,16 @@ function planRepository(database: SqlDatabase): LocalRepositories['plans'] {
       return (await loadPlan(transaction, planId))!
     }),
     updateExercise: async (planId, dayId, exerciseId, input) => {
+      const valid = validateDayExerciseInput(input)
       const result = await database.run(`
         UPDATE training_day_exercises SET sets = ?, min_reps = ?, max_reps = ?,
           planned_load = ?, planned_duration_seconds = ?, planned_distance = ?,
           rest_seconds = ?, planned_rpe = ?, set_type = ?, notes = ?,
           alternative_exercise_id = ?
         WHERE id = ? AND training_plan_day_id = ?
-      `, input.sets, input.minReps, input.maxReps, input.plannedLoad,
-      input.plannedDurationSeconds, input.plannedDistance, input.restSeconds,
-      input.plannedRpe, input.setType, input.notes, input.alternativeExerciseId,
+      `, valid.sets, valid.minReps, valid.maxReps, valid.plannedLoad,
+      valid.plannedDurationSeconds, valid.plannedDistance, valid.restSeconds,
+      valid.plannedRpe, valid.setType, valid.notes, valid.alternativeExerciseId,
       exerciseId, dayId)
       if (!result.changes) throw notFound('Exercício da ficha')
       return get(planId)
@@ -334,6 +360,7 @@ function planRepository(database: SqlDatabase): LocalRepositories['plans'] {
       return (await loadPlan(transaction, planId))!
     }),
     addRestActivity: (planId, dayId, input) => database.transaction(async (transaction) => {
+      const valid = validateRestActivityInput(input)
       await assertDay(transaction, planId, dayId)
       const last = await transaction.first<{ value: number }>(
         'SELECT COALESCE(MAX(sort_order), -1) AS value FROM rest_activities WHERE training_plan_day_id = ?',
@@ -344,16 +371,17 @@ function planRepository(database: SqlDatabase): LocalRepositories['plans'] {
           training_plan_day_id, name, description, estimated_duration_minutes,
           category, optional, sort_order
         ) VALUES (?, ?, ?, ?, ?, ?, ?)
-      `, dayId, input.name.trim(), input.description.trim(), input.estimatedDurationMinutes,
-      input.category.trim(), Number(input.optional), (last?.value ?? -1) + 1)
+      `, dayId, valid.name, valid.description, valid.estimatedDurationMinutes,
+      valid.category, Number(valid.optional), (last?.value ?? -1) + 1)
       return (await loadPlan(transaction, planId))!
     }),
     updateRestActivity: async (planId, dayId, activityId, input) => {
+      const valid = validateRestActivityInput(input)
       const result = await database.run(`
         UPDATE rest_activities SET name = ?, description = ?, estimated_duration_minutes = ?,
           category = ?, optional = ? WHERE id = ? AND training_plan_day_id = ?
-      `, input.name.trim(), input.description.trim(), input.estimatedDurationMinutes,
-      input.category.trim(), Number(input.optional), activityId, dayId)
+      `, valid.name, valid.description, valid.estimatedDurationMinutes,
+      valid.category, Number(valid.optional), activityId, dayId)
       if (!result.changes) throw notFound('Atividade')
       return get(planId)
     },
@@ -384,18 +412,16 @@ async function insertDayExercise(
   exerciseDefinitionId: number,
   input: DayExerciseConfigInput & { sortOrder: number },
 ) {
-  if (input.sets < 1 || input.minReps < 0 || input.maxReps < input.minReps || input.restSeconds < 0) {
-    throw new DomainError('INVALID_EXERCISE_CONFIG', 'Configuração de exercício inválida.')
-  }
+  const valid = validateDayExerciseInput(input)
   await database.run(`
     INSERT INTO training_day_exercises(
       training_plan_day_id, exercise_definition_id, sort_order, sets, min_reps,
       max_reps, planned_load, planned_duration_seconds, planned_distance,
       rest_seconds, planned_rpe, set_type, notes, alternative_exercise_id
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `, dayId, exerciseDefinitionId, input.sortOrder, input.sets, input.minReps, input.maxReps,
-  input.plannedLoad, input.plannedDurationSeconds, input.plannedDistance, input.restSeconds,
-  input.plannedRpe, input.setType, input.notes, input.alternativeExerciseId)
+  `, dayId, exerciseDefinitionId, valid.sortOrder, valid.sets, valid.minReps, valid.maxReps,
+  valid.plannedLoad, valid.plannedDurationSeconds, valid.plannedDistance, valid.restSeconds,
+  valid.plannedRpe, valid.setType, valid.notes, valid.alternativeExerciseId)
 }
 
 async function assertDay(database: SqlDatabase, planId: number, dayId: number) {
@@ -482,9 +508,8 @@ function sessionRepository(database: SqlDatabase): WorkoutSessionRepository {
     setId: number,
     input: SetLogInput,
   ) => {
-    if (input.reps < 0 || input.load < 0 || input.durationSeconds < 0 || input.distance < 0) {
-      throw new DomainError('INVALID_SET', 'Valores da série não podem ser negativos.')
-    }
+    const valid = validateSetLogInput(input)
+    await assertEditableSession(database, sessionId)
     const result = await database.run(`
       UPDATE workout_set_logs SET reps = ?, load = ?, duration_seconds = ?, distance = ?,
         rpe = ?, completed = ?, completed_at = ?, notes = ?
@@ -493,12 +518,12 @@ function sessionRepository(database: SqlDatabase): WorkoutSessionRepository {
           SELECT 1 FROM workout_session_exercises exercise
           JOIN workout_sessions session ON session.id = exercise.workout_session_id
           WHERE exercise.id = workout_set_logs.workout_session_exercise_id
-            AND session.id = ? AND session.active_slot = 1
+            AND session.id = ? AND session.status = 'IN_PROGRESS' AND session.active_slot = 1
         )
-    `, input.reps, input.load, input.durationSeconds, input.distance, input.rpe,
-    Number(input.completed), input.completed ? new Date().toISOString() : null,
-    input.notes.trim(), setId, exerciseId, sessionId)
-    if (!result.changes) throw notFound('Série')
+    `, valid.reps, valid.load, valid.durationSeconds, valid.distance, valid.rpe,
+    Number(valid.completed), valid.completed ? new Date().toISOString() : null,
+    valid.notes, setId, exerciseId, sessionId)
+    if (!result.changes) throw invalidTransition()
     return requireSession(sessionId)
   }
   return {
@@ -526,14 +551,17 @@ function sessionRepository(database: SqlDatabase): WorkoutSessionRepository {
           if (day.restDay || !day.exercises.length) {
             throw new DomainError('EMPTY_TRAINING_DAY', 'Configure exercícios antes de iniciar esta sessão.')
           }
-          const timestamp = new Date().toISOString()
+          const now = new Date()
+          const timestamp = now.toISOString()
           const inserted = await transaction.run(`
             INSERT INTO workout_sessions(
               training_plan_id, plan_day_id, workout_name, day_name, scheduled_date,
               started_at, status, active_slot
             ) VALUES (?, ?, ?, ?, ?, ?, 'IN_PROGRESS', 1)
-          `, plan.id, day.id, plan.name, day.title, timestamp.slice(0, 10), timestamp)
-          const snapshot = createSessionSnapshot(plan, day, inserted.lastInsertRowId, () => 0, () => 0)
+          `, plan.id, day.id, plan.name, day.title, localDateKey(now), timestamp)
+          const snapshot = createSessionSnapshot(
+            plan, day, inserted.lastInsertRowId, () => 0, () => 0, now,
+          )
           for (const exercise of snapshot.exercises) {
             const insertedExercise = await transaction.run(`
               INSERT INTO workout_session_exercises(
@@ -576,10 +604,12 @@ function sessionRepository(database: SqlDatabase): WorkoutSessionRepository {
     },
     updateSet: mutateSet,
     addSet: (sessionId, exerciseId) => database.transaction(async (transaction) => {
+      await assertEditableSession(transaction, sessionId)
       const owner = await transaction.first<Row>(`
         SELECT exercise.id FROM workout_session_exercises exercise
         JOIN workout_sessions session ON session.id = exercise.workout_session_id
-        WHERE exercise.id = ? AND session.id = ? AND session.active_slot = 1
+        WHERE exercise.id = ? AND session.id = ?
+          AND session.status = 'IN_PROGRESS' AND session.active_slot = 1
       `, exerciseId, sessionId)
       if (!owner) throw notFound('Exercício da sessão')
       const last = await transaction.first<{ value: number }>(
@@ -595,13 +625,14 @@ function sessionRepository(database: SqlDatabase): WorkoutSessionRepository {
       return (await loadSession(transaction, sessionId))!
     }),
     removeSet: (sessionId, exerciseId, setId) => database.transaction(async (transaction) => {
+      await assertEditableSession(transaction, sessionId)
       const result = await transaction.run(`
         DELETE FROM workout_set_logs WHERE id = ? AND workout_session_exercise_id = ?
           AND EXISTS (
             SELECT 1 FROM workout_session_exercises exercise
             JOIN workout_sessions session ON session.id = exercise.workout_session_id
             WHERE exercise.id = workout_set_logs.workout_session_exercise_id
-              AND session.id = ? AND session.active_slot = 1
+              AND session.id = ? AND session.status = 'IN_PROGRESS' AND session.active_slot = 1
           )
       `, setId, exerciseId, sessionId)
       if (!result.changes) throw notFound('Série')
@@ -619,10 +650,14 @@ function sessionRepository(database: SqlDatabase): WorkoutSessionRepository {
       return (await loadSession(transaction, sessionId))!
     }),
     updateExerciseStatus: async (sessionId, exerciseId, status) => {
+      await assertEditableSession(database, sessionId)
       const result = await database.run(`
         UPDATE workout_session_exercises SET status = ? WHERE id = ?
           AND workout_session_id = ?
-          AND EXISTS (SELECT 1 FROM workout_sessions WHERE id = ? AND active_slot = 1)
+          AND EXISTS (
+            SELECT 1 FROM workout_sessions
+            WHERE id = ? AND status = 'IN_PROGRESS' AND active_slot = 1
+          )
       `, status, exerciseId, sessionId, sessionId)
       if (!result.changes) throw notFound('Exercício da sessão')
       return requireSession(sessionId)
@@ -639,16 +674,27 @@ function sessionRepository(database: SqlDatabase): WorkoutSessionRepository {
     },
     resume: async (sessionId) => {
       const resumed = resumeWorkoutSession(await requireSession(sessionId))
-      await database.run(`
+      const result = await database.run(`
         UPDATE workout_sessions SET status = 'IN_PROGRESS', paused_at = NULL,
-          paused_duration_seconds = ? WHERE id = ?
+          paused_duration_seconds = ?
+        WHERE id = ? AND status = 'PAUSED' AND active_slot = 1
       `, resumed.pausedDurationSeconds, sessionId)
+      if (!result.changes) throw invalidTransition()
       return requireSession(sessionId)
     },
     complete: (sessionId, overallRpe, notes) =>
       finishSession(database, sessionId, 'COMPLETED', overallRpe, notes),
     abandon: (sessionId) => finishSession(database, sessionId, 'ABANDONED', null, ''),
   }
+}
+
+async function assertEditableSession(database: SqlDatabase, sessionId: number) {
+  const row = await database.first<Row>(
+    `SELECT id FROM workout_sessions
+     WHERE id = ? AND status = 'IN_PROGRESS' AND active_slot = 1`,
+    sessionId,
+  )
+  if (!row) throw invalidTransition()
 }
 
 async function finishSession(
@@ -662,12 +708,13 @@ async function finishSession(
     const session = await loadSession(transaction, sessionId)
     if (!session || !['IN_PROGRESS', 'PAUSED'].includes(session.status)) throw invalidTransition()
     const finished = finishWorkoutSession(session, status, overallRpe, notes)
-    await transaction.run(`
+    const result = await transaction.run(`
       UPDATE workout_sessions SET status = ?, active_slot = NULL, completed_at = ?,
         paused_at = NULL, paused_duration_seconds = ?, total_duration_seconds = ?,
         overall_rpe = ?, notes = ? WHERE id = ? AND active_slot = 1
     `, status, finished.completedAt, finished.pausedDurationSeconds,
     finished.totalDurationSeconds, finished.overallRpe, finished.notes, sessionId)
+    if (!result.changes) throw invalidTransition()
     return (await loadSession(transaction, sessionId))!
   })
 }

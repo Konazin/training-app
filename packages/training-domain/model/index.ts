@@ -20,6 +20,15 @@ export type SetType =
   | 'CIRCUIT' | 'TO_FAILURE' | 'CONTROLLED_TEMPO'
 export type SessionStatus = 'IN_PROGRESS' | 'PAUSED' | 'COMPLETED' | 'ABANDONED'
 export type SessionExerciseStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED'
+export type AutomaticBackupReason = 'BEFORE_IMPORT' | 'BEFORE_ERASE' | 'BEFORE_RESET_SEED'
+
+export interface AutomaticBackupInfo {
+  uri: string
+  fileName: string
+  createdAt: string
+  sizeBytes: number
+  reason: AutomaticBackupReason
+}
 
 export interface ExerciseMedia {
   id: number

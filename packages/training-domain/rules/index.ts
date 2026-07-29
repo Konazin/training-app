@@ -2,9 +2,14 @@ import type {
   ExerciseDefinition,
   ExerciseDefinitionInput,
   ExerciseMedia,
+  DayExerciseConfigInput,
+  RestActivityInput,
   SetLog,
+  SetLogInput,
   TrainingPlan,
   TrainingPlanDay,
+  TrainingPlanDayInput,
+  TrainingPlanInput,
   WorkoutSession,
 } from '../model'
 import { WEEKDAYS } from '../model'
@@ -21,6 +26,105 @@ export function validateExercise(input: ExerciseDefinitionInput) {
   return { ...input, name: input.name.trim() }
 }
 
+export function validateOptionalNonNegativeNumber(value: number | null | undefined, field: string) {
+  if (value == null) return null
+  if (!Number.isFinite(value) || value < 0) {
+    throw new DomainError('INVALID_NUMBER', `${field} deve ser um número maior ou igual a zero.`)
+  }
+  return value
+}
+
+export function validateRpe(value: number | null | undefined) {
+  if (value == null) return null
+  if (!Number.isFinite(value) || value < 0 || value > 10) {
+    throw new DomainError('INVALID_RPE', 'RPE deve estar entre 0 e 10.')
+  }
+  return value
+}
+
+export function validateTrainingPlanInput(input: TrainingPlanInput): TrainingPlanInput {
+  const name = input.name.trim()
+  const category = input.category.trim()
+  const difficulty = input.difficulty.trim()
+  if (!name) throw new DomainError('INVALID_TRAINING_PLAN', 'Informe o nome da ficha.')
+  if (!category) throw new DomainError('INVALID_TRAINING_PLAN', 'Informe a categoria da ficha.')
+  if (!difficulty) throw new DomainError('INVALID_TRAINING_PLAN', 'Informe a dificuldade da ficha.')
+  if ((input.startDate && !isDateKey(input.startDate)) || (input.endDate && !isDateKey(input.endDate))) {
+    throw new DomainError('INVALID_TRAINING_PLAN', 'Informe datas válidas no formato AAAA-MM-DD.')
+  }
+  if (input.startDate && input.endDate && input.endDate < input.startDate) {
+    throw new DomainError('INVALID_TRAINING_PLAN', 'A data final não pode ser anterior à data inicial.')
+  }
+  return {
+    ...input,
+    name,
+    description: input.description.trim(),
+    category,
+    difficulty,
+    startDate: input.startDate ?? null,
+    endDate: input.endDate ?? null,
+  }
+}
+
+export function validateTrainingPlanDayInput(input: TrainingPlanDayInput): TrainingPlanDayInput {
+  const title = input.title.trim()
+  if (!title) throw new DomainError('INVALID_TRAINING_DAY', 'Informe o título do dia.')
+  validateOptionalNonNegativeNumber(input.estimatedDurationMinutes, 'Duração estimada')
+  return { ...input, title, description: input.description.trim(), notes: input.notes.trim() }
+}
+
+export function validateDayExerciseInput<T extends DayExerciseConfigInput>(input: T): T {
+  if (!Number.isInteger(input.sets) || input.sets < 1) {
+    throw new DomainError('INVALID_EXERCISE_CONFIG', 'A quantidade de séries deve ser maior ou igual a 1.')
+  }
+  validateOptionalNonNegativeNumber(input.minReps, 'Repetições mínimas')
+  validateOptionalNonNegativeNumber(input.maxReps, 'Repetições máximas')
+  if (input.maxReps < input.minReps) {
+    throw new DomainError('INVALID_EXERCISE_CONFIG', 'Repetições máximas não podem ser menores que as mínimas.')
+  }
+  validateOptionalNonNegativeNumber(input.plannedLoad, 'Carga planejada')
+  validateOptionalNonNegativeNumber(input.plannedDurationSeconds, 'Duração planejada')
+  validateOptionalNonNegativeNumber(input.plannedDistance, 'Distância planejada')
+  validateOptionalNonNegativeNumber(input.restSeconds, 'Descanso')
+  validateRpe(input.plannedRpe)
+  return { ...input, notes: input.notes.trim() }
+}
+
+export function validateRestActivityInput(input: RestActivityInput): RestActivityInput {
+  const name = input.name.trim()
+  const category = input.category.trim()
+  if (!name) throw new DomainError('INVALID_REST_ACTIVITY', 'Informe o nome da atividade.')
+  if (!category) throw new DomainError('INVALID_REST_ACTIVITY', 'Informe a categoria da atividade.')
+  validateOptionalNonNegativeNumber(input.estimatedDurationMinutes, 'Duração estimada')
+  return { ...input, name, category, description: input.description.trim() }
+}
+
+export function validateSetLogInput(input: SetLogInput): SetLogInput {
+  validateOptionalNonNegativeNumber(input.reps, 'Repetições')
+  validateOptionalNonNegativeNumber(input.load, 'Carga')
+  validateOptionalNonNegativeNumber(input.durationSeconds, 'Duração')
+  validateOptionalNonNegativeNumber(input.distance, 'Distância')
+  validateRpe(input.rpe)
+  return { ...input, notes: input.notes.trim() }
+}
+
+export function localDateKey(date: Date) {
+  if (Number.isNaN(date.getTime())) throw new DomainError('INVALID_DATE', 'Data local inválida.')
+  const year = String(date.getFullYear()).padStart(4, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function isDateKey(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const [year, month, day] = value.split('-').map(Number)
+  const parsed = new Date(Date.UTC(year!, month! - 1, day!))
+  return parsed.getUTCFullYear() === year
+    && parsed.getUTCMonth() === month! - 1
+    && parsed.getUTCDate() === day
+}
+
 export function assertValidWeek(days: TrainingPlanDay[]) {
   if (days.length !== WEEKDAYS.length || new Set(days.map((day) => day.weekday)).size !== WEEKDAYS.length) {
     throw new DomainError('INVALID_TRAINING_WEEK', 'A ficha deve conter segunda a domingo sem repetição.')
@@ -28,14 +132,12 @@ export function assertValidWeek(days: TrainingPlanDay[]) {
 }
 
 export function validatePlan(plan: TrainingPlan) {
-  if (!plan.name.trim()) throw new DomainError('INVALID_TRAINING_PLAN', 'Informe o nome da ficha.')
+  validateTrainingPlanInput(plan)
   assertValidWeek(plan.days)
   for (const day of plan.days) {
-    for (const exercise of day.exercises) {
-      if (exercise.sets < 1 || exercise.minReps < 0 || exercise.maxReps < exercise.minReps || exercise.restSeconds < 0) {
-        throw new DomainError('INVALID_EXERCISE_CONFIG', 'Configuração de exercício inválida.')
-      }
-    }
+    validateTrainingPlanDayInput(day)
+    day.exercises.forEach(validateDayExerciseInput)
+    day.restActivities.forEach(validateRestActivityInput)
   }
   return plan
 }
@@ -68,7 +170,19 @@ export function sessionVolume(session: WorkoutSession) {
 
 export function sessionDuration(session: WorkoutSession, now = new Date()) {
   const end = session.completedAt ? new Date(session.completedAt) : now
-  return Math.max(0, Math.floor((end.getTime() - new Date(session.startedAt).getTime()) / 1000) - session.pausedDurationSeconds)
+  const started = new Date(session.startedAt)
+  if (
+    Number.isNaN(started.getTime())
+    || Number.isNaN(end.getTime())
+    || end < started
+    || !Number.isFinite(session.pausedDurationSeconds)
+    || session.pausedDurationSeconds < 0
+  ) {
+    throw new DomainError('INVALID_SESSION_DURATION', 'Dados de duração da sessão são inválidos.')
+  }
+  const duration = Math.floor((end.getTime() - started.getTime()) / 1000) - session.pausedDurationSeconds
+  if (duration < 0) throw new DomainError('INVALID_SESSION_DURATION', 'A duração da sessão não pode ser negativa.')
+  return duration
 }
 
 export function historyStats(sessions: WorkoutSession[], now = new Date()) {

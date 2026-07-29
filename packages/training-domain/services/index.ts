@@ -10,7 +10,15 @@ import type {
 } from '../model'
 import { WEEKDAYS } from '../model'
 import { invalidTransition, notFound } from '../errors'
-import { historyStats, selectPrimaryMedia, sessionDuration, validatePlan } from '../rules'
+import {
+  historyStats,
+  localDateKey,
+  selectPrimaryMedia,
+  sessionDuration,
+  validatePlan,
+  validateRpe,
+  validateTrainingPlanInput,
+} from '../rules'
 
 export function newTrainingWeek(makeId: () => number): TrainingPlanDay[] {
   return WEEKDAYS.map((weekday, sortOrder) => ({
@@ -28,15 +36,16 @@ export function newTrainingWeek(makeId: () => number): TrainingPlanDay[] {
 }
 
 export function createTrainingPlan(input: TrainingPlanInput, id: number, makeDayId: () => number, now = new Date()): TrainingPlan {
+  const validInput = validateTrainingPlanInput(input)
   const timestamp = now.toISOString()
   return validatePlan({
     id,
-    name: input.name.trim(),
-    description: input.description.trim(),
-    category: input.category.trim(),
-    difficulty: input.difficulty.trim(),
-    startDate: input.startDate ?? null,
-    endDate: input.endDate ?? null,
+    name: validInput.name,
+    description: validInput.description,
+    category: validInput.category,
+    difficulty: validInput.difficulty,
+    startDate: validInput.startDate ?? null,
+    endDate: validInput.endDate ?? null,
     active: false,
     archived: false,
     days: newTrainingWeek(makeDayId),
@@ -132,7 +141,7 @@ export function createSessionSnapshot(
     planDayId: day.id,
     workoutName: plan.name,
     dayName: day.title,
-    scheduledDate: timestamp.slice(0, 10),
+    scheduledDate: localDateKey(now),
     startedAt: timestamp,
     completedAt: null,
     pausedAt: null,
@@ -187,7 +196,9 @@ export function pauseWorkoutSession(session: WorkoutSession, now = new Date()) {
 
 export function resumeWorkoutSession(session: WorkoutSession, now = new Date()) {
   if (session.status !== 'PAUSED' || !session.pausedAt) throw invalidTransition()
-  const paused = Math.max(0, Math.floor((now.getTime() - new Date(session.pausedAt).getTime()) / 1000))
+  const pausedAt = new Date(session.pausedAt)
+  if (Number.isNaN(pausedAt.getTime()) || now < pausedAt) throw invalidTransition()
+  const paused = Math.floor((now.getTime() - pausedAt.getTime()) / 1000)
   return {
     ...session,
     status: 'IN_PROGRESS' as const,
@@ -204,9 +215,14 @@ export function finishWorkoutSession(
   now = new Date(),
 ) {
   if (!['IN_PROGRESS', 'PAUSED'].includes(session.status)) throw invalidTransition()
+  validateRpe(overallRpe)
+  const pausedAt = session.pausedAt ? new Date(session.pausedAt) : null
+  if (session.status === 'PAUSED' && (!pausedAt || Number.isNaN(pausedAt.getTime()) || now < pausedAt)) {
+    throw invalidTransition()
+  }
   const pausedDurationSeconds = session.status === 'PAUSED' && session.pausedAt
     ? session.pausedDurationSeconds
-      + Math.max(0, Math.floor((now.getTime() - new Date(session.pausedAt).getTime()) / 1000))
+      + Math.floor((now.getTime() - new Date(session.pausedAt).getTime()) / 1000)
     : session.pausedDurationSeconds
   const finished = {
     ...session,

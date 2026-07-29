@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   createLocalRepositories,
+  initializeFirstInstallation,
+  markSuccessfulStartup,
   openTrainingDatabase,
-  seedEmptyDatabase,
   type LocalRepositories,
   type SeedData,
   type SqlDatabase,
 } from '@training/training-local-db'
 import seed from '../../../assets/seeds/exercises.v1.json'
+import { createLocalRuntimeManager } from './localRuntime'
 
 export type LocalRuntimeState =
   | 'initializing_database'
@@ -29,40 +31,56 @@ export function useLocalRuntime(): LocalRuntime {
   const [message, setMessage] = useState('')
   const [migrationName, setMigrationName] = useState('')
   const [repositories, setRepositories] = useState<LocalRepositories | null>(null)
-  const databaseRef = useRef<SqlDatabase | null>(null)
+  const [database, setDatabase] = useState<SqlDatabase | null>(null)
+  const mounted = useRef(true)
   const running = useRef<Promise<void> | null>(null)
+  const manager = useRef(createLocalRuntimeManager({
+    open: (onMigration) => openTrainingDatabase((progress) => {
+      onMigration(`${progress.version} · ${progress.name}`)
+    }),
+    initialize: (opened) => initializeFirstInstallation(opened, seed as SeedData).then(() => undefined),
+    createRepositories: createLocalRepositories,
+    markStartup: markSuccessfulStartup,
+  }))
 
   const start = useCallback(() => {
     if (running.current) return running.current
-    running.current = (async () => {
-      setState('initializing_database')
-      setMessage('')
-      setMigrationName('')
-      try {
-        const database = await openTrainingDatabase((progress) => {
+    setState('initializing_database')
+    setMessage('')
+    setMigrationName('')
+    setRepositories(null)
+    setDatabase(null)
+    const operation = manager.current.start((name) => {
+      if (mounted.current) {
           setState('migrating_data')
-          setMigrationName(`${progress.version} · ${progress.name}`)
-        })
-        databaseRef.current = database
-        await seedEmptyDatabase(database, seed as SeedData)
-        setRepositories(createLocalRepositories(database))
+        setMigrationName(name)
+      }
+    }).then((result) => {
+      if (mounted.current) {
+        setRepositories(result.repositories)
+        setDatabase(result.database)
         setState('ready')
-      } catch (cause) {
+      }
+    }).catch((cause) => {
+      if (mounted.current) {
+        setRepositories(null)
+        setDatabase(null)
         setMessage(cause instanceof Error ? cause.message : 'Falha ao abrir os dados locais.')
         setState('error')
       }
-    })().finally(() => {
-      running.current = null
+    }).finally(() => {
+      if (running.current === operation) running.current = null
     })
-    return running.current
+    running.current = operation
+    return operation
   }, [])
 
   useEffect(() => {
+    mounted.current = true
     void start()
     return () => {
-      const database = databaseRef.current
-      databaseRef.current = null
-      if (database) void database.close()
+      mounted.current = false
+      void manager.current.dispose()
     }
   }, [start])
 
@@ -71,7 +89,7 @@ export function useLocalRuntime(): LocalRuntime {
     message,
     migrationName,
     repositories,
-    database: databaseRef.current,
+    database,
     retry: start,
   }
 }
