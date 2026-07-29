@@ -1,13 +1,11 @@
 import type { ExerciseDefinition } from '../../../models/training'
-
-export type Weekday =
-  | 'MONDAY'
-  | 'TUESDAY'
-  | 'WEDNESDAY'
-  | 'THURSDAY'
-  | 'FRIDAY'
-  | 'SATURDAY'
-  | 'SUNDAY'
+import type {
+  RestActivity as SharedRestActivity,
+  TrainingPlan as TrainingPlanSummary,
+  TrainingPlanDay as SharedTrainingPlanDay,
+  Weekday,
+} from '@training/training-contracts'
+export type { Weekday } from '@training/training-contracts'
 
 export type SetType =
   | 'NORMAL'
@@ -35,37 +33,13 @@ export interface DayExercise {
   alternativeExerciseId: number | null
 }
 
-export interface RestActivity {
-  id: number
-  name: string
-  description: string
-  estimatedDurationMinutes: number
-  category: string
-  optional: boolean
-  sortOrder: number
-}
+export type RestActivity = SharedRestActivity
 
-export interface TrainingPlanDay {
-  id: number
-  weekday: Weekday
-  title: string
-  description: string
-  sortOrder: number
-  restDay: boolean
-  estimatedDurationMinutes: number
-  notes: string
+export interface TrainingPlanDay extends SharedTrainingPlanDay {
   exercises: DayExercise[]
-  restActivities: RestActivity[]
 }
 
-export interface TrainingPlan {
-  id: number
-  name: string
-  description: string
-  category: string
-  difficulty: string
-  active: boolean
-  archived: boolean
+export interface TrainingPlan extends TrainingPlanSummary {
   startDate: string | null
   endDate: string | null
   days: TrainingPlanDay[]

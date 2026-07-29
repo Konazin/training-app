@@ -2,7 +2,7 @@
   "name": "training-mobile",
   "version": "0.1.0",
   "private": true,
-  "main": "node_modules/expo/AppEntry.js",
+  "main": "expo/AppEntry.js",
   "engines": {
     "node": ">=20.19.4"
   },
@@ -12,9 +12,12 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests && npm run test --workspace=@training/mobile-api && npm run test --workspace=@training/workout-session-core"
   },
   "dependencies": {
+    "@training/mobile-api": "*",
+    "@training/training-contracts": "*",
+    "@training/workout-session-core": "*",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^7.18.14",
     "@react-navigation/native": "^7.3.14",

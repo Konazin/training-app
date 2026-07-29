@@ -16,6 +16,11 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator, type NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
+import {
+  createHttpWorkoutSessionRepository,
+  useWorkoutSessionController,
+} from '@training/workout-session-core'
+import { apiClient } from './src/config/api'
 import type { MainTabParamList, RootStackParamList } from './src/core/navigation/types'
 import { useTrainingController } from './src/controllers/useTrainingController'
 import { useTrainingPlanController } from './src/features/training-plan/controller/useTrainingPlanController'
@@ -26,13 +31,6 @@ import { RestActivityEditorScreen } from './src/features/training-plan/views/Res
 import { TrainingPlanDayScreen } from './src/features/training-plan/views/TrainingPlanDayScreen'
 import { TrainingPlanEditorScreen } from './src/features/training-plan/views/TrainingPlanEditorScreen'
 import { TrainingPlanView } from './src/features/training-plan/views/TrainingPlanView'
-import { useUmaCareerController } from './src/features/umamusume/controller/useUmaCareerController'
-import { isUmaCareerSession, sessionOrigin } from './src/features/umamusume/model/umaCareer'
-import { UmaCareerCreateScreen } from './src/features/umamusume/views/UmaCareerCreateScreen'
-import { UmaCareerHistoryScreen } from './src/features/umamusume/views/UmaCareerHistoryScreen'
-import { UmaCareerListScreen } from './src/features/umamusume/views/UmaCareerListScreen'
-import { UmaCareerScreen } from './src/features/umamusume/views/UmaCareerScreen'
-import { useWorkoutSessionController } from './src/features/workout-session/controller/useWorkoutSessionController'
 import { WorkoutSessionScreen } from './src/features/workout-session/views/WorkoutSessionScreen'
 import { ExerciseScreen } from './src/screens/ExerciseScreen'
 import { HomeScreen } from './src/screens/HomeScreen'
@@ -44,6 +42,7 @@ import { ThemeProvider, type ThemeColors, useTheme } from './src/theme'
 
 const Stack = createNativeStackNavigator<RootStackParamList>()
 const Tabs = createBottomTabNavigator<MainTabParamList>()
+const workoutSessionRepository = createHttpWorkoutSessionRepository(apiClient)
 
 export default function App() {
   return (
@@ -58,10 +57,9 @@ function TrainingApp() {
   const styles = createStyles(colors)
   const controller = useTrainingController()
   const trainingPlan = useTrainingPlanController()
-  const workoutSession = useWorkoutSessionController()
-  const umaCareer = useUmaCareerController()
+  const workoutSession = useWorkoutSessionController(workoutSessionRepository)
   const [currentRoute, setCurrentRoute] = useState('MainTabs')
-  const message = umaCareer.message || workoutSession.message || trainingPlan.message || controller.message
+  const message = workoutSession.message || trainingPlan.message || controller.message
   const navigationTheme = useMemo<NavigationTheme>(() => ({
     ...DefaultTheme,
     dark: isDark,
@@ -81,9 +79,8 @@ function TrainingApp() {
       controller.refresh(),
       trainingPlan.refresh(),
       workoutSession.refresh(),
-      umaCareer.refresh(),
     ])
-  }, [controller.refresh, trainingPlan.refresh, workoutSession.refresh, umaCareer.refresh])
+  }, [controller.refresh, trainingPlan.refresh, workoutSession.refresh])
 
   return (
     <SafeAreaProvider>
@@ -115,7 +112,6 @@ function TrainingApp() {
                   controller={controller}
                   trainingPlan={trainingPlan}
                   workoutSession={workoutSession}
-                  umaCareer={umaCareer}
                 />
               )}
             </Stack.Screen>
@@ -227,71 +223,9 @@ function TrainingApp() {
                 />
               )}
             </Stack.Screen>
-            <Stack.Screen name="UmaCareer">
-              {({ navigation }) => (
-                <UmaCareerScreen
-                  career={umaCareer.career}
-                  loading={umaCareer.loading}
-                  busyKeys={umaCareer.busyKeys}
-                  canContinueTraining={isUmaCareerSession(
-                    umaCareer.career,
-                    workoutSession.activeSession?.id ?? null,
-                  )}
-                  onCreate={() => navigation.navigate('UmaCareerCreate')}
-                  onHistory={(careerId) => navigation.navigate('UmaCareerHistory', { careerId })}
-                  onAllCareers={() => navigation.navigate('UmaCareerList')}
-                  onRefresh={async () => {
-                    await Promise.all([workoutSession.refresh(), umaCareer.refresh()])
-                  }}
-                  onStartTraining={() => void (async () => {
-                    const session = await umaCareer.startTraining()
-                    if (!session) return
-                    workoutSession.adoptSession(session)
-                    navigation.navigate('Session', { origin: 'UMAMUSUME' })
-                  })()}
-                  onContinueTraining={() => navigation.navigate('Session', { origin: 'UMAMUSUME' })}
-                  onAcceptRestActivity={umaCareer.acceptRestActivity}
-                  onCompleteRestActivity={umaCareer.completeRestActivity}
-                  onCancelRestActivity={umaCareer.cancelRestActivity}
-                  onFullRest={umaCareer.fullRest}
-                  onAbandon={umaCareer.abandonCareer}
-                />
-              )}
-            </Stack.Screen>
-            <Stack.Screen name="UmaCareerList">
-              {() => (
-                <UmaCareerListScreen
-                  careers={umaCareer.careers}
-                  selectedCareerId={umaCareer.selectedCareerId}
-                  onSelect={umaCareer.selectCareer}
-                />
-              )}
-            </Stack.Screen>
-            <Stack.Screen name="UmaCareerCreate">
-              {() => (
-                <UmaCareerCreateScreen
-                  plans={trainingPlan.trainingPlans}
-                  busy={umaCareer.busyKeys.has('career:create')}
-                  onCreate={umaCareer.createCareer}
-                />
-              )}
-            </Stack.Screen>
-            <Stack.Screen name="UmaCareerHistory">
-              {({ route }) => (
-                <UmaCareerHistoryScreen
-                  careerId={route.params.careerId}
-                  turns={umaCareer.turns}
-                  turnsCareerId={umaCareer.turnsCareerId}
-                  loading={umaCareer.turnsLoading}
-                  error={umaCareer.turnsError}
-                  onLoad={umaCareer.loadTurns}
-                />
-              )}
-            </Stack.Screen>
             <Stack.Screen name="Session">
-              {({ route }) => (
+              {() => (
                 <WorkoutSessionScreen
-                  origin={route.params?.origin ?? 'NORMAL'}
                   session={workoutSession.activeSession}
                   restTimer={workoutSession.restTimer}
                   errors={workoutSession.errors}
@@ -307,7 +241,6 @@ function TrainingApp() {
                   onStartRest={workoutSession.startRest}
                   onAdjustRest={workoutSession.adjustRest}
                   onSkipRest={workoutSession.skipRest}
-                  onCareerRefresh={umaCareer.refresh}
                 />
               )}
             </Stack.Screen>
@@ -339,13 +272,11 @@ function MainTabs({
   controller,
   trainingPlan,
   workoutSession,
-  umaCareer,
 }: {
   navigation: NativeStackNavigationProp<RootStackParamList, 'MainTabs'>
   controller: ReturnType<typeof useTrainingController>
   trainingPlan: ReturnType<typeof useTrainingPlanController>
   workoutSession: ReturnType<typeof useWorkoutSessionController>
-  umaCareer: ReturnType<typeof useUmaCareerController>
 }) {
   const { colors } = useTheme()
   const symbols: Record<keyof MainTabParamList, string> = {
@@ -390,12 +321,7 @@ function MainTabs({
               else navigation.navigate('Exercise')
             }}
             activeSession={workoutSession.activeSession}
-            onResumeSession={() => navigation.navigate('Session', {
-              origin: sessionOrigin(
-                umaCareer.activeCareer,
-                workoutSession.activeSession?.id ?? null,
-              ),
-            })}
+            onResumeSession={() => navigation.navigate('Session')}
           />
         )}
       </Tabs.Screen>
@@ -421,10 +347,7 @@ function MainTabs({
         {() => (
           <MoreScreen
             onOpen={(screen) => {
-              if (screen === 'UmaCareer') {
-                void umaCareer.refresh()
-                navigation.navigate('UmaCareer')
-              } else if (screen === 'Exercise') {
+              if (screen === 'Exercise') {
                 navigation.navigate('Exercise')
               } else if (screen === 'Workouts') {
                 navigation.navigate('Workouts')

@@ -1,4 +1,4 @@
-import { request } from '../../../core/api/request'
+import { apiClient } from '../../../config/api'
 import type {
   DayExerciseConfigInput,
   DayExerciseInput,
@@ -15,21 +15,21 @@ const json = (body: unknown): RequestInit => ({
 })
 
 export const httpTrainingPlanRepository: TrainingPlanRepository = {
-  list: () => request<TrainingPlan[]>('/training-plans'),
-  getById: (id) => request<TrainingPlan>(`/training-plans/${id}`),
-  create: (input) => request<TrainingPlan>('/training-plans', {
+  list: () => apiClient.request<TrainingPlan[]>('/training-plans'),
+  getById: (id) => apiClient.request<TrainingPlan>(`/training-plans/${id}`),
+  create: (input) => apiClient.request<TrainingPlan>('/training-plans', {
     method: 'POST',
     body: JSON.stringify(input),
   }),
-  update: (id, input) => request<TrainingPlan>(`/training-plans/${id}`, json(input)),
-  activate: (id) => request<TrainingPlan>(`/training-plans/${id}/activate`, { method: 'POST' }),
-  duplicate: (id) => request<TrainingPlan>(`/training-plans/${id}/duplicate`, { method: 'POST' }),
+  update: (id, input) => apiClient.request<TrainingPlan>(`/training-plans/${id}`, json(input)),
+  activate: (id) => apiClient.request<TrainingPlan>(`/training-plans/${id}/activate`, { method: 'POST' }),
+  duplicate: (id) => apiClient.request<TrainingPlan>(`/training-plans/${id}/duplicate`, { method: 'POST' }),
   archive: (id, archived) =>
-    request<TrainingPlan>(`/training-plans/${id}/archive?archived=${archived}`, { method: 'PATCH' }),
+    apiClient.request<TrainingPlan>(`/training-plans/${id}/archive?archived=${archived}`, { method: 'PATCH' }),
   updateDay: (planId: number, dayId: number, input: TrainingPlanDayInput) =>
-    request<TrainingPlan>(`/training-plans/${planId}/days/${dayId}`, json(input)),
+    apiClient.request<TrainingPlan>(`/training-plans/${planId}/days/${dayId}`, json(input)),
   addDayExercise: (planId: number, dayId: number, input: DayExerciseInput) =>
-    request<TrainingPlan>(`/training-plans/${planId}/days/${dayId}/exercises`, {
+    apiClient.request<TrainingPlan>(`/training-plans/${planId}/days/${dayId}/exercises`, {
       method: 'POST',
       body: JSON.stringify(input),
     }),
@@ -38,18 +38,18 @@ export const httpTrainingPlanRepository: TrainingPlanRepository = {
     dayId: number,
     exerciseId: number,
     input: DayExerciseConfigInput,
-  ) => request<TrainingPlan>(
+  ) => apiClient.request<TrainingPlan>(
     `/training-plans/${planId}/days/${dayId}/exercises/${exerciseId}`,
     json(input),
   ),
   removeDayExercise: (planId, dayId, exerciseId) =>
-    request<TrainingPlan>(`/training-plans/${planId}/days/${dayId}/exercises/${exerciseId}`, {
+    apiClient.request<TrainingPlan>(`/training-plans/${planId}/days/${dayId}/exercises/${exerciseId}`, {
       method: 'DELETE',
     }),
   reorderDayExercises: (planId, dayId, exerciseIds) =>
-    request<TrainingPlan>(`/training-plans/${planId}/days/${dayId}/exercises/order`, json(exerciseIds)),
+    apiClient.request<TrainingPlan>(`/training-plans/${planId}/days/${dayId}/exercises/order`, json(exerciseIds)),
   addRestActivity: (planId: number, dayId: number, input: RestActivityInput) =>
-    request<TrainingPlan>(`/training-plans/${planId}/days/${dayId}/rest-activities`, {
+    apiClient.request<TrainingPlan>(`/training-plans/${planId}/days/${dayId}/rest-activities`, {
       method: 'POST',
       body: JSON.stringify(input),
     }),
@@ -58,14 +58,14 @@ export const httpTrainingPlanRepository: TrainingPlanRepository = {
     dayId: number,
     activityId: number,
     input: RestActivityInput,
-  ) => request<TrainingPlan>(
+  ) => apiClient.request<TrainingPlan>(
     `/training-plans/${planId}/days/${dayId}/rest-activities/${activityId}`,
     json(input),
   ),
   removeRestActivity: (planId, dayId, activityId) =>
-    request<TrainingPlan>(`/training-plans/${planId}/days/${dayId}/rest-activities/${activityId}`, {
+    apiClient.request<TrainingPlan>(`/training-plans/${planId}/days/${dayId}/rest-activities/${activityId}`, {
       method: 'DELETE',
     }),
   reorderRestActivities: (planId, dayId, activityIds) =>
-    request<TrainingPlan>(`/training-plans/${planId}/days/${dayId}/rest-activities/order`, json(activityIds)),
+    apiClient.request<TrainingPlan>(`/training-plans/${planId}/days/${dayId}/rest-activities/order`, json(activityIds)),
 }

@@ -47,8 +47,6 @@ export interface ExerciseInput {
   customStats: CustomStats
 }
 
-export type ExerciseCategory = 'STRENGTH' | 'HYPERTROPHY' | 'ENDURANCE' | 'CARDIO' | 'MOBILITY' | 'STRETCHING' | 'TECHNIQUE' | 'RECOVERY'
-
 export interface ExerciseDefinition {
   id: number; name: string; description: string; primaryMuscleGroup: string
   secondaryMuscleGroups: string[]; equipment: string; category: ExerciseCategory; difficulty: string
@@ -75,3 +73,5 @@ export interface Dashboard {
   totalVolume: number
   adherence: number
 }
+import type { ExerciseCategory } from '@training/training-contracts'
+export type { ExerciseCategory } from '@training/training-contracts'

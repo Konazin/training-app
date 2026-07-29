@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Modo Umamusume",
+    "slug": "modo-umamusume",
+    "scheme": "modouma",
+    "icon": "./assets/icon.png",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#f4f4f2"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.konazin.modouma"
+    },
+    "android": {
+      "package": "com.konazin.modouma",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#0a0a0a"
+      }
+    }
+  }
+}

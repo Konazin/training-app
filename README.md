@@ -1,17 +1,23 @@
 # Training App
 
-Primeira versão de um gerenciador de treinos com aplicativo React Native, cliente web para teste e debug e uma API Java compartilhada.
+Gerenciador de treinos com dois aplicativos Expo independentes, cliente web
+para teste e debug e uma única API Java compartilhada.
 
 ## Estrutura
 
 ```text
 training-app/
-├── backend/  # Java 21, Spring Boot 4.1, Spring MVC, JPA e H2
-├── mobile/   # React Native, Expo e TypeScript
-└── web/      # Vue 3, Vite, Tailwind CSS e TypeScript
+├── backend/             # Java 21, Spring Boot 4.1, Spring MVC, JPA e H2
+├── mobile/              # Aplicativo principal de treino
+├── umamusume-mobile/    # Aplicativo independente do modo de carreira
+├── packages/
+│   ├── mobile-api/             # Cliente HTTP configurável e erros comuns
+│   ├── training-contracts/     # Contratos TypeScript compartilhados
+│   └── workout-session-core/   # Regras, repository, storage e controller de sessão
+└── web/                 # Vue 3, Vite, Tailwind CSS e TypeScript
 ```
 
-O mobile concentra o fluxo principal; a interface web permanece como apoio para teste e debug:
+O aplicativo principal contém:
 
 1. **Início:** resumo de treinos, exercícios, minutos e sessões recentes.
 2. **Gestão de treinos:** cadastro, listagem e exclusão de treinos.
@@ -20,8 +26,12 @@ O mobile concentra o fluxo principal; a interface web permanece como apoio para 
 5. **Sessão:** séries, carga, repetições, RPE, cronômetro e conclusão.
 6. **Histórico:** sessões persistidas, volume, frequência e aderência.
 7. **Adicionar exercício:** fluxo legado preservado para sessões avulsas.
-8. **Modo Umamusume:** carreira de 8, 12 ou 16 semanas usando os treinos e
-   atividades reais da ficha semanal.
+
+O aplicativo Modo Umamusume contém apenas carreira, consulta de fichas,
+execução de sessão e histórico. As fichas continuam sendo criadas e editadas
+no aplicativo principal. Ambos os APKs usam o mesmo backend e banco.
+
+A interface web permanece como apoio para teste e debug.
 
 O visual usa uma paleta neutra em preto, branco e cinza, oferece modos claro e escuro e mantém navegação lateral no desktop e inferior no mobile.
 
@@ -35,9 +45,10 @@ O backend segue MVC com uma camada de serviço:
 - `controller`: contrato HTTP;
 - `dto`: entradas e respostas da API.
 
-No mobile, `workout-session`, `training-plan` e `umamusume` seguem MVC por feature, com
-`model`, `repository`, `service`, `controller` e `views`. Dashboard,
-biblioteca e o domínio legado `Workout` ainda usam as pastas globais.
+As features mobile seguem MVC. A apresentação e a navegação pertencem a cada
+app; o código não visual de sessão fica em `workout-session-core`. O package
+`mobile-api` não possui URL global: cada aplicativo cria seu cliente com a
+própria `EXPO_PUBLIC_API_URL`.
 
 ## Requisitos
 
@@ -46,9 +57,19 @@ biblioteca e o domínio legado `Workout` ainda usam as pastas globais.
 - Node.js 20.19.4 ou superior
 - npm 9+
 
+## Instalar
+
+Na raiz, instale todos os workspaces mobile com um único lockfile:
+
+```bash
+npm install
+```
+
+O diretório `web/` continua com lockfile próprio.
+
 ## Executar
 
-Abra três terminais.
+Abra quatro terminais.
 
 ### 1. Backend
 
@@ -69,7 +90,7 @@ npm run dev
 
 Abra `http://localhost:5173`. Durante o desenvolvimento, o Vite encaminha `/api` para o backend. Para outro endereço, copie `.env.example` para `.env` e ajuste `VITE_API_URL`.
 
-### 3. Mobile
+### 3. Aplicativo principal
 
 ```bash
 cd mobile
@@ -84,6 +105,32 @@ EXPO_PUBLIC_API_URL=http://192.168.0.10:8080/api
 ```
 
 O celular e o computador precisam estar na mesma rede. Se necessário, inclua a origem web adicional em `CORS_ALLOWED_ORIGINS` ao iniciar o backend.
+
+### 4. Modo Umamusume
+
+```bash
+cd umamusume-mobile
+npm start
+```
+
+Configure `umamusume-mobile/.env` da mesma forma:
+
+```env
+EXPO_PUBLIC_API_URL=http://192.168.0.10:8080/api
+```
+
+Cada app cria seu próprio cliente HTTP; nenhum token, secret ou endereço fica
+armazenado nos packages compartilhados.
+
+## Identidade dos aplicativos
+
+| Aplicativo | Slug | Scheme | Android package |
+| --- | --- | --- | --- |
+| Training App | `training-app` | `trainingapp` | `com.konazin.trainingapp` |
+| Modo Umamusume | `modo-umamusume` | `modouma` | `com.konazin.modouma` |
+
+Ícone e splash usam placeholders geométricos locais e não incluem personagens,
+nomes, logotipos ou assets oficiais.
 
 ## API
 
@@ -173,6 +220,18 @@ npm run typecheck
 npm run test
 npx expo install --check
 EXPO_NO_TELEMETRY=1 npx expo export --platform android --output-dir dist
+
+# Modo Umamusume
+cd umamusume-mobile
+npm ci
+npm run typecheck
+npm run test
+npx expo install --check
+EXPO_NO_TELEMETRY=1 npx expo export --platform android --output-dir dist
+
+# Workspaces
+cd ..
+npm install
 ```
 
 Os testes Maven e Vitest descobrem automaticamente os casos disponíveis, sem
@@ -196,8 +255,8 @@ depender de uma quantidade fixa documentada.
   continuam concluíveis ou canceláveis mesmo após mudanças na ficha.
 - O histórico registra somente os deltas efetivamente aplicados após os limites,
   e carreiras concluídas ou abandonadas continuam disponíveis para consulta.
-- A retomada de sessão compara o ID da sessão ativa com o turno pendente para
-  preservar corretamente a origem normal ou Umamusume.
+- O app Modo Umamusume oferece retomada somente quando o ID da sessão ativa
+  coincide com o turno pendente da carreira.
 - Nesta primeira versão, a carreira consulta a ficha atual diretamente. Alterar
   a ficha durante uma carreira muda os próximos dias; o snapshot completo fica
   para uma etapa futura.
@@ -206,3 +265,7 @@ Não há comando separado de migration: ela roda automaticamente com
 `mvn spring-boot:run`. O APK depende da API Java e ainda não possui banco
 local, sincronização ou funcionamento offline. O fluxo legado `Workout`
 continua disponível para sessões avulsas.
+
+Integrações com wger, Groq, Health Connect e API Ninjas, autenticação, modo
+offline, cálculo de calorias, geração por IA e redesign amplo ainda não foram
+implementados.

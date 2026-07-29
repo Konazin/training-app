@@ -1,6 +1,6 @@
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { ScreenHeader } from '../components/ScreenHeader'
-import type { WorkoutSession } from '../features/workout-session/model/workoutSession'
+import type { WorkoutSession } from '@training/training-contracts'
 import { shared, type ThemeColors, useTheme } from '../theme'
 export function HistoryScreen({ sessions }: { sessions: WorkoutSession[] }) {
   const { colors } = useTheme(); const styles = createStyles(colors)

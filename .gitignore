@@ -75,6 +75,16 @@ mobile/*.jks
 mobile/*.keystore
 mobile/google-services.json
 mobile/GoogleService-Info.plist
+umamusume-mobile/.expo/
+umamusume-mobile/.expo-shared/
+umamusume-mobile/.cache/
+umamusume-mobile/web-build/
+umamusume-mobile/android/
+umamusume-mobile/ios/
+umamusume-mobile/*.jks
+umamusume-mobile/*.keystore
+umamusume-mobile/google-services.json
+umamusume-mobile/GoogleService-Info.plist
 *.mobileprovision
 *.orig.*
 

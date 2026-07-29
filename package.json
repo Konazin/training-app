@@ -1,0 +1,13 @@
+{
+  "name": "training-app",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "mobile",
+    "umamusume-mobile",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20.19.4"
+  }
+}

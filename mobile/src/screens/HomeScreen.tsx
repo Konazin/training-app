@@ -8,7 +8,7 @@ import {
 } from 'react-native'
 import { ScreenHeader } from '../components/ScreenHeader'
 import { StatusPill } from '../components/StatusPill'
-import type { WorkoutSession } from '../features/workout-session/model/workoutSession'
+import type { WorkoutSession } from '@training/training-contracts'
 import type { Dashboard } from '../models/training'
 import { colors, shared, type ThemeColors, useTheme } from '../theme'
 
