@@ -35,6 +35,12 @@ public class WorkoutSessionExercise {
     @Column(length = 30)
     private ExerciseCategory categorySnapshot;
     private Boolean timedSnapshot = false;
+    @Column(length = 1000)
+    private String primaryVideoUrl;
+    @Column(length = 1000)
+    private String primaryImageUrl;
+    @Column(length = 1000)
+    private String attribution;
     @Column(nullable = false)
     private int sortOrder;
     @Column(nullable = false)
@@ -66,6 +72,12 @@ public class WorkoutSessionExercise {
     public void setCategorySnapshot(ExerciseCategory value) { categorySnapshot = value; }
     public boolean isTimedSnapshot() { return Boolean.TRUE.equals(timedSnapshot); }
     public void setTimedSnapshot(boolean value) { timedSnapshot = value; }
+    public String getPrimaryVideoUrl() { return primaryVideoUrl; }
+    public void setPrimaryVideoUrl(String value) { primaryVideoUrl = value; }
+    public String getPrimaryImageUrl() { return primaryImageUrl; }
+    public void setPrimaryImageUrl(String value) { primaryImageUrl = value; }
+    public String getAttribution() { return attribution; }
+    public void setAttribution(String value) { attribution = value; }
     public int getSortOrder() { return sortOrder; }
     public void setSortOrder(int value) { sortOrder = value; }
     public int getPlannedSets() { return plannedSets; }

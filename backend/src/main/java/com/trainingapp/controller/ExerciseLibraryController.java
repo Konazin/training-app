@@ -2,6 +2,8 @@ package com.trainingapp.controller;
 
 import com.trainingapp.dto.ExerciseDefinitionRequest;
 import com.trainingapp.dto.ExerciseDefinitionResponse;
+import com.trainingapp.dto.PageResponse;
+import com.trainingapp.model.ExerciseSource;
 import com.trainingapp.service.ExerciseLibraryService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -16,8 +18,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-
 @RestController
 @RequestMapping("/api/exercise-library")
 public class ExerciseLibraryController {
@@ -26,14 +26,18 @@ public class ExerciseLibraryController {
     public ExerciseLibraryController(ExerciseLibraryService service) { this.service = service; }
 
     @GetMapping
-    public List<ExerciseDefinitionResponse> findAll(
+    public PageResponse<ExerciseDefinitionResponse> findAll(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String query,
             @RequestParam(required = false) String muscle,
             @RequestParam(required = false) String equipment,
             @RequestParam(required = false) String category,
+            @RequestParam(required = false) ExerciseSource source,
+            @RequestParam(required = false) Boolean hasVideo,
             @RequestParam(defaultValue = "false") boolean includeArchived
     ) {
-        return service.findAll(query, muscle, equipment, category, includeArchived);
+        return service.findAll(page, size, query, muscle, equipment, category, source, hasVideo, includeArchived);
     }
 
     @GetMapping("/{id}")

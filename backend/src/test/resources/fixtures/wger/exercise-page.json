@@ -1,0 +1,61 @@
+{
+  "count": 1,
+  "next": null,
+  "previous": null,
+  "results": [{
+    "id": 454,
+    "uuid": "3b96a05b-9705-48da-b43e-6e098234bb35",
+    "last_update_global": "2026-06-06T13:35:29+02:00",
+    "category": { "id": 8, "name": "Arms" },
+    "muscles": [{ "id": 4, "name": "Pectoralis major", "name_en": "Chest" }],
+    "muscles_secondary": [{ "id": 5, "name": "Triceps brachii", "name_en": "Triceps" }],
+    "equipment": [{ "id": 7, "name": "none (bodyweight exercise)" }],
+    "license": {
+      "id": 2,
+      "full_name": "Creative Commons Attribution Share Alike 4",
+      "short_name": "CC-BY-SA 4",
+      "url": "https://creativecommons.org/licenses/by-sa/4.0/"
+    },
+    "license_author": "Autor de exemplo",
+    "translations": [
+      { "id": 1, "name": "Flexão", "description": "<p>Apoie as mãos.</p><p>Empurre o corpo.</p>", "language": 7 },
+      { "id": 2, "name": "Push-up", "description": "Push the body.", "language": 2 }
+    ],
+    "images": [{
+      "id": 697,
+      "image": "/media/exercise-images/example.webp",
+      "thumbnails": {
+        "small": "https://wger.de/media/exercise-images/example-small.webp",
+        "medium": "https://wger.de/media/exercise-images/example-thumb.webp"
+      },
+      "is_main": true,
+      "license_title": "CC-BY-SA 4",
+      "license_object_url": "https://wger.de/",
+      "license_author": "Autor de exemplo"
+    }],
+    "videos": [
+      {
+        "id": 41,
+        "video": "https://wger.de/media/exercise-videos/example.mp4",
+        "is_main": true,
+        "duration": "12.40",
+        "width": 1280,
+        "height": 720,
+        "codec": "mp4",
+        "license_title": "CC-BY-SA 4",
+        "license_object_url": "https://wger.de/",
+        "license_author": "Autor de exemplo"
+      },
+      {
+        "id": 42,
+        "video": "/media/exercise-videos/example-alt.mp4",
+        "is_main": false,
+        "duration": "10.00",
+        "width": 720,
+        "height": 720,
+        "codec": "mp4",
+        "license_author": ""
+      }
+    ]
+  }]
+}

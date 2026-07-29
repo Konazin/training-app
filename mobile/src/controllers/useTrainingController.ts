@@ -32,7 +32,7 @@ export function useTrainingController() {
       ])
       setWorkouts(workoutData)
       setDashboard(dashboardData)
-      setExerciseLibrary(libraryData)
+      setExerciseLibrary(libraryData.content)
       setSelectedWorkoutId((current) => current ?? workoutData[0]?.id ?? null)
     } catch (cause) {
       setMessage(messageFrom(cause))
@@ -53,7 +53,7 @@ export function useTrainingController() {
       ])
       setWorkouts(workoutData)
       setDashboard(dashboardData)
-      setExerciseLibrary(libraryData)
+      setExerciseLibrary(libraryData.content)
       setSelectedWorkoutId((current) =>
         workoutData.some((item) => item.id === current) ? current : workoutData[0]?.id ?? null,
       )

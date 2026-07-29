@@ -14,6 +14,7 @@ import type {
 } from '../models/training'
 
 const API_URL = import.meta.env.VITE_API_URL ?? '/api'
+const API_TOKEN = import.meta.env.VITE_API_TOKEN
 
 interface ApiErrorBody {
   message?: string
@@ -25,6 +26,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...(API_TOKEN ? { Authorization: `Bearer ${API_TOKEN}` } : {}),
       ...options?.headers,
     },
   })
@@ -114,7 +116,9 @@ export const trainingApi = {
   removeRestActivity: (planId: number, dayId: number, activityId: number) =>
     request<TrainingPlan>(`/training-plans/${planId}/days/${dayId}/rest-activities/${activityId}`, { method: 'DELETE' }),
   getExerciseLibrary: (params = '') =>
-    request<ExerciseDefinition[]>(`/exercise-library${params ? `?${params}` : ''}`),
+    request<{ content: ExerciseDefinition[] }>(
+      `/exercise-library?size=100${params ? `&${params}` : ''}`,
+    ).then((page) => page.content),
   createExerciseDefinition: (payload: ExerciseDefinitionInput) =>
     request<ExerciseDefinition>('/exercise-library', { method: 'POST', body: JSON.stringify(payload) }),
   updateExerciseDefinition: (id: number, payload: ExerciseDefinitionInput) =>

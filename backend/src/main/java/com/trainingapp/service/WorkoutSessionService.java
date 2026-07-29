@@ -17,6 +17,10 @@ import com.trainingapp.model.WorkoutSessionExercise;
 import com.trainingapp.model.WorkoutSetLog;
 import com.trainingapp.repository.TrainingPlanDayRepository;
 import com.trainingapp.repository.WorkoutSessionRepository;
+import com.trainingapp.repository.WorkoutSessionLockRepository;
+import com.trainingapp.exception.DomainConflictException;
+import com.trainingapp.model.ExerciseMedia;
+import com.trainingapp.model.ExerciseMediaType;
 import jakarta.transaction.Transactional;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -35,29 +39,32 @@ public class WorkoutSessionService {
     private final TrainingPlanService planService;
     private final TrainingPlanDayRepository dayRepository;
     private final ApplicationEventPublisher events;
+    private final WorkoutSessionLockRepository sessionLock;
 
     public WorkoutSessionService(
             WorkoutSessionRepository repository,
             TrainingPlanService planService,
             TrainingPlanDayRepository dayRepository,
-            ApplicationEventPublisher events
+            ApplicationEventPublisher events,
+            WorkoutSessionLockRepository sessionLock
     ) {
         this.repository = repository;
         this.planService = planService;
         this.dayRepository = dayRepository;
         this.events = events;
+        this.sessionLock = sessionLock;
     }
 
     public WorkoutSessionResponse start(StartSessionRequest request) {
+        lockSessionSlot();
         TrainingPlan plan = planService.findPlan(request.trainingPlanId());
         TrainingPlanDay day = dayRepository.findById(request.planDayId())
                 .orElseThrow(() -> new ResourceNotFoundException("Dia da ficha não encontrado"));
         if (!day.getTrainingPlan().getId().equals(plan.getId())) throw new IllegalArgumentException("Dia não pertence à ficha informada");
         if (day.isRestDay()) throw new IllegalArgumentException("Um dia de descanso não inicia uma sessão convencional");
         if (day.getExercises().isEmpty()) throw new IllegalArgumentException("Adicione exercícios antes de iniciar o treino");
-        // ponytail: single app instance; use a database lock before horizontally scaling the API.
         if (repository.existsByStatusIn(ACTIVE)) {
-            throw new IllegalArgumentException("Já existe uma sessão ativa");
+            throw new DomainConflictException("Já existe uma sessão ativa");
         }
         WorkoutSession session = new WorkoutSession();
         session.setTrainingPlan(plan);
@@ -73,6 +80,9 @@ public class WorkoutSessionService {
             exercise.setMuscleGroupSnapshot(planned.getExercise().getPrimaryMuscleGroup());
             exercise.setCategorySnapshot(planned.getExercise().getCategory());
             exercise.setTimedSnapshot(planned.getExercise().isTimed());
+            exercise.setPrimaryVideoUrl(primaryMedia(planned.getExercise().getMedia(), ExerciseMediaType.VIDEO));
+            exercise.setPrimaryImageUrl(primaryMedia(planned.getExercise().getMedia(), ExerciseMediaType.IMAGE));
+            exercise.setAttribution(attribution(planned.getExercise()));
             exercise.setSortOrder(planned.getSortOrder());
             exercise.setPlannedSets(planned.getSets());
             exercise.setPlannedMinReps(planned.getMinReps());
@@ -197,6 +207,7 @@ public class WorkoutSessionService {
     }
 
     public WorkoutSessionResponse complete(Long id, CompleteSessionRequest request) {
+        lockSessionSlot();
         WorkoutSession session = requireEditable(id);
         if (session.getExercises().stream().flatMap(item -> item.getSets().stream()).noneMatch(WorkoutSetLog::isCompleted)) {
             throw new IllegalArgumentException("Registre ao menos uma série antes de concluir");
@@ -208,6 +219,7 @@ public class WorkoutSessionService {
     }
 
     public WorkoutSessionResponse abandon(Long id, CompleteSessionRequest request) {
+        lockSessionSlot();
         WorkoutSession session = requireEditable(id);
         finalizeSession(session, SessionStatus.ABANDONED, request);
         WorkoutSession saved = repository.save(session);
@@ -267,7 +279,8 @@ public class WorkoutSessionService {
                         exercise.getId(), exercise.getExerciseDefinitionId(), exercise.getExerciseNameSnapshot(),
                         exercise.getMuscleGroupSnapshot(),
                         exercise.getCategorySnapshot() == null ? ExerciseCategory.STRENGTH : exercise.getCategorySnapshot(),
-                        exercise.isTimedSnapshot(), exercise.getSortOrder(), exercise.getPlannedSets(),
+                        exercise.isTimedSnapshot(), exercise.getPrimaryVideoUrl(), exercise.getPrimaryImageUrl(),
+                        exercise.getAttribution(), exercise.getSortOrder(), exercise.getPlannedSets(),
                         exercise.getPlannedMinReps(), exercise.getPlannedMaxReps(), exercise.getRestSeconds(),
                         exercise.getStatus(), exercise.getNotes(), exercise.getSets().stream().map(set ->
                                 new WorkoutSessionResponse.SetLogResponse(
@@ -275,5 +288,20 @@ public class WorkoutSessionService {
                                         set.getDistance(), set.getRpe(), set.isCompleted(), set.getCompletedAt(),
                                         set.isManuallyAdded(), set.getNotes(),
                                         set.getLoad().multiply(BigDecimal.valueOf(set.getReps())))).toList())).toList());
+    }
+
+    private void lockSessionSlot() {
+        if (sessionLock.lock() == null) throw new IllegalStateException("Controle de sessão ativa não inicializado");
+    }
+
+    private String primaryMedia(List<ExerciseMedia> media, ExerciseMediaType type) {
+        return media.stream().filter(item -> item.getType() == type && item.isMain()).findFirst()
+                .or(() -> media.stream().filter(item -> item.getType() == type).findFirst())
+                .map(ExerciseMedia::getUrl).orElse(null);
+    }
+
+    private String attribution(com.trainingapp.model.ExerciseDefinition exercise) {
+        return java.util.stream.Stream.of(exercise.getAuthor(), exercise.getLicenseName(), exercise.getSourceUrl())
+                .filter(value -> value != null && !value.isBlank()).reduce((a, b) -> a + " • " + b).orElse(null);
     }
 }

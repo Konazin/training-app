@@ -22,11 +22,8 @@ jobs:
           cache: maven
       - run: mvn test
 
-  mobile:
+  frontend:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: mobile
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -35,30 +32,13 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm run test
-      - run: npx expo install --check
-      - run: npx expo export --platform android --output-dir dist
-        env:
-          EXPO_NO_TELEMETRY: '1'
-
-  umamusume-mobile:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: umamusume-mobile
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 20.19.4
-          cache: npm
-          cache-dependency-path: package-lock.json
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm run test
-      - run: npx expo install --check
-      - run: npx expo export --platform android --output-dir dist
+      - run: npm run test --workspace=@training/mobile-api
+      - run: npm run test --workspace=@training/workout-session-core
+      - run: npm run typecheck --workspace=training-mobile
+      - run: npm run test --workspace=training-mobile
+      - run: npm run typecheck --workspace=umamusume-mobile
+      - run: npm exec --workspace=training-mobile -- expo install --check
+      - run: npm exec --workspace=training-mobile -- expo export --platform android --output-dir dist
         env:
           EXPO_NO_TELEMETRY: '1'
 

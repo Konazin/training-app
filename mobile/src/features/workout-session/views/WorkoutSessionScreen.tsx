@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   Alert,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -21,6 +22,7 @@ import type {
   WorkoutSession,
 } from '@training/workout-session-core'
 import { shared, type ThemeColors, useTheme } from '../../../theme'
+import { ExerciseVideo } from '../../exercise-library/ExerciseVideo'
 
 interface Props {
   session: WorkoutSession | null
@@ -65,6 +67,8 @@ export function WorkoutSessionScreen(props: Props) {
   const [rpe, setRpe] = useState('')
   const [notes, setNotes] = useState('')
   const [canLeave, setCanLeave] = useState(false)
+  const [videoExercise, setVideoExercise] = useState<SessionExercise | null>(null)
+  const [videoRetryKey, setVideoRetryKey] = useState(0)
   const notifiedTimer = useRef('')
 
   useEffect(() => {
@@ -137,7 +141,7 @@ export function WorkoutSessionScreen(props: Props) {
     }
   }
 
-  return (
+  return (<>
     <ScrollView
       contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled"
@@ -202,6 +206,11 @@ export function WorkoutSessionScreen(props: Props) {
                   : `${exercise.plannedMinReps}–${exercise.plannedMaxReps} reps`}
                 {' · '}{exercise.restSeconds}s descanso
               </Text>
+              {!!exercise.primaryVideoUrl && (
+                <TouchableOpacity accessibilityLabel={`Ver execução de ${exercise.name}`} onPress={() => setVideoExercise(exercise)}>
+                  <Text style={styles.videoLink}>▶ Ver execução</Text>
+                </TouchableOpacity>
+              )}
             </View>
             <TouchableOpacity
               disabled={busyKeys.has(`exercise:${exercise.id}`)}
@@ -290,7 +299,17 @@ export function WorkoutSessionScreen(props: Props) {
         </TouchableOpacity>
       </View>
     </ScrollView>
-  )
+    <Modal visible={Boolean(videoExercise)} transparent animationType="fade" onRequestClose={() => setVideoExercise(null)}>
+      <View style={styles.videoBackdrop}>
+        <View style={styles.videoSheet}>
+          <Text style={styles.videoTitle}>{videoExercise?.name}</Text>
+          {!!videoExercise?.primaryVideoUrl && <ExerciseVideo url={videoExercise.primaryVideoUrl} posterUrl={videoExercise.primaryImageUrl} retryKey={videoRetryKey} onRetry={() => setVideoRetryKey((value) => value + 1)} />}
+          {!!videoExercise?.attribution && <Text style={styles.videoAttribution}>{videoExercise.attribution}</Text>}
+          <TouchableOpacity onPress={() => setVideoExercise(null)}><Text style={styles.videoClose}>Fechar</Text></TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  </>)
 }
 
 function SetEditor({
@@ -458,6 +477,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   index: { backgroundColor: colors.nearBlack, borderRadius: 13, color: '#fff', fontSize: 10, fontWeight: '800', overflow: 'hidden', padding: 12 },
   exerciseName: { color: colors.ink, fontSize: 12, fontWeight: '700' },
   muted: { color: colors.gray500, fontSize: 9, marginTop: 4 },
+  videoLink: { color: colors.primary, fontSize: 10, fontWeight: '800', marginTop: 7 },
   skip: { color: colors.gray500, fontSize: 9, fontWeight: '700', padding: 8 },
   setEditor: { borderTopColor: colors.gray100, borderTopWidth: 1, gap: 9, padding: 12 },
   setTitle: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
@@ -487,4 +507,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   error: { color: colors.danger, fontSize: 9, paddingHorizontal: 2 },
   empty: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: 30 },
   emptyTitle: { color: colors.ink, fontSize: 21, fontWeight: '700', marginBottom: 6 },
+  videoBackdrop: { backgroundColor: 'rgba(0,0,0,.72)', flex: 1, justifyContent: 'center', padding: 18 },
+  videoSheet: { backgroundColor: colors.card, borderRadius: 24, padding: 16 },
+  videoTitle: { color: colors.ink, fontSize: 18, fontWeight: '800', marginBottom: 14 },
+  videoAttribution: { color: colors.gray500, fontSize: 10, lineHeight: 16, marginTop: 4 },
+  videoClose: { color: colors.primary, fontSize: 12, fontWeight: '800', padding: 14, textAlign: 'center' },
 })

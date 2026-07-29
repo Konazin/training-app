@@ -12,6 +12,10 @@ import com.trainingapp.dto.WorkoutRequest;
 import com.trainingapp.model.WorkoutStatus;
 import com.trainingapp.repository.TrainingPlanRepository;
 import com.trainingapp.repository.WorkoutRepository;
+import com.trainingapp.repository.WorkoutSessionLockRepository;
+import com.trainingapp.repository.ExerciseDefinitionRepository;
+import com.trainingapp.model.ExerciseSource;
+import com.trainingapp.model.WorkoutSessionLock;
 import com.trainingapp.service.TrainingPlanService;
 import com.trainingapp.service.ExerciseLibraryService;
 import com.trainingapp.service.WorkoutService;
@@ -32,9 +36,18 @@ public class SeedDataConfig {
             WorkoutService workoutService,
             TrainingPlanRepository trainingPlanRepository,
             TrainingPlanService trainingPlanService,
-            ExerciseLibraryService exerciseLibrary
+            ExerciseLibraryService exerciseLibrary,
+            WorkoutSessionLockRepository sessionLockRepository,
+            ExerciseDefinitionRepository exerciseDefinitionRepository
     ) {
         return args -> {
+            if (!sessionLockRepository.existsById(1)) sessionLockRepository.save(new WorkoutSessionLock(1));
+            exerciseDefinitionRepository.findAll().stream()
+                    .filter(item -> item.isCustom() && item.getSource() == ExerciseSource.SYSTEM)
+                    .forEach(item -> {
+                        item.setSource(ExerciseSource.CUSTOM);
+                        exerciseDefinitionRepository.save(item);
+                    });
             if (workoutRepository.count() == 0) {
                 var workout = workoutService.create(new WorkoutRequest(
                         "Força — membros superiores",

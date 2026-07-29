@@ -4,11 +4,13 @@ import type {
   ExerciseInput,
   ExerciseDefinition,
   ExerciseDefinitionInput,
+  ExerciseLibraryPage,
   Workout,
   WorkoutInput,
 } from '../models/training'
 
 export const trainingApi = {
+  getHealth: () => apiClient.request<{ status: string; database: string; version: string; timestamp: string }>('/health'),
   getDashboard: () => apiClient.request<Dashboard>('/dashboard'),
   getWorkouts: () => apiClient.request<Workout[]>('/workouts'),
   createWorkout: (payload: WorkoutInput) =>
@@ -24,7 +26,17 @@ export const trainingApi = {
     apiClient.request<void>(`/workouts/${workoutId}/exercises/${exerciseId}`, {
       method: 'DELETE',
     }),
-  getExerciseLibrary: () => apiClient.request<ExerciseDefinition[]>('/exercise-library'),
+  getExerciseLibrary: (params: {
+    page?: number; size?: number; query?: string; source?: string; hasVideo?: boolean
+  } = {}) => {
+    const query = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== '') query.set(key, String(value))
+    })
+    return apiClient.request<ExerciseLibraryPage>(`/exercise-library?${query}`)
+  },
+  getExerciseDefinition: (id: number) =>
+    apiClient.request<ExerciseDefinition>(`/exercise-library/${id}`),
   createExerciseDefinition: (payload: ExerciseDefinitionInput) =>
     apiClient.request<ExerciseDefinition>('/exercise-library', { method: 'POST', body: JSON.stringify(payload) }),
 }

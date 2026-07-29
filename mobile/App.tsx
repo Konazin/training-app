@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   KeyboardAvoidingView,
   Platform,
@@ -32,6 +32,7 @@ import { TrainingPlanDayScreen } from './src/features/training-plan/views/Traini
 import { TrainingPlanEditorScreen } from './src/features/training-plan/views/TrainingPlanEditorScreen'
 import { TrainingPlanView } from './src/features/training-plan/views/TrainingPlanView'
 import { WorkoutSessionScreen } from './src/features/workout-session/views/WorkoutSessionScreen'
+import { ExerciseDetailScreen } from './src/features/exercise-library/ExerciseDetailScreen'
 import { ExerciseScreen } from './src/screens/ExerciseScreen'
 import { HomeScreen } from './src/screens/HomeScreen'
 import { HistoryScreen } from './src/screens/HistoryScreen'
@@ -39,6 +40,9 @@ import { LibraryScreen } from './src/screens/LibraryScreen'
 import { MoreScreen } from './src/screens/MoreScreen'
 import { WorkoutsScreen } from './src/screens/WorkoutsScreen'
 import { ThemeProvider, type ThemeColors, useTheme } from './src/theme'
+import { useAppBootstrap } from './src/features/bootstrap/useAppBootstrap'
+import { BootstrapScreen } from './src/features/bootstrap/BootstrapScreen'
+import { AppErrorBoundary } from './src/features/bootstrap/AppErrorBoundary'
 
 const Stack = createNativeStackNavigator<RootStackParamList>()
 const Tabs = createBottomTabNavigator<MainTabParamList>()
@@ -46,9 +50,7 @@ const workoutSessionRepository = createHttpWorkoutSessionRepository(apiClient)
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <TrainingApp />
-    </ThemeProvider>
+    <AppErrorBoundary><ThemeProvider><TrainingApp /></ThemeProvider></AppErrorBoundary>
   )
 }
 
@@ -58,6 +60,7 @@ function TrainingApp() {
   const controller = useTrainingController()
   const trainingPlan = useTrainingPlanController()
   const workoutSession = useWorkoutSessionController(workoutSessionRepository)
+  const bootstrap = useAppBootstrap(controller.refresh, trainingPlan.refresh, workoutSession.refresh)
   const [currentRoute, setCurrentRoute] = useState('MainTabs')
   const message = workoutSession.message || trainingPlan.message || controller.message
   const navigationTheme = useMemo<NavigationTheme>(() => ({
@@ -74,13 +77,9 @@ function TrainingApp() {
     },
   }), [colors, isDark])
 
-  useEffect(() => {
-    void Promise.all([
-      controller.refresh(),
-      trainingPlan.refresh(),
-      workoutSession.refresh(),
-    ])
-  }, [controller.refresh, trainingPlan.refresh, workoutSession.refresh])
+  if (bootstrap.state !== 'ready') {
+    return <BootstrapScreen state={bootstrap.state} message={bootstrap.message} onRetry={() => void bootstrap.retry()} />
+  }
 
   return (
     <SafeAreaProvider>
@@ -149,6 +148,7 @@ function TrainingApp() {
                 />
               )}
             </Stack.Screen>
+            <Stack.Screen name="ExerciseDetail" component={ExerciseDetailScreen} />
             <Stack.Screen name="TrainingPlanEditor">
               {() => (
                 <TrainingPlanEditorScreen

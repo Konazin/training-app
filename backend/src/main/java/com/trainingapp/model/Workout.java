@@ -49,7 +49,7 @@ public class Workout {
     private Integer calories = 0;
 
     @Convert(converter = JsonMapConverter.class)
-    @Column(nullable = false, columnDefinition = "CLOB")
+    @Column(nullable = false, columnDefinition = "TEXT")
     private Map<String, Object> customStats = new LinkedHashMap<>();
 
     @Column(nullable = false, updatable = false)

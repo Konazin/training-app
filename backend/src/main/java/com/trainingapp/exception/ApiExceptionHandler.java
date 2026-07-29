@@ -35,6 +35,12 @@ public class ApiExceptionHandler {
                 .body(new ApiError(400, exception.getMessage(), Map.of(), OffsetDateTime.now()));
     }
 
+    @ExceptionHandler(DomainConflictException.class)
+    public ResponseEntity<ApiError> handleConflict(DomainConflictException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ApiError(409, exception.getMessage(), Map.of(), OffsetDateTime.now()));
+    }
+
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
     public ResponseEntity<ApiError> handleOptimisticLock() {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ApiError(

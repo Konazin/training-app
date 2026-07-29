@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-training}
+      POSTGRES_USER: ${POSTGRES_USER:-training}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-before-beta}
+    volumes:
+      - training_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-training} -d ${POSTGRES_DB:-training}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-training}
+      DATABASE_USERNAME: ${POSTGRES_USER:-training}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-change-me-before-beta}
+      APP_API_TOKEN: ${APP_API_TOKEN:-change-me-before-beta}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      WGER_INTEGRATION_ENABLED: ${WGER_INTEGRATION_ENABLED:-false}
+      WGER_API_BASE_URL: ${WGER_API_BASE_URL:-https://wger.de/api/v2}
+      WGER_LANGUAGE: ${WGER_LANGUAGE:-pt-br}
+      WGER_FALLBACK_LANGUAGE: ${WGER_FALLBACK_LANGUAGE:-en}
+      WGER_REQUEST_TIMEOUT_SECONDS: ${WGER_REQUEST_TIMEOUT_SECONDS:-15}
+      WGER_PAGE_SIZE: ${WGER_PAGE_SIZE:-100}
+      WGER_SYNC_MAX_PAGES: ${WGER_SYNC_MAX_PAGES:-0}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  training_postgres:

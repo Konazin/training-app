@@ -8,11 +8,19 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.OrderBy;
+import jakarta.persistence.FetchType;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
-@Table(name = "exercise_definitions")
+@Table(name = "exercise_definitions", uniqueConstraints = @UniqueConstraint(
+        name = "uk_exercise_definition_source_external", columnNames = {"source", "external_id"}))
 public class ExerciseDefinition {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -38,6 +46,25 @@ public class ExerciseDefinition {
     private String notes = "";
     @Column(length = 500)
     private String mediaUrl = "";
+    @Enumerated(EnumType.STRING) @Column(nullable = false, length = 20, columnDefinition = "varchar(20) default 'SYSTEM'")
+    private ExerciseSource source = ExerciseSource.SYSTEM;
+    @Column(name = "external_id", length = 100)
+    private String externalId;
+    @Column(length = 100)
+    private String externalBaseId;
+    @Column(length = 1000)
+    private String sourceUrl;
+    @Column(length = 200)
+    private String licenseName;
+    @Column(length = 1000)
+    private String licenseUrl;
+    @Column(length = 500)
+    private String author;
+    private OffsetDateTime lastSyncedAt;
+    private OffsetDateTime upstreamUpdatedAt;
+    @OneToMany(mappedBy = "exerciseDefinition", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OrderBy("sortOrder ASC, id ASC")
+    private List<ExerciseMedia> media = new ArrayList<>();
     @Column(nullable = false)
     private boolean unilateral;
     @Column(nullable = false)
@@ -74,6 +101,25 @@ public class ExerciseDefinition {
     public void setNotes(String value) { notes = value; }
     public String getMediaUrl() { return mediaUrl; }
     public void setMediaUrl(String value) { mediaUrl = value; }
+    public ExerciseSource getSource() { return source; }
+    public void setSource(ExerciseSource value) { source = value; }
+    public String getExternalId() { return externalId; }
+    public void setExternalId(String value) { externalId = value; }
+    public String getExternalBaseId() { return externalBaseId; }
+    public void setExternalBaseId(String value) { externalBaseId = value; }
+    public String getSourceUrl() { return sourceUrl; }
+    public void setSourceUrl(String value) { sourceUrl = value; }
+    public String getLicenseName() { return licenseName; }
+    public void setLicenseName(String value) { licenseName = value; }
+    public String getLicenseUrl() { return licenseUrl; }
+    public void setLicenseUrl(String value) { licenseUrl = value; }
+    public String getAuthor() { return author; }
+    public void setAuthor(String value) { author = value; }
+    public OffsetDateTime getLastSyncedAt() { return lastSyncedAt; }
+    public void setLastSyncedAt(OffsetDateTime value) { lastSyncedAt = value; }
+    public OffsetDateTime getUpstreamUpdatedAt() { return upstreamUpdatedAt; }
+    public void setUpstreamUpdatedAt(OffsetDateTime value) { upstreamUpdatedAt = value; }
+    public List<ExerciseMedia> getMedia() { return media; }
     public boolean isUnilateral() { return unilateral; }
     public void setUnilateral(boolean value) { unilateral = value; }
     public boolean isTimed() { return timed; }

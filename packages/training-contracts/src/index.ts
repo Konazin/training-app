@@ -74,6 +74,9 @@ export interface SessionExercise {
   muscleGroup: string
   category: ExerciseCategory
   timed: boolean
+  primaryVideoUrl: string | null
+  primaryImageUrl: string | null
+  attribution: string | null
   sortOrder: number
   plannedSets: number
   plannedMinReps: number

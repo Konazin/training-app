@@ -1,6 +1,7 @@
 package com.trainingapp.dto;
 
 import com.trainingapp.model.ExerciseCategory;
+import com.trainingapp.model.ExerciseSource;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -17,6 +18,16 @@ public record ExerciseDefinitionResponse(
         String instructions,
         String notes,
         String mediaUrl,
+        ExerciseSource source,
+        String externalId,
+        String sourceUrl,
+        String licenseName,
+        String licenseUrl,
+        String author,
+        List<ExerciseMediaResponse> media,
+        boolean hasVideo,
+        String primaryVideoUrl,
+        String primaryImageUrl,
         boolean unilateral,
         boolean timed,
         boolean custom,

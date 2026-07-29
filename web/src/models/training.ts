@@ -90,6 +90,15 @@ export interface ExerciseDefinition {
   instructions: string
   notes: string
   mediaUrl: string
+  source?: 'SYSTEM' | 'CUSTOM' | 'WGER'
+  externalId?: string | null
+  sourceUrl?: string | null
+  licenseName?: string | null
+  licenseUrl?: string | null
+  author?: string | null
+  hasVideo?: boolean
+  primaryVideoUrl?: string | null
+  primaryImageUrl?: string | null
   unilateral: boolean
   timed: boolean
   custom: boolean
@@ -98,7 +107,9 @@ export interface ExerciseDefinition {
   updatedAt: string
 }
 
-export type ExerciseDefinitionInput = Omit<ExerciseDefinition, 'id' | 'custom' | 'archived' | 'createdAt' | 'updatedAt'>
+export type ExerciseDefinitionInput = Omit<ExerciseDefinition,
+  'id' | 'source' | 'externalId' | 'sourceUrl' | 'licenseName' | 'licenseUrl' | 'author' |
+  'hasVideo' | 'primaryVideoUrl' | 'primaryImageUrl' | 'custom' | 'archived' | 'createdAt' | 'updatedAt'>
 
 export interface DayExercise {
   id: number

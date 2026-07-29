@@ -241,6 +241,13 @@ class CompleteTrainingFlowTest {
                         .content(exercise.replace("Remada Única", "remada unica")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Já existe um exercício com este nome"));
+        mockMvc.perform(get("/api/exercise-library")
+                        .param("query", "remada")
+                        .param("source", "CUSTOM")
+                        .param("hasVideo", "false"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].name").value("Remada Única"))
+                .andExpect(jsonPath("$.totalElements").value(1));
     }
 
     @Test
@@ -306,7 +313,7 @@ class CompleteTrainingFlowTest {
         mockMvc.perform(post("/api/sessions")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(sessionRequest(planId, tuesdayId)))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value("Já existe uma sessão ativa"));
 
         long firstId = first.get("id").asLong();

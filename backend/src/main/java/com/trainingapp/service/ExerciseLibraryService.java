@@ -2,10 +2,18 @@ package com.trainingapp.service;
 
 import com.trainingapp.dto.ExerciseDefinitionRequest;
 import com.trainingapp.dto.ExerciseDefinitionResponse;
+import com.trainingapp.dto.ExerciseMediaResponse;
+import com.trainingapp.dto.PageResponse;
 import com.trainingapp.exception.ResourceNotFoundException;
 import com.trainingapp.model.ExerciseDefinition;
+import com.trainingapp.model.ExerciseMedia;
+import com.trainingapp.model.ExerciseMediaType;
+import com.trainingapp.model.ExerciseSource;
 import com.trainingapp.repository.ExerciseDefinitionRepository;
 import jakarta.transaction.Transactional;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.text.Normalizer;
@@ -23,16 +31,38 @@ public class ExerciseLibraryService {
         this.repository = repository;
     }
 
-    public List<ExerciseDefinitionResponse> findAll(String query, String muscle, String equipment, String category, boolean includeArchived) {
-        String normalizedQuery = query == null ? "" : normalize(query);
-        return repository.findAllByOrderByNameAsc().stream()
-                .filter(item -> includeArchived || !item.isArchived())
-                .filter(item -> normalizedQuery.isBlank() || item.getNormalizedName().contains(normalizedQuery))
-                .filter(item -> matches(item.getPrimaryMuscleGroup(), muscle))
-                .filter(item -> matches(item.getEquipment(), equipment))
-                .filter(item -> category == null || category.isBlank() || item.getCategory().name().equalsIgnoreCase(category))
-                .map(this::toResponse)
-                .toList();
+    public PageResponse<ExerciseDefinitionResponse> findAll(
+            int page, int size, String query, String muscle, String equipment, String category,
+            ExerciseSource source, Boolean hasVideo, boolean includeArchived
+    ) {
+        Specification<ExerciseDefinition> spec = (root, ignored, cb) -> includeArchived
+                ? cb.conjunction() : cb.isFalse(root.get("archived"));
+        if (query != null && !query.isBlank()) {
+            spec = spec.and((root, ignored, cb) -> cb.like(root.get("normalizedName"), "%" + normalize(query) + "%"));
+        }
+        if (muscle != null && !muscle.isBlank()) {
+            spec = spec.and((root, ignored, cb) -> cb.like(cb.lower(root.get("primaryMuscleGroup")), "%" + muscle.toLowerCase(Locale.ROOT) + "%"));
+        }
+        if (equipment != null && !equipment.isBlank()) {
+            spec = spec.and((root, ignored, cb) -> cb.like(cb.lower(root.get("equipment")), "%" + equipment.toLowerCase(Locale.ROOT) + "%"));
+        }
+        if (category != null && !category.isBlank()) {
+            spec = spec.and((root, ignored, cb) -> cb.equal(root.get("category"), com.trainingapp.model.ExerciseCategory.valueOf(category.toUpperCase(Locale.ROOT))));
+        }
+        if (source != null) spec = spec.and((root, ignored, cb) -> cb.equal(root.get("source"), source));
+        if (hasVideo != null) {
+            spec = spec.and((root, queryObject, cb) -> {
+                var media = queryObject.subquery(Long.class);
+                var mediaRoot = media.from(ExerciseMedia.class);
+                media.select(cb.literal(1L)).where(
+                        cb.equal(mediaRoot.get("exerciseDefinition"), root),
+                        cb.equal(mediaRoot.get("type"), ExerciseMediaType.VIDEO));
+                return hasVideo ? cb.exists(media) : cb.not(cb.exists(media));
+            });
+        }
+        return PageResponse.from(repository.findAll(spec,
+                        PageRequest.of(Math.max(0, page), Math.min(Math.max(size, 1), 100), Sort.by("name").ascending()))
+                .map(this::toResponse));
     }
 
     public ExerciseDefinitionResponse findById(Long id) { return toResponse(findEntity(id)); }
@@ -46,6 +76,7 @@ public class ExerciseLibraryService {
         apply(exercise, request);
         exercise.setNormalizedName(normalized);
         exercise.setCustom(true);
+        exercise.setSource(ExerciseSource.CUSTOM);
         OffsetDateTime now = OffsetDateTime.now();
         exercise.setCreatedAt(now);
         exercise.setUpdatedAt(now);
@@ -60,6 +91,7 @@ public class ExerciseLibraryService {
                     apply(exercise, request);
                     exercise.setNormalizedName(normalize(request.name()));
                     exercise.setCustom(false);
+                    exercise.setSource(ExerciseSource.SYSTEM);
                     OffsetDateTime now = OffsetDateTime.now();
                     exercise.setCreatedAt(now);
                     exercise.setUpdatedAt(now);
@@ -108,10 +140,6 @@ public class ExerciseLibraryService {
         item.setTimed(request.timed());
     }
 
-    private boolean matches(String value, String filter) {
-        return filter == null || filter.isBlank() || normalize(value).contains(normalize(filter));
-    }
-
     private String clean(String value) { return value == null ? "" : value.trim(); }
 
     public static String normalize(String value) {
@@ -123,10 +151,28 @@ public class ExerciseLibraryService {
     public ExerciseDefinitionResponse toResponse(ExerciseDefinition item) {
         List<String> secondary = item.getSecondaryMuscleGroups().isBlank() ? List.of()
                 : Arrays.stream(item.getSecondaryMuscleGroups().split("\\|")).toList();
+        List<ExerciseMediaResponse> media = item.getMedia().stream().map(this::toMediaResponse).toList();
+        String primaryVideo = primary(item.getMedia(), ExerciseMediaType.VIDEO);
+        String primaryImage = primary(item.getMedia(), ExerciseMediaType.IMAGE);
         return new ExerciseDefinitionResponse(
                 item.getId(), item.getName(), item.getDescription(), item.getPrimaryMuscleGroup(), secondary,
                 item.getEquipment(), item.getCategory(), item.getDifficulty(), item.getInstructions(),
-                item.getNotes(), item.getMediaUrl(), item.isUnilateral(), item.isTimed(), item.isCustom(),
+                item.getNotes(), item.getMediaUrl(), item.getSource(), item.getExternalId(), item.getSourceUrl(),
+                item.getLicenseName(), item.getLicenseUrl(), item.getAuthor(), media, primaryVideo != null,
+                primaryVideo, primaryImage, item.isUnilateral(), item.isTimed(), item.isCustom(),
                 item.isArchived(), item.getCreatedAt(), item.getUpdatedAt());
+    }
+
+    private String primary(List<ExerciseMedia> media, ExerciseMediaType type) {
+        return media.stream().filter(item -> item.getType() == type && item.isMain()).findFirst()
+                .or(() -> media.stream().filter(item -> item.getType() == type).findFirst())
+                .map(ExerciseMedia::getUrl).orElse(null);
+    }
+
+    private ExerciseMediaResponse toMediaResponse(ExerciseMedia item) {
+        return new ExerciseMediaResponse(item.getId(), item.getType(), item.getSource(), item.getUrl(),
+                item.getThumbnailUrl(), item.getMimeType(), item.getWidth(), item.getHeight(),
+                item.getDurationSeconds(), item.isMain(), item.getLicenseName(), item.getLicenseUrl(),
+                item.getAuthor(), item.getSourceUrl());
     }
 }
