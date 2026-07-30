@@ -4,7 +4,7 @@ Este documento substitui o fluxo antigo baseado em IP e backend local.
 
 O Training App não exige `EXPO_PUBLIC_API_URL`, token, computador na rede,
 PostgreSQL ou `usesCleartextTraffic`. O perfil `preview` gera APK interno com
-package `com.konazin.trainingapp`, versão `0.8.1` e `versionCode` 11.
+package `com.konazin.trainingapp`, versão `0.9.0` e `versionCode` 12.
 
 Valide o bundle Android local:
 
@@ -36,18 +36,10 @@ npx eas-cli@latest build --platform android --profile preview \
 ```
 
 O APK baixado fica fora do Git em
-`artifacts/training-app-local-0.8.1.apk`. Registre o SHA-256 antes de instalar.
+`artifacts/training-app-local-0.9.0.apk`. Registre o SHA-256 antes de instalar.
 
-## Estado do candidato de 30/07/2026
+## Estado do candidato 0.9.0
 
-**APK gerado; smoke físico pendente.** O build EAS
-`6779eb3a-435a-4e75-aaf8-949ea57ac320` terminou com o perfil `preview`:
-
-- download: <https://expo.dev/artifacts/eas/FMAK5GV93kQT1iSn0I3DLR21dZoUGwHSmUgqjL7Bk6w.apk>;
-- arquivo local ignorado pelo Git: `artifacts/training-app-local-0.8.1.apk`;
-- tamanho: 89.914.181 bytes;
-- SHA-256: `3d3f0a68a7146d0f6a8b71275b9f7ea248293b7039894573980047608f74ad67`.
-
-O arquivo foi reconhecido como APK e passou na verificação de integridade ZIP.
-Os Marcos 4 e 5 permanecem em validação até a conclusão do roteiro em aparelho
-Android.
+O identificador EAS, URL, tamanho e SHA-256 serão registrados somente depois do
+build e das verificações `file`, `sha256sum` e `unzip -t`. O smoke físico
+permanece separado no roteiro do Marco 6.
