@@ -3,6 +3,7 @@ import type {
   AutomaticBackupInfo,
   AutomaticBackupReason,
   BackupRepository,
+  BackupRestoreResult,
 } from '@training/training-domain'
 import type { AppMetadataRepository } from '@training/training-local-db'
 import { pickBackup, shareBackup } from '../integrations/backupFiles'
@@ -21,6 +22,7 @@ export function useBackupController(
   const [message, setMessage] = useState('')
   const [messageKind, setMessageKind] = useState<'success' | 'warning' | 'error'>('success')
   const [refreshPending, setRefreshPending] = useState(false)
+  const postCommitRetry = useRef<BackupRestoreResult['retryPostCommit'] | null>(null)
   const [automaticBackups, setAutomaticBackups] = useState<AutomaticBackupInfo[]>([])
   const automatic = useMemo(
     () => createAutomaticBackupService(repository, metadata, appVersion),
@@ -77,7 +79,7 @@ export function useBackupController(
   }, [onChanged, refreshBackups])
 
   const runCommitted = useCallback(async (
-    mutation: () => Promise<false | void | { success: string; warning: string }>,
+    mutation: () => Promise<false | void | BackupRestoreResult | { success: string; warning: string }>,
     successMessage: string,
     warningMessage: string,
   ) => {
@@ -86,7 +88,7 @@ export function useBackupController(
     setBusy(true)
     setMessage('')
     try {
-      let result: false | void | { success: string; warning: string }
+      let result: false | void | BackupRestoreResult | { success: string; warning: string }
       try {
         result = await mutation()
       } catch (cause) {
@@ -95,13 +97,18 @@ export function useBackupController(
         return false
       }
       if (result === false) return false
+      const restoreWarning = result && 'postCommitWarning' in result ? result : null
+      postCommitRetry.current = restoreWarning?.retryPostCommit ?? null
       const failedParts = await refreshCommitted()
-      const refreshWarning = failedParts.length > 0
-      setRefreshPending(refreshWarning)
-      setMessageKind(refreshWarning ? 'warning' : 'success')
-      setMessage(refreshWarning
-        ? `${result?.warning ?? warningMessage} Não atualizadas: ${failedParts.join(', ')}.`
-        : result?.success ?? successMessage)
+      const hasWarning = Boolean(restoreWarning) || failedParts.length > 0
+      setRefreshPending(hasWarning)
+      setMessageKind(hasWarning ? 'warning' : 'success')
+      const operationMessage = restoreWarning?.postCommitWarning
+        ?? (result && 'warning' in result ? result.warning : warningMessage)
+      const success = result && 'success' in result ? result.success : successMessage
+      setMessage(hasWarning
+        ? `${operationMessage}${failedParts.length ? ` Não atualizadas: ${failedParts.join(', ')}.` : ''}`
+        : success)
       return true
     } finally {
       busyRef.current = false
@@ -114,13 +121,31 @@ export function useBackupController(
     busyRef.current = true
     setBusy(true)
     try {
+      const retry = postCommitRetry.current
+      let preferenceApplied = true
+      if (retry) {
+        try {
+          preferenceApplied = await retry()
+        } catch {
+          preferenceApplied = false
+        }
+        if (preferenceApplied) postCommitRetry.current = null
+      }
       const failedParts = await refreshCommitted()
-      const success = failedParts.length === 0
+      const success = preferenceApplied && failedParts.length === 0
       setRefreshPending(!success)
       setMessageKind(success ? 'success' : 'warning')
       setMessage(success
-        ? 'Informações atualizadas.'
-        : `Algumas informações ainda não puderam ser atualizadas. Não atualizadas: ${failedParts.join(', ')}.`)
+        ? retry ? 'Preferências e informações atualizadas.' : 'Informações atualizadas.'
+        : [
+          !preferenceApplied
+            ? 'As preferências visuais ainda não puderam ser aplicadas.'
+            : '',
+          failedParts.length
+            ? `Não atualizadas: ${failedParts.join(', ')}.`
+            : '',
+          'Tente novamente.',
+        ].filter(Boolean).join(' '))
       return success
     } finally {
       busyRef.current = false
@@ -148,7 +173,7 @@ export function useBackupController(
       const selected = await pickBackup()
       if (!selected) return false
       await automatic.create('BEFORE_IMPORT')
-      await repository.restore(selected)
+      return repository.restore(selected)
     }, 'Backup restaurado com sucesso.',
     'Backup restaurado, mas algumas informações não puderam ser atualizadas.'),
     eraseAll: () => runCommitted(async () => {
@@ -173,7 +198,7 @@ export function useBackupController(
     'Os dados foram recriados, mas algumas informações não puderam ser atualizadas.'),
     restoreAutomatic: (uri: string) => runCommitted(async () => {
       await automatic.create('BEFORE_IMPORT')
-      await automatic.restore(uri)
+      return automatic.restore(uri)
     }, 'Backup automático restaurado com sucesso.',
     'Backup automático restaurado, mas algumas informações não puderam ser atualizadas.'),
     shareAutomatic: (uri: string) => run(() => automatic.share(uri)),

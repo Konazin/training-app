@@ -59,6 +59,8 @@ migração de `react-test-renderer` para Testing Library é dívida técnica.
 - prévia não persistida e confirmação atômica no AsyncStorage;
 - alto contraste dedicado à sessão;
 - feedback tátil isolado e desativável;
+- prévia de movimento reiniciada ao reativar animações;
+- término do descanso roteado pelo helper tátil central;
 - auditoria dos estados, rótulos, progresso e modais acessíveis.
 
 O Marco 4 permanece em validação até a execução do roteiro em um aparelho ou
@@ -69,12 +71,15 @@ emulador Android com TalkBack, fonte ampliada e redução de movimento.
 - catálogo offline com 40 exercícios originais em português;
 - sincronização transacional e idempotente por slug estável;
 - migration 6 para catálogo, aliases, favoritos e recentes;
-- busca local normalizada, agrupamento, filtros e quatro packs;
+- busca local normalizada, visualização em lista ou por músculo, filtros e
+  quatro packs;
 - biblioteca e seletor com favoritos, recentes e proteção contra toque duplo;
-- mídia resolvida centralmente, placeholders próprios e vídeo sob ação;
+- mídia real diferenciada de placeholders e vídeo sob ação;
 - atribuição externa preservada e notas editáveis separadamente;
 - backup v2 ampliado apenas com campos opcionais;
-- versão mobile 0.8.0, `versionCode` 10.
+- restauração e sincronização do catálogo em uma única transação;
+- testes comportamentais renderizados dos fluxos críticos;
+- candidato mobile 0.8.1, `versionCode` 11.
 
 O Marco 5 permanece em validação até o smoke Android do catálogo, mídia,
 upgrade e backup. O Wger continua manual e não participa do bootstrap.

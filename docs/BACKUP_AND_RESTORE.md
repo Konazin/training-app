@@ -16,7 +16,7 @@ e seus prazos.
 Campos opcionais compatíveis com a v2 guardam preferências visuais, favoritos,
 uso recente e aliases criados pelo usuário. Backups v2 antigos sem esses campos
 usam padrões seguros. O catálogo canônico `BUNDLED` não precisa ser repetido no
-arquivo: ele é sincronizado localmente depois da restauração.
+arquivo: ele é sincronizado na mesma transação da restauração.
 
 Não contém chaves, tokens, arquivos de vídeo, caches ou estado do player.
 
@@ -38,8 +38,7 @@ Faça isso regularmente e antes de desinstalar o app.
 
 ## Importar
 
-Abra **Mais → Importar backup** e selecione um JSON. Antes de alterar o SQLite,
-o app:
+Abra **Mais → Importar backup** e selecione um JSON. O app:
 
 1. lê e parseia o arquivo;
 2. valida `schemaVersion`;
@@ -47,12 +46,16 @@ o app:
 4. garante no máximo uma sessão ativa;
 5. valida o ciclo de vida das fichas na v2;
 6. cria um backup automático do estado atual;
-7. restaura tudo em uma transação;
-8. remove fichas cujo prazo já venceu, preservando sessões e snapshots;
-9. sincroniza novamente o catálogo empacotado e aplica preferências opcionais.
+7. em uma única transação SQLite, apaga os dados atuais, insere o backup,
+   remove fichas vencidas e sincroniza o catálogo empacotado;
+8. depois do commit, aplica as preferências visuais opcionais e atualiza a
+   interface.
 
-JSON inválido não toca no banco. Erros durante a transação fazem rollback.
-Campos opcionais malformados também são rejeitados antes da troca de dados.
+JSON inválido e qualquer erro anterior ao commit mantêm o banco original por
+rollback, inclusive falha ao sincronizar o catálogo. Se apenas a aplicação das
+preferências no AsyncStorage falhar, o banco continua restaurado e o app mostra
+um aviso com **Tentar novamente**. Essa tentativa repete somente as preferências
+e a atualização da interface; nunca restaura nem altera o SQLite outra vez.
 
 ## Backups automáticos
 

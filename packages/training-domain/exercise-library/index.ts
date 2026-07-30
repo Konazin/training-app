@@ -5,6 +5,7 @@ import type {
 import { normalizeName } from '../rules'
 
 export type ExercisePlaceholderKind = 'STRENGTH' | 'MOBILITY' | 'CARDIO' | 'BODYWEIGHT' | 'EQUIPMENT'
+export const BUNDLED_CATALOG_VERSION = 2
 
 export interface BundledExercise extends ExerciseDefinitionInput {
   slug: string

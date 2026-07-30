@@ -7,6 +7,7 @@ export type HapticEvent =
   | 'SESSION_PAUSE'
   | 'SESSION_RESUME'
   | 'SESSION_COMPLETE'
+  | 'REST_TIMER_COMPLETE'
   | 'DESTRUCTIVE_CONFIRM'
 
 export interface HapticsAdapter {
@@ -25,7 +26,7 @@ export async function triggerHaptic(
   if (!enabled) return
   try {
     if (event === 'THEME_SELECT') await adapter.selectionAsync()
-    else if (event === 'SESSION_COMPLETE') {
+    else if (event === 'SESSION_COMPLETE' || event === 'REST_TIMER_COMPLETE') {
       await adapter.notificationAsync(Haptics.NotificationFeedbackType.Success)
     } else if (event === 'DESTRUCTIVE_CONFIRM') {
       await adapter.notificationAsync(Haptics.NotificationFeedbackType.Warning)

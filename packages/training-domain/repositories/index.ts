@@ -94,9 +94,14 @@ export interface SettingsRepository {
   remove(key: string): Promise<void>
 }
 
+export interface BackupRestoreResult {
+  postCommitWarning: string
+  retryPostCommit: () => Promise<boolean>
+}
+
 export interface BackupRepository {
   export(appVersion: string): Promise<TrainingBackup>
-  restore(backup: TrainingBackup): Promise<void>
+  restore(backup: TrainingBackup): Promise<void | BackupRestoreResult>
   reset(): Promise<void>
 }
 

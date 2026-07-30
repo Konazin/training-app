@@ -7,7 +7,6 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  Vibration,
   View,
 } from 'react-native'
 import { useNavigation, usePreventRemove } from '@react-navigation/native'
@@ -109,7 +108,7 @@ export function WorkoutSessionScreen(props: Props) {
   useEffect(() => {
     if (restTimer && !restTimer.paused && remaining === 0 && notifiedTimer.current !== timerKey) {
       notifiedTimer.current = timerKey
-      if (preferences.hapticsEnabled) Vibration.vibrate([0, 180, 80, 180])
+      void triggerHaptic('REST_TIMER_COMPLETE', preferences.hapticsEnabled)
       onSkipRest()
     }
   }, [onSkipRest, preferences.hapticsEnabled, remaining, restTimer, timerKey])

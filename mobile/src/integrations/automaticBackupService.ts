@@ -69,7 +69,7 @@ export function createAutomaticBackupService(
       } catch {
         throw new Error('O backup automático não contém JSON válido.')
       }
-      await repository.restore(backup)
+      return repository.restore(backup)
     },
     async share(uri: string) {
       if (!await Sharing.isAvailableAsync()) throw new Error('Compartilhamento não disponível neste aparelho.')

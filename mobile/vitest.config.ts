@@ -7,6 +7,7 @@ export default defineConfig({
       '**/.eas-inspect/**',
       '**/.expo/**',
       '**/dist/**',
+      '**/*.rntl.test.tsx',
     ],
   },
 })

@@ -961,6 +961,9 @@ describe('SQLite local schema', () => {
     expect((await repositories.exercises.list({ source: 'BUNDLED' }))).toHaveLength(40)
     expect((await repositories.exercises.search('puxador frente'))[0]?.externalId)
       .toBe('puxada_frente_maquina')
+    expect(await repositories.exercises.list({ hasMedia: true })).toMatchObject([
+      { source: 'WGER', name: 'Rosca sem peso' },
+    ])
     expect(await repositories.exercises.list({ muscle: 'Tríceps' })).not.toHaveLength(0)
     expect(await repositories.exercises.list({ equipment: 'Máquina' })).not.toHaveLength(0)
     const pushUp = (await repositories.exercises.list({ source: 'BUNDLED' }))
@@ -1066,6 +1069,33 @@ describe('SQLite local schema', () => {
     await expect(syncBundledCatalog(database, bundledCatalog())).rejects.toThrow('injetada')
     expect(await database.first('SELECT COUNT(*) AS count FROM exercise_definitions')).toEqual({ count: 0 })
     expect(await database.first('SELECT COUNT(*) AS count FROM exercise_catalog_entries')).toEqual({ count: 0 })
+    await database.close()
+  })
+
+  it('reverte toda a restauração quando a sincronização do catálogo falha', async () => {
+    const path = newDatabase()
+    let database = betterDatabase(path)
+    await runMigrations(database)
+    await initializeFirstInstallation(database, bundledSeedData())
+    await syncBundledCatalog(database, bundledCatalog())
+    let repositories = createLocalRepositories(database)
+    const backup = await repositories.backup.export('0.8.0')
+    const original = await repositories.exercises.create({
+      name: 'Estado anterior preservado', description: '', primaryMuscleGroup: 'Teste',
+      secondaryMuscleGroups: [], equipment: 'Sem equipamento', category: 'STRENGTH',
+      difficulty: 'Teste', instructions: '', notes: 'Não apagar',
+      unilateral: false, timed: false,
+    })
+    await database.close()
+
+    database = betterDatabase(path, failOn('INSERT INTO exercise_catalog_entries'))
+    repositories = createLocalRepositories(database)
+    await expect(repositories.backup.restore(backup)).rejects.toThrow('injetada')
+    expect(await repositories.exercises.findById(original.id)).toMatchObject({
+      name: 'Estado anterior preservado',
+      notes: 'Não apagar',
+    })
+    expect(await repositories.exercises.list({ source: 'BUNDLED' })).toHaveLength(40)
     await database.close()
   })
 })

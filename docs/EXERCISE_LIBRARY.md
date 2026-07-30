@@ -32,8 +32,14 @@ relevância prioriza nome exato, prefixo do nome, alias, trecho do nome e, por
 fim, músculo ou equipamento.
 
 Os filtros incluem Todos, Favoritos, Recentes, Com mídia, Peso corporal,
-equipamento, grupo muscular, categoria e fonte. Há também agrupamento por
-músculo e quatro packs definidos por slug:
+equipamento, grupo muscular, categoria e fonte. **Com mídia** considera somente
+imagem ou vídeo real; uma URI `placeholder://` é uma ilustração genérica e não
+entra no filtro. Cartões e seletor diferenciam Imagem, Vídeo, Imagem e vídeo,
+Ilustração genérica e Sem mídia.
+
+O seletor **Lista / Por músculo** alterna entre a lista normal e seções reais
+por músculo principal, sempre reutilizando a mesma busca e os mesmos filtros.
+Há também quatro packs definidos por slug:
 
 - **Começar na academia**;
 - **Treino em casa**;

@@ -2,7 +2,9 @@ import { describe, expect, test } from 'vitest'
 import {
   attributionLabel,
   filterExerciseLibrary,
+  exerciseMediaLabel,
   groupExercisesByMuscle,
+  hasRealExerciseMedia,
   libraryEmptyMessage,
   mergeExercisePages,
   resolveExerciseMedia,
@@ -63,21 +65,31 @@ describe('estado da biblioteca', () => {
 
   test('resolve placeholder, imagem local, vídeo remoto e ausência sem colapsar', () => {
     const placeholder = media({ localUri: 'placeholder://mobility', source: 'BUNDLED' })
-    expect(resolveExerciseMedia(exercise(1, { media: [placeholder] }))).toMatchObject({
+    const illustrated = exercise(1, { media: [placeholder] })
+    expect(resolveExerciseMedia(illustrated)).toMatchObject({
       kind: 'PLACEHOLDER',
       placeholder: 'MOBILITY',
     })
+    expect(hasRealExerciseMedia(illustrated)).toBe(false)
+    expect(exerciseMediaLabel(illustrated)).toBe('Ilustração genérica')
     const image = media({ localUri: 'file:///imagem.png' })
-    expect(resolveExerciseMedia(exercise(2, { media: [image] }))).toMatchObject({
+    const withImage = exercise(2, { media: [image] })
+    expect(resolveExerciseMedia(withImage)).toMatchObject({
       kind: 'IMAGE',
       local: true,
     })
     const video = media({ type: 'VIDEO', localUri: null, remoteUrl: 'https://video.test/a.mp4' })
-    expect(resolveExerciseMedia(exercise(3, { media: [video] }), 'VIDEO')).toMatchObject({
+    const withVideo = exercise(3, { media: [video] })
+    expect(resolveExerciseMedia(withVideo, 'VIDEO')).toMatchObject({
       kind: 'VIDEO',
       local: false,
     })
-    expect(resolveExerciseMedia(exercise(4))).toMatchObject({ kind: 'MISSING' })
+    expect(exerciseMediaLabel(withImage)).toBe('Imagem')
+    expect(exerciseMediaLabel(withVideo)).toBe('Vídeo')
+    expect(exerciseMediaLabel(exercise(4, { media: [image, video] }))).toBe('Imagem e vídeo')
+    expect(exerciseMediaLabel(exercise(5))).toBe('Sem mídia')
+    expect(filterExerciseLibrary([illustrated, withImage], '', { kind: 'MEDIA' }))
+      .toEqual([withImage])
   })
 
   test('diferencia estados vazios', () => {

@@ -42,6 +42,30 @@ export function attributionLabel(metadata: AttributionMetadata) {
     || 'Informação não fornecida pela fonte'
 }
 
+function isRealMediaUri(uri: string | null | undefined) {
+  return Boolean(uri && !uri.startsWith('placeholder://'))
+}
+
+export function hasRealExerciseMedia(exercise: ExerciseDefinition) {
+  return exercise.media.some((media) =>
+    isRealMediaUri(media.localUri) || isRealMediaUri(media.remoteUrl))
+}
+
+export function exerciseMediaLabel(exercise: ExerciseDefinition) {
+  const real = exercise.media.filter((media) =>
+    isRealMediaUri(media.localUri) || isRealMediaUri(media.remoteUrl))
+  const image = real.some((media) => media.type === 'IMAGE')
+  const video = real.some((media) => media.type === 'VIDEO')
+  if (image && video) return 'Imagem e vídeo'
+  if (image) return 'Imagem'
+  if (video) return 'Vídeo'
+  if (exercise.media.some((media) =>
+    media.localUri?.startsWith('placeholder://') || media.remoteUrl?.startsWith('placeholder://'))) {
+    return 'Ilustração genérica'
+  }
+  return 'Sem mídia'
+}
+
 export type LibraryFilter =
   | { kind: 'ALL' }
   | { kind: 'FAVORITES' }
@@ -67,7 +91,7 @@ export function filterExerciseLibrary(
       .sort((first, second) => second.lastUsedAt!.localeCompare(first.lastUsedAt!))
       .slice(0, 20)
   }
-  if (filter.kind === 'MEDIA') filtered = filtered.filter((exercise) => exercise.media.length > 0)
+  if (filter.kind === 'MEDIA') filtered = filtered.filter(hasRealExerciseMedia)
   if (filter.kind === 'BODYWEIGHT') {
     filtered = filtered.filter((exercise) =>
       ['peso corporal', 'sem equipamento'].includes(normalizeName(exercise.equipment)))

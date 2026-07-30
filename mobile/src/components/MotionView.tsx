@@ -17,6 +17,7 @@ export function MotionView({
       progress.setValue(1)
       return
     }
+    progress.setValue(0)
     const animation = Animated.timing(progress, {
       duration: motion.duration,
       toValue: 1,
@@ -32,9 +33,14 @@ export function MotionView({
         style,
         {
           opacity: progress,
-          transform: motion.translate
-            ? [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [motion.translate, 0] }) }]
-            : [],
+          transform: [
+            ...(motion.translate
+              ? [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [motion.translate, 0] }) }]
+              : []),
+            ...(motion.scale !== 1
+              ? [{ scale: progress.interpolate({ inputRange: [0, 1], outputRange: [motion.scale, 1] }) }]
+              : []),
+          ],
         },
       ]}
     >

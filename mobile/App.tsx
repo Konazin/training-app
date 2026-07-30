@@ -53,7 +53,7 @@ import {
 } from './src/controllers/useRefreshUi'
 import { systemBarStyle } from './src/theme/uiContracts'
 import { bundledCatalog } from './src/features/exercise-library/bundledCatalog'
-import { isUiPreferences } from './src/theme/preferences'
+import { isUiPreferences, type UiPreferences } from './src/theme/preferences'
 
 const Stack = createNativeStackNavigator<RootStackParamList>()
 const Tabs = createBottomTabNavigator<MainTabParamList>()
@@ -127,9 +127,14 @@ function LocalApp({
     }),
     restore: async (value) => {
       await repositories.backup.restore(value)
-      await repositories.catalog.sync(bundledCatalog)
       if (value.uiPreferences !== undefined && isUiPreferences(value.uiPreferences)) {
-        await applyImportedPreferences(value.uiPreferences)
+        const applyPreferences = () => applyImportedPreferences(value.uiPreferences as UiPreferences)
+        if (!await applyPreferences()) {
+          return {
+            postCommitWarning: 'O backup foi restaurado, mas as preferências visuais não puderam ser aplicadas.',
+            retryPostCommit: applyPreferences,
+          }
+        }
       }
     },
     reset: async () => {
@@ -370,9 +375,9 @@ function LocalApp({
         actionLabel={notification.source === 'trash' && trash.pendingUndo
           ? 'Desfazer'
           : notification.source === 'backup' && backup.refreshPending
-            ? 'Tentar atualizar'
+            ? 'Tentar novamente'
             : undefined}
-        actionBusyLabel={notification.source === 'backup' ? 'Atualizando…' : 'Desfazendo…'}
+        actionBusyLabel={notification.source === 'backup' ? 'Tentando novamente…' : 'Desfazendo…'}
         onAction={notification.source === 'trash' && trash.pendingUndo
           ? () => trash.undoMoveToTrash(trash.pendingUndo!.token)
           : notification.source === 'backup' && backup.refreshPending

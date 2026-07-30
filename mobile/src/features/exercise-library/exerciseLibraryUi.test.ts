@@ -14,7 +14,9 @@ describe('UI da biblioteca integrada', () => {
     ]) expect(library).toContain(label)
     expect(library).toContain('<SkeletonList')
     expect(library).toContain('accessibilityState={{ selected: exercise.favorite }}')
-    expect(library).toContain("exercise.media.length ? 'Com mídia' : 'Sem mídia'")
+    expect(library).toContain('exerciseMediaLabel(exercise)')
+    expect(library).toContain('<SectionList')
+    expect(library).toContain('Por músculo')
     expect(library).toContain('useTheme()')
   })
 

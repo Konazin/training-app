@@ -6,6 +6,7 @@ import { ThemedTextInput } from '../../../components/ThemedTextInput'
 import { shared, type ThemeColors, useTheme } from '../../../theme'
 import {
   filterExerciseLibrary,
+  exerciseMediaLabel,
   libraryEmptyMessage,
   type LibraryFilter,
 } from '../../exercise-library/libraryState'
@@ -102,7 +103,9 @@ export function ExercisePicker({
           >
             <View style={{ flex: 1 }}>
               <Text style={styles.name}>{item.name}</Text>
-              <Text style={styles.meta}>{item.primaryMuscleGroup} · {item.equipment}</Text>
+              <Text style={styles.meta}>
+                {item.primaryMuscleGroup} · {item.equipment} · {exerciseMediaLabel(item)}
+              </Text>
             </View>
             <Text style={styles.arrow}>→</Text>
           </TouchableOpacity>

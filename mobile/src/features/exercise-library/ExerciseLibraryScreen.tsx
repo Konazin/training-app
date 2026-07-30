@@ -8,6 +8,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  SectionList,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -32,6 +33,7 @@ import { shared, type ThemeColors, useTheme } from '../../theme'
 import { ExercisePlaceholder } from './ExercisePlaceholder'
 import {
   filterExerciseLibrary,
+  exerciseMediaLabel,
   exerciseCategoryLabel,
   groupExercisesByMuscle,
   libraryEmptyMessage,
@@ -59,6 +61,7 @@ export function ExerciseLibraryScreen({
   const styles = createStyles(colors)
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<LibraryFilter>({ kind: 'ALL' })
+  const [viewMode, setViewMode] = useState<'LIST' | 'MUSCLE'>('LIST')
   const [editing, setEditing] = useState<ExerciseDefinition | null | 'new'>(null)
   const filtered = useMemo(() => {
     return filterExerciseLibrary(exercises, query, filter)
@@ -68,63 +71,86 @@ export function ExerciseLibraryScreen({
   const categories = useMemo(() => [...new Set(exercises.map((item) => item.category))].sort(), [exercises])
   const sources = useMemo(() => [...new Set(exercises.map((item) => item.source))].sort(), [exercises])
   const emptyMessage = libraryEmptyMessage(exercises.length, query, filter)
+  const sections = useMemo(() => groupExercisesByMuscle(filtered)
+    .map((group) => ({ title: group.muscle, data: group.exercises })), [filtered])
+  const listHeader = <>
+    <ScreenHeader
+      eyebrow="Catálogo no aparelho"
+      title={'Biblioteca de\nexercícios'}
+      description="Crie, edite e use exercícios sem conexão."
+    />
+    <ThemedTextInput
+      accessibilityLabel="Buscar exercício"
+      value={query}
+      onChangeText={setQuery}
+      placeholder="Nome, músculo ou equipamento"
+      style={styles.search}
+    />
+    <View accessibilityLabel="Modo de visualização" style={styles.filters}>
+      <SelectableChip label="Lista" selected={viewMode === 'LIST'} onPress={() => setViewMode('LIST')} />
+      <SelectableChip label="Por músculo" selected={viewMode === 'MUSCLE'} onPress={() => setViewMode('MUSCLE')} />
+    </View>
+    <View style={styles.filters}>
+      <FilterChip label="Todos" filter={{ kind: 'ALL' }} selected={filter} onSelect={setFilter} />
+      <FilterChip label="Favoritos" filter={{ kind: 'FAVORITES' }} selected={filter} onSelect={setFilter} />
+      <FilterChip label="Recentes" filter={{ kind: 'RECENTS' }} selected={filter} onSelect={setFilter} />
+      <FilterChip label="Com mídia" filter={{ kind: 'MEDIA' }} selected={filter} onSelect={setFilter} />
+      <FilterChip label="Peso corporal" filter={{ kind: 'BODYWEIGHT' }} selected={filter} onSelect={setFilter} />
+    </View>
+    <FilterGroup title="PACOTES">
+      {EXERCISE_PACKS.map((pack) => (
+        <FilterChip key={pack.id} label={pack.name} filter={{ kind: 'PACK', value: pack.id }} selected={filter} onSelect={setFilter} />
+      ))}
+    </FilterGroup>
+    <FilterGroup title="GRUPO MUSCULAR">
+      {muscles.map((group) => (
+        <FilterChip key={group.muscle} label={`${group.muscle} (${group.exercises.length})`} filter={{ kind: 'MUSCLE', value: group.muscle }} selected={filter} onSelect={setFilter} />
+      ))}
+    </FilterGroup>
+    <FilterGroup title="EQUIPAMENTO">
+      {equipment.map((value) => <FilterChip key={value} label={value} filter={{ kind: 'EQUIPMENT', value }} selected={filter} onSelect={setFilter} />)}
+    </FilterGroup>
+    <FilterGroup title="CATEGORIA">
+      {categories.map((value) => <FilterChip key={value} label={exerciseCategoryLabel(value)} filter={{ kind: 'CATEGORY', value }} selected={filter} onSelect={setFilter} />)}
+    </FilterGroup>
+    <FilterGroup title="FONTE">
+      {sources.map((value) => <FilterChip key={value} label={sourceLabel(value)} filter={{ kind: 'SOURCE', value }} selected={filter} onSelect={setFilter} />)}
+    </FilterGroup>
+  </>
+  const empty = loading && !exercises.length
+    ? <SkeletonList />
+    : <Text accessibilityLiveRegion="polite" style={styles.empty}>{emptyMessage}</Text>
+  const renderExercise = ({ item }: { item: ExerciseDefinition }) => <ExerciseCard
+    exercise={item}
+    onEdit={item.custom ? () => setEditing(item) : undefined}
+    onFavorite={() => void onFavorite(item.id, !item.favorite)}
+    onOpen={() => navigation.navigate('ExerciseDetail', { exerciseId: item.id })}
+  />
 
   return (
     <Screen style={styles.screen}>
-      <FlatList
-        contentContainerStyle={styles.content}
-        data={filtered}
-        keyExtractor={(item) => String(item.id)}
-        ListHeaderComponent={<>
-          <ScreenHeader
-            eyebrow="Catálogo no aparelho"
-            title={'Biblioteca de\nexercícios'}
-            description="Crie, edite e use exercícios sem conexão."
-          />
-          <ThemedTextInput
-            accessibilityLabel="Buscar exercício"
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Nome, músculo ou equipamento"
-            style={styles.search}
-          />
-          <View style={styles.filters}>
-            <FilterChip label="Todos" filter={{ kind: 'ALL' }} selected={filter} onSelect={setFilter} />
-            <FilterChip label="Favoritos" filter={{ kind: 'FAVORITES' }} selected={filter} onSelect={setFilter} />
-            <FilterChip label="Recentes" filter={{ kind: 'RECENTS' }} selected={filter} onSelect={setFilter} />
-            <FilterChip label="Com mídia" filter={{ kind: 'MEDIA' }} selected={filter} onSelect={setFilter} />
-            <FilterChip label="Peso corporal" filter={{ kind: 'BODYWEIGHT' }} selected={filter} onSelect={setFilter} />
-          </View>
-          <FilterGroup title="PACOTES">
-            {EXERCISE_PACKS.map((pack) => (
-              <FilterChip key={pack.id} label={pack.name} filter={{ kind: 'PACK', value: pack.id }} selected={filter} onSelect={setFilter} />
-            ))}
-          </FilterGroup>
-          <FilterGroup title="GRUPO MUSCULAR">
-            {muscles.map((group) => (
-              <FilterChip key={group.muscle} label={`${group.muscle} (${group.exercises.length})`} filter={{ kind: 'MUSCLE', value: group.muscle }} selected={filter} onSelect={setFilter} />
-            ))}
-          </FilterGroup>
-          <FilterGroup title="EQUIPAMENTO">
-            {equipment.map((value) => <FilterChip key={value} label={value} filter={{ kind: 'EQUIPMENT', value }} selected={filter} onSelect={setFilter} />)}
-          </FilterGroup>
-          <FilterGroup title="CATEGORIA">
-            {categories.map((value) => <FilterChip key={value} label={exerciseCategoryLabel(value)} filter={{ kind: 'CATEGORY', value }} selected={filter} onSelect={setFilter} />)}
-          </FilterGroup>
-          <FilterGroup title="FONTE">
-            {sources.map((value) => <FilterChip key={value} label={sourceLabel(value)} filter={{ kind: 'SOURCE', value }} selected={filter} onSelect={setFilter} />)}
-          </FilterGroup>
-        </>}
-        ListEmptyComponent={loading && !exercises.length
-          ? <SkeletonList />
-          : <Text accessibilityLiveRegion="polite" style={styles.empty}>{emptyMessage}</Text>}
-        renderItem={({ item }) => <ExerciseCard
-          exercise={item}
-          onEdit={item.custom ? () => setEditing(item) : undefined}
-          onFavorite={() => void onFavorite(item.id, !item.favorite)}
-          onOpen={() => navigation.navigate('ExerciseDetail', { exerciseId: item.id })}
-        />}
-      />
+      {viewMode === 'MUSCLE' ? (
+        <SectionList
+          contentContainerStyle={styles.content}
+          sections={sections}
+          keyExtractor={(item) => String(item.id)}
+          ListHeaderComponent={listHeader}
+          ListEmptyComponent={empty}
+          renderSectionHeader={({ section }) => (
+            <Text accessibilityRole="header" style={styles.muscleHeader}>{section.title}</Text>
+          )}
+          renderItem={renderExercise}
+        />
+      ) : (
+        <FlatList
+          contentContainerStyle={styles.content}
+          data={filtered}
+          keyExtractor={(item) => String(item.id)}
+          ListHeaderComponent={listHeader}
+          ListEmptyComponent={empty}
+          renderItem={renderExercise}
+        />
+      )}
       <TouchableOpacity
         accessibilityLabel="Criar exercício personalizado"
         accessibilityRole="button"
@@ -269,7 +295,7 @@ function ExerciseCard({
         <View style={styles.cardBody}>
           <Text style={styles.name}>{exercise.name}</Text>
           <Text style={styles.meta}>{exercise.primaryMuscleGroup} · {exercise.equipment}</Text>
-          <Text style={styles.source}>{sourceLabel(exercise.source)} · {exercise.media.length ? 'Com mídia' : 'Sem mídia'}</Text>
+          <Text style={styles.source}>{sourceLabel(exercise.source)} · {exerciseMediaLabel(exercise)}</Text>
         </View>
         <Text style={styles.arrow}>›</Text>
       </Pressable>
@@ -364,6 +390,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   pressed: { opacity: 0.72 },
   filterGroup: { marginBottom: 12 },
   filterTitle: { color: colors.textSecondary, fontSize: 12, fontWeight: '900', marginBottom: 6 },
+  muscleHeader: { backgroundColor: colors.background, color: colors.textPrimary, fontSize: 18, fontWeight: '900', paddingBottom: 8, paddingTop: 14 },
   filterScroll: { gap: 8, paddingRight: 12 },
   skeleton: { alignItems: 'center', backgroundColor: colors.surface, borderRadius: 19, flexDirection: 'row', gap: 12, marginBottom: 9, minHeight: 76, padding: 12 },
   skeletonIcon: { backgroundColor: colors.surfaceSecondary, borderRadius: 14, height: 52, width: 52 },

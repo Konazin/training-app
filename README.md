@@ -193,7 +193,9 @@ git diff --check
 npm run test --workspace=training-mobile
 ```
 
-O export Expo valida o bundle; esta etapa não gera APK. Para o teste físico em
-modo avião, use [o roteiro local-only](docs/LOCAL_ONLY_SMOKE_TEST.md).
+O export Expo valida o bundle; esta etapa não gera APK. Para gerar o candidato
+instalável, use [o roteiro do APK local-only](docs/LOCAL_ANDROID_APK.md) e faça
+o teste físico em modo avião com
+[o roteiro local-only](docs/LOCAL_ONLY_SMOKE_TEST.md).
 O roteiro específico desta entrega está em
 [smoke Android dos Marcos 4 e 5](docs/MARCO_4_5_ANDROID_SMOKE.md).

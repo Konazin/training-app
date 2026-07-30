@@ -35,6 +35,9 @@ precisa ser confirmado.
 - **Reduzido** usa somente opacidade curta;
 - **Desativado** remove animação decorativa e transições da pilha.
 
+Ao sair de **Desativado** para um modo animado, a prévia reinicia do começo
+para tornar a mudança perceptível.
+
 O listener do sistema é removido ao desmontar o provider e operações
 assíncronas não atualizam estado depois da desmontagem.
 
@@ -42,9 +45,9 @@ assíncronas não atualizam estado depois da desmontagem.
 
 O `expo-haptics` é acessado por um único helper que respeita **Feedback tátil**.
 Há retorno discreto ao selecionar tema, concluir série, iniciar, pausar ou
-retomar treino, concluir sessão e confirmar ação destrutiva. Falhas do recurso
-nativo não interrompem a ação principal. O bootstrap, renderização e refresh
-automático não disparam feedback.
+retomar treino, terminar o descanso, concluir sessão e confirmar ação
+destrutiva. Falhas do recurso nativo não interrompem a ação principal. O
+bootstrap, renderização e refresh automático não disparam feedback.
 
 ## Alto contraste no treino
 

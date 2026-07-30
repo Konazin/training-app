@@ -1,5 +1,9 @@
 import { DomainError, type BackupRepository, type TrainingBackup } from '@training/training-domain'
 import type { BindValue, SqlDatabase } from '../database'
+import {
+  defaultBundledCatalog,
+  syncBundledCatalogInTransaction,
+} from '../database/catalog'
 import { clearUserData, deleteUserRows } from '../database/installation'
 import type { Row } from '../mappers'
 
@@ -70,8 +74,8 @@ export function createBackupRepository(database: SqlDatabase): BackupRepository 
   return {
     export: (appVersion) => exportBackup(database, appVersion),
     restore: async (backup) => {
-      validateBackup(backup)
       await database.transaction(async (transaction) => {
+        validateBackup(backup)
         await deleteUserRows(transaction)
         await insertRows(transaction, 'exercise_definitions', backup.exercises)
         await insertRows(transaction, 'exercise_aliases', backup.exerciseAliases ?? [])
@@ -95,6 +99,7 @@ export function createBackupRepository(database: SqlDatabase): BackupRepository 
                 AND session.status IN ('IN_PROGRESS','PAUSED')
             )
         `, new Date().toISOString())
+        await syncBundledCatalogInTransaction(transaction, defaultBundledCatalog)
       })
     },
     reset: () => clearUserData(database),

@@ -446,7 +446,14 @@ async function loadExercises(database: SqlDatabase, query: ExerciseLibraryQuery 
     )`)
   }
   if (query.hasMedia) clauses.push(`EXISTS (
-    SELECT 1 FROM exercise_media media WHERE media.exercise_definition_id = definition.id
+    SELECT 1 FROM exercise_media media
+    WHERE media.exercise_definition_id = definition.id
+      AND (
+        (media.local_uri IS NOT NULL AND media.local_uri <> ''
+          AND media.local_uri NOT LIKE 'placeholder://%')
+        OR (media.remote_url IS NOT NULL AND media.remote_url <> ''
+          AND media.remote_url NOT LIKE 'placeholder://%')
+      )
   )`)
   if (query.favorite) clauses.push('favorite.exercise_id IS NOT NULL')
   if (query.recent) clauses.push('recent.exercise_id IS NOT NULL')
