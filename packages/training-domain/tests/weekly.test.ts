@@ -71,6 +71,33 @@ describe('visão semanal', () => {
     expect(overview.plannedTrainingDays).toBe(0)
     expect(overview.progressPercent).toBe(0)
   })
+
+  it('preserva status histórico em descanso sem ultrapassar o progresso planejado', () => {
+    const plan = configuredPlan()
+    for (const day of plan.days) day.restDay = true
+    plan.days[0]!.restDay = false
+    const sessions = [
+      session('COMPLETED', plan, 0, '2026-07-27', 1),
+      session('COMPLETED', plan, 1, '2026-07-28', 2),
+      session('ABANDONED', plan, 2, '2026-07-29', 3),
+    ]
+    const before = structuredClone([plan, sessions])
+    const overview = buildWeeklyTrainingOverview(
+      plan,
+      sessions,
+      null,
+      new Date(2026, 6, 30, 12),
+    )
+    expect(overview.days[1]!.status).toBe('COMPLETED')
+    expect(overview.days[2]!.status).toBe('ABANDONED')
+    expect(overview.plannedTrainingDays).toBe(1)
+    expect(overview.completedTrainingDays).toBe(1)
+    expect(overview.abandonedTrainingDays).toBe(0)
+    expect(overview.completedTrainingDays).toBeLessThanOrEqual(overview.plannedTrainingDays)
+    expect(overview.progressPercent).toBe(100)
+    expect(overview.progressPercent).toBeLessThanOrEqual(100)
+    expect([plan, sessions]).toEqual(before)
+  })
 })
 
 describe('referências de carga', () => {
@@ -88,9 +115,10 @@ describe('referências de carga', () => {
     const ignored = [
       { ...latest, id: 3, status: 'ABANDONED' as const },
       { ...latest, id: 4, planDayId: 999 },
+      { ...latest, id: 5, trainingPlanId: 999 },
     ]
     const before = structuredClone([day, older, latest, ignored])
-    expect(findLatestExerciseLoadReferences(day, [older, ...ignored, latest])).toEqual([
+    expect(findLatestExerciseLoadReferences(plan.id, day, [older, ...ignored, latest])).toEqual([
       expect.objectContaining({ exerciseDefinitionId: 1, load: 20, sessionId: 2 }),
       expect.objectContaining({ exerciseDefinitionId: 2, load: 12, sessionId: 1 }),
       expect.objectContaining({ exerciseDefinitionId: 3, load: 30, sessionId: 2 }),

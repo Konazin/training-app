@@ -57,8 +57,8 @@ export function HomeScreen({
     ? buildWeeklyTrainingOverview(activePlan, sessions, activeSession, now)
     : null
   const todayDay = activePlan?.days.find((day) => day.id === overview?.today.planDayId)
-  const references = todayDay
-    ? findLatestExerciseLoadReferences(todayDay, sessions)
+  const references = activePlan && todayDay
+    ? findLatestExerciseLoadReferences(activePlan.id, todayDay, sessions)
     : []
   const todaySession = overview?.today.sessionId
     ? [activeSession, ...sessions].find((session) => session?.id === overview.today.sessionId) ?? null
@@ -76,6 +76,22 @@ export function HomeScreen({
         description={formatReadableDate(now)}
       />
       {!!warning && <Text accessibilityRole="alert" style={styles.warning}>{warning}</Text>}
+      {!!activeSession && (
+        <Pressable
+          accessibilityLabel={`${activeSession.status === 'PAUSED' ? 'Sessão pausada' : 'Sessão em andamento'}: ${activeSession.workoutName}, ${activeSession.dayName}`}
+          accessibilityRole="button"
+          onPress={onContinueSession}
+          style={({ pressed }) => [styles.activeSession, pressed && styles.pressed]}
+        >
+          <Text style={styles.activeEyebrow}>
+            {activeSession.status === 'PAUSED' ? 'SESSÃO PAUSADA' : 'SESSÃO EM ANDAMENTO'}
+          </Text>
+          <Text style={styles.activeTitle}>{activeSession.workoutName} · {activeSession.dayName}</Text>
+          <Text style={styles.activeAction}>
+            {activeSession.status === 'PAUSED' ? 'Retomar treino' : 'Continuar treino'} →
+          </Text>
+        </Pressable>
+      )}
       {!normalPlans.length ? (
         <EmptyPlan
           title="Nenhuma ficha ativa"
@@ -92,22 +108,6 @@ export function HomeScreen({
         />
       ) : overview ? (
         <>
-          {!!activeSession && (
-            <Pressable
-              accessibilityLabel={`${activeSession.status === 'PAUSED' ? 'Sessão pausada' : 'Sessão em andamento'}: ${activeSession.workoutName}, ${activeSession.dayName}`}
-              accessibilityRole="button"
-              onPress={onContinueSession}
-              style={({ pressed }) => [styles.activeSession, pressed && styles.pressed]}
-            >
-              <Text style={styles.activeEyebrow}>
-                {activeSession.status === 'PAUSED' ? 'SESSÃO PAUSADA' : 'SESSÃO EM ANDAMENTO'}
-              </Text>
-              <Text style={styles.activeTitle}>{activeSession.workoutName} · {activeSession.dayName}</Text>
-              <Text style={styles.activeAction}>
-                {activeSession.status === 'PAUSED' ? 'Retomar treino' : 'Continuar treino'} →
-              </Text>
-            </Pressable>
-          )}
           <TodayWorkoutCard
             plan={activePlan}
             day={overview.today}

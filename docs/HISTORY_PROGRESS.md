@@ -22,8 +22,12 @@ Cada sessão mostra status por texto — **Concluída**, **Não concluída**,
 duração e volume quando maior que zero. O status não depende somente de cor ou
 ícone.
 
-O pull-to-refresh preserva a lista atual durante a atualização e informa falhas
-parciais. Não existe sincronização em nuvem, chamada de rede ou migration nova.
+A semana é recalculada quando a aba ganha foco, quando o aplicativo volta ao
+primeiro plano e depois do pull-to-refresh, mesmo que a lista de sessões não
+tenha mudado. O próprio fluxo de refresh mantém o indicador visível até todas
+as leituras locais terminarem, inclusive com histórico vazio, preserva a lista
+atual e informa falhas parciais. Não existe sincronização em nuvem, chamada de
+rede ou migration nova.
 
 ## Dívida técnica
 

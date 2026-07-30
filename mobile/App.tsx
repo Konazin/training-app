@@ -1,9 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AppState } from 'react-native'
+import { useCallback, useMemo, useRef } from 'react'
 import {
   DefaultTheme,
   NavigationContainer,
-  useFocusEffect,
   type Theme as NavigationTheme,
 } from '@react-navigation/native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
@@ -46,6 +44,11 @@ import { exportDiagnostic } from './src/integrations/backupFiles'
 import { getAppVersion } from './src/config/version'
 import { Toast } from './src/components/Toast'
 import { runRefreshParts, type RefreshAllResult } from './src/controllers/refreshAll'
+import {
+  useLocalCalendarClock,
+  useRefreshOnFocus,
+  useRefreshUi,
+} from './src/controllers/useRefreshUi'
 
 const Stack = createNativeStackNavigator<RootStackParamList>()
 const Tabs = createBottomTabNavigator<MainTabParamList>()
@@ -363,6 +366,7 @@ function MainTabs({
     More: 'ellipsis-horizontal-circle-outline',
   }
   const labels: Record<keyof MainTabParamList, string> = { Today: 'Hoje', Plan: 'Ficha', History: 'Progresso', More: 'Mais' }
+  const { clock, refreshClock } = useLocalCalendarClock()
   const historySessions = useMemo(
     () => workoutSession.activeSession
       ? [
@@ -373,8 +377,8 @@ function MainTabs({
     [workoutSession.activeSession, workoutSession.sessions],
   )
   const historyProgress = useMemo(
-    () => calculateHistoryProgress(historySessions),
-    [historySessions],
+    () => calculateHistoryProgress(historySessions, clock.now),
+    [clock.dateKey, historySessions],
   )
   const onStartToday = useCallback(async (
     planId: number,
@@ -411,14 +415,16 @@ function MainTabs({
         {({ navigation: tabNavigation }) => (
           <TodayTab
             refreshAll={refreshAll}
-            render={(refresh, warning) => (
+            onDateChange={refreshClock}
+            render={({ refresh, refreshing, warning }) => (
               <HomeScreen
                 plans={trainingPlan.trainingPlans}
                 sessions={workoutSession.sessions}
-                loading={controller.loading || trainingPlan.loading || workoutSession.loading}
+                loading={refreshing}
                 activeSession={workoutSession.activeSession}
                 trashCount={trash.count}
                 warning={warning}
+                now={clock.now}
                 onRefresh={() => void refresh()}
                 onCreatePlan={() => navigation.navigate('TrainingPlanEditor')}
                 onOpenPlans={() => tabNavigation.navigate('Plan')}
@@ -457,8 +463,8 @@ function MainTabs({
           <RefreshableHistory
             sessions={historySessions}
             progress={historyProgress}
-            loading={workoutSession.loading}
             onRefresh={refreshAll}
+            onDateChange={refreshClock}
           />
         )}
       </Tabs.Screen>
@@ -488,69 +494,41 @@ function MainTabs({
 
 function TodayTab({
   refreshAll,
+  onDateChange,
   render,
 }: {
   refreshAll: () => Promise<RefreshAllResult>
-  render: (refresh: () => Promise<void>, warning: string) => React.ReactNode
+  onDateChange: () => void
+  render: (state: ReturnType<typeof useRefreshUi>) => React.ReactNode
 }) {
-  const [warning, setWarning] = useState('')
-  const mountedRef = useRef(false)
-  useEffect(() => {
-    mountedRef.current = true
-    return () => { mountedRef.current = false }
-  }, [])
-  const refresh = useCallback(async () => {
-    const result = await refreshAll()
-    if (mountedRef.current) {
-      setWarning(result.success
-        ? ''
-        : `Algumas informações não puderam ser atualizadas: ${result.failedParts.join(', ')}.`)
-    }
-  }, [refreshAll])
-  useFocusEffect(useCallback(() => {
-    void refresh()
-  }, [refresh]))
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void refresh()
-    })
-    return () => subscription.remove()
-  }, [refresh])
-  return render(refresh, warning)
+  const refreshState = useRefreshUi(refreshAll, onDateChange)
+  useRefreshOnFocus(useCallback(() => {
+    onDateChange()
+    void refreshState.refresh()
+  }, [onDateChange, refreshState.refresh]))
+  return render(refreshState)
 }
 
 function RefreshableHistory({
   sessions,
   progress,
-  loading,
   onRefresh,
+  onDateChange,
 }: {
   sessions: Parameters<typeof HistoryScreen>[0]['sessions']
   progress: Parameters<typeof HistoryScreen>[0]['progress']
-  loading: boolean
   onRefresh: () => Promise<RefreshAllResult>
+  onDateChange: () => void
 }) {
-  const [warning, setWarning] = useState('')
-  const mountedRef = useRef(false)
-  useEffect(() => {
-    mountedRef.current = true
-    return () => { mountedRef.current = false }
-  }, [])
-  const refresh = useCallback(async () => {
-    const result = await onRefresh()
-    if (mountedRef.current) {
-      setWarning(result.success
-        ? ''
-        : `Algumas informações não puderam ser atualizadas: ${result.failedParts.join(', ')}.`)
-    }
-  }, [onRefresh])
+  const refreshState = useRefreshUi(onRefresh, onDateChange)
+  useRefreshOnFocus(onDateChange)
   return (
     <HistoryScreen
       sessions={sessions}
       progress={progress}
-      loading={loading}
-      warning={warning}
-      onRefresh={() => void refresh()}
+      loading={refreshState.refreshing}
+      warning={refreshState.warning}
+      onRefresh={() => void refreshState.refresh()}
     />
   )
 }

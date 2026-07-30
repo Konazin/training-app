@@ -170,6 +170,49 @@ describe('Home semanal', () => {
       unmount(view)
     }
   })
+
+  it('mantém sessão ativa ou pausada visível sem ficha ativa e sem duplicar o cartão', async () => {
+    const inactive = plan()
+    inactive.active = false
+    const archived = plan()
+    archived.archived = true
+    const cases = [
+      { plans: [] as TrainingPlan[], status: 'IN_PROGRESS' as const, empty: 'Nenhuma ficha ativa', action: 'Continuar treino' },
+      { plans: [inactive], status: 'IN_PROGRESS' as const, empty: 'Escolha sua ficha ativa', action: 'Continuar treino' },
+      { plans: [archived], status: 'IN_PROGRESS' as const, empty: 'Nenhuma ficha ativa', action: 'Continuar treino' },
+      { plans: [] as TrainingPlan[], status: 'PAUSED' as const, empty: 'Nenhuma ficha ativa', action: 'Retomar treino' },
+    ]
+    for (const testCase of cases) {
+      const current = completedSession(plan(), 20, testCase.status)
+      const props = homeProps(testCase.plans, [], current)
+      const view = await render(HomeScreen, props)
+      const content = text(view)
+      const heading = testCase.status === 'PAUSED' ? 'SESSÃO PAUSADA' : 'SESSÃO EM ANDAMENTO'
+      expect(content.match(new RegExp(heading, 'g'))).toHaveLength(1)
+      expect(content).toContain(testCase.empty)
+      expect(content).not.toContain('Iniciar treino')
+      press(view, testCase.action)
+      expect(props.onContinueSession).toHaveBeenCalledOnce()
+      unmount(view)
+    }
+  })
+
+  it('resume no máximo três atividades de descanso e informa as restantes', async () => {
+    const activePlan = plan()
+    const day = activePlan.days[3]!
+    day.restDay = true
+    day.restActivities = ['Alongamento', 'Caminhada', 'Mobilidade', 'Yoga', 'Respiração']
+      .map((name, index) => ({ id: index + 1, name }) as never)
+    const view = await render(HomeScreen, homeProps([activePlan]))
+    const content = text(view)
+    expect(content).toContain('Alongamento')
+    expect(content).toContain('Caminhada')
+    expect(content).toContain('Mobilidade')
+    expect(content).toMatch(/\+\s*2\s*atividades/)
+    expect(content).not.toContain('Yoga')
+    expect(content).not.toContain('Respiração')
+    unmount(view)
+  })
 })
 
 describe('Histórico e progresso', () => {
@@ -220,10 +263,12 @@ describe('Histórico e progresso', () => {
         totalDurationSeconds: 0,
         totalVolume: 0,
       },
-      loading: false,
+      loading: true,
       onRefresh: vi.fn(),
     })
     expect(text(view)).toContain('Nenhuma sessão registrada')
+    expect(view.root.findByType('ScreenScrollView' as never).props.refreshControl.props.refreshing)
+      .toBe(true)
     expect(formatDuration(45)).toBe('45 s')
     expect(formatDuration(120)).toBe('2 min')
     unmount(view)

@@ -30,7 +30,7 @@ export function HistoryScreen({
   return (
     <ScreenScrollView
       includeBottomInset={false}
-      refreshControl={<RefreshControl refreshing={loading && !!sessions.length} onRefresh={onRefresh} tintColor={colors.ink} />}
+      refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} tintColor={colors.ink} />}
     >
       <ScreenHeader
         eyebrow="Progresso local"

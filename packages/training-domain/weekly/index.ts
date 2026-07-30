@@ -72,9 +72,15 @@ export function buildWeeklyTrainingOverview(
     const planDay = plan.days.find((day) => day.weekday === weekday)
     return buildDay(plan, planDay, weekday, dateKey, todayDateKey, sessions, activeSession)
   })
-  const plannedTrainingDays = days.filter((day) => !day.restDay && day.planDayId !== null).length
-  const completedTrainingDays = days.filter((day) => day.status === 'COMPLETED').length
-  const abandonedTrainingDays = days.filter((day) => day.status === 'ABANDONED').length
+  const isPlannedTrainingDay = (day: WeeklyTrainingDayOverview) =>
+    day.planDayId !== null && !day.restDay
+  const plannedTrainingDays = days.filter(isPlannedTrainingDay).length
+  const completedTrainingDays = days.filter(
+    (day) => isPlannedTrainingDay(day) && day.status === 'COMPLETED',
+  ).length
+  const abandonedTrainingDays = days.filter(
+    (day) => isPlannedTrainingDay(day) && day.status === 'ABANDONED',
+  ).length
   return {
     planId: plan.id,
     planName: plan.name,
@@ -86,20 +92,24 @@ export function buildWeeklyTrainingOverview(
     completedTrainingDays,
     abandonedTrainingDays,
     progressPercent: plannedTrainingDays
-      ? Math.round(completedTrainingDays / plannedTrainingDays * 100)
+      ? Math.min(100, Math.round(completedTrainingDays / plannedTrainingDays * 100))
       : 0,
     today: days.find((day) => day.isToday)!,
   }
 }
 
 export function findLatestExerciseLoadReferences(
+  planId: number,
   day: TrainingPlanDay,
   sessions: readonly WorkoutSession[],
   limit = 3,
 ): ExerciseLoadReference[] {
   if (limit <= 0) return []
   const completed = [...sessions]
-    .filter((session) => session.status === 'COMPLETED' && session.planDayId === day.id)
+    .filter((session) =>
+      session.trainingPlanId === planId
+      && session.planDayId === day.id
+      && session.status === 'COMPLETED')
     .sort((first, second) =>
       `${second.scheduledDate}|${second.completedAt ?? second.startedAt}`
         .localeCompare(`${first.scheduledDate}|${first.completedAt ?? first.startedAt}`))

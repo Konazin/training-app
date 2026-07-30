@@ -60,6 +60,11 @@ export function TodayWorkoutCard({
           {planDay.restActivities.slice(0, 3).map((activity) => (
             <Text key={activity.id} style={styles.listItem}>• {activity.name}</Text>
           ))}
+          {planDay.restActivities.length > 3 && (
+            <Text style={styles.listItem}>
+              +{planDay.restActivities.length - 3} atividades
+            </Text>
+          )}
         </View>
       )}
       {!!references.length && day.status === 'READY' && (
