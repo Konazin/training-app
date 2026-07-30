@@ -1,7 +1,9 @@
 import {
   DomainError,
   activeSessionExists,
+  activeSessionUsesTrainingPlan,
   calculateDashboard,
+  computeTrainingPlanPurgeAt,
   createSessionSnapshot,
   createTrainingPlan,
   duplicateTrainingPlan,
@@ -14,6 +16,7 @@ import {
   reorder,
   resumeWorkoutSession,
   serializeJson,
+  trainingPlanInTrash,
   validateDayExerciseInput,
   validateExercise,
   validateRestActivityInput,
@@ -34,6 +37,7 @@ import {
   type TrainingPlan,
   type TrainingPlanDay,
   type TrainingPlanRepository,
+  type TrainingPlanTrashRepository,
   type WorkoutSession,
   type WorkoutSessionRepository,
 } from '@training/training-domain'
@@ -64,6 +68,7 @@ export interface LocalRepositories {
   plans: TrainingPlanRepository & {
     reorderRestActivities(planId: number, dayId: number, activityIds: number[]): Promise<TrainingPlan>
   }
+  planTrash: TrainingPlanTrashRepository
   sessions: WorkoutSessionRepository
   dashboard: DashboardRepository
   settings: SettingsRepository
@@ -79,10 +84,12 @@ export function createLocalRepositories(database: SqlDatabase): LocalRepositorie
   const exercises = exerciseRepository(database)
   const plans = planRepository(database)
   const sessions = sessionRepository(database)
+  const planTrash = trainingPlanTrashRepository(database)
   return {
     exercises,
     externalExerciseImport: externalExerciseImportRepository(database),
     plans,
+    planTrash,
     sessions,
     dashboard: {
       get: async () => {
@@ -431,11 +438,7 @@ async function loadExercise(database: SqlDatabase, id: number) {
 }
 
 function planRepository(database: SqlDatabase): LocalRepositories['plans'] {
-  const get = async (id: number) => {
-    const plan = await loadPlan(database, id)
-    if (!plan) throw notFound('Ficha')
-    return plan
-  }
+  const get = (id: number) => requireNormalPlan(database, id)
   return {
     list: () => loadPlans(database),
     findById: (id) => loadPlan(database, id),
@@ -462,6 +465,7 @@ function planRepository(database: SqlDatabase): LocalRepositories['plans'] {
       return (await loadPlan(transaction, result.lastInsertRowId))!
     }),
     update: async (id, input) => {
+      await assertNormalPlan(database, id)
       const valid = validateTrainingPlanInput(input)
       const result = await database.run(`
         UPDATE training_plans SET name = ?, description = ?, category = ?, difficulty = ?,
@@ -472,8 +476,7 @@ function planRepository(database: SqlDatabase): LocalRepositories['plans'] {
       return get(id)
     },
     duplicate: (id) => database.transaction(async (transaction) => {
-      const source = await loadPlan(transaction, id)
-      if (!source) throw notFound('Ficha')
+      const source = await requireNormalPlan(transaction, id)
       const draft = duplicateTrainingPlan(source, 0, () => 0, () => 0, () => 0)
       const inserted = await transaction.run(`
         INSERT INTO training_plans(
@@ -506,7 +509,11 @@ function planRepository(database: SqlDatabase): LocalRepositories['plans'] {
       return (await loadPlan(transaction, inserted.lastInsertRowId))!
     }),
     activate: (id) => database.transaction(async (transaction) => {
-      if (!await transaction.first<Row>('SELECT id FROM training_plans WHERE id = ? AND archived = 0', id)) {
+      await assertNormalPlan(transaction, id)
+      if (!await transaction.first<Row>(
+        'SELECT id FROM training_plans WHERE id = ? AND archived = 0 AND deleted_at IS NULL',
+        id,
+      )) {
         throw notFound('Ficha')
       }
       await transaction.run('UPDATE training_plans SET active = 0 WHERE active = 1')
@@ -517,14 +524,17 @@ function planRepository(database: SqlDatabase): LocalRepositories['plans'] {
       return (await loadPlan(transaction, id))!
     }),
     archive: (id, archived = true) => database.transaction(async (transaction) => {
+      await assertNormalPlan(transaction, id)
       const result = await transaction.run(
-        'UPDATE training_plans SET archived = ?, active = 0, updated_at = ? WHERE id = ?',
+        `UPDATE training_plans SET archived = ?, active = 0, updated_at = ?
+         WHERE id = ? AND deleted_at IS NULL`,
         Number(archived), new Date().toISOString(), id,
       )
       if (!result.changes) throw notFound('Ficha')
       return (await loadPlan(transaction, id))!
     }),
     updateDay: async (planId, dayId, input) => {
+      await assertNormalPlan(database, planId)
       const valid = validateTrainingPlanDayInput(input)
       const result = await database.run(`
         UPDATE training_plan_days SET title = ?, description = ?, rest_day = ?,
@@ -536,6 +546,7 @@ function planRepository(database: SqlDatabase): LocalRepositories['plans'] {
       return get(planId)
     },
     addExercise: (planId, dayId, input) => database.transaction(async (transaction) => {
+      await assertNormalPlan(transaction, planId)
       await assertDay(transaction, planId, dayId)
       if (!await transaction.first<Row>('SELECT id FROM exercise_definitions WHERE id = ? AND archived = 0', input.exerciseDefinitionId)) {
         throw notFound('Exercício')
@@ -551,6 +562,8 @@ function planRepository(database: SqlDatabase): LocalRepositories['plans'] {
       return (await loadPlan(transaction, planId))!
     }),
     updateExercise: async (planId, dayId, exerciseId, input) => {
+      await assertNormalPlan(database, planId)
+      await assertDay(database, planId, dayId)
       const valid = validateDayExerciseInput(input)
       const result = await database.run(`
         UPDATE training_day_exercises SET sets = ?, min_reps = ?, max_reps = ?,
@@ -566,6 +579,8 @@ function planRepository(database: SqlDatabase): LocalRepositories['plans'] {
       return get(planId)
     },
     removeExercise: (planId, dayId, exerciseId) => database.transaction(async (transaction) => {
+      await assertNormalPlan(transaction, planId)
+      await assertDay(transaction, planId, dayId)
       const result = await transaction.run(
         'DELETE FROM training_day_exercises WHERE id = ? AND training_plan_day_id = ?',
         exerciseId, dayId,
@@ -575,6 +590,8 @@ function planRepository(database: SqlDatabase): LocalRepositories['plans'] {
       return (await loadPlan(transaction, planId))!
     }),
     reorderExercise: (planId, dayId, exerciseIds) => database.transaction(async (transaction) => {
+      await assertNormalPlan(transaction, planId)
+      await assertDay(transaction, planId, dayId)
       const rows = await transaction.all<{ id: number; sort_order: number }>(
         'SELECT id, sort_order FROM training_day_exercises WHERE training_plan_day_id = ?',
         dayId,
@@ -584,6 +601,7 @@ function planRepository(database: SqlDatabase): LocalRepositories['plans'] {
       return (await loadPlan(transaction, planId))!
     }),
     addRestActivity: (planId, dayId, input) => database.transaction(async (transaction) => {
+      await assertNormalPlan(transaction, planId)
       const valid = validateRestActivityInput(input)
       await assertDay(transaction, planId, dayId)
       const last = await transaction.first<{ value: number }>(
@@ -600,6 +618,8 @@ function planRepository(database: SqlDatabase): LocalRepositories['plans'] {
       return (await loadPlan(transaction, planId))!
     }),
     updateRestActivity: async (planId, dayId, activityId, input) => {
+      await assertNormalPlan(database, planId)
+      await assertDay(database, planId, dayId)
       const valid = validateRestActivityInput(input)
       const result = await database.run(`
         UPDATE rest_activities SET name = ?, description = ?, estimated_duration_minutes = ?,
@@ -610,6 +630,8 @@ function planRepository(database: SqlDatabase): LocalRepositories['plans'] {
       return get(planId)
     },
     removeRestActivity: (planId, dayId, activityId) => database.transaction(async (transaction) => {
+      await assertNormalPlan(transaction, planId)
+      await assertDay(transaction, planId, dayId)
       const result = await transaction.run(
         'DELETE FROM rest_activities WHERE id = ? AND training_plan_day_id = ?',
         activityId, dayId,
@@ -619,6 +641,8 @@ function planRepository(database: SqlDatabase): LocalRepositories['plans'] {
       return (await loadPlan(transaction, planId))!
     }),
     reorderRestActivities: (planId, dayId, activityIds) => database.transaction(async (transaction) => {
+      await assertNormalPlan(transaction, planId)
+      await assertDay(transaction, planId, dayId)
       const rows = await transaction.all<{ id: number; sort_order: number }>(
         'SELECT id, sort_order FROM rest_activities WHERE training_plan_day_id = ?',
         dayId,
@@ -628,6 +652,117 @@ function planRepository(database: SqlDatabase): LocalRepositories['plans'] {
       return (await loadPlan(transaction, planId))!
     }),
   }
+}
+
+function trainingPlanTrashRepository(database: SqlDatabase): TrainingPlanTrashRepository {
+  return {
+    list: async () => {
+      const rows = await database.all<Row>(
+        `SELECT * FROM training_plans
+         WHERE deleted_at IS NOT NULL
+         ORDER BY julianday(purge_at) ASC, julianday(deleted_at) ASC`,
+      )
+      return Promise.all(rows.map((row) => loadPlanFromRow(database, row)))
+    },
+    count: async () => {
+      const row = await database.first<{ value: number }>(
+        'SELECT COUNT(*) AS value FROM training_plans WHERE deleted_at IS NOT NULL',
+      )
+      return row?.value ?? 0
+    },
+    moveToTrash: (planId, requestedDeletedAt) => database.transaction(async (transaction) => {
+      const row = await transaction.first<Row>('SELECT * FROM training_plans WHERE id = ?', planId)
+      if (!row) throw notFound('Ficha')
+      if (row.deleted_at !== null) {
+        throw new DomainError('TRAINING_PLAN_ALREADY_IN_TRASH', 'Esta ficha já está na lixeira.')
+      }
+      await assertNoActiveSessionForPlan(transaction, planId)
+      const deletedAt = requestedDeletedAt ?? new Date().toISOString()
+      const purgeAt = computeTrainingPlanPurgeAt(deletedAt)
+      await transaction.run(`
+        UPDATE training_plans
+        SET active = 0, archived = 0, deleted_at = ?, purge_at = ?, updated_at = ?
+        WHERE id = ?
+      `, deletedAt, purgeAt, deletedAt, planId)
+      return (await loadTrashPlan(transaction, planId))!
+    }),
+    restore: (planId) => database.transaction(async (transaction) => {
+      const result = await transaction.run(`
+        UPDATE training_plans
+        SET active = 0, archived = 0, deleted_at = NULL, purge_at = NULL, updated_at = ?
+        WHERE id = ? AND deleted_at IS NOT NULL
+      `, new Date().toISOString(), planId)
+      if (!result.changes) await throwTrashPlanState(transaction, planId)
+      return requireNormalPlan(transaction, planId)
+    }),
+    deletePermanently: (planId) => database.transaction(async (transaction) => {
+      await requireTrashPlan(transaction, planId)
+      await assertNoActiveSessionForPlan(transaction, planId)
+      await transaction.run('DELETE FROM training_plans WHERE id = ? AND deleted_at IS NOT NULL', planId)
+    }),
+    emptyTrash: () => database.transaction(async (transaction) => {
+      const blocked = await transaction.first<Row>(`
+        SELECT plan.id FROM training_plans plan
+        JOIN workout_sessions session ON session.training_plan_id = plan.id
+        WHERE plan.deleted_at IS NOT NULL AND session.status IN ('IN_PROGRESS','PAUSED')
+        LIMIT 1
+      `)
+      if (blocked) throw activeSessionUsesTrainingPlan()
+      const result = await transaction.run('DELETE FROM training_plans WHERE deleted_at IS NOT NULL')
+      return result.changes
+    }),
+    purgeExpired: (now = new Date().toISOString()) => database.transaction(async (transaction) => {
+      const timestamp = new Date(now)
+      if (Number.isNaN(timestamp.getTime()) || timestamp.toISOString() !== now) {
+        throw new DomainError('INVALID_DATE', 'Data de limpeza inválida.')
+      }
+      const result = await transaction.run(`
+        DELETE FROM training_plans
+        WHERE deleted_at IS NOT NULL AND julianday(purge_at) <= julianday(?)
+          AND NOT EXISTS (
+            SELECT 1 FROM workout_sessions session
+            WHERE session.training_plan_id = training_plans.id
+              AND session.status IN ('IN_PROGRESS','PAUSED')
+          )
+      `, now)
+      return result.changes
+    }),
+  }
+}
+
+async function assertNoActiveSessionForPlan(database: SqlDatabase, planId: number) {
+  if (await database.first<Row>(`
+    SELECT id FROM workout_sessions
+    WHERE training_plan_id = ? AND status IN ('IN_PROGRESS','PAUSED') LIMIT 1
+  `, planId)) throw activeSessionUsesTrainingPlan()
+}
+
+async function assertNormalPlan(database: SqlDatabase, id: number) {
+  const row = await database.first<Row>(
+    'SELECT id, deleted_at FROM training_plans WHERE id = ?',
+    id,
+  )
+  if (!row) throw notFound('Ficha')
+  if (row.deleted_at !== null) throw trainingPlanInTrash()
+}
+
+async function requireNormalPlan(database: SqlDatabase, id: number) {
+  await assertNormalPlan(database, id)
+  return (await loadPlan(database, id))!
+}
+
+async function requireTrashPlan(database: SqlDatabase, id: number) {
+  const plan = await loadTrashPlan(database, id)
+  if (plan) return plan
+  await throwTrashPlanState(database, id)
+  throw notFound('Ficha')
+}
+
+async function throwTrashPlanState(database: SqlDatabase, id: number): Promise<never> {
+  if (await database.first<Row>('SELECT id FROM training_plans WHERE id = ?', id)) {
+    throw new DomainError('TRAINING_PLAN_NOT_IN_TRASH', 'Esta ficha não está na lixeira.')
+  }
+  throw notFound('Ficha')
 }
 
 async function insertDayExercise(
@@ -674,12 +809,26 @@ async function compactOrder(database: SqlDatabase, table: 'training_day_exercise
 }
 
 async function loadPlans(database: SqlDatabase) {
-  const rows = await database.all<Row>('SELECT * FROM training_plans ORDER BY active DESC, updated_at DESC')
+  const rows = await database.all<Row>(
+    `SELECT * FROM training_plans
+     WHERE deleted_at IS NULL ORDER BY active DESC, updated_at DESC`,
+  )
   return Promise.all(rows.map((row) => loadPlanFromRow(database, row)))
 }
 
 async function loadPlan(database: SqlDatabase, id: number) {
-  const row = await database.first<Row>('SELECT * FROM training_plans WHERE id = ?', id)
+  const row = await database.first<Row>(
+    'SELECT * FROM training_plans WHERE id = ? AND deleted_at IS NULL',
+    id,
+  )
+  return row ? loadPlanFromRow(database, row) : null
+}
+
+async function loadTrashPlan(database: SqlDatabase, id: number) {
+  const row = await database.first<Row>(
+    'SELECT * FROM training_plans WHERE id = ? AND deleted_at IS NOT NULL',
+    id,
+  )
   return row ? loadPlanFromRow(database, row) : null
 }
 
@@ -769,9 +918,9 @@ function sessionRepository(database: SqlDatabase): WorkoutSessionRepository {
           if (await transaction.first<Row>('SELECT id FROM workout_sessions WHERE active_slot = 1')) {
             throw activeSessionExists()
           }
-          const plan = await loadPlan(transaction, planId)
+          const plan = await requireNormalPlan(transaction, planId)
           const day = plan?.days.find((candidate) => candidate.id === dayId)
-          if (!plan || !day) throw notFound('Ficha ou dia')
+          if (!day) throw notFound('Ficha ou dia')
           if (day.restDay || !day.exercises.length) {
             throw new DomainError('EMPTY_TRAINING_DAY', 'Configure exercícios antes de iniciar esta sessão.')
           }

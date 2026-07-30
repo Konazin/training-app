@@ -1,4 +1,5 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { AppState } from 'react-native'
 import { DefaultTheme, NavigationContainer, type Theme as NavigationTheme } from '@react-navigation/native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator, type NativeStackNavigationProp } from '@react-navigation/native-stack'
@@ -13,6 +14,7 @@ import { useTrainingController } from './src/controllers/useTrainingController'
 import { useWorkoutSessionController } from './src/controllers/useWorkoutSessionController'
 import { useBackupController } from './src/controllers/useBackupController'
 import { useTrainingPlanController } from './src/features/training-plan/controller/useTrainingPlanController'
+import { useTrainingPlanTrashController } from './src/features/training-plan/controller/useTrainingPlanTrashController'
 import { ArchivedTrainingPlansScreen } from './src/features/training-plan/views/ArchivedTrainingPlansScreen'
 import { DayExerciseEditorScreen } from './src/features/training-plan/views/DayExerciseEditorScreen'
 import { ExercisePickerScreen } from './src/features/training-plan/views/ExercisePickerScreen'
@@ -20,6 +22,7 @@ import { RestActivityEditorScreen } from './src/features/training-plan/views/Res
 import { TrainingPlanDayScreen } from './src/features/training-plan/views/TrainingPlanDayScreen'
 import { TrainingPlanEditorScreen } from './src/features/training-plan/views/TrainingPlanEditorScreen'
 import { TrainingPlanView } from './src/features/training-plan/views/TrainingPlanView'
+import { TrainingPlanTrashScreen } from './src/features/training-plan/views/TrainingPlanTrashScreen'
 import { WorkoutSessionScreen } from './src/features/workout-session/views/WorkoutSessionScreen'
 import { ExerciseDetailScreen } from './src/features/exercise-library/ExerciseDetailScreen'
 import { LibraryScreen } from './src/screens/LibraryScreen'
@@ -88,7 +91,8 @@ function LocalApp({
   const controller = useTrainingController(repositories.exercises, repositories.dashboard)
   const trainingPlan = useTrainingPlanController(repositories.plans, controller.refresh)
   const workoutSession = useWorkoutSessionController(repositories.sessions, controller.refresh)
-  const refreshAll = useCallback(async () => {
+  const trashRefresh = useRef<() => Promise<boolean>>(async () => true)
+  const refreshCore = useCallback(async () => {
     const results = await Promise.all([
       workoutSession.refresh(),
       trainingPlan.refresh(),
@@ -96,11 +100,9 @@ function LocalApp({
     ])
     if (results.some((result) => !result)) throw new Error('Não foi possível recarregar todos os dados locais.')
   }, [controller.refresh, trainingPlan.refresh, workoutSession.refresh])
-  const bootstrap = useAppBootstrap([
-    workoutSession.refresh,
-    trainingPlan.refresh,
-    controller.refresh,
-  ])
+  const refreshAll = useCallback(async () => {
+    await Promise.all([refreshCore(), trashRefresh.current()])
+  }, [refreshCore])
   const backup = useBackupController(
     repositories.backup,
     repositories.metadata,
@@ -108,13 +110,33 @@ function LocalApp({
     () => repositories.maintenance.resetToSeed(seed as SeedData),
     refreshAll,
   )
+  const trash = useTrainingPlanTrashController(
+    repositories.planTrash,
+    () => backup.createAutomaticBackup('BEFORE_EMPTY_TRASH'),
+    refreshCore,
+  )
+  trashRefresh.current = trash.refresh
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void trash.refresh()
+    })
+    return () => subscription.remove()
+  }, [trash.refresh])
+  const bootstrap = useAppBootstrap([
+    workoutSession.refresh,
+    trainingPlan.refresh,
+    controller.refresh,
+    trash.refresh,
+  ])
   const notification = workoutSession.message
-    ? { message: workoutSession.message, kind: 'error' as const }
+    ? { message: workoutSession.message, kind: 'error' as const, source: 'other' as const }
     : trainingPlan.message
-      ? { message: trainingPlan.message, kind: 'error' as const }
+      ? { message: trainingPlan.message, kind: 'error' as const, source: 'other' as const }
       : controller.message
-        ? { message: controller.message, kind: 'error' as const }
-        : { message: backup.message, kind: backup.messageKind }
+        ? { message: controller.message, kind: 'error' as const, source: 'other' as const }
+        : trash.message
+          ? { message: trash.message, kind: trash.messageKind, source: 'trash' as const }
+          : { message: backup.message, kind: backup.messageKind, source: 'other' as const }
   const navigationTheme = useMemo<NavigationTheme>(() => ({
     ...DefaultTheme,
     dark: isDark,
@@ -156,6 +178,7 @@ function LocalApp({
                     trainingPlan={trainingPlan}
                     workoutSession={workoutSession}
                     backup={backup}
+                    trash={trash}
                   />
                 )}
               </Stack.Screen>
@@ -194,6 +217,7 @@ function LocalApp({
                     onActivate={trainingPlan.activate}
                     onDuplicate={trainingPlan.duplicate}
                     onArchive={trainingPlan.archive}
+                    onMoveToTrash={trash.moveToTrash}
                   />
                 )}
               </Stack.Screen>
@@ -226,6 +250,19 @@ function LocalApp({
                     busyKeys={trainingPlan.busyKeys}
                     errors={trainingPlan.errors}
                     onRestore={trainingPlan.archive}
+                  />
+                )}
+              </Stack.Screen>
+              <Stack.Screen name="TrainingPlanTrash">
+                {() => (
+                  <TrainingPlanTrashScreen
+                    plans={trash.plans}
+                    loading={trash.loading}
+                    busy={trash.busy}
+                    onRefresh={trash.refresh}
+                    onRestore={trash.restore}
+                    onDelete={trash.deletePermanently}
+                    onEmpty={trash.emptyTrash}
                   />
                 )}
               </Stack.Screen>
@@ -275,7 +312,15 @@ function LocalApp({
               </Stack.Screen>
             </Stack.Navigator>
       </NavigationContainer>
-      <Toast message={notification.message} kind={notification.kind} />
+      <Toast
+        message={notification.message}
+        kind={notification.kind}
+        notificationId={notification.source === 'trash' ? trash.notificationId : undefined}
+        actionLabel={notification.source === 'trash' && trash.hasUndo ? 'Desfazer' : undefined}
+        onAction={notification.source === 'trash' && trash.hasUndo ? () => void trash.undo() : undefined}
+        duration={notification.source === 'trash' && trash.hasUndo ? 6000 : undefined}
+        onDismiss={notification.source === 'trash' ? trash.dismissMessage : undefined}
+      />
     </>
   )
 }
@@ -286,12 +331,14 @@ function MainTabs({
   trainingPlan,
   workoutSession,
   backup,
+  trash,
 }: {
   navigation: NativeStackNavigationProp<RootStackParamList>
   controller: ReturnType<typeof useTrainingController>
   trainingPlan: ReturnType<typeof useTrainingPlanController>
   workoutSession: ReturnType<typeof useWorkoutSessionController>
   backup: ReturnType<typeof useBackupController>
+  trash: ReturnType<typeof useTrainingPlanTrashController>
 }) {
   const { colors } = useTheme()
   const insets = useSafeAreaInsets()
@@ -357,6 +404,8 @@ function MainTabs({
           <MoreScreen
             busy={backup.busy}
             onLibrary={() => navigation.navigate('Library')}
+            onTrash={() => navigation.navigate('TrainingPlanTrash')}
+            trashCount={trash.count}
             onIntegrations={() => navigation.navigate('Integrations')}
             onExport={() => void backup.exportBackup()}
             onImport={() => void backup.importBackup()}

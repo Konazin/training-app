@@ -10,6 +10,8 @@ export function MoreScreen({
   busy,
   onIntegrations,
   onLibrary,
+  onTrash,
+  trashCount,
   onExport,
   onImport,
   onErase,
@@ -23,6 +25,8 @@ export function MoreScreen({
   busy: boolean
   onIntegrations: () => void
   onLibrary: () => void
+  onTrash: () => void
+  trashCount: number
   onExport: () => void
   onImport: () => void
   onErase: () => void
@@ -70,6 +74,14 @@ export function MoreScreen({
       </View>
       <Text style={styles.section}>CONTEÚDO</Text>
       <MenuItem label="Biblioteca de exercícios" detail="Criar e editar" onPress={onLibrary} disabled={busy} />
+      <MenuItem
+        label="Lixeira de fichas"
+        detail="Restaurar ou excluir definitivamente"
+        onPress={onTrash}
+        disabled={busy}
+        badge={trashCount}
+        accessibilityLabel={`Lixeira de fichas, ${trashCount} ${trashCount === 1 ? 'item' : 'itens'}`}
+      />
       <Text style={styles.section}>INTEGRAÇÕES</Text>
       <MenuItem
         label="Catálogo Wger"
@@ -78,7 +90,7 @@ export function MoreScreen({
         disabled={busy}
       />
       <Text style={styles.section}>BACKUP</Text>
-      <MenuItem label="Exportar backup" detail="training-backup-v1.json" onPress={onExport} disabled={busy} />
+      <MenuItem label="Exportar backup" detail="training-backup-v2.json" onPress={onExport} disabled={busy} />
       <MenuItem label="Importar backup" detail="Validar e restaurar" onPress={onImport} disabled={busy} />
       <Text style={styles.section}>BACKUPS AUTOMÁTICOS</Text>
       {!automaticBackups.length && <Text style={styles.note}>Nenhum backup automático criado.</Text>}
@@ -155,6 +167,7 @@ function reasonLabel(reason: AutomaticBackupInfo['reason']) {
     BEFORE_IMPORT: 'Antes de restaurar',
     BEFORE_ERASE: 'Antes de apagar',
     BEFORE_RESET_SEED: 'Antes de recriar dados iniciais',
+    BEFORE_EMPTY_TRASH: 'Antes de esvaziar a lixeira',
   }[reason]
 }
 
@@ -170,22 +183,33 @@ function MenuItem({
   onPress,
   disabled,
   danger,
+  badge,
+  accessibilityLabel,
 }: {
   label: string
   detail: string
   onPress: () => void
   disabled: boolean
   danger?: boolean
+  badge?: number
+  accessibilityLabel?: string
 }) {
   const { colors } = useTheme()
   const styles = createStyles(colors)
   return (
-    <Pressable accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} style={({ pressed }) => [styles.item, disabled && styles.disabled, pressed && styles.pressed]} onPress={onPress}>
+    <Pressable accessibilityLabel={accessibilityLabel} accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} style={({ pressed }) => [styles.item, disabled && styles.disabled, pressed && styles.pressed]} onPress={onPress}>
       <View style={styles.itemCopy}>
         <Text style={[styles.label, danger && styles.danger]}>{label}</Text>
         <Text style={styles.detail}>{detail}</Text>
       </View>
-      <Text style={styles.arrow}>→</Text>
+      <View style={styles.trailing}>
+        {!!badge && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
+          </View>
+        )}
+        <Text style={styles.arrow}>→</Text>
+      </View>
     </Pressable>
   )
 }
@@ -200,6 +224,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   detail: { ...typography.caption, color: colors.textSecondary, flexShrink: 1, marginTop: 4 },
   danger: { color: colors.danger },
   arrow: { color: colors.gray500, fontSize: 17 },
+  trailing: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+  badge: { alignItems: 'center', backgroundColor: colors.danger, borderRadius: 12, justifyContent: 'center', minHeight: 24, minWidth: 24, paddingHorizontal: 7 },
+  badgeText: { color: colors.onPrimary, fontSize: 12, fontWeight: '900' },
   note: { ...typography.bodySmall, color: colors.textSecondary, marginTop: 18 },
   backup: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 17, borderWidth: 1, marginBottom: 8, padding: 16 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 10 },

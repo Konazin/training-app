@@ -1,1156 +1,994 @@
 Continue o desenvolvimento do repositório `training-app` a partir do commit:
 
-c4bce5b7e19306db2770657dcd4d0887be21ac32
+f0eb7601bbdd1d4dd723fcafa56366d7a074d26f
 
-Esta sprint deve implementar a primeira integração externa real do aplicativo
-local-only: importação explícita de exercícios do catálogo público Wger para o
-SQLite do aparelho.
+Este é o MARCO 1 do novo roadmap do aplicativo:
 
-Também deve corrigir os problemas visuais residuais encontrados na revisão da
-versão 0.2.1.
+CICLO DE VIDA DAS FICHAS E LIXEIRA LOCAL
 
-O aplicativo continua local-only:
+O aplicativo deve continuar:
 
-- nenhuma VPS;
-- nenhum backend próprio;
-- nenhum login obrigatório;
-- nenhuma chamada de rede no bootstrap;
-- nenhuma sincronização silenciosa;
-- nenhum dado de treino enviado para fora;
-- nenhuma dependência de internet após o exercício ser importado, exceto mídia
-  remota que não tenha sido baixada.
+- local-only;
+- offline-first;
+- sem backend obrigatório;
+- sem VPS;
+- sem login;
+- com SQLite como fonte de verdade;
+- com histórico baseado em snapshots;
+- compatível com a integração Wger já implementada.
 
-A rede deve ser usada somente quando o usuário abrir a integração e iniciar uma
-busca ou atualização.
+Trabalhe principalmente em:
 
-Ao final, preparar e gerar o APK preview:
+packages/training-domain/
+packages/training-local-db/
+mobile/
+docs/
 
-- version: 0.3.0
-- android.versionCode: 5
+Não alterar funcionalmente:
 
-==================================================
-1. OBJETIVO DO FLUXO
-==================================================
-
-O usuário deve conseguir:
-
-1. abrir Mais;
-2. abrir Integrações;
-3. escolher Wger;
-4. ler claramente o que será consultado e salvo;
-5. iniciar a consulta;
-6. navegar pelos exercícios retornados;
-7. filtrar e buscar nos resultados;
-8. abrir uma prévia;
-9. selecionar exercícios;
-10. importar os selecionados;
-11. fechar o aplicativo;
-12. abrir em modo avião;
-13. encontrar os exercícios importados na biblioteca;
-14. adicioná-los à ficha;
-15. iniciar e concluir uma sessão com eles.
-
-Nenhuma etapa normal do app deve depender do Wger.
-
-==================================================
-2. ARQUITETURA
-==================================================
-
-Criar package:
-
+backend/
+web/
+umamusume-mobile/
 packages/training-wger/
 
-Estrutura sugerida:
+Não implementar nesta etapa:
 
-packages/training-wger/
-├── client/
-│   ├── WgerClient.ts
-│   ├── WgerHttpError.ts
-│   └── types.ts
-├── mapper/
-│   ├── mapWgerExercise.ts
-│   ├── language.ts
-│   ├── category.ts
-│   └── sanitizeText.ts
-├── provider/
-│   └── WgerExerciseCatalogProvider.ts
-├── fixtures/
-├── tests/
-├── index.ts
-├── package.json
-└── tsconfig.json
-
-Dependências permitidas:
-
-- @training/training-domain;
-- APIs padrão do JavaScript;
-- fetch injetado.
-
-Não depender de:
-
-- React;
-- React Native;
-- Expo;
-- SQLite;
-- backend Spring;
-- Axios;
-- DOMParser;
-- bibliotecas HTML pesadas.
-
-O package deve ser reutilizável e testável em Node.
+- nova Home;
+- templates de ficha;
+- novos temas;
+- animações;
+- catálogo inicial expandido;
+- thumbnails;
+- múltiplos providers;
+- IA;
+- Health Connect;
+- nuvem;
+- novas funcionalidades de treino.
 
 ==================================================
-3. CONTRATOS DO DOMÍNIO
+1. OBJETIVO DO MARCO
 ==================================================
 
-Substituir o placeholder atual:
+Implementar uma lixeira local segura para fichas de treino.
 
-ExternalExerciseCatalogProvider.preview(
-  filters: Record<string, unknown>
-): Promise<ExerciseDefinitionInput[]>
+O ciclo de vida deve distinguir claramente:
 
-por tipos explícitos.
+1. ficha ativa;
+2. ficha inativa;
+3. ficha arquivada;
+4. ficha na lixeira;
+5. ficha apagada permanentemente.
+
+Arquivar e excluir não são a mesma ação.
+
+Arquivar:
+
+- mantém a ficha salva;
+- mantém a ficha fora da seleção principal;
+- permite restauração normal;
+- não inicia contagem para exclusão.
+
+Mover para a lixeira:
+
+- desativa a ficha;
+- remove a ficha das listas normais;
+- inicia retenção de sete dias;
+- permite desfazer e restaurar;
+- resulta em exclusão permanente após a retenção.
+
+==================================================
+2. ROADMAP DO PRODUTO
+==================================================
 
 Criar:
 
-ExternalExerciseCatalogQuery
+docs/PRODUCT_ROADMAP.md
 
-Campos:
+Registrar os seis marcos planejados:
 
-- page;
-- pageSize;
-- language;
-- fallbackLanguage;
-- text;
-- categoryIds;
-- muscleIds;
-- equipmentIds;
-- onlyWithImage;
-- onlyWithVideo.
+1. ciclo de vida das fichas e lixeira;
+2. editor de ficha e templates;
+3. Home semanal limpa;
+4. skins, animações e acessibilidade;
+5. biblioteca inicial e mídia;
+6. providers, inteligência local e release candidate.
 
-Criar:
+No Marco 1, registrar como aprovados:
 
-ExternalExerciseMediaCandidate
+- lixeira com sete dias;
+- badge com quantidade;
+- aviso de expiração;
+- backup antes de esvaziar;
+- lixeira incluída no backup;
+- confirmação reforçada para exclusão permanente.
 
-Campos:
+Registrar que estão adiados:
 
-- type;
-- source;
-- externalId;
-- remoteUrl;
-- thumbnailRemoteUrl;
-- mimeType;
-- width;
-- height;
-- durationSeconds;
-- main;
-- sortOrder;
-- licenseName;
-- licenseUrl;
-- author;
-- sourceUrl.
+- ordenação avançada da lixeira;
+- auditoria detalhada da origem da exclusão.
 
-Criar:
-
-ExternalExerciseCandidate
-
-Campos:
-
-- provider;
-- externalId;
-- name;
-- description;
-- primaryMuscleGroup;
-- secondaryMuscleGroups;
-- equipment;
-- category;
-- difficulty;
-- instructions;
-- unilateral;
-- timed;
-- sourceUrl;
-- licenseName;
-- licenseUrl;
-- author;
-- media;
-- warnings.
-
-Criar:
-
-ExternalExerciseCatalogPage
-
-Campos:
-
-- items;
-- page;
-- pageSize;
-- total;
-- hasNext;
-- hasPrevious;
-- nextCursor opcional.
-
-Interface:
-
-ExternalExerciseCatalogProvider {
-  search(query: ExternalExerciseCatalogQuery):
-    Promise<ExternalExerciseCatalogPage>
-
-  findByExternalId(externalId: string, language?: string):
-    Promise<ExternalExerciseCandidate | null>
-}
-
-Não usar ExerciseDefinitionInput como representação de um exercício externo,
-porque esse tipo não possui origem, externalId, licença ou mídia.
+Não implementar itens dos marcos seguintes.
 
 ==================================================
-4. CONTRATO WGER
+3. MODELO DE DOMÍNIO
 ==================================================
 
-Usar por padrão:
+Adicionar ao modelo TrainingPlan:
 
-https://wger.de/api/v2
+- deletedAt: string | null;
+- purgeAt: string | null.
 
-Consultar o OpenAPI atual antes de implementar:
+Não substituir `active` e `archived` por um enum nesta etapa.
 
-https://wger.de/api/v2/schema
+Regras válidas:
 
-Endpoint principal esperado:
+Ficha normal:
+- deletedAt = null;
+- purgeAt = null.
 
-/exerciseinfo/
+Ficha na lixeira:
+- deletedAt contém timestamp ISO UTC;
+- purgeAt contém timestamp ISO UTC;
+- purgeAt é exatamente sete dias após deletedAt;
+- active = false;
+- archived = false.
 
-Não assumir campos pela memória ou pelo backend Java antigo.
+Ficha arquivada:
+- archived = true;
+- active = false;
+- deletedAt = null;
+- purgeAt = null.
 
-Antes de escrever DTOs:
+Ficha ativa:
+- active = true;
+- archived = false;
+- deletedAt = null;
+- purgeAt = null.
 
-1. baixar ou consultar o OpenAPI;
-2. localizar o schema real de exerciseinfo;
-3. documentar os campos utilizados;
-4. salvar fixtures representativas;
-5. implementar parser defensivo.
+Nunca permitir:
 
-Não consultar o OpenAPI durante o uso normal do aplicativo.
-
-O runtime deve usar apenas endpoints necessários ao catálogo.
-
-==================================================
-5. SEGURANÇA DO CLIENTE
-==================================================
-
-Configuração padrão:
-
-WGER_BASE_URL=https://wger.de/api/v2
-WGER_TIMEOUT_MS=15000
-WGER_PAGE_SIZE=20
-WGER_MAX_PAGE_SIZE=50
-WGER_MAX_PAGES_PER_ACTION=5
-
-Regras:
-
-- somente HTTPS;
-- aceitar apenas origem wger.de nesta versão;
-- não seguir paginação para outro host;
-- validar a URL de `next`;
-- timeout com AbortController;
-- aceitar somente JSON;
-- rejeitar resposta excessivamente grande;
-- não registrar corpo completo da resposta;
-- não registrar dados sensíveis;
-- não usar token;
-- não solicitar chave de API;
-- não enviar fichas, sessões, histórico ou identificadores locais.
-
-Headers:
-
-- Accept: application/json;
-- Accept-Language quando aplicável.
-
-Não inventar User-Agent proibido pelo ambiente React Native.
+- ficha ativa e arquivada;
+- ficha ativa e na lixeira;
+- ficha arquivada e na lixeira;
+- deletedAt sem purgeAt;
+- purgeAt sem deletedAt;
+- purgeAt menor ou igual a deletedAt.
 
 ==================================================
-6. PAGINAÇÃO E ERROS
+4. FUNÇÕES PURAS DE DOMÍNIO
 ==================================================
 
-O cliente deve interpretar:
+Criar funções puras e testáveis:
 
-- count;
-- next;
-- previous;
-- results.
+computeTrainingPlanPurgeAt(
+  deletedAt: Date,
+  retentionDays?: number
+): string
 
-Tratar explicitamente:
+trainingPlanTrashDaysRemaining(
+  purgeAt: string,
+  now?: Date
+): number
 
-- offline;
-- timeout;
-- DNS;
-- HTTP 400;
-- HTTP 404;
-- HTTP 429;
-- HTTP 500–599;
-- JSON inválido;
-- schema incompatível;
-- resposta vazia.
+trainingPlanTrashStatusLabel(
+  purgeAt: string,
+  now?: Date
+): string
 
-Para 429:
+validateTrainingPlanLifecycle(plan): void
 
-- ler Retry-After;
-- mostrar tempo aproximado;
-- não repetir automaticamente.
+A retenção padrão deve ser:
 
-Não implementar retry automático agressivo.
+7 dias exatos, equivalentes a 7 * 24 horas.
 
-Permitir apenas retry manual iniciado pelo usuário.
+Labels esperadas:
 
-==================================================
-7. IDIOMAS
-==================================================
+- mais de um dia:
+  “Será apagada em 5 dias”
 
-Seleção da tradução:
+- um dia:
+  “Será apagada amanhã”
 
-1. pt-br exato;
-2. pt exato;
-3. en exato;
-4. primeira tradução válida.
+- menos de 24 horas:
+  “Será apagada hoje”
 
-Normalizar:
+- vencida:
+  “Pronta para exclusão”
 
-- maiúsculas/minúsculas;
-- hífen e underscore;
-- espaços.
-
-Nunca usar tradução sem nome.
-
-Quando português não existir:
-
-- mostrar indicador “Tradução em inglês”;
-- preservar o idioma original no candidate;
-- não esconder que houve fallback.
-
-Adicionar testes para:
-
-- pt-br;
-- pt;
-- en;
-- fallback;
-- tradução vazia;
-- múltiplas traduções incompletas.
+O cálculo deve ser determinístico e não depender do timezone para comparar
+timestamps UTC.
 
 ==================================================
-8. TEXTO E HTML
+5. MIGRATION SQLITE
 ==================================================
 
-Descrição e instruções vindas do Wger podem conter formatação.
+Não editar migrations 1, 2, 3 ou 4.
 
-Armazenar texto plano sanitizado.
+Criar migration 5:
 
-Suportar ao menos:
+training_plan_trash
 
-- parágrafos;
-- quebras de linha;
-- listas;
-- entidades HTML comuns.
+Adicionar em training_plans:
 
-Remover:
+- deleted_at TEXT;
+- purge_at TEXT.
 
-- tags;
-- scripts;
-- estilos;
-- URLs javascript:;
-- caracteres de controle;
-- espaços repetidos excessivos.
+Adicionar índice:
 
-Não renderizar HTML remoto em WebView.
+training_plan_trash_lookup
 
-==================================================
-9. MAPEAMENTO DE EXERCÍCIOS
-==================================================
+sobre:
 
-Mapear:
+- deleted_at;
+- purge_at.
 
-- ID ou UUID Wger para externalId estável;
-- tradução escolhida para name, description e instructions;
-- músculos para primaryMuscleGroup e secondaryMuscleGroups;
-- equipamentos para equipment;
-- imagens;
-- vídeos;
-- licença;
-- autoria;
-- objeto original;
-- sourceUrl.
+Adicionar índice ou ajuste de consulta para listagem das fichas normais sem
+prejudicar a listagem da lixeira.
 
-Categoria local:
+Quando viável sem reconstrução insegura da tabela, criar triggers que impeçam:
 
-- CARDIO quando explicitamente cardio;
-- MOBILITY quando explicitamente mobilidade;
-- STRETCHING quando explicitamente alongamento;
-- RECOVERY quando explicitamente recuperação;
-- TECHNIQUE quando explicitamente técnica;
-- STRENGTH como fallback para exercícios resistidos.
+- active = 1 com archived = 1;
+- active = 1 com deleted_at preenchido;
+- archived = 1 com deleted_at preenchido;
+- apenas um dos timestamps deleted_at/purge_at preenchido.
 
-Não usar região corporal do Wger como categoria local.
+Caso triggers tornem a migration excessivamente complexa, manter as garantias
+no domínio e repositories, mas documentar a decisão.
 
-Difficulty:
+Não usar `IF NOT EXISTS` para esconder inconsistências do histórico de
+migrations.
 
-- usar valor remoto somente quando existir e for compreensível;
-- caso contrário usar “Não informado”.
+Testar:
 
-Unilateral e timed devem ser inferidos apenas quando o contrato remoto fornecer
-informação confiável.
-
-Não inferir com base apenas no nome.
+- upgrade migration 4 para 5;
+- banco novo migrations 1 a 5;
+- segunda inicialização;
+- checksums imutáveis;
+- dados antigos preservados;
+- fichas existentes recebem deleted_at e purge_at nulos.
 
 ==================================================
-10. MÍDIAS
+6. REPOSITORY DE LIXEIRA
 ==================================================
 
-Importar apenas metadados e URLs.
+Criar interface separada:
 
-Não baixar arquivos nesta sprint.
-
-Rejeitar mídia quando:
-
-- não possui ID externo;
-- URL não é HTTPS;
-- URL está vazia;
-- tipo é desconhecido;
-- largura é negativa;
-- altura é negativa;
-- duração é negativa.
-
-Preservar:
-
-- licença específica da mídia;
-- autor específico;
-- sourceUrl;
-- thumbnail;
-- ordem;
-- mídia principal.
-
-Não usar URL direta do arquivo como sourceUrl quando existir página ou objeto
-original.
-
-Não carregar vídeos:
-
-- durante busca;
-- durante lista;
-- durante bootstrap.
-
-Vídeo só pode carregar após ação explícita na tela de detalhe.
-
-==================================================
-11. REPOSITORY DE IMPORTAÇÃO
-==================================================
-
-Criar interface:
-
-ExternalExerciseImportRepository
+TrainingPlanTrashRepository
 
 Métodos:
 
-previewExisting(candidates):
-  Promise<ExternalExerciseImportPreview[]>
+list(): Promise<TrainingPlan[]>
 
-importSelected(candidates):
-  Promise<ExternalExerciseImportResult>
+count(): Promise<number>
 
-refreshImported(provider):
-  Promise<ExternalExerciseImportResult>
+moveToTrash(
+  planId: number,
+  deletedAt?: Date
+): Promise<TrainingPlan>
 
-Tipos de resultado:
+restore(
+  planId: number
+): Promise<TrainingPlan>
 
-- created;
-- updated;
-- unchanged;
-- skipped;
-- failed;
-- warnings;
-- affectedIds.
+deletePermanently(
+  planId: number
+): Promise<void>
 
-Adicionar ao LocalRepositories:
+emptyTrash(): Promise<number>
 
-externalExerciseImport
+purgeExpired(
+  now?: Date
+): Promise<number>
 
-Não misturar essa operação com create(), que deve continuar criando exercício
-CUSTOM.
+Adicionar ao composition root:
 
-==================================================
-12. UPSERT LOCAL
-==================================================
+repositories.planTrash
 
-Importar Wger com:
-
-source = 'WGER'
-
-Chave lógica:
-
-(source, external_id)
-
-Regras:
-
-- exercício existente mantém o mesmo ID SQLite;
-- referências em fichas continuam válidas;
-- importar novamente não cria duplicata;
-- campos remotos podem ser atualizados;
-- archived local deve ser preservado;
-- exercícios CUSTOM nunca são alterados;
-- exercícios SYSTEM nunca são alterados;
-- notas pessoais locais não devem ser apagadas sem decisão explícita;
-- mídias são atualizadas por source + externalId;
-- IDs de mídia existentes devem ser preservados.
-
-Executar o lote inteiro em transação.
-
-Falha de banco durante o lote:
-
-- rollback completo;
-- nenhum exercício parcial;
-- nenhuma mídia órfã.
+Não misturar operações de lixeira com `BackupRepository.reset()`.
 
 ==================================================
-13. MIGRATION SQLITE
+7. MOVER PARA A LIXEIRA
 ==================================================
 
-Não editar migrations 1, 2 ou 3.
-
-Criar migration 4.
-
-Adicionar índice único parcial de mídia:
-
-CREATE UNIQUE INDEX ... ON exercise_media(source, external_id)
-WHERE external_id IS NOT NULL;
-
-Antes de criar o índice:
-
-- verificar fixtures e testes;
-- garantir que não existam duplicatas introduzidas pelo seed.
-
-Criar também índice de consulta:
-
-exercise_definitions(source, external_id, archived)
-
-Não usar IF NOT EXISTS para esconder histórico inconsistente.
-
-Testar upgrade:
-
-- banco na migration 3;
-- aplicar migration 4;
-- preservar exercícios, fichas, sessões e backups;
-- segunda inicialização;
-- checksum imutável.
-
-==================================================
-14. ATUALIZAÇÃO DE IMPORTADOS
-==================================================
-
-Criar ação:
-
-“Atualizar exercícios importados”
+`moveToTrash` deve executar em transação.
 
 Fluxo:
 
-1. carregar IDs Wger locais;
-2. consultar detalhes atuais;
-3. mostrar quantos serão atualizados;
-4. usuário confirma;
-5. aplicar upsert;
-6. preservar IDs SQLite;
-7. informar criados, atualizados, inalterados e falhas.
+1. buscar ficha;
+2. rejeitar ficha inexistente;
+3. rejeitar ficha já na lixeira;
+4. verificar sessão ativa ou pausada;
+5. caso exista sessão ativa ligada à ficha, bloquear;
+6. calcular deletedAt;
+7. calcular purgeAt em sete dias;
+8. definir active = false;
+9. definir archived = false;
+10. persistir deleted_at e purge_at;
+11. atualizar updated_at;
+12. retornar a ficha alterada.
 
-Não executar automaticamente.
+Erro de domínio sugerido:
 
-Não apagar exercícios locais caso o Wger esteja indisponível.
+ACTIVE_SESSION_USES_TRAINING_PLAN
 
-Caso um item remoto não seja encontrado:
+Mensagem:
 
-- manter item local;
-- registrar aviso;
-- não arquivar silenciosamente.
+“Conclua ou abandone a sessão ativa antes de excluir esta ficha.”
+
+Não abandonar ou concluir sessão automaticamente.
 
 ==================================================
-15. TELA DE INTEGRAÇÕES
+8. LISTAGENS E CONSULTAS
+==================================================
+
+Por padrão, fichas na lixeira não podem aparecer em:
+
+- lista normal de fichas;
+- seletor de ficha;
+- ficha ativa;
+- dashboard;
+- tela de arquivadas;
+- criação de sessão;
+- duplicação;
+- ativação;
+- edição;
+- reordenação;
+- busca normal por ID.
+
+A tela de lixeira deve usar uma consulta explícita que retorna apenas:
+
+deleted_at IS NOT NULL
+
+A tela de arquivadas deve retornar apenas:
+
+archived = 1
+AND deleted_at IS NULL
+
+A listagem normal deve retornar apenas:
+
+archived = 0
+AND deleted_at IS NULL
+
+A ativação deve exigir:
+
+archived = 0
+AND deleted_at IS NULL
+
+O início de sessão deve rejeitar uma ficha na lixeira mesmo que um ID antigo seja
+fornecido diretamente.
+
+==================================================
+9. RESTAURAÇÃO
+==================================================
+
+Ao restaurar uma ficha:
+
+- deletedAt = null;
+- purgeAt = null;
+- active = false;
+- archived = false;
+- updatedAt atualizado.
+
+A ficha volta como inativa.
+
+Não reativar automaticamente, mesmo que fosse ativa antes da exclusão.
+
+Não registrar estado anterior nesta etapa.
+
+Não restaurar fichas já apagadas permanentemente.
+
+==================================================
+10. EXCLUSÃO PERMANENTE
+==================================================
+
+`deletePermanently` deve aceitar apenas fichas que já estejam na lixeira.
+
+Não permitir apagar permanentemente:
+
+- ficha normal;
+- ficha arquivada;
+- ficha ativa;
+- ficha usada por sessão ativa ou pausada.
+
+A exclusão deve:
+
+- apagar training_plan_days por cascade;
+- apagar training_day_exercises por cascade;
+- apagar rest_activities por cascade;
+- preservar workout_sessions;
+- preservar workout_session_exercises;
+- preservar workout_set_logs;
+- preservar nomes e snapshots do histórico.
+
+O histórico não pode depender da existência posterior da ficha.
+
+Adicionar teste explícito:
+
+1. criar ficha;
+2. iniciar e concluir sessão;
+3. mover ficha para lixeira;
+4. excluir permanentemente;
+5. confirmar que o histórico e snapshots continuam legíveis.
+
+==================================================
+11. EXPURGO AUTOMÁTICO
+==================================================
+
+Executar purgeExpired:
+
+- durante o bootstrap local, após migrations e inicialização;
+- ao abrir a tela da lixeira;
+- após restaurar um backup.
+
+O expurgo deve remover apenas fichas onde:
+
+deleted_at IS NOT NULL
+AND purge_at <= now
+
+Não apagar:
+
+- ficha normal;
+- ficha arquivada;
+- ficha ainda dentro dos sete dias;
+- ficha ligada a sessão ativa ou pausada.
+
+O expurgo deve ser transacional.
+
+Não executar serviço em background.
+
+Não adicionar WorkManager, cron job, servidor ou processo externo.
+
+==================================================
+12. BADGE DA LIXEIRA
+==================================================
+
+Na tela Mais, adicionar entrada:
+
+Lixeira de fichas
+
+Exibir badge com a quantidade atual.
+
+Exemplos:
+
+- sem itens: sem badge ou badge oculto;
+- um item: 1;
+- nove itens: 9;
+- mais de 99: 99+.
+
+O badge deve atualizar após:
+
+- mover ficha;
+- desfazer;
+- restaurar;
+- excluir permanentemente;
+- esvaziar;
+- expurgo;
+- restaurar backup.
+
+Acessibilidade:
+
+“Lixeira de fichas, 3 itens”
+
+Não alterar a Home neste marco.
+
+==================================================
+13. TELA DA LIXEIRA
 ==================================================
 
 Criar rota:
 
-Integrations
+TrainingPlanTrash
 
-Na tela Mais, adicionar:
+Criar tela:
 
-INTEGRAÇÕES
-- Catálogo Wger
+TrainingPlanTrashScreen
 
-Detalhes:
+Cada card deve mostrar:
 
-“Busca exercícios públicos e salva uma cópia no aparelho.”
-
-Não colocar a ação de rede diretamente no bootstrap ou na Home.
-
-==================================================
-16. TELA WGER
-==================================================
-
-Criar:
-
-WgerIntegrationScreen
+- nome da ficha;
+- categoria;
+- dificuldade;
+- data da exclusão;
+- aviso de tempo restante;
+- Restaurar;
+- Excluir permanentemente.
 
 Estados:
 
-- explicação;
-- pronto;
 - carregando;
-- resultados;
-- importando;
-- sucesso;
-- parcial;
+- vazia;
+- com itens;
 - erro;
-- offline.
+- expurgando;
+- restaurando;
+- excluindo;
+- esvaziando.
 
-No primeiro uso, mostrar:
+Estado vazio:
 
-- o app fará requisições GET ao Wger;
-- nenhum treino será enviado;
-- exercícios escolhidos serão salvos no aparelho;
-- imagens e vídeos podem depender de internet;
-- cada item mantém licença e atribuição;
-- o usuário controla quando consultar e importar.
+“Não há fichas na lixeira.”
 
-Botão principal:
+Descrição:
 
-“Buscar exercícios”
+“As fichas excluídas ficam aqui por sete dias antes da remoção permanente.”
 
-Filtros iniciais:
+Adicionar ação:
 
-- texto;
-- somente com imagem;
-- somente com vídeo;
-- idioma;
-- quantidade por página.
+Esvaziar lixeira
 
-Não mostrar filtros remotos que o OpenAPI não suporte.
+Mostrar apenas quando houver pelo menos uma ficha.
 
-Busca textual pode ser local sobre os resultados carregados caso o endpoint não
-ofereça busca textual oficial.
+Não implementar ordenação avançada neste marco.
 
-==================================================
-17. RESULTADOS E SELEÇÃO
-==================================================
+Ordenar inicialmente por:
 
-Cada resultado deve mostrar:
+purge_at ASC
 
-- checkbox;
-- nome;
-- músculo principal;
-- equipamento;
-- categoria mapeada;
-- idioma;
-- indicador de imagem;
-- indicador de vídeo;
-- origem Wger;
-- aviso de item já importado.
+ou seja, fichas próximas de expirar primeiro.
 
-Ações:
-
-- selecionar;
-- selecionar página;
-- limpar seleção;
-- abrir detalhes;
-- importar selecionados;
-- próxima página;
-- página anterior.
-
-Não importar automaticamente ao marcar.
-
-Não selecionar todos os resultados globais sem o usuário saber quantos serão
-importados.
+Essa ordenação básica é necessária para segurança e não constitui o sistema
+avançado adiado.
 
 ==================================================
-18. PRÉ-VISUALIZAÇÃO
+14. AVISO DE EXPIRAÇÃO
 ==================================================
 
-Tela ou modal deve mostrar:
+Exibir labels usando a função pura do domínio.
 
-- nome;
-- descrição;
-- instruções;
-- músculos;
-- equipamentos;
-- categoria local;
-- mídia principal;
-- autor;
-- licença;
-- fonte original;
-- avisos do mapper.
+Estilos:
 
-Não reproduzir vídeo automaticamente.
+- mais de 2 dias: texto secundário;
+- 2 dias ou menos: warning;
+- pronta para exclusão: danger.
 
-Permitir editar antes da importação apenas:
+Não depender apenas da cor.
 
-- categoria local;
-- dificuldade;
-- músculo principal;
-- equipamento.
+Usar também texto explícito.
 
-Não permitir alterar:
+Exemplo:
 
-- externalId;
-- origem;
-- licença;
-- autoria;
-- URLs da fonte.
+“Será apagada amanhã”
+
+Não atualizar a tela a cada segundo.
+
+Atualizar ao:
+
+- abrir tela;
+- voltar do background;
+- restaurar;
+- excluir;
+- realizar pull-to-refresh.
 
 ==================================================
-19. EXPERIÊNCIA OFFLINE
+15. DESFAZER EXCLUSÃO
 ==================================================
 
-Em modo avião:
+Depois de mover uma ficha para a lixeira:
 
-- botão Wger permanece visível;
-- tocar mostra mensagem clara;
-- banco local não é modificado;
-- biblioteca local continua funcionando;
-- fichas e sessões continuam funcionando;
-- exercícios anteriormente importados continuam visíveis;
-- vídeos remotos mostram indisponibilidade sem bloquear treino.
+- voltar para a tela anterior;
+- mostrar Snackbar global;
+- mensagem:
+  “Ficha movida para a lixeira.”
+- ação:
+  “Desfazer”
 
-Não usar a falha externa como erro global do aplicativo.
+A ação Desfazer deve restaurar a ficha.
+
+Como a restauração sempre volta inativa, desfazer também retorna a ficha como
+inativa.
+
+Estender o componente Toast/Snackbar atual para aceitar opcionalmente:
+
+- actionLabel;
+- onAction;
+- duração configurável.
+
+Requisitos:
+
+- ação acessível;
+- ação com touch target mínimo;
+- não cobrir tab bar;
+- não cobrir teclado;
+- não armazenar callback no domínio ou SQLite;
+- limpar a ação ao expirar;
+- evitar executar duas vezes.
+
+Duração recomendada para Snackbar com ação:
+
+6 segundos.
+
+Se o desfazer falhar, mostrar erro normal e manter a ficha na lixeira.
 
 ==================================================
-20. CORRIGIR INPUTS VISUAIS RESTANTES
+16. EDITOR DA FICHA
 ==================================================
 
-Criar componente:
+No TrainingPlanEditorScreen, manter:
 
-ThemedTextInput
+- Salvar;
+- Ativar;
+- Duplicar;
+- Arquivar.
+
+Adicionar seção visual separada:
+
+ZONA DE PERIGO
+
+Conteúdo:
+
+“Mover ficha para a lixeira”
+
+Descrição:
+
+“Ela poderá ser restaurada durante sete dias.”
+
+A ação deve:
+
+- exigir que não existam alterações não salvas;
+- pedir confirmação;
+- chamar moveToTrash;
+- navegar para trás quando concluída;
+- mostrar Snackbar com Desfazer.
+
+Não adicionar ainda:
+
+- dropdown de categoria;
+- dropdown de dificuldade;
+- templates;
+- nova organização completa do editor.
+
+Esses itens pertencem ao Marco 2.
+
+==================================================
+17. CONFIRMAÇÃO REFORÇADA
+==================================================
+
+Mover para a lixeira:
+
+- confirmação simples;
+- informar retenção de sete dias;
+- não usar linguagem de exclusão permanente.
+
+Excluir uma ficha permanentemente:
+
+- abrir confirmação específica;
+- mostrar o nome da ficha;
+- explicar que histórico será preservado;
+- explicar que a programação da ficha não poderá ser recuperada;
+- usar ação destructive com texto:
+  “Excluir permanentemente”
+
+Esvaziar lixeira:
+
+- usar modal de confirmação reforçada;
+- mostrar quantidade de fichas;
+- informar que um backup será criado;
+- exigir digitação da palavra:
+  ESVAZIAR
+
+A comparação deve:
+
+- ignorar espaços externos;
+- aceitar maiúsculas/minúsculas;
+- não aceitar texto parcial.
+
+Não usar o nome da ficha como confirmação em exclusão individual, porque isso
+torna a operação excessivamente incômoda no celular.
+
+==================================================
+18. BACKUP ANTES DE ESVAZIAR
+==================================================
+
+Adicionar motivo:
+
+BEFORE_EMPTY_TRASH
+
+ao tipo AutomaticBackupReason.
+
+Antes de esvaziar a lixeira:
+
+1. exportar backup automático;
+2. persistir metadados do backup;
+3. confirmar que o arquivo foi criado;
+4. somente então executar emptyTrash.
+
+Caso o backup falhe:
+
+- não esvaziar;
+- mostrar erro;
+- manter todos os dados;
+- não executar exclusão parcial.
+
+Após sucesso:
+
+“Backup de segurança criado e lixeira esvaziada.”
+
+Não criar backup automático antes do expurgo normal de fichas já vencidas.
+
+A retenção de sete dias já é a proteção para esse fluxo.
+
+==================================================
+19. BACKUP COM LIXEIRA
+==================================================
+
+Atualizar o formato para:
+
+training-backup-v2.json
+
+Definir:
+
+schemaVersion: 2
+
+Adicionar aos registros de trainingPlans:
+
+- deleted_at;
+- purge_at.
+
+O backup deve incluir:
+
+- fichas normais;
+- fichas arquivadas;
+- fichas na lixeira;
+- dias e exercícios de todas elas;
+- deletedAt original;
+- purgeAt original.
+
+Não incluir:
+
+- callbacks de Snackbar;
+- estado transitório de desfazer;
+- contador derivado;
+- labels de expiração calculadas.
+
+Manter compatibilidade de leitura com schemaVersion 1.
+
+Ao importar backup v1:
+
+- deleted_at = null;
+- purge_at = null;
+- preservar todo o restante.
+
+Ao importar backup v2, validar:
+
+- os timestamps são ISO UTC;
+- ambos são nulos ou ambos preenchidos;
+- purge_at > deleted_at;
+- ficha na lixeira tem active = 0;
+- ficha na lixeira tem archived = 0;
+- apenas uma ficha normal pode estar ativa;
+- ficha ativa não pode estar na lixeira;
+- ficha arquivada não pode estar na lixeira.
+
+Não exportar app_metadata.
+
+==================================================
+20. RESTAURAÇÃO DE BACKUP
+==================================================
+
+A restauração deve continuar transacional.
+
+Fluxo:
+
+1. validar backup completo;
+2. converter backup v1 para representação v2;
+3. criar backup de segurança do banco atual;
+4. restaurar em transação;
+5. executar purgeExpired;
+6. atualizar controllers;
+7. atualizar badge da lixeira.
+
+Se a restauração falhar:
+
+- rollback integral;
+- manter banco anterior;
+- manter lixeira anterior;
+- não apagar backup de segurança.
+
+Adicionar testes para:
+
+- importar v1;
+- importar v2;
+- importar v2 com ficha na lixeira;
+- importar v2 com timestamps inconsistentes;
+- rollback;
+- backup contendo ficha expirada;
+- histórico preservado.
+
+==================================================
+21. CONTROLLER
+==================================================
+
+Criar hook separado:
+
+useTrainingPlanTrashController
 
 Responsabilidades:
 
-- cursorColor;
-- selectionColor;
-- placeholder;
-- foco;
-- erro;
-- disabled;
-- tamanho mínimo;
-- acessibilidade.
-
-Migrar todos os TextInput avulsos, incluindo:
-
-- busca da biblioteca;
-- busca do ExercisePicker;
-- busca Wger;
-- campos da sessão;
-- campos de série;
-- campos dos modais.
-
-Nenhum TextInput escuro deve depender das cores padrão do Android.
-
-==================================================
-21. CORRIGIR TOAST
-==================================================
-
-O Toast atual não pode cobrir o ScreenHeader.
-
-Escolher uma abordagem:
-
-- snackbar inferior acima da tab bar;
-- ou container de layout que reserve espaço.
-
-Preferir snackbar inferior.
-
-Considerar:
-
-- safe area inferior;
-- altura da tab bar;
-- teclado;
-- tela Session sem tab bar;
-- modal.
-
-Suportar tipos:
-
-- info;
-- success;
-- warning;
-- error.
-
-A origem da mensagem deve informar o tipo correto.
-
-Não tratar erro como info.
-
-==================================================
-22. MODAIS E SAFE AREA
-==================================================
-
-Corrigir o modal de exercício e novos modais Wger.
-
-Todos devem possuir:
-
-- SafeAreaView ou insets explícitos;
-- KeyboardAvoidingView;
-- conteúdo rolável;
-- padding inferior real;
-- botão fechar acessível;
-- suporte a tela pequena;
-- suporte a teclado aberto.
-
-Nenhum botão pode ficar escondido atrás da barra gestual.
-
-==================================================
-23. CONTRASTE RESIDUAL
-==================================================
-
-Corrigir:
-
-- setas de reordenação sem cor de tema;
-- chip pressionado com texto incompatível;
-- textos pequenos usando gray400 no tema claro;
-- nomes de ficha com apenas 12 px;
-- nomes de exercício com apenas 13 px.
-
-Mínimos:
-
-- nomes de exercícios: 16 px;
-- nomes de fichas: 15 px;
-- metadados principais: 14 px.
-
-Adicionar testes de contraste para:
-
-- chip pressionado;
-- gray400 ou seu substituto;
-- botões de reordenação;
-- Snackbar;
-- estados offline, erro e sucesso.
-
-==================================================
-24. CONTROLLER DA INTEGRAÇÃO
-==================================================
-
-Criar hook:
-
-useWgerIntegrationController
-
-Responsabilidades:
-
-- query;
-- página;
-- resultados;
-- seleção;
-- preview;
-- carregamento;
-- cancelamento;
-- importação;
-- atualização;
+- carregar itens;
+- carregar contador;
+- mover para lixeira;
+- restaurar;
+- excluir permanentemente;
+- esvaziar;
+- expurgar;
+- controlar loading e busy keys;
 - mensagens;
-- erros.
+- Snackbar com Desfazer;
+- sincronizar demais controllers.
 
-Cancelar requisição quando:
+Não esconder repository em singleton global.
 
-- usuário sai da tela;
-- inicia nova busca;
-- altera página antes da resposta;
-- fecha o app.
+Injetar explicitamente:
 
-Evitar resposta antiga substituindo uma busca nova.
+- TrainingPlanTrashRepository;
+- função para criar backup automático;
+- callback de refresh das fichas;
+- callback de refresh do dashboard;
+- callback de refresh da lixeira.
 
-Usar request ID ou AbortController.
-
-==================================================
-25. PRIVACIDADE
-==================================================
-
-Nenhum dado local deve ser enviado.
-
-Adicionar teste garantindo que a URL e o body das requisições não contêm:
-
-- nomes de fichas;
-- sessões;
-- séries;
-- histórico;
-- notas;
-- IDs SQLite;
-- backups;
-- configurações;
-- identificador do dispositivo.
-
-As consultas devem conter apenas filtros do catálogo.
+Uma operação em andamento deve impedir duplo clique equivalente.
 
 ==================================================
-26. LICENÇAS E ATRIBUIÇÃO
+22. PROTEÇÃO DAS OPERAÇÕES EXISTENTES
 ==================================================
 
-Preservar licença individual do exercício e das mídias.
+Atualizar operações existentes para rejeitar fichas na lixeira:
 
-Na biblioteca e detalhe:
+- update;
+- duplicate;
+- activate;
+- archive;
+- updateDay;
+- addExercise;
+- updateExercise;
+- removeExercise;
+- reorderExercise;
+- addRestActivity;
+- updateRestActivity;
+- removeRestActivity;
+- reorderRestActivities;
+- start session.
 
-- mostrar origem Wger;
-- mostrar autor quando fornecido;
-- mostrar licença quando fornecida;
-- permitir abrir fonte original;
-- permitir abrir licença;
-- mostrar “Informação não fornecida pela fonte” quando ausente.
+Usar erro de domínio consistente:
 
-Não aplicar uma única licença global a todos os itens.
+TRAINING_PLAN_IN_TRASH
 
-Não remover atribuição durante atualização.
+Mensagem:
+
+“Esta ficha está na lixeira e precisa ser restaurada antes de ser alterada.”
+
+Não reutilizar `notFound` para esconder todos os casos nos repositories internos.
+
+Na UI pública, pode ser mostrada mensagem amigável sem expor detalhes do banco.
 
 ==================================================
-27. DOCUMENTAÇÃO DO USUÁRIO
+23. TESTES DE DOMÍNIO
+==================================================
+
+Adicionar testes para:
+
+- purgeAt sete dias depois;
+- dias restantes;
+- amanhã;
+- hoje;
+- vencida;
+- ciclo normal;
+- ativa não pode estar na lixeira;
+- arquivada não pode estar na lixeira;
+- timestamps incompletos;
+- purgeAt anterior a deletedAt;
+- restauração sempre inativa;
+- timezone não altera retenção.
+
+==================================================
+24. TESTES SQLITE
+==================================================
+
+Adicionar testes com transação real para:
+
+1. migration 4 para 5;
+2. banco novo até migration 5;
+3. segunda inicialização;
+4. ficha normal não aparece na lixeira;
+5. ficha arquivada não aparece na lixeira;
+6. mover ficha ativa desativa;
+7. mover ficha arquivada remove archived;
+8. sessão ativa bloqueia exclusão;
+9. sessão pausada bloqueia exclusão;
+10. sessão concluída não bloqueia;
+11. restaurar retorna inativa;
+12. ativação de ficha na lixeira falha;
+13. edição de ficha na lixeira falha;
+14. início de sessão com ficha na lixeira falha;
+15. exclusão permanente preserva histórico;
+16. expurgo remove apenas vencidas;
+17. expurgo não remove fichas dentro do prazo;
+18. emptyTrash remove todas as fichas na lixeira;
+19. rollback em falha de emptyTrash;
+20. count atualizado;
+21. backup v1 compatível;
+22. backup v2 preserva lixeira;
+23. backup inválido rejeitado;
+24. restauração faz rollback integral.
+
+==================================================
+25. TESTES MOBILE
+==================================================
+
+Adicionar testes para:
+
+- badge oculto quando vazio;
+- badge atualizado após exclusão;
+- tela vazia;
+- lista com dias restantes;
+- alerta “amanhã”;
+- mover ficha;
+- Snackbar com Desfazer;
+- Desfazer restaura;
+- Desfazer não executa duas vezes;
+- botão bloqueado com formulário sujo;
+- erro de sessão ativa;
+- restauração;
+- confirmação permanente;
+- palavra ESVAZIAR incorreta;
+- palavra ESVAZIAR correta;
+- backup criado antes de esvaziar;
+- falha do backup impede esvaziar;
+- navegação para lixeira;
+- acessibilidade do badge e das ações.
+
+==================================================
+26. DOCUMENTAÇÃO
 ==================================================
 
 Criar:
 
-docs/WGER_INTEGRATION.md
+docs/TRAINING_PLAN_LIFECYCLE.md
 
 Documentar:
 
-- o que é Wger;
-- por que internet é necessária somente durante consulta;
-- o que o app envia;
-- o que o app não envia;
-- como abrir a integração;
-- como buscar;
-- como selecionar;
-- como importar;
-- como atualizar;
-- como usar offline;
-- comportamento de imagens e vídeos;
-- licenças e atribuição;
-- erros comuns;
-- timeout;
-- limite de requisições;
-- indisponibilidade;
-- remoção de exercícios;
-- diferenças entre CUSTOM, SYSTEM e WGER.
-
-Não afirmar que vídeos ficam offline.
-
-==================================================
-28. DOCUMENTAÇÃO TÉCNICA
-==================================================
-
-Criar:
-
-docs/WGER_API_CONTRACT.md
-
-Registrar:
-
-- data da verificação;
-- base URL;
-- endpoint;
-- paginação;
-- campos utilizados;
-- seleção de idioma;
-- mapeamento de categoria;
-- validação de URLs;
-- tratamento de licença;
-- política de timeout;
-- política de 429;
-- política de retries;
-- fixtures;
-- limitações conhecidas.
-
-Adicionar exemplo sanitizado de resposta.
-
-Não copiar uma resposta enorme da API.
-
-==================================================
-29. README
-==================================================
-
-Atualizar o README:
-
-- app continua local-only;
-- Wger é integração opcional;
-- nenhuma VPS é necessária;
-- nenhuma chave Wger é necessária para catálogo público;
-- consulta só ocorre por ação do usuário;
-- dados importados ficam no SQLite;
-- mídia remota pode exigir internet.
-
-Adicionar fluxo resumido:
-
-Mais
-→ Integrações
-→ Catálogo Wger
-→ Buscar
-→ Selecionar
-→ Importar
-
-==================================================
-30. TESTES DO CLIENTE WGER
-==================================================
-
-Não chamar Wger real no CI.
-
-Usar fixtures.
-
-Cobrir:
-
-- resposta paginada;
-- próxima página;
-- página anterior;
-- host inválido em next;
-- timeout;
-- abort;
-- offline;
-- 429 com Retry-After;
-- 500;
-- JSON inválido;
-- schema incompleto;
-- resposta vazia;
-- limite de página;
-- URL não HTTPS.
-
-==================================================
-31. TESTES DO MAPPER
-==================================================
-
-Cobrir:
-
-- pt-br;
-- pt;
-- inglês;
-- fallback;
-- HTML;
-- listas;
-- entidades;
-- músculos;
-- equipamentos;
-- categoria;
-- licença;
-- autor;
-- imagem;
-- vídeo;
-- mídia inválida;
-- exercício sem nome;
-- exercício sem músculo;
-- URLs HTTP;
-- campos desconhecidos.
-
-Um item incompleto deve retornar aviso ou ser rejeitado de maneira explícita.
-
-Não inventar dados silenciosamente.
-
-==================================================
-32. TESTES SQLITE
-==================================================
-
-Cobrir:
-
-- importar um exercício;
-- importar mídia;
-- reimportar sem duplicar;
-- manter ID local;
-- atualizar conteúdo;
-- preservar archived;
-- preservar CUSTOM;
-- preservar SYSTEM;
-- rollback de lote;
-- mídia inválida ignorada;
-- migration 3 para 4;
-- índice único;
-- segunda inicialização;
-- ficha usando exercício importado;
-- sessão usando snapshot;
-- exercício remoto atualizado sem alterar sessão histórica.
-
-==================================================
-33. TESTES MOBILE
-==================================================
-
-Cobrir:
-
-- abrir Integrações;
-- consentimento;
-- busca;
-- cancelar busca;
-- erro offline;
-- resultado;
-- seleção;
-- selecionar página;
-- limpar seleção;
-- preview;
-- importar;
-- reimportar;
-- atualizar importados;
-- mensagem parcial;
-- voltar durante requisição;
-- resposta antiga ignorada;
-- Snackbar não cobrindo header;
-- modal com teclado;
-- ThemedTextInput no tema escuro.
-
-==================================================
-34. TESTE REAL DA API
-==================================================
-
-Após os testes automatizados, executar manualmente:
-
-1. abrir OpenAPI atual;
-2. confirmar endpoint e campos;
-3. fazer uma consulta com pageSize 5;
-4. verificar português;
-5. verificar fallback inglês;
-6. verificar exercício com imagem;
-7. verificar exercício com vídeo;
-8. selecionar três exercícios;
-9. importar;
-10. fechar o app;
-11. ativar modo avião;
-12. abrir biblioteca;
-13. adicionar exercício importado à ficha;
-14. iniciar treino;
-15. concluir série;
-16. concluir sessão;
-17. reativar internet;
-18. atualizar os importados;
-19. confirmar IDs locais preservados;
-20. reimportar e confirmar ausência de duplicatas.
-
-Registrar em:
-
-docs/WGER_REAL_SMOKE_TEST.md
-
-Não colocar dados pessoais.
-
-==================================================
-35. SMOKE VISUAL
-==================================================
-
-No mesmo aparelho, validar:
-
-- topo;
-- status bar;
-- tab bar;
-- tema claro;
-- tema escuro;
-- cursor;
-- seleção de texto;
-- Snackbar;
-- modal de exercício;
-- modal Wger;
-- busca;
-- chips;
-- setas;
-- teclado;
-- fonte aumentada;
-- nomes de exercícios;
-- nomes de fichas.
+- diferença entre inativa, arquivada e lixeira;
+- retenção de sete dias;
+- restauração;
+- expurgo;
+- exclusão permanente;
+- proteção de sessão ativa;
+- preservação do histórico;
+- backup v1 e v2;
+- comportamento offline.
 
 Atualizar:
 
-docs/ui-smoke/
+docs/BACKUP_AND_RESTORE.md
+README.md
+
+No README, incluir fluxo:
+
+Ficha
+→ Editar
+→ Mover para lixeira
+→ Restaurar em até sete dias
+→ Exclusão automática
+
+Não afirmar que o sistema apaga exatamente após sete dias em background.
+
+Explicar corretamente:
+
+“A ficha é removida após vencer o prazo na próxima inicialização ou abertura da
+lixeira.”
 
 ==================================================
-36. VERSÃO
+27. VERSÃO
 ==================================================
 
 Atualizar somente o app padrão:
 
 mobile/app.json:
-- version 0.3.0
-- android.versionCode 5
+- version: 0.4.0
+- android.versionCode: 6
 
 mobile/package.json:
-- version 0.3.0
+- version: 0.4.0
 
 Não alterar:
 
@@ -1158,13 +996,13 @@ Não alterar:
 - slug;
 - scheme;
 - projectId;
-- Umamusume.
+- versão do Umamusume.
 
 ==================================================
-37. VALIDAÇÃO
+28. VALIDAÇÃO
 ==================================================
 
-Executar:
+Executar na raiz:
 
 npm ci
 
@@ -1190,110 +1028,51 @@ EXPO_NO_TELEMETRY=1 npm exec --workspace=training-mobile -- expo export \
 
 git diff --check
 
-Não declarar conclusão se qualquer comando falhar.
+Não gerar APK neste marco.
+
+Não declarar conclusão caso qualquer validação falhe.
 
 ==================================================
-38. APK
+29. CRITÉRIOS DE CONCLUSÃO
 ==================================================
 
-Após validações e smoke real:
+O Marco 1 estará aprovado somente quando:
 
-cd mobile
-
-npx eas-cli@latest build:inspect \
-  --platform android \
-  --stage pre-build \
-  --profile preview \
-  --output .eas-inspect \
-  --force
-
-Confirmar:
-
-- package com.konazin.trainingapp;
-- versionName 0.3.0;
-- versionCode 5;
-- sem URL de backend próprio;
-- sem token;
-- Wger somente HTTPS;
-- SQLite presente;
-- buildType APK.
-
-Gerar:
-
-npx eas-cli@latest build \
-  --platform android \
-  --profile preview \
-  --non-interactive \
-  --json
-
-Baixar como:
-
-artifacts/training-app-local-0.3.0.apk
-
-Calcular SHA-256.
-
-Não adicionar APK ao Git.
+- lixeira funcionar integralmente offline;
+- retenção de sete dias estiver correta;
+- arquivar e excluir forem distintos;
+- sessão ativa bloquear exclusão;
+- restauração retornar a ficha como inativa;
+- histórico sobreviver à exclusão permanente;
+- badge atualizar;
+- labels de expiração funcionarem;
+- Desfazer funcionar;
+- backup for criado antes de esvaziar;
+- backup v2 incluir a lixeira;
+- backup v1 continuar importável;
+- migrations antigas permanecerem imutáveis;
+- testes e export Android passarem.
 
 ==================================================
-39. CRITÉRIOS DE CONCLUSÃO
-==================================================
-
-APROVADO:
-
-- app funciona offline;
-- Wger só é chamado por ação explícita;
-- consulta real funciona;
-- importação persiste no SQLite;
-- duplicatas não são criadas;
-- atribuição é preservada;
-- exercício importado funciona em ficha e sessão;
-- problemas visuais residuais foram corrigidos;
-- testes passam;
-- export passa;
-- APK foi gerado.
-
-CÓDIGO APROVADO, BUILD BLOQUEADO:
-
-- código, testes e consulta real passam;
-- EAS está bloqueado somente por autenticação ou credencial.
-
-REPROVADO:
-
-- importação altera dados em erro;
-- importação cria duplicatas;
-- app depende da API para abrir;
-- item importado desaparece offline;
-- licença ou autoria é perdida;
-- qualquer teste obrigatório falha.
-
-==================================================
-40. ENTREGA
+30. ENTREGA
 ==================================================
 
 Informar:
 
 1. commit final;
-2. endpoint Wger validado;
-3. data da validação do OpenAPI;
-4. contratos criados;
-5. estratégia de idioma;
-6. estratégia de mapeamento;
-7. estratégia de upsert;
-8. migration criada;
-9. fluxo visual;
-10. dados enviados ao Wger;
-11. dados nunca enviados;
-12. testes automatizados;
-13. resultado da consulta real;
-14. quantidade importada;
-15. teste offline;
-16. resultado visual;
-17. versão e versionCode;
-18. build ID;
-19. URL do build;
-20. caminho do APK;
-21. tamanho;
-22. SHA-256;
-23. limitações restantes.
+2. migration adicionada;
+3. modelo de ciclo de vida;
+4. repository criado;
+5. política de retenção;
+6. proteção de sessão ativa;
+7. funcionamento do expurgo;
+8. funcionamento do badge;
+9. funcionamento do Desfazer;
+10. backup automático antes de esvaziar;
+11. compatibilidade v1/v2;
+12. testes adicionados;
+13. resultado de todas as validações;
+14. versão e versionCode;
+15. limitações restantes.
 
-Não implementar IA, Health Connect, nuvem ou download de vídeo nesta sprint.
+Não iniciar o Marco 2.

@@ -222,11 +222,61 @@ CREATE INDEX exercise_definition_external_lookup
   ON exercise_definitions(source, external_id, archived);
 `
 
+const trainingPlanTrash = `
+ALTER TABLE training_plans ADD COLUMN deleted_at TEXT;
+ALTER TABLE training_plans ADD COLUMN purge_at TEXT;
+
+CREATE INDEX training_plan_trash_lookup
+  ON training_plans(deleted_at, purge_at);
+CREATE INDEX training_plan_normal_lookup
+  ON training_plans(active DESC, archived, updated_at DESC)
+  WHERE deleted_at IS NULL;
+
+CREATE TRIGGER training_plan_lifecycle_insert
+BEFORE INSERT ON training_plans
+WHEN NOT (
+  (NEW.active = 0 AND NEW.archived = 0 AND NEW.deleted_at IS NULL AND NEW.purge_at IS NULL)
+  OR (NEW.active = 1 AND NEW.archived = 0 AND NEW.deleted_at IS NULL AND NEW.purge_at IS NULL)
+  OR (NEW.active = 0 AND NEW.archived = 1 AND NEW.deleted_at IS NULL AND NEW.purge_at IS NULL)
+  OR (
+    NEW.active = 0 AND NEW.archived = 0
+    AND NEW.deleted_at IS NOT NULL AND NEW.purge_at IS NOT NULL
+    AND strftime('%s', NEW.deleted_at) IS NOT NULL
+    AND strftime('%s', NEW.purge_at) IS NOT NULL
+    AND CAST(strftime('%s', NEW.purge_at) AS INTEGER)
+      = CAST(strftime('%s', NEW.deleted_at) AS INTEGER) + 604800
+  )
+)
+BEGIN
+  SELECT RAISE(ABORT, 'invalid training plan lifecycle');
+END;
+
+CREATE TRIGGER training_plan_lifecycle_update
+BEFORE UPDATE OF active, archived, deleted_at, purge_at ON training_plans
+WHEN NOT (
+  (NEW.active = 0 AND NEW.archived = 0 AND NEW.deleted_at IS NULL AND NEW.purge_at IS NULL)
+  OR (NEW.active = 1 AND NEW.archived = 0 AND NEW.deleted_at IS NULL AND NEW.purge_at IS NULL)
+  OR (NEW.active = 0 AND NEW.archived = 1 AND NEW.deleted_at IS NULL AND NEW.purge_at IS NULL)
+  OR (
+    NEW.active = 0 AND NEW.archived = 0
+    AND NEW.deleted_at IS NOT NULL AND NEW.purge_at IS NOT NULL
+    AND strftime('%s', NEW.deleted_at) IS NOT NULL
+    AND strftime('%s', NEW.purge_at) IS NOT NULL
+    AND CAST(strftime('%s', NEW.purge_at) AS INTEGER)
+      = CAST(strftime('%s', NEW.deleted_at) AS INTEGER) + 604800
+  )
+)
+BEGIN
+  SELECT RAISE(ABORT, 'invalid training plan lifecycle');
+END;
+`
+
 export const MIGRATIONS: Migration[] = [
   migration(1, 'local_training_schema', schema),
   migration(2, 'local_query_indexes', indexes),
   migration(3, 'app_installation_metadata', appMetadata),
   migration(4, 'external_exercise_indexes', externalExerciseIndexes),
+  migration(5, 'training_plan_trash', trainingPlanTrash),
 ]
 
 export async function runMigrations(database: SqlDatabase, onProgress?: (progress: MigrationProgress) => void) {

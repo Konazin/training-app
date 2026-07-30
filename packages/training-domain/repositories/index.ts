@@ -51,6 +51,16 @@ export interface TrainingPlanRepository {
   reorderRestActivities(planId: number, dayId: number, activityIds: number[]): Promise<TrainingPlan>
 }
 
+export interface TrainingPlanTrashRepository {
+  list(): Promise<TrainingPlan[]>
+  count(): Promise<number>
+  moveToTrash(planId: number, deletedAt?: string): Promise<TrainingPlan>
+  restore(planId: number): Promise<TrainingPlan>
+  deletePermanently(planId: number): Promise<void>
+  emptyTrash(): Promise<number>
+  purgeExpired(now?: string): Promise<number>
+}
+
 export interface WorkoutSessionRepository {
   getActive(): Promise<WorkoutSession | null>
   getHistory(): Promise<WorkoutSession[]>

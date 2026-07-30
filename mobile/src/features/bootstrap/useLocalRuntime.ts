@@ -40,6 +40,7 @@ export function useLocalRuntime(): LocalRuntime {
     }),
     initialize: (opened) => initializeFirstInstallation(opened, seed as SeedData).then(() => undefined),
     createRepositories: createLocalRepositories,
+    afterInitialize: (repositories) => repositories.planTrash.purgeExpired().then(() => undefined),
     markStartup: markSuccessfulStartup,
   }))
 

@@ -27,7 +27,7 @@ const TABLES = {
   ],
   training_plans: [
     'id', 'name', 'description', 'category', 'difficulty', 'start_date', 'end_date',
-    'active', 'archived', 'created_at', 'updated_at',
+    'active', 'archived', 'deleted_at', 'purge_at', 'created_at', 'updated_at',
   ],
   training_plan_days: [
     'id', 'training_plan_id', 'weekday', 'title', 'description', 'sort_order',
@@ -80,6 +80,15 @@ export function createBackupRepository(database: SqlDatabase): BackupRepository 
         await insertRows(transaction, 'workout_session_exercises', backup.sessionExercises)
         await insertRows(transaction, 'workout_set_logs', backup.setLogs)
         await insertRows(transaction, 'app_settings', backup.settings)
+        await transaction.run(`
+          DELETE FROM training_plans
+          WHERE deleted_at IS NOT NULL AND julianday(purge_at) <= julianday(?)
+            AND NOT EXISTS (
+              SELECT 1 FROM workout_sessions session
+              WHERE session.training_plan_id = training_plans.id
+                AND session.status IN ('IN_PROGRESS','PAUSED')
+            )
+        `, new Date().toISOString())
       })
     },
     reset: () => clearUserData(database),
@@ -103,7 +112,7 @@ export async function exportBackup(database: SqlDatabase, appVersion: string): P
     database.all<Row>(`SELECT * FROM app_settings WHERE key NOT LIKE 'secret.%' ORDER BY key`),
   ])
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     appVersion,
     exportedAt: new Date().toISOString(),
     exercises,
@@ -122,7 +131,9 @@ export async function exportBackup(database: SqlDatabase, appVersion: string): P
 export function validateBackup(candidate: unknown): asserts candidate is TrainingBackup {
   assertPlainObject(candidate, 'arquivo não é um objeto JSON')
   const backup = candidate as Partial<TrainingBackup>
-  if (backup.schemaVersion !== 1) throw invalidBackup('versão não suportada')
+  if (backup.schemaVersion !== 1 && backup.schemaVersion !== 2) {
+    throw invalidBackup('versão não suportada')
+  }
   if ('app_metadata' in candidate || 'appMetadata' in candidate) {
     throw invalidBackup('app_metadata não pode ser importado')
   }
@@ -183,6 +194,7 @@ export function validateBackup(candidate: unknown): asserts candidate is Trainin
   if (backup.trainingPlans!.filter((row) => value(row, 'active') === 1).length > 1) {
     throw invalidBackup('mais de uma ficha ativa')
   }
+  assertTrainingPlanLifecycle(backup.trainingPlans!, backup.schemaVersion)
   const active = backup.sessions!.filter((row) => value(row, 'active_slot') === 1)
   if (active.length > 1) throw invalidBackup('mais de uma sessão ativa')
   for (const row of backup.sessions!) {
@@ -313,7 +325,10 @@ function assertFiniteNumbers(backup: Partial<TrainingBackup>) {
 }
 
 function assertDates(backup: Partial<TrainingBackup>) {
-  const timestampFields = ['created_at', 'updated_at', 'downloaded_at', 'started_at', 'completed_at', 'paused_at']
+  const timestampFields = [
+    'created_at', 'updated_at', 'downloaded_at', 'started_at', 'completed_at',
+    'paused_at', 'deleted_at', 'purge_at',
+  ]
   const dateFields = ['start_date', 'end_date', 'scheduled_date']
   const rows = [
     ...backup.exercises!, ...backup.media!, ...backup.trainingPlans!, ...backup.sessions!,
@@ -332,6 +347,31 @@ function assertDates(backup: Partial<TrainingBackup>) {
   }
 }
 
+function assertTrainingPlanLifecycle(rows: unknown[], schemaVersion: 1 | 2) {
+  for (const row of rows) {
+    const record = row as Record<string, unknown>
+    if (schemaVersion === 2 && (!('deleted_at' in record) || !('purge_at' in record))) {
+      throw invalidBackup('ciclo de vida da ficha ausente')
+    }
+    const active = value(row, 'active') === 1
+    const archived = value(row, 'archived') === 1
+    const deletedAt = value(row, 'deleted_at') ?? null
+    const purgeAt = value(row, 'purge_at') ?? null
+    const trashed = deletedAt !== null || purgeAt !== null
+    if (
+      (active && archived)
+      || (active && trashed)
+      || (archived && trashed)
+      || (deletedAt === null) !== (purgeAt === null)
+      || (deletedAt !== null && (
+        !isIsoTimestamp(deletedAt)
+        || !isIsoTimestamp(purgeAt)
+        || Date.parse(String(purgeAt)) - Date.parse(String(deletedAt)) !== 7 * 24 * 60 * 60 * 1000
+      ))
+    ) throw invalidBackup('ciclo de vida da ficha inválido')
+  }
+}
+
 function isDateKey(value: unknown): value is string {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
   const [year, month, day] = value.split('-').map(Number)
@@ -342,9 +382,12 @@ function isDateKey(value: unknown): value is string {
 }
 
 function isIsoTimestamp(value: unknown): value is string {
-  return typeof value === 'string'
-    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value)
-    && !Number.isNaN(Date.parse(value))
+  if (typeof value !== 'string'
+    || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value)) return false
+  const timestamp = Date.parse(value)
+  if (Number.isNaN(timestamp)) return false
+  const normalized = new Date(timestamp).toISOString()
+  return value === normalized || value === normalized.replace('.000Z', 'Z')
 }
 
 function assertUniqueOrder(rows: unknown[], ownerField: string, orderField: string) {

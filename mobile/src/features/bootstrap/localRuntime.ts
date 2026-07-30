@@ -4,6 +4,7 @@ export interface RuntimeDependencies {
   open(onMigration: (name: string) => void): Promise<SqlDatabase>
   initialize(database: SqlDatabase): Promise<void>
   createRepositories(database: SqlDatabase): LocalRepositories
+  afterInitialize?(repositories: LocalRepositories): Promise<void>
   markStartup(database: SqlDatabase): Promise<void>
 }
 
@@ -34,6 +35,7 @@ export function createLocalRuntimeManager(dependencies: RuntimeDependencies) {
           opened = await dependencies.open(onMigration)
           await dependencies.initialize(opened)
           const repositories = dependencies.createRepositories(opened)
+          await dependencies.afterInitialize?.(repositories)
           await dependencies.markStartup(opened)
           if (disposed) throw new Error('Inicialização cancelada.')
           current = opened

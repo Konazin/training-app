@@ -5,6 +5,7 @@ import {
   activateTrainingPlan,
   archiveTrainingPlan,
   calculateDashboard,
+  computeTrainingPlanPurgeAt,
   createSessionSnapshot,
   createTrainingPlan,
   duplicateTrainingPlan,
@@ -17,11 +18,14 @@ import {
   resumeWorkoutSession,
   sessionDuration,
   sessionVolume,
+  trainingPlanTrashDaysRemaining,
+  trainingPlanTrashStatusLabel,
   validateDayExerciseInput,
   validateRestActivityInput,
   validateSetLogInput,
   validateTrainingPlanDayInput,
   validateTrainingPlanInput,
+  validateTrainingPlanLifecycle,
   validatePlan,
   type ExerciseDefinition,
   type TrainingDayExercise,
@@ -155,6 +159,33 @@ describe('training-domain', () => {
     expect(() => validateSetLogInput({
       reps: 1, load: 0, durationSeconds: 0, distance: 0, rpe: 11, completed: false, notes: '',
     })).toThrow('RPE')
+  })
+
+  it('calcula e valida o ciclo UTC da lixeira', () => {
+    const deletedAt = '2026-07-29T12:00:00.000Z'
+    const purgeAt = computeTrainingPlanPurgeAt(deletedAt)
+    expect(purgeAt).toBe('2026-08-05T12:00:00.000Z')
+    expect(trainingPlanTrashDaysRemaining(purgeAt, new Date('2026-08-01T12:01:00.000Z'))).toBe(4)
+    expect(trainingPlanTrashStatusLabel(purgeAt, new Date('2026-08-04T11:59:00.000Z')))
+      .toBe('Será apagada em 2 dias')
+    expect(trainingPlanTrashStatusLabel(purgeAt, new Date('2026-08-04T12:00:00.000Z')))
+      .toBe('Será apagada amanhã')
+    expect(trainingPlanTrashStatusLabel(purgeAt, new Date('2026-08-05T11:59:00.000Z')))
+      .toBe('Será apagada hoje')
+    expect(trainingPlanTrashStatusLabel(purgeAt, new Date('2026-08-05T12:00:00.000Z')))
+      .toBe('Pronta para exclusão')
+    expect(() => validateTrainingPlanLifecycle({
+      active: false, archived: false, deletedAt, purgeAt,
+    })).not.toThrow()
+    expect(() => validateTrainingPlanLifecycle({
+      active: true, archived: false, deletedAt, purgeAt,
+    })).toThrow('Ciclo de vida')
+    expect(() => validateTrainingPlanLifecycle({
+      active: false, archived: false, deletedAt, purgeAt: null,
+    })).toThrow('Ciclo de vida')
+    expect(() => validateTrainingPlanLifecycle({
+      active: false, archived: false, deletedAt, purgeAt: deletedAt,
+    })).toThrow('Ciclo de vida')
   })
 
   it('calcula duração ativa, pausada e rejeita relógios inválidos', () => {

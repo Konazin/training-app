@@ -9,7 +9,7 @@ import type {
   WorkoutSession,
 } from '../model'
 import { WEEKDAYS } from '../model'
-import { invalidTransition, notFound } from '../errors'
+import { invalidTransition, notFound, trainingPlanInTrash } from '../errors'
 import {
   historyStats,
   localDateKey,
@@ -48,6 +48,8 @@ export function createTrainingPlan(input: TrainingPlanInput, id: number, makeDay
     endDate: validInput.endDate ?? null,
     active: false,
     archived: false,
+    deletedAt: null,
+    purgeAt: null,
     days: newTrainingWeek(makeDayId),
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -69,6 +71,8 @@ export function duplicateTrainingPlan(
     name: `${source.name} (cópia)`,
     active: false,
     archived: false,
+    deletedAt: null,
+    purgeAt: null,
     createdAt: timestamp,
     updatedAt: timestamp,
     days: source.days.map((day) => ({
@@ -171,6 +175,7 @@ export function calculateDashboard(sessions: WorkoutSession[], activePlan: Train
 }
 
 export function activateTrainingPlan(plans: TrainingPlan[], id: number, now = new Date()) {
+  if (plans.some((plan) => plan.id === id && plan.deletedAt !== null)) throw trainingPlanInTrash()
   const selected = plans.find((plan) => plan.id === id && !plan.archived)
   if (!selected) throw notFound('Ficha')
   return plans.map((plan) => ({
@@ -181,6 +186,7 @@ export function activateTrainingPlan(plans: TrainingPlan[], id: number, now = ne
 }
 
 export function archiveTrainingPlan(plan: TrainingPlan, archived = true, now = new Date()) {
+  if (plan.deletedAt !== null) throw trainingPlanInTrash()
   return {
     ...plan,
     archived,

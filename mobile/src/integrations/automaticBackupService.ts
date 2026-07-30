@@ -21,7 +21,7 @@ const isBackupList = (value: unknown): value is AutomaticBackupInfo[] =>
     && typeof (item as AutomaticBackupInfo).fileName === 'string'
     && typeof (item as AutomaticBackupInfo).createdAt === 'string'
     && typeof (item as AutomaticBackupInfo).sizeBytes === 'number'
-    && ['BEFORE_IMPORT', 'BEFORE_ERASE', 'BEFORE_RESET_SEED']
+    && ['BEFORE_IMPORT', 'BEFORE_ERASE', 'BEFORE_RESET_SEED', 'BEFORE_EMPTY_TRASH']
       .includes((item as AutomaticBackupInfo).reason),
   )
 

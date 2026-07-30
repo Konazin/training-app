@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { AutomaticBackupInfo, BackupRepository } from '@training/training-domain'
+import type {
+  AutomaticBackupInfo,
+  AutomaticBackupReason,
+  BackupRepository,
+} from '@training/training-domain'
 import type { AppMetadataRepository } from '@training/training-local-db'
 import { pickBackup, shareBackup } from '../integrations/backupFiles'
 import { createAutomaticBackupService } from '../integrations/automaticBackupService'
@@ -52,6 +56,11 @@ export function useBackupController(
     message,
     messageKind,
     automaticBackups,
+    createAutomaticBackup: async (reason: AutomaticBackupReason) => {
+      const result = await automatic.create(reason)
+      await refreshBackups()
+      return result
+    },
     exportBackup: () => run(async () => {
       await shareBackup(repository, appVersion)
       return 'Backup exportado.'

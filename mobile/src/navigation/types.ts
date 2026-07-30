@@ -15,6 +15,7 @@ export type RootStackParamList = {
   WgerIntegration: undefined
   Session: undefined
   ArchivedTrainingPlans: undefined
+  TrainingPlanTrash: undefined
   ExercisePicker: { planId: number; dayId: number }
   TrainingPlanEditor: { planId?: number } | undefined
   TrainingPlanDay: { planId: number; dayId: number }

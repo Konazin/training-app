@@ -112,7 +112,10 @@ export function mapPlan(row: Row, days: TrainingPlanDay[]): TrainingPlan {
     category: text(row.category), difficulty: text(row.difficulty),
     startDate: row.start_date ? text(row.start_date) : null,
     endDate: row.end_date ? text(row.end_date) : null,
-    active: bool(row.active), archived: bool(row.archived), days,
+    active: bool(row.active), archived: bool(row.archived),
+    deletedAt: row.deleted_at ? text(row.deleted_at) : null,
+    purgeAt: row.purge_at ? text(row.purge_at) : null,
+    days,
     createdAt: text(row.created_at), updatedAt: text(row.updated_at),
   }
 }

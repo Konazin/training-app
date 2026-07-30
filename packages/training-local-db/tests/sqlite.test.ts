@@ -37,7 +37,7 @@ describe('SQLite local schema', () => {
       'workout_session_exercises', 'workout_set_logs', 'app_settings', 'app_metadata',
       'schema_migrations',
     ]))
-    expect(query(path, 'SELECT COUNT(*) AS value FROM schema_migrations;')[0]?.value).toBe(4)
+    expect(query(path, 'SELECT COUNT(*) AS value FROM schema_migrations;')[0]?.value).toBe(5)
 
     const base = `
       PRAGMA foreign_keys=ON;
@@ -92,7 +92,27 @@ describe('SQLite local schema', () => {
   it('valida formato, referências e sessão única antes de restaurar', () => {
     const backup = validBackup()
     expect(() => validateBackup(backup)).not.toThrow()
-    expect(() => validateBackup({ ...backup, schemaVersion: 2 })).toThrow('versão')
+    const v2 = {
+      ...backup,
+      schemaVersion: 2 as const,
+      trainingPlans: backup.trainingPlans.map((row) => ({
+        ...row as object,
+        deleted_at: null,
+        purge_at: null,
+      })),
+    }
+    expect(() => validateBackup(v2)).not.toThrow()
+    expect(() => validateBackup({ ...backup, schemaVersion: 3 })).toThrow('versão')
+    expect(() => validateBackup({ ...v2, trainingPlans: backup.trainingPlans })).toThrow('ciclo de vida')
+    expect(() => validateBackup({
+      ...v2,
+      trainingPlans: [{
+        ...v2.trainingPlans[0] as object,
+        active: 0,
+        deleted_at: '2026-07-29T00:00:00.000Z',
+        purge_at: null,
+      }],
+    })).toThrow('ciclo de vida')
     expect(() => validateBackup({
       ...backup,
       media: [{ id: 2, exercise_definition_id: 999 }],
@@ -314,6 +334,7 @@ describe('SQLite local schema', () => {
     expect(history[0]?.totalVolume).toBe(40)
 
     const backup = await repositories.backup.export('test')
+    expect(backup.schemaVersion).toBe(2)
     await expect(repositories.backup.restore({
       ...backup,
       media: [{ id: 999, exercise_definition_id: 999 }],
@@ -323,13 +344,127 @@ describe('SQLite local schema', () => {
     expect(await repositories.plans.list()).toHaveLength(0)
     expect(await repositories.metadata.get(APP_METADATA_KEYS.initialized, (value): value is boolean =>
       typeof value === 'boolean')).toBe(true)
-    await repositories.backup.restore(backup)
+    const legacyBackup: TrainingBackup = {
+      ...backup,
+      schemaVersion: 1,
+      trainingPlans: backup.trainingPlans.map((row) => {
+        const { deleted_at: _deletedAt, purge_at: _purgeAt, ...legacy } =
+          row as Record<string, unknown>
+        return legacy
+      }),
+    }
+    await repositories.backup.restore(legacyBackup)
     expect(await repositories.sessions.getHistory()).toHaveLength(1)
     expect(await repositories.plans.list()).toHaveLength(1)
     await database.close()
   })
 
-  it('migra 3 para 4 e faz upsert Wger transacional preservando IDs e dados locais', async () => {
+  it('migra 4 para 5 sem alterar dados e mantém o ciclo completo da lixeira', async () => {
+    const path = newDatabase()
+    const database = betterDatabase(path)
+    await database.exec(`
+      CREATE TABLE schema_migrations (
+        version INTEGER PRIMARY KEY, name TEXT NOT NULL, checksum TEXT NOT NULL, applied_at TEXT NOT NULL
+      );
+    `)
+    for (const migration of MIGRATIONS.slice(0, 4)) {
+      await database.exec(migration.sql)
+      await database.run(
+        'INSERT INTO schema_migrations VALUES (?, ?, ?, ?)',
+        migration.version, migration.name, migration.checksum, '2026-07-29T00:00:00.000Z',
+      )
+    }
+    await initializeFirstInstallation(database, seedData())
+    const before = await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM training_plans')
+    await runMigrations(database)
+    await runMigrations(database)
+    expect((await database.first<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM schema_migrations',
+    ))?.count).toBe(5)
+    expect((await database.first<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM training_plans',
+    ))?.count).toBe(before?.count)
+    expect(await database.first(
+      'SELECT id FROM training_plans WHERE deleted_at IS NOT NULL OR purge_at IS NOT NULL',
+    )).toBeNull()
+    expect(await database.first(
+      `SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'training_plan_trash_lookup'`,
+    )).toBeTruthy()
+
+    const repositories = createLocalRepositories(database)
+    const plan = (await repositories.plans.list())[0]!
+    await expect(database.run(`
+      UPDATE training_plans SET active = 0, deleted_at = ?, purge_at = NULL WHERE id = ?
+    `, '2026-07-29T12:00:00.000Z', plan.id)).rejects.toThrow('lifecycle')
+    await expect(database.run(`
+      UPDATE training_plans SET active = 0, deleted_at = ?, purge_at = ? WHERE id = ?
+    `, '2026-07-29T12:00:00.000Z', '2026-08-04T12:00:00.000Z', plan.id))
+      .rejects.toThrow('lifecycle')
+    const session = await repositories.sessions.start(plan.id, plan.days[0]!.id)
+    await expect(repositories.planTrash.moveToTrash(plan.id)).rejects.toMatchObject({
+      code: 'ACTIVE_SESSION_USES_TRAINING_PLAN',
+    })
+    await repositories.sessions.abandon(session.id)
+    const trashed = await repositories.planTrash.moveToTrash(
+      plan.id,
+      '2026-07-29T12:00:00.000Z',
+    )
+    expect(trashed).toMatchObject({
+      active: false,
+      archived: false,
+      deletedAt: '2026-07-29T12:00:00.000Z',
+      purgeAt: '2026-08-05T12:00:00.000Z',
+    })
+    expect(await repositories.plans.list()).toHaveLength(0)
+    expect(await repositories.planTrash.count()).toBe(1)
+    await expect(repositories.plans.update(plan.id, {
+      name: plan.name,
+      description: plan.description,
+      category: plan.category,
+      difficulty: plan.difficulty,
+    })).rejects.toMatchObject({ code: 'TRAINING_PLAN_IN_TRASH' })
+    expect(await repositories.planTrash.restore(plan.id)).toMatchObject({
+      active: false,
+      archived: false,
+      deletedAt: null,
+      purgeAt: null,
+    })
+
+    const completed = await repositories.sessions.start(plan.id, plan.days[0]!.id)
+    await repositories.sessions.complete(completed.id, null, '')
+    await repositories.planTrash.moveToTrash(plan.id)
+    await repositories.planTrash.deletePermanently(plan.id)
+    expect((await repositories.sessions.getHistory()).some((item) =>
+      item.id === completed.id && item.status === 'COMPLETED')).toBe(true)
+    expect((await database.first<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM training_plan_days WHERE training_plan_id = ?',
+      plan.id,
+    ))?.count).toBe(0)
+
+    const expiring = await repositories.plans.create({
+      name: 'Expirada', description: '', category: 'Força', difficulty: 'Inicial',
+    })
+    await repositories.planTrash.moveToTrash(expiring.id, '2026-07-01T00:00:00.000Z')
+    const trashBackup = await repositories.backup.export('0.4.0')
+    expect(trashBackup.trainingPlans).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: expiring.id,
+        deleted_at: '2026-07-01T00:00:00.000Z',
+        purge_at: '2026-07-08T00:00:00.000Z',
+      }),
+    ]))
+    await repositories.backup.restore(trashBackup)
+    expect(await repositories.planTrash.count()).toBe(0)
+
+    const secondExpiring = await repositories.plans.create({
+      name: 'Expirada 2', description: '', category: 'Força', difficulty: 'Inicial',
+    })
+    await repositories.planTrash.moveToTrash(secondExpiring.id, '2026-07-01T00:00:00.000Z')
+    expect(await repositories.planTrash.purgeExpired('2026-07-08T00:00:00.000Z')).toBe(1)
+    await database.close()
+  })
+
+  it('migra 3 para 5 e faz upsert Wger transacional preservando IDs e dados locais', async () => {
     const path = newDatabase()
     let database = betterDatabase(path)
     await database.exec(`
@@ -348,7 +483,7 @@ describe('SQLite local schema', () => {
     const beforeSeed = await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM exercise_definitions')
     await runMigrations(database)
     await runMigrations(database)
-    expect((await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM schema_migrations'))?.count).toBe(4)
+    expect((await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM schema_migrations'))?.count).toBe(5)
     expect((await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM exercise_definitions'))?.count)
       .toBe(beforeSeed?.count)
     expect(await database.first<{ name: string }>(

@@ -8,6 +8,7 @@ import type {
   ExerciseLibraryRepository,
   ExternalExerciseCandidate,
   ExternalExerciseImportRepository,
+  TrainingPlanTrashRepository,
   WorkoutSession,
   WorkoutSessionRepository,
 } from '@training/training-domain'
@@ -17,6 +18,10 @@ import { useTrainingController } from './useTrainingController'
 import { useWorkoutSessionController } from './useWorkoutSessionController'
 import { useBackupController } from './useBackupController'
 import { useWgerIntegrationController } from '../features/wger/useWgerIntegrationController'
+import {
+  isEmptyTrashConfirmation,
+  useTrainingPlanTrashController,
+} from '../features/training-plan/controller/useTrainingPlanTrashController'
 
 const mocks = vi.hoisted(() => ({
   storage: {
@@ -163,6 +168,49 @@ describe('controllers locais', () => {
     expect(automatic.create).toHaveBeenCalledWith('BEFORE_IMPORT')
     expect(automatic.restore).toHaveBeenCalledWith('file:///backup.json')
     expect(changed).toHaveBeenCalledTimes(2)
+    hook.unmount()
+  })
+
+  it('move, desfaz uma vez e exige backup antes de esvaziar a lixeira', async () => {
+    expect(isEmptyTrashConfirmation('esvaziar')).toBe(true)
+    expect(isEmptyTrashConfirmation(' esvaziar ')).toBe(true)
+    expect(isEmptyTrashConfirmation('esvaziar agora')).toBe(false)
+    const trashed = { id: 7, name: 'Ficha', deletedAt: '2026-07-29T12:00:00.000Z' }
+    const repository = {
+      purgeExpired: vi.fn(async () => 0),
+      list: vi.fn(async () => [trashed]),
+      count: vi.fn(async () => 1),
+      moveToTrash: vi.fn(async () => trashed),
+      restore: vi.fn(async () => trashed),
+      deletePermanently: vi.fn(async () => {}),
+      emptyTrash: vi.fn(async () => 1),
+    } as unknown as TrainingPlanTrashRepository
+    const backup = vi.fn(async () => ({
+      uri: 'file:///backup.json',
+      fileName: 'backup.json',
+      createdAt: '2026-07-29T12:00:00.000Z',
+      sizeBytes: 10,
+      reason: 'BEFORE_EMPTY_TRASH' as const,
+    }))
+    const changed = vi.fn(async () => {})
+    const hook = await renderController(() =>
+      useTrainingPlanTrashController(repository, backup, changed))
+
+    await act(async () => { await hook.current.moveToTrash(7) })
+    expect(hook.current.hasUndo).toBe(true)
+    await act(async () => {
+      await hook.current.undo()
+      await hook.current.undo()
+    })
+    expect(repository.restore).toHaveBeenCalledTimes(1)
+
+    backup.mockRejectedValueOnce(new Error('Backup falhou'))
+    await act(async () => { await hook.current.emptyTrash() })
+    expect(repository.emptyTrash).not.toHaveBeenCalled()
+    expect(hook.current.message).toBe('Backup falhou')
+    await act(async () => { await hook.current.emptyTrash() })
+    expect(backup).toHaveBeenCalledTimes(2)
+    expect(repository.emptyTrash).toHaveBeenCalledTimes(1)
     hook.unmount()
   })
 

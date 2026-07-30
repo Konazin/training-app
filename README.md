@@ -7,13 +7,14 @@ com repositories `expo-sqlite`, sem exigir servidor, VPS, IP, conta ou internet.
 ## O que funciona offline
 
 - criar, editar e arquivar exercícios;
-- criar, editar, duplicar, ativar e arquivar fichas;
+- criar, editar, duplicar, ativar, arquivar e restaurar fichas;
 - configurar segunda a domingo, incluindo descanso;
 - iniciar, pausar, retomar, concluir ou abandonar sessões;
 - editar séries e usar cronômetro de descanso;
 - recuperar uma sessão após fechar o aplicativo;
 - consultar histórico, duração, volume e aderência;
-- exportar, validar e restaurar `training-backup-v1.json`.
+- mover fichas para uma lixeira local com retenção de sete dias;
+- exportar, validar e restaurar `training-backup-v2.json`.
 
 O SQLite `training.db` é a fonte de verdade. AsyncStorage guarda somente o
 cronômetro transitório. Desinstalar o aplicativo apaga o banco local; exporte
@@ -68,7 +69,7 @@ demonstrativa pode ser editada ou arquivada.
 
 Em **Mais**:
 
-- **Exportar backup** cria e compartilha `training-backup-v1.json`;
+- **Exportar backup** cria e compartilha `training-backup-v2.json`;
 - **Importar backup** valida versão e referências antes de trocar dados;
 - operações destrutivas criam primeiro um backup automático no diretório de
   documentos do app;
@@ -81,6 +82,18 @@ metadados técnicos e impede que o seed reapareça ao reabrir.
 
 Arquivos de backup não contêm tokens, chaves, mídia, cache ou estado do player.
 Veja [backup e restauração](docs/BACKUP_AND_RESTORE.md).
+
+## Ciclo de vida das fichas
+
+O fluxo principal é:
+
+**Ficha → Editar → Mover para lixeira → Restaurar em até sete dias → Exclusão automática**
+
+Arquivar apenas tira uma ficha do uso normal; a lixeira inicia a retenção para
+exclusão. A ficha vencida é removida na próxima inicialização ou abertura da
+lixeira, sem serviço em background. Sessões ativas ou pausadas impedem a
+remoção, e o histórico concluído permanece salvo em snapshots. Veja
+[ciclo de vida das fichas](docs/TRAINING_PLAN_LIFECYCLE.md).
 
 ## Integração opcional Wger
 

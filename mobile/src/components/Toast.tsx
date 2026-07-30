@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Keyboard, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { shared, useTheme } from '../theme'
@@ -7,18 +7,41 @@ import { feedbackColors } from '../theme/uiContracts'
 
 export type ToastKind = 'info' | 'success' | 'warning' | 'error'
 
-export function Toast({ message, kind = 'info' }: { message: string; kind?: ToastKind }) {
+export function Toast({
+  message,
+  kind = 'info',
+  actionLabel,
+  onAction,
+  duration = 4500,
+  notificationId,
+  onDismiss,
+}: {
+  message: string
+  kind?: ToastKind
+  actionLabel?: string
+  onAction?: () => void
+  duration?: number
+  notificationId?: number
+  onDismiss?: () => void
+}) {
   const { colors } = useTheme()
   const insets = useSafeAreaInsets()
   const [visible, setVisible] = useState(false)
   const [keyboardHeight, setKeyboardHeight] = useState(0)
+  const actionUsed = useRef(false)
+  const dismiss = useRef(onDismiss)
+  dismiss.current = onDismiss
 
   useEffect(() => {
+    actionUsed.current = false
     setVisible(Boolean(message))
     if (!message) return
-    const timer = setTimeout(() => setVisible(false), 4500)
+    const timer = setTimeout(() => {
+      setVisible(false)
+      dismiss.current?.()
+    }, duration)
     return () => clearTimeout(timer)
-  }, [message])
+  }, [duration, message, notificationId])
   useEffect(() => {
     const show = Keyboard.addListener('keyboardDidShow', (event) => {
       setKeyboardHeight(Platform.OS === 'ios' ? event.endCoordinates.height : 0)
@@ -39,7 +62,25 @@ export function Toast({ message, kind = 'info' }: { message: string; kind?: Toas
       bottom: keyboardHeight + insets.bottom + 76,
     }]}>
       <Text style={[styles.message, { color: palette.text }]}>{message}</Text>
-      <Pressable accessibilityLabel="Fechar mensagem" accessibilityRole="button" hitSlop={8} onPress={() => setVisible(false)} style={styles.close}>
+      {!!actionLabel && !!onAction && (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => {
+            if (actionUsed.current) return
+            actionUsed.current = true
+            setVisible(false)
+            onAction()
+            onDismiss?.()
+          }}
+          style={styles.action}
+        >
+          <Text style={[styles.actionText, { color: palette.text }]}>{actionLabel}</Text>
+        </Pressable>
+      )}
+      <Pressable accessibilityLabel="Fechar mensagem" accessibilityRole="button" hitSlop={8} onPress={() => {
+        setVisible(false)
+        onDismiss?.()
+      }} style={styles.close}>
         <Text style={[styles.closeText, { color: palette.text }]}>×</Text>
       </Pressable>
     </View>
@@ -64,6 +105,8 @@ const styles = StyleSheet.create({
     zIndex: 50,
   },
   message: { ...typography.label, flex: 1, fontWeight: '700', paddingVertical: shared.spacing.md },
+  action: { alignItems: 'center', justifyContent: 'center', minHeight: 48, paddingHorizontal: 8 },
+  actionText: { ...typography.label, fontWeight: '900', textDecorationLine: 'underline' },
   close: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 },
   closeText: { fontSize: 24, lineHeight: 28 },
 })

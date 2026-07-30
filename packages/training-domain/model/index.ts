@@ -20,7 +20,11 @@ export type SetType =
   | 'CIRCUIT' | 'TO_FAILURE' | 'CONTROLLED_TEMPO'
 export type SessionStatus = 'IN_PROGRESS' | 'PAUSED' | 'COMPLETED' | 'ABANDONED'
 export type SessionExerciseStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED'
-export type AutomaticBackupReason = 'BEFORE_IMPORT' | 'BEFORE_ERASE' | 'BEFORE_RESET_SEED'
+export type AutomaticBackupReason =
+  | 'BEFORE_IMPORT'
+  | 'BEFORE_ERASE'
+  | 'BEFORE_RESET_SEED'
+  | 'BEFORE_EMPTY_TRASH'
 
 export interface AutomaticBackupInfo {
   uri: string
@@ -251,6 +255,8 @@ export interface TrainingPlan {
   endDate: string | null
   active: boolean
   archived: boolean
+  deletedAt: string | null
+  purgeAt: string | null
   days: TrainingPlanDay[]
   createdAt: string
   updatedAt: string
@@ -388,7 +394,7 @@ export interface ExerciseLibraryQuery {
 }
 
 export interface TrainingBackup {
-  schemaVersion: 1
+  schemaVersion: 1 | 2
   appVersion: string
   exportedAt: string
   exercises: unknown[]

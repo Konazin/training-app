@@ -66,6 +66,64 @@ export function validateTrainingPlanInput(input: TrainingPlanInput): TrainingPla
   }
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000
+
+export function computeTrainingPlanPurgeAt(deletedAt: string, retentionDays = 7) {
+  const timestamp = Date.parse(deletedAt)
+  if (!isIsoUtc(deletedAt) || !Number.isFinite(retentionDays) || retentionDays <= 0) {
+    throw new DomainError('INVALID_TRAINING_PLAN_LIFECYCLE', 'Ciclo de vida da ficha inválido.')
+  }
+  return new Date(timestamp + retentionDays * DAY_MS).toISOString()
+}
+
+export function trainingPlanTrashDaysRemaining(purgeAt: string, now = new Date()) {
+  const purgeTimestamp = Date.parse(purgeAt)
+  if (!isIsoUtc(purgeAt) || Number.isNaN(now.getTime())) {
+    throw new DomainError('INVALID_TRAINING_PLAN_LIFECYCLE', 'Ciclo de vida da ficha inválido.')
+  }
+  return Math.max(0, Math.ceil((purgeTimestamp - now.getTime()) / DAY_MS))
+}
+
+export function trainingPlanTrashStatusLabel(purgeAt: string, now = new Date()) {
+  const remainingMs = Date.parse(purgeAt) - now.getTime()
+  if (!isIsoUtc(purgeAt) || Number.isNaN(now.getTime())) {
+    throw new DomainError('INVALID_TRAINING_PLAN_LIFECYCLE', 'Ciclo de vida da ficha inválido.')
+  }
+  if (remainingMs <= 0) return 'Pronta para exclusão'
+  if (remainingMs < DAY_MS) return 'Será apagada hoje'
+  const days = Math.ceil(remainingMs / DAY_MS)
+  return days === 1 ? 'Será apagada amanhã' : `Será apagada em ${days} dias`
+}
+
+export function validateTrainingPlanLifecycle(
+  plan: Pick<TrainingPlan, 'active' | 'archived' | 'deletedAt' | 'purgeAt'>,
+) {
+  const hasDeletedAt = plan.deletedAt !== null
+  const hasPurgeAt = plan.purgeAt !== null
+  const invalidState = (plan.active && plan.archived)
+    || (plan.active && hasDeletedAt)
+    || (plan.archived && hasDeletedAt)
+    || hasDeletedAt !== hasPurgeAt
+  if (invalidState) {
+    throw new DomainError('INVALID_TRAINING_PLAN_LIFECYCLE', 'Ciclo de vida da ficha inválido.')
+  }
+  if (hasDeletedAt) {
+    if (!isIsoUtc(plan.deletedAt!) || !isIsoUtc(plan.purgeAt!)
+      || Date.parse(plan.purgeAt!) - Date.parse(plan.deletedAt!) !== 7 * DAY_MS) {
+      throw new DomainError('INVALID_TRAINING_PLAN_LIFECYCLE', 'Ciclo de vida da ficha inválido.')
+    }
+  }
+  return plan
+}
+
+function isIsoUtc(value: string) {
+  const timestamp = Date.parse(value)
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value)
+    || Number.isNaN(timestamp)) return false
+  const normalized = new Date(timestamp).toISOString()
+  return value === normalized || value === normalized.replace('.000Z', 'Z')
+}
+
 export function validateTrainingPlanDayInput(input: TrainingPlanDayInput): TrainingPlanDayInput {
   const title = input.title.trim()
   if (!title) throw new DomainError('INVALID_TRAINING_DAY', 'Informe o título do dia.')
@@ -133,6 +191,7 @@ export function assertValidWeek(days: TrainingPlanDay[]) {
 
 export function validatePlan(plan: TrainingPlan) {
   validateTrainingPlanInput(plan)
+  validateTrainingPlanLifecycle(plan)
   assertValidWeek(plan.days)
   for (const day of plan.days) {
     validateTrainingPlanDayInput(day)
