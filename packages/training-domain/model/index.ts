@@ -146,7 +146,7 @@ export interface ExternalExerciseMediaCandidate {
 }
 
 export interface ExternalExerciseCandidate {
-  provider: 'WGER'
+  provider: import('../providers').ExerciseProviderId
   externalId: string
   name: string
   description: string
@@ -333,6 +333,10 @@ export interface SessionExercise {
   setType: SetType
   status: SessionExerciseStatus
   notes: string
+  userNotes: string
+  substituteExerciseDefinitionId: number | null
+  substituteName: string | null
+  substitutionReason: string | null
   sets: SetLog[]
 }
 

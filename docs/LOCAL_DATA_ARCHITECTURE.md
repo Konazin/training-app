@@ -56,6 +56,10 @@ As migrations 1 a 5 permanecem byte a byte iguais. A migration 6 adiciona
 `exercise_catalog_entries`, `exercise_aliases`, `exercise_favorites` e
 `exercise_recent_usage`, com chaves estrangeiras em cascata, unicidade e
 índices de busca/ordenação.
+A migration 7 adiciona somente `user_notes` e campos de substituição ao snapshot
+`workout_session_exercises`. As migrations 1 a 6 mantêm SQL e checksums
+publicados. Upgrade, repetição e falha injetada são cobertos por testes de
+rollback.
 Falhas de migration, seed, composição de repositories ou registro de startup
 fecham a conexão antes de permitir retry.
 
@@ -68,8 +72,9 @@ exclusivamente no SQLite.
 
 ## Integrações futuras
 
-Wger é uma integração manual; IA, saúde e backup remoto permanecem sem
-implementação real. Nenhuma integração roda no bootstrap ou background.
+Wger é uma integração manual registrada por capacidades tipadas; IA, saúde e
+backup remoto permanecem sem implementação real. Nenhuma integração roda no
+bootstrap ou background.
 
 Segredos futuros usam a porta `SecretsRepository` e deverão ser implementados
 com SecureStore. Eles não podem entrar em SQLite, AsyncStorage, `EXPO_PUBLIC_*`

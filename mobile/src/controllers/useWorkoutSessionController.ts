@@ -1,5 +1,6 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
+  LocalProgressionSuggestion,
   SessionExerciseStatus,
   SetLogInput,
   WorkoutSession,
@@ -24,24 +25,33 @@ export function useWorkoutSessionController(
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [busyKeys, setBusyKeys] = useState<Set<string>>(new Set())
   const busy = useRef(new Set<string>())
+  const mounted = useRef(true)
+
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
 
   const refresh = useCallback(async () => {
     setLoading(true)
     setMessage('')
     try {
       const [history, active] = await Promise.all([repository.getHistory(), repository.getActive()])
+      if (!mounted.current) return false
       setSessions(history)
       setActiveSession(active)
       const timer = active ? await restTimerStorage.get(active.id) : null
       const valid = timer && (timer.paused || timer.endsAt > Date.now())
-      setRestTimer(valid ? timer : null)
+      if (mounted.current) setRestTimer(valid ? timer : null)
       if (!valid) await restTimerStorage.clear()
       return true
     } catch (cause) {
-      setMessage(messageFrom(cause))
+      if (mounted.current) setMessage(messageFrom(cause))
       return false
     } finally {
-      setLoading(false)
+      if (mounted.current) setLoading(false)
     }
   }, [repository])
 
@@ -51,14 +61,15 @@ export function useWorkoutSessionController(
     setBusyKeys(new Set(busy.current))
     setErrors((current) => ({ ...current, [key]: '' }))
     try {
-      setActiveSession(await operation())
+      const session = await operation()
+      if (mounted.current) setActiveSession(session)
       return true
     } catch (cause) {
-      setErrors((current) => ({ ...current, [key]: messageFrom(cause) }))
+      if (mounted.current) setErrors((current) => ({ ...current, [key]: messageFrom(cause) }))
       return false
     } finally {
       busy.current.delete(key)
-      setBusyKeys(new Set(busy.current))
+      if (mounted.current) setBusyKeys(new Set(busy.current))
     }
   }, [])
 
@@ -69,14 +80,14 @@ export function useWorkoutSessionController(
     setMessage('')
     try {
       const session = await repository.start(planId, dayId)
-      setActiveSession(session)
+      if (mounted.current) setActiveSession(session)
       return true
     } catch (cause) {
-      setMessage(messageFrom(cause))
+      if (mounted.current) setMessage(messageFrom(cause))
       return false
     } finally {
       busy.current.delete('start')
-      setBusyKeys(new Set(busy.current))
+      if (mounted.current) setBusyKeys(new Set(busy.current))
     }
   }, [repository])
 
@@ -101,6 +112,58 @@ export function useWorkoutSessionController(
       `exercise:${exerciseId}`,
       () => repository.updateExerciseStatus(activeSession.id, exerciseId, status),
     )
+  }, [activeSession, mutate, repository])
+
+  const updateExerciseNotes = useCallback((exerciseId: number, notes: string) => {
+    if (!activeSession) return Promise.resolve(false)
+    return mutate(
+      `exercise-note:${exerciseId}`,
+      () => repository.updateExerciseNotes(activeSession.id, exerciseId, notes),
+    )
+  }, [activeSession, mutate, repository])
+
+  const updateSessionNotes = useCallback((notes: string) => {
+    if (!activeSession) return Promise.resolve(false)
+    return mutate('session-note', () => repository.updateSessionNotes(activeSession.id, notes))
+  }, [activeSession, mutate, repository])
+
+  const substituteExercise = useCallback((exerciseId: number, replacementId: number, reason: string) => {
+    if (!activeSession) return Promise.resolve(false)
+    return mutate(
+      `substitution:${exerciseId}`,
+      () => repository.substituteExercise(activeSession.id, exerciseId, replacementId, reason),
+    )
+  }, [activeSession, mutate, repository])
+
+  const undoSubstitution = useCallback((exerciseId: number) => {
+    if (!activeSession) return Promise.resolve(false)
+    return mutate(
+      `substitution:${exerciseId}`,
+      () => repository.undoSubstitution(activeSession.id, exerciseId),
+    )
+  }, [activeSession, mutate, repository])
+
+  const applySuggestion = useCallback(async (
+    exerciseId: number,
+    suggestion: LocalProgressionSuggestion,
+  ) => {
+    const exercise = activeSession?.exercises.find((item) => item.id === exerciseId)
+    if (!activeSession || !exercise || busy.current.has(`suggestion:${exerciseId}`)) return false
+    return mutate(`suggestion:${exerciseId}`, async () => {
+      let updated = activeSession
+      for (const set of exercise.sets.filter((item) => !item.completed)) {
+        updated = await repository.updateSet(activeSession.id, exerciseId, set.id, {
+          reps: suggestion.proposedReps ?? set.reps,
+          load: suggestion.proposedLoad ?? set.load,
+          durationSeconds: suggestion.proposedDurationSeconds ?? set.durationSeconds,
+          distance: set.distance,
+          rpe: set.rpe,
+          completed: false,
+          notes: set.notes,
+        })
+      }
+      return updated
+    })
   }, [activeSession, mutate, repository])
 
   const pause = useCallback(async () => {
@@ -137,18 +200,20 @@ export function useWorkoutSessionController(
     setBusyKeys(new Set(busy.current))
     try {
       const finished = await operation(activeSession.id)
-      setSessions((current) => [finished, ...current.filter((item) => item.id !== finished.id)])
-      setActiveSession(null)
-      setRestTimer(null)
+      if (mounted.current) {
+        setSessions((current) => [finished, ...current.filter((item) => item.id !== finished.id)])
+        setActiveSession(null)
+        setRestTimer(null)
+      }
       await restTimerStorage.clear()
       await onChanged?.()
       return true
     } catch (cause) {
-      setErrors((current) => ({ ...current, session: messageFrom(cause) }))
+      if (mounted.current) setErrors((current) => ({ ...current, session: messageFrom(cause) }))
       return false
     } finally {
       busy.current.delete('session')
-      setBusyKeys(new Set(busy.current))
+      if (mounted.current) setBusyKeys(new Set(busy.current))
     }
   }, [activeSession, onChanged])
 
@@ -193,6 +258,11 @@ export function useWorkoutSessionController(
     addSet,
     removeSet,
     setExerciseStatus,
+    updateExerciseNotes,
+    updateSessionNotes,
+    substituteExercise,
+    undoSubstitution,
+    applySuggestion,
     pause,
     resume,
     complete: (rpe: number | null, notes: string) =>

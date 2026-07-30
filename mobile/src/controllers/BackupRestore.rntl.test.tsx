@@ -59,6 +59,9 @@ function Harness({
       <Pressable accessibilityRole="button" onPress={() => void backup.retryRefresh()}>
         <Text>Tentar novamente</Text>
       </Pressable>
+      <Pressable accessibilityRole="button" onPress={() => void backup.exportBackup()}>
+        <Text>Exportar</Text>
+      </Pressable>
     </View>
   )
 }
@@ -93,5 +96,28 @@ describe('restauração pós-commit renderizada', () => {
     expect(mockRetryPreferences).toHaveBeenCalledTimes(1)
     expect(repository.restore).toHaveBeenCalledTimes(1)
     expect(onChanged).toHaveBeenCalledTimes(2)
+  })
+
+  it('limpa retry antigo somente após uma ação diferente concluída', async () => {
+    const repository = {
+      export: jest.fn(),
+      reset: jest.fn(),
+      restore: jest.fn(async () => ({
+        postCommitWarning: 'Preferências pendentes.',
+        retryPostCommit: mockRetryPreferences,
+      })),
+    } as unknown as BackupRepository
+    await renderAsync(createElement(Harness, {
+      repository,
+      onChanged: jest.fn(async () => ({ success: true, failedParts: [] })),
+    }))
+
+    fireEvent.press(screen.getByText('Restaurar'))
+    await waitFor(() => expect(screen.getByText('Preferências pendentes.')).toBeTruthy())
+    fireEvent.press(screen.getByText('Exportar'))
+    await waitFor(() => expect(screen.getByText('Backup exportado.')).toBeTruthy())
+    fireEvent.press(screen.getByText('Tentar novamente'))
+    await waitFor(() => expect(screen.getByText('Informações atualizadas.')).toBeTruthy())
+    expect(mockRetryPreferences).not.toHaveBeenCalled()
   })
 })

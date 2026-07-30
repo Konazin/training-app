@@ -58,6 +58,7 @@ const TABLES = {
     'primary_video_author', 'attribution', 'sort_order', 'planned_sets',
     'planned_min_reps', 'planned_max_reps', 'planned_load', 'planned_duration_seconds',
     'planned_distance', 'rest_seconds', 'set_type', 'status', 'notes',
+    'user_notes', 'substitute_exercise_definition_id', 'substitute_name', 'substitution_reason',
   ],
   workout_set_logs: [
     'id', 'workout_session_exercise_id', 'set_number', 'reps', 'load',

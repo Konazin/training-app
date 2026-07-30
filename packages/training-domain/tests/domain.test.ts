@@ -123,6 +123,13 @@ describe('training-domain', () => {
       .toMatchObject({ status: 'COMPLETED', totalDurationSeconds: 240, overallRpe: 8 })
     expect(finishWorkoutSession(session, 'ABANDONED', null, '', new Date('2026-07-29T12:01:00.000Z')).status)
       .toBe('ABANDONED')
+    expect(() => finishWorkoutSession(
+      session,
+      'COMPLETED',
+      8,
+      'a'.repeat(2_001),
+      new Date('2026-07-29T12:01:00.000Z'),
+    )).toThrow('2000')
     expect(() => pauseWorkoutSession(paused, now)).toThrow('Transição')
   })
 
@@ -159,6 +166,10 @@ describe('training-domain', () => {
     expect(() => validateSetLogInput({
       reps: 1, load: 0, durationSeconds: 0, distance: 0, rpe: 11, completed: false, notes: '',
     })).toThrow('RPE')
+    expect(() => validateSetLogInput({
+      reps: 1, load: 0, durationSeconds: 0, distance: 0, rpe: 7,
+      completed: false, notes: 'a'.repeat(501),
+    })).toThrow('500')
   })
 
   it('calcula e valida o ciclo UTC da lixeira', () => {

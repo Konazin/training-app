@@ -1,10 +1,11 @@
+import { useState } from 'react'
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
 import { ScreenScrollView } from '../components/Screen'
 import { ScreenHeader } from '../components/ScreenHeader'
 import { shared, type ThemeColors, useTheme } from '../theme'
 import { triggerHaptic } from '../theme/haptics'
 import { typography } from '../theme/typography'
-import type { AutomaticBackupInfo } from '@training/training-domain'
+import type { AutomaticBackupInfo, LocalNotice } from '@training/training-domain'
 import {
   trashBadgeAccessibilityLabel,
   trashBadgeText,
@@ -26,6 +27,8 @@ export function MoreScreen({
   onShareAutomatic,
   onDeleteAutomatic,
   onDeleteAllAutomatic,
+  notices,
+  onOnboarding,
 }: {
   busy: boolean
   onIntegrations: () => void
@@ -42,9 +45,13 @@ export function MoreScreen({
   onShareAutomatic: (uri: string) => void
   onDeleteAutomatic: (uri: string) => void
   onDeleteAllAutomatic: () => void
+  notices: LocalNotice[]
+  onOnboarding: () => void
 }) {
   const { colors, preferences } = useTheme()
   const styles = createStyles(colors)
+  const [dismissedNotices, setDismissedNotices] = useState<Set<string>>(new Set())
+  const visibleNotices = notices.filter((notice) => !dismissedNotices.has(notice.id))
   const confirmErase = () => Alert.alert(
     'Apagar todos os dados?',
     'Um backup automático será criado antes. Esta ação remove fichas, exercícios e histórico deste aparelho.',
@@ -82,11 +89,28 @@ export function MoreScreen({
         title="Mais"
         description="Backup e dados do aparelho. Nenhuma destas ações usa servidor."
       />
+      {!!visibleNotices.length && <Text style={styles.section}>AVISOS</Text>}
+      {visibleNotices.map((notice) => (
+        <View accessibilityLiveRegion="polite" key={notice.id} style={styles.notice}>
+          <Text style={styles.noticeText}>{notice.message}</Text>
+          <SmallAction
+            label="Dispensar"
+            disabled={false}
+            onPress={() => setDismissedNotices((current) => new Set(current).add(notice.id))}
+          />
+        </View>
+      ))}
       <Text style={styles.section}>APARÊNCIA</Text>
       <MenuItem
         label="Aparência e acessibilidade"
         detail="Tema, movimento, contraste e feedback tátil"
         onPress={onAppearance}
+        disabled={busy}
+      />
+      <MenuItem
+        label="Conhecer o aplicativo"
+        detail="Reabrir a apresentação inicial"
+        onPress={onOnboarding}
         disabled={busy}
       />
       <Text style={styles.section}>CONTEÚDO</Text>
@@ -244,6 +268,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   badge: { alignItems: 'center', backgroundColor: colors.danger, borderRadius: 12, justifyContent: 'center', minHeight: 24, minWidth: 24, paddingHorizontal: 7 },
   badgeText: { color: colors.onPrimary, fontSize: 12, fontWeight: '900' },
   note: { ...typography.bodySmall, color: colors.textSecondary, marginTop: 18 },
+  notice: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 17, borderWidth: 1, gap: 10, marginBottom: 8, padding: 16 },
+  noticeText: { ...typography.bodySmall, color: colors.textPrimary },
   backup: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 17, borderWidth: 1, marginBottom: 8, padding: 16 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 10 },
   smallAction: { alignItems: 'center', borderColor: colors.border, borderRadius: 10, borderWidth: 1, justifyContent: 'center', minHeight: shared.touchTarget.minimum, paddingHorizontal: 12 },

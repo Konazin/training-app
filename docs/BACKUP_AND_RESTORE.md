@@ -18,6 +18,12 @@ uso recente e aliases criados pelo usuário. Backups v2 antigos sem esses campos
 usam padrões seguros. O catálogo canônico `BUNDLED` não precisa ser repetido no
 arquivo: ele é sincronizado na mesma transação da restauração.
 
+A partir da migration 7, snapshots de exercício incluem anotação da sessão e
+dados de substituição. Esses campos permanecem dentro do mesmo
+`schemaVersion: 2`; arquivos v2 anteriores, sem as colunas, restauram valores
+nulos ou vazios. Observações de série e anotação geral da sessão já usam as
+coleções existentes.
+
 Não contém chaves, tokens, arquivos de vídeo, caches ou estado do player.
 
 O arquivo é limitado a 25 MB. A validação rejeita IDs repetidos ou não
@@ -56,6 +62,8 @@ rollback, inclusive falha ao sincronizar o catálogo. Se apenas a aplicação da
 preferências no AsyncStorage falhar, o banco continua restaurado e o app mostra
 um aviso com **Tentar novamente**. Essa tentativa repete somente as preferências
 e a atualização da interface; nunca restaura nem altera o SQLite outra vez.
+Uma ação de backup diferente e concluída substitui explicitamente esse contexto
+e remove qualquer retry pós-commit antigo; falhas não limpam uma pendência real.
 
 ## Backups automáticos
 

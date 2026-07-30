@@ -78,6 +78,10 @@ export interface WorkoutSessionRepository {
   addSet(sessionId: number, exerciseId: number): Promise<WorkoutSession>
   removeSet(sessionId: number, exerciseId: number, setId: number): Promise<WorkoutSession>
   updateExerciseStatus(sessionId: number, exerciseId: number, status: SessionExerciseStatus): Promise<WorkoutSession>
+  updateExerciseNotes(sessionId: number, exerciseId: number, notes: string): Promise<WorkoutSession>
+  updateSessionNotes(sessionId: number, notes: string): Promise<WorkoutSession>
+  substituteExercise(sessionId: number, exerciseId: number, replacementId: number, reason: string): Promise<WorkoutSession>
+  undoSubstitution(sessionId: number, exerciseId: number): Promise<WorkoutSession>
   pause(sessionId: number): Promise<WorkoutSession>
   resume(sessionId: number): Promise<WorkoutSession>
   complete(sessionId: number, overallRpe: number | null, notes: string): Promise<WorkoutSession>

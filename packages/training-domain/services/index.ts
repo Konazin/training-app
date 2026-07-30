@@ -9,7 +9,7 @@ import type {
   WorkoutSession,
 } from '../model'
 import { WEEKDAYS } from '../model'
-import { invalidTransition, notFound, trainingPlanInTrash } from '../errors'
+import { DomainError, invalidTransition, notFound, trainingPlanInTrash } from '../errors'
 import {
   calculateHistoryProgress,
   historyStats,
@@ -113,6 +113,10 @@ export function snapshotExercise(source: TrainingDayExercise, id: number, makeSe
     setType: source.setType,
     status: 'PENDING',
     notes: source.notes,
+    userNotes: '',
+    substituteExerciseDefinitionId: null,
+    substituteName: null,
+    substitutionReason: null,
     sets: Array.from({ length: source.sets }, (_, index) => ({
       id: makeSetId(),
       setNumber: index + 1,
@@ -224,6 +228,10 @@ export function finishWorkoutSession(
 ) {
   if (!['IN_PROGRESS', 'PAUSED'].includes(session.status)) throw invalidTransition()
   validateRpe(overallRpe)
+  const finalNotes = notes.trim()
+  if (finalNotes.length > 2_000) {
+    throw new DomainError('INVALID_WORKOUT_NOTE', 'A anotação da sessão deve ter no máximo 2000 caracteres.')
+  }
   const pausedAt = session.pausedAt ? new Date(session.pausedAt) : null
   if (session.status === 'PAUSED' && (!pausedAt || Number.isNaN(pausedAt.getTime()) || now < pausedAt)) {
     throw invalidTransition()
@@ -239,7 +247,7 @@ export function finishWorkoutSession(
     pausedAt: null,
     pausedDurationSeconds,
     overallRpe,
-    notes: notes.trim(),
+    notes: finalNotes,
   }
   return { ...finished, totalDurationSeconds: sessionDuration(finished, now) }
 }

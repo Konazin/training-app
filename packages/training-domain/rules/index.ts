@@ -181,7 +181,11 @@ export function validateSetLogInput(input: SetLogInput): SetLogInput {
   validateOptionalNonNegativeNumber(input.durationSeconds, 'Duração')
   validateOptionalNonNegativeNumber(input.distance, 'Distância')
   validateRpe(input.rpe)
-  return { ...input, notes: input.notes.trim() }
+  const notes = input.notes.trim()
+  if (notes.length > 500) {
+    throw new DomainError('INVALID_SET_LOG', 'A observação da série deve ter no máximo 500 caracteres.')
+  }
+  return { ...input, notes }
 }
 
 export function localDateKey(date: Date) {

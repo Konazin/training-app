@@ -4,6 +4,11 @@ Wger é um catálogo público e comunitário de exercícios. No Training App, el
 uma integração opcional: o aplicativo continua abrindo e funcionando sem
 internet, conta, chave de API, backend próprio ou VPS.
 
+Wger é o único provider do registro genérico atual. A tela informa
+**Manual · Requer internet · Sem sincronização automática** e suas capacidades
+de busca, importação, atualização, mídia e atribuição. Consulte
+[`PROVIDER_ARCHITECTURE.md`](PROVIDER_ARCHITECTURE.md).
+
 ## Privacidade e conexão
 
 A internet é usada somente quando você abre **Mais → Integrações → Catálogo

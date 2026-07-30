@@ -47,6 +47,8 @@ export function useBackupController(
     try {
       const result = await operation()
       await refreshBackups()
+      postCommitRetry.current = null
+      setRefreshPending(false)
       if (result) {
         setMessageKind('success')
         setMessage(result)

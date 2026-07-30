@@ -295,6 +295,10 @@ function sessionExercise(
     setType: 'NORMAL',
     status,
     notes: '',
+    userNotes: '',
+    substituteExerciseDefinitionId: null,
+    substituteName: null,
+    substitutionReason: null,
     sets: loads.map((load, index) => ({
       id: index + 1,
       setNumber: index + 1,

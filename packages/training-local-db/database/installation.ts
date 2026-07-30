@@ -8,6 +8,8 @@ export const APP_METADATA_KEYS = {
   seedSuppressed: 'seed.suppressed',
   automaticBackups: 'last.automatic.backup',
   lastStartup: 'last.successful.startup',
+  onboardingEligible: 'onboarding.eligible',
+  onboardingComplete: 'onboarding.complete',
 } as const
 
 export interface AppMetadataRepository {
@@ -46,6 +48,8 @@ export async function initializeFirstInstallation(database: SqlDatabase, seed: S
     await setMetadata(transaction, APP_METADATA_KEYS.initialized, true)
     await setMetadata(transaction, APP_METADATA_KEYS.seedVersion, seed.version)
     await setMetadata(transaction, APP_METADATA_KEYS.seedSuppressed, false)
+    await setMetadata(transaction, APP_METADATA_KEYS.onboardingEligible, true)
+    await setMetadata(transaction, APP_METADATA_KEYS.onboardingComplete, false)
   })
   return true
 }

@@ -1,11 +1,11 @@
 # Roadmap do produto
 
-1. **Ciclo de vida das fichas e lixeira — Marco 1 ESTABILIZADO**
-2. **Editor de ficha, templates e duplicação — Marco 2 IMPLEMENTADO, smoke Android pendente**
-3. **Home semanal e progresso — Marco 3 IMPLEMENTADO, smoke Android pendente**
-4. **Temas, movimento e acessibilidade — Marco 4 EM VALIDAÇÃO**
-5. **Biblioteca inicial e mídia — Marco 5 EM VALIDAÇÃO**
-6. **Providers, inteligência local e release candidate — PLANEJADO**
+1. **Ciclo de vida das fichas e lixeira — Marco 1 IMPLEMENTADO**
+2. **Editor de ficha, templates e duplicação — Marco 2 IMPLEMENTADO, smoke consolidado pendente**
+3. **Home semanal e progresso — Marco 3 IMPLEMENTADO, smoke consolidado pendente**
+4. **Temas, movimento e acessibilidade — Marco 4 IMPLEMENTADO, smoke físico pendente**
+5. **Biblioteca inicial e mídia — Marco 5 IMPLEMENTADO, smoke físico pendente**
+6. **Providers, inteligência local e release candidate — Marco 6 EM VALIDAÇÃO**
 
 ## Marco 1 estabilizado
 
@@ -83,6 +83,22 @@ emulador Android com TalkBack, fonte ampliada e redução de movimento.
 
 O Marco 5 permanece em validação até o smoke Android do catálogo, mídia,
 upgrade e backup. O Wger continua manual e não participa do bootstrap.
+
+## Marco 6 em validação
+
+- registry tipado de providers, mantendo Wger como integração manual;
+- último desempenho baseado em snapshots concluídos;
+- progressão determinística, explicada, dispensável e nunca automática;
+- substituição local com motivo e desfazer;
+- anotações de série, exercício e sessão;
+- migration 7 aditiva, preservando byte a byte as migrations 1 a 6;
+- backups v2 antigos compatíveis;
+- avisos locais e onboarding dispensável somente em instalações novas;
+- versão mobile 0.9.0, `versionCode` 12.
+
+O release candidate 0.9.0 só passa a **PRONTO PARA TESTES** depois de todas as
+validações automatizadas e da geração e inspeção do APK. O smoke físico segue
+pendente e o produto não está marcado como pronto para produção.
 
 ## Adiado
 

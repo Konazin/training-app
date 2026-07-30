@@ -11,7 +11,11 @@ import { Ionicons } from '@expo/vector-icons'
 import { NavigationBar } from 'expo-navigation-bar'
 import { StatusBar } from 'expo-status-bar'
 import { type LocalRepositories, type SeedData } from '@training/training-local-db'
-import { calculateHistoryProgress, type BackupRepository } from '@training/training-domain'
+import {
+  buildLocalNotices,
+  calculateHistoryProgress,
+  type BackupRepository,
+} from '@training/training-domain'
 import seed from './assets/seeds/exercises.v1.json'
 import type { MainTabParamList, RootStackParamList } from './src/navigation/types'
 import { useTrainingController } from './src/controllers/useTrainingController'
@@ -54,6 +58,8 @@ import {
 import { systemBarStyle } from './src/theme/uiContracts'
 import { bundledCatalog } from './src/features/exercise-library/bundledCatalog'
 import { isUiPreferences, type UiPreferences } from './src/theme/preferences'
+import { Onboarding } from './src/features/onboarding/Onboarding'
+import { useOnboarding } from './src/features/onboarding/useOnboarding'
 
 const Stack = createNativeStackNavigator<RootStackParamList>()
 const Tabs = createBottomTabNavigator<MainTabParamList>()
@@ -113,6 +119,7 @@ function LocalApp({
   const controller = useTrainingController(repositories.exercises, repositories.dashboard)
   const trainingPlan = useTrainingPlanController(repositories.plans, controller.refresh)
   const workoutSession = useWorkoutSessionController(repositories.sessions, controller.refresh)
+  const onboarding = useOnboarding(repositories.metadata)
   const trashRefresh = useRef<() => Promise<boolean>>(async () => true)
   const refreshAll = useCallback((): Promise<RefreshAllResult> => runRefreshParts([
     { name: 'sessão', refresh: workoutSession.refresh },
@@ -217,6 +224,16 @@ function LocalApp({
                     backup={backup}
                     trash={trash}
                     refreshAll={refreshAll}
+                    notices={buildLocalNotices({
+                      activeSession: workoutSession.activeSession,
+                      hasActivePlan: trainingPlan.trainingPlans.some((plan) =>
+                        plan.active && !plan.archived && plan.deletedAt === null),
+                      providerMediaUnavailable: controller.exerciseLibrary.some((exercise) =>
+                        exercise.source === 'WGER'
+                        && !exercise.primaryImageUrl
+                        && !exercise.primaryVideoUrl),
+                    })}
+                    onOnboarding={onboarding.reopen}
                   />
                 )}
               </Stack.Screen>
@@ -349,6 +366,8 @@ function LocalApp({
                 {() => (
                   <WorkoutSessionScreen
                     session={workoutSession.activeSession}
+                    history={workoutSession.sessions}
+                    library={controller.exerciseLibrary}
                     restTimer={workoutSession.restTimer}
                     errors={workoutSession.errors}
                     busyKeys={workoutSession.busyKeys}
@@ -356,6 +375,11 @@ function LocalApp({
                     onAddSet={workoutSession.addSet}
                     onRemoveSet={workoutSession.removeSet}
                     onSetExerciseStatus={workoutSession.setExerciseStatus}
+                    onUpdateExerciseNotes={workoutSession.updateExerciseNotes}
+                    onUpdateSessionNotes={workoutSession.updateSessionNotes}
+                    onApplySuggestion={workoutSession.applySuggestion}
+                    onSubstituteExercise={workoutSession.substituteExercise}
+                    onUndoSubstitution={workoutSession.undoSubstitution}
                     onPause={workoutSession.pause}
                     onResume={workoutSession.resume}
                     onComplete={workoutSession.complete}
@@ -391,6 +415,11 @@ function LocalApp({
           )
           : undefined}
       />
+      <Onboarding
+        visible={onboarding.visible}
+        onSkip={onboarding.skip}
+        onComplete={onboarding.complete}
+      />
     </>
   )
 }
@@ -403,6 +432,8 @@ function MainTabs({
   backup,
   trash,
   refreshAll,
+  notices,
+  onOnboarding,
 }: {
   navigation: NativeStackNavigationProp<RootStackParamList>
   controller: ReturnType<typeof useTrainingController>
@@ -411,6 +442,8 @@ function MainTabs({
   backup: ReturnType<typeof useBackupController>
   trash: ReturnType<typeof useTrainingPlanTrashController>
   refreshAll: () => Promise<RefreshAllResult>
+  notices: ReturnType<typeof buildLocalNotices>
+  onOnboarding: () => void
 }) {
   const { colors, preferences } = useTheme()
   const insets = useSafeAreaInsets()
@@ -547,6 +580,8 @@ function MainTabs({
             onShareAutomatic={(uri) => void backup.shareAutomatic(uri)}
             onDeleteAutomatic={(uri) => void backup.deleteAutomatic(uri)}
             onDeleteAllAutomatic={() => void backup.deleteAllAutomatic()}
+            notices={notices}
+            onOnboarding={onOnboarding}
           />
         )}
       </Tabs.Screen>

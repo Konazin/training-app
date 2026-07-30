@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   Linking,
@@ -13,11 +13,18 @@ import { useNavigation, usePreventRemove } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import type { RootStackParamList } from '../../../navigation/types'
 import type {
+  ExerciseDefinition,
+  LocalProgressionSuggestion,
   SessionExercise,
   SessionExerciseStatus,
   SetLog,
   SetLogInput,
   WorkoutSession,
+} from '@training/training-domain'
+import {
+  rankExerciseSubstitutions,
+  selectPreviousPerformance,
+  suggestProgression,
 } from '@training/training-domain'
 import type { RestTimerState } from '../model/restTimer'
 import { Screen, ScreenScrollView } from '../../../components/Screen'
@@ -29,6 +36,8 @@ import { triggerHaptic } from '../../../theme/haptics'
 
 interface Props {
   session: WorkoutSession | null
+  history: WorkoutSession[]
+  library: ExerciseDefinition[]
   restTimer: RestTimerState | null
   errors: Record<string, string>
   busyKeys: Set<string>
@@ -36,6 +45,11 @@ interface Props {
   onAddSet: (exerciseId: number) => Promise<boolean>
   onRemoveSet: (exerciseId: number, setId: number) => Promise<boolean>
   onSetExerciseStatus: (exerciseId: number, status: SessionExerciseStatus) => Promise<boolean>
+  onUpdateExerciseNotes: (exerciseId: number, notes: string) => Promise<boolean>
+  onUpdateSessionNotes: (notes: string) => Promise<boolean>
+  onApplySuggestion: (exerciseId: number, suggestion: LocalProgressionSuggestion) => Promise<boolean>
+  onSubstituteExercise: (exerciseId: number, replacementId: number, reason: string) => Promise<boolean>
+  onUndoSubstitution: (exerciseId: number) => Promise<boolean>
   onPause: () => Promise<boolean>
   onResume: () => Promise<boolean>
   onComplete: (rpe: number | null, notes: string) => Promise<boolean>
@@ -48,6 +62,8 @@ interface Props {
 export function WorkoutSessionScreen(props: Props) {
   const {
     session,
+    history,
+    library,
     restTimer,
     errors,
     busyKeys,
@@ -55,6 +71,11 @@ export function WorkoutSessionScreen(props: Props) {
     onAddSet,
     onRemoveSet,
     onSetExerciseStatus,
+    onUpdateExerciseNotes,
+    onUpdateSessionNotes,
+    onApplySuggestion,
+    onSubstituteExercise,
+    onUndoSubstitution,
     onPause,
     onResume,
     onComplete,
@@ -68,11 +89,19 @@ export function WorkoutSessionScreen(props: Props) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>()
   const [now, setNow] = useState(Date.now())
   const [rpe, setRpe] = useState('')
-  const [notes, setNotes] = useState('')
+  const [notes, setNotes] = useState(session?.notes ?? '')
   const [canLeave, setCanLeave] = useState(false)
   const [videoExercise, setVideoExercise] = useState<SessionExercise | null>(null)
   const [videoRetryKey, setVideoRetryKey] = useState(0)
+  const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<number>>(new Set())
+  const [substitutionFor, setSubstitutionFor] = useState<number | null>(null)
+  const [sessionNoteSaved, setSessionNoteSaved] = useState(false)
   const notifiedTimer = useRef('')
+  const noteSession = useRef(session?.id)
+  const definitions = useMemo(
+    () => new Map(library.map((exercise) => [exercise.id, exercise])),
+    [library],
+  )
   const closeVideo = () => {
     setVideoExercise(null)
     setVideoRetryKey(0)
@@ -97,6 +126,14 @@ export function WorkoutSessionScreen(props: Props) {
     const timer = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(timer)
   }, [])
+
+  useEffect(() => {
+    if (session && noteSession.current !== session.id) {
+      noteSession.current = session.id
+      setNotes(session.notes)
+      setSessionNoteSaved(false)
+    }
+  }, [session])
 
   const remaining = restTimer
     ? Math.max(0, Math.ceil((
@@ -241,6 +278,20 @@ export function WorkoutSessionScreen(props: Props) {
       )}
 
       {session.exercises.map((exercise, index) => {
+        const definition = definitions.get(exercise.exerciseDefinitionId)
+        const previous = selectPreviousPerformance(
+          history,
+          exercise.exerciseDefinitionId,
+          session.trainingPlanId,
+        )
+        const suggestion = suggestProgression(
+          exercise,
+          previous,
+          definition?.equipment.toLocaleLowerCase('pt-BR').includes('peso corporal') ?? false,
+        )
+        const substitutions = definition
+          ? rankExerciseSubstitutions(definition, library).slice(0, 4)
+          : []
         const statusLabel = exercise.status === 'SKIPPED'
           ? 'Pulado'
           : exercise.sets.length > 0 && exercise.sets.every((set) => set.completed)
@@ -256,6 +307,11 @@ export function WorkoutSessionScreen(props: Props) {
             <Text style={styles.index}>{index + 1}</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.exerciseName}>{exercise.name}</Text>
+              {!!exercise.substituteName && (
+                <Text style={styles.substitution}>
+                  Substituído por {exercise.substituteName}
+                </Text>
+              )}
               <Text style={styles.muted}>
                 {exercise.category === 'CARDIO' || exercise.timed
                   ? 'Duração'
@@ -285,6 +341,93 @@ export function WorkoutSessionScreen(props: Props) {
             </TouchableOpacity>
           </View>
 
+          {previous && (
+            <View style={styles.reference}>
+              <Text style={styles.referenceTitle}>Último desempenho</Text>
+              <Text style={styles.referenceText}>
+                {new Date(previous.completedAt).toLocaleDateString('pt-BR')} · {previous.completedSetCount} série(s)
+              </Text>
+              <Text style={styles.referenceText}>
+                Carga anterior: {previous.load == null ? 'não registrada' : `${previous.load} kg`}
+              </Text>
+              <Text style={styles.referenceText}>
+                Repetições anteriores: {previous.reps.length ? previous.reps.join(' · ') : 'não registradas'}
+              </Text>
+              <Text style={styles.referenceText}>
+                RPE anterior: {previous.lastRpe ?? 'não registrado'}
+              </Text>
+              <Text style={styles.referenceText}>
+                Anotação anterior: {previous.annotation ?? 'nenhuma'}
+              </Text>
+            </View>
+          )}
+
+          {suggestion.type !== 'NO_HISTORY' && !dismissedSuggestions.has(exercise.id) && (
+            <View accessibilityLabel="Sugestão local disponível" style={styles.suggestion}>
+              <Text style={styles.suggestionTitle}>Sugestão local</Text>
+              <Text style={styles.referenceText}>{suggestion.reason}</Text>
+              <Text style={styles.referenceText}>
+                {suggestion.proposedLoad != null
+                  ? `Carga proposta: ${suggestion.proposedLoad} kg`
+                  : suggestion.proposedDurationSeconds != null
+                    ? `Duração proposta: ${suggestion.proposedDurationSeconds} s`
+                    : suggestion.proposedReps != null
+                      ? `Repetições propostas: ${suggestion.proposedReps}`
+                      : 'Manter o alvo atual.'}
+              </Text>
+              <View style={styles.inlineActions}>
+                <SmallAction
+                  label="Aplicar nesta sessão"
+                  disabled={busyKeys.has(`suggestion:${exercise.id}`)}
+                  onPress={() => void (async () => {
+                    if (await onApplySuggestion(exercise.id, suggestion)) {
+                      setDismissedSuggestions((current) => new Set(current).add(exercise.id))
+                    }
+                  })()}
+                />
+                <SmallAction
+                  label="Dispensar"
+                  onPress={() => setDismissedSuggestions((current) => new Set(current).add(exercise.id))}
+                />
+              </View>
+            </View>
+          )}
+
+          <View style={styles.substitutionPanel}>
+            {exercise.substituteExerciseDefinitionId ? (
+              <SmallAction
+                label="Desfazer substituição"
+                disabled={busyKeys.has(`substitution:${exercise.id}`)}
+                onPress={() => void onUndoSubstitution(exercise.id)}
+              />
+            ) : (
+              <SmallAction
+                label="Ver substituições"
+                disabled={!substitutions.length}
+                onPress={() => setSubstitutionFor(
+                  substitutionFor === exercise.id ? null : exercise.id)}
+              />
+            )}
+            {substitutionFor === exercise.id && substitutions.map((candidate) => (
+              <TouchableOpacity
+                key={candidate.exercise.id}
+                accessibilityRole="button"
+                disabled={busyKeys.has(`substitution:${exercise.id}`)}
+                onPress={() => void (async () => {
+                  if (await onSubstituteExercise(
+                    exercise.id,
+                    candidate.exercise.id,
+                    candidate.reason,
+                  )) setSubstitutionFor(null)
+                })()}
+                style={styles.substitutionOption}
+              >
+                <Text style={styles.substitutionName}>{candidate.exercise.name}</Text>
+                <Text style={styles.referenceText}>{candidate.reason}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
           {exercise.sets.map((set) => (
             <SetEditor
               key={set.id}
@@ -297,6 +440,12 @@ export function WorkoutSessionScreen(props: Props) {
               onStartRest={() => onStartRest(exercise.id, set.id, exercise.restSeconds)}
             />
           ))}
+
+          <ExerciseNotesEditor
+            exercise={exercise}
+            busy={busyKeys.has(`exercise-note:${exercise.id}`)}
+            onSave={(value) => onUpdateExerciseNotes(exercise.id, value)}
+          />
 
           {!!errors[`exercise:${exercise.id}`] && (
             <Text accessibilityLiveRegion="polite" style={styles.error}>{errors[`exercise:${exercise.id}`]}</Text>
@@ -324,12 +473,31 @@ export function WorkoutSessionScreen(props: Props) {
           style={styles.input}
         />
         <ThemedTextInput
-          accessibilityLabel="Observações da sessão"
+          accessibilityLabel="Anotações da sessão"
           value={notes}
-          onChangeText={setNotes}
-          placeholder="Observações da sessão"
+          onChangeText={(value) => {
+            setNotes(value.slice(0, 2_000))
+            setSessionNoteSaved(false)
+          }}
+          placeholder="Anotações da sessão"
+          multiline
+          maxLength={2_000}
           style={styles.input}
         />
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityState={{ disabled: busyKeys.has('session-note') }}
+          disabled={busyKeys.has('session-note')}
+          style={styles.saveSet}
+          onPress={() => void (async () => {
+            setSessionNoteSaved(await onUpdateSessionNotes(notes))
+          })()}
+        >
+          <Text style={styles.saveSetText}>Salvar anotação</Text>
+        </TouchableOpacity>
+        {sessionNoteSaved && (
+          <Text accessibilityLiveRegion="polite" style={styles.saved}>Anotação salva.</Text>
+        )}
         {!!errors.session && <Text accessibilityLiveRegion="polite" style={styles.error}>{errors.session}</Text>}
         <TouchableOpacity
           accessibilityRole="button"
@@ -381,6 +549,69 @@ export function WorkoutSessionScreen(props: Props) {
       </Screen>
     </Modal>}
   </>)
+}
+
+function ExerciseNotesEditor({
+  exercise,
+  busy,
+  onSave,
+}: {
+  exercise: SessionExercise
+  busy: boolean
+  onSave: (notes: string) => Promise<boolean>
+}) {
+  const { colors, preferences } = useTheme()
+  const styles = createStyles(colors, preferences.workoutHighContrast)
+  const [notes, setNotes] = useState(exercise.userNotes)
+  const [saved, setSaved] = useState(false)
+  useEffect(() => setNotes(exercise.userNotes), [exercise.userNotes])
+  return (
+    <View style={styles.exerciseNotes}>
+      <Text style={styles.referenceTitle}>Anotações do exercício</Text>
+      <ThemedTextInput
+        accessibilityLabel={`Anotações do exercício ${exercise.name}`}
+        value={notes}
+        onChangeText={(value) => {
+          setNotes(value.slice(0, 1_000))
+          setSaved(false)
+        }}
+        multiline
+        maxLength={1_000}
+        placeholder="Anotação desta sessão"
+        style={styles.setNotes}
+      />
+      <SmallAction
+        label={busy ? 'Salvando…' : 'Salvar anotação'}
+        disabled={busy}
+        onPress={() => void (async () => setSaved(await onSave(notes)))()}
+      />
+      {saved && <Text accessibilityLiveRegion="polite" style={styles.saved}>Anotação salva.</Text>}
+    </View>
+  )
+}
+
+function SmallAction({
+  label,
+  onPress,
+  disabled = false,
+}: {
+  label: string
+  onPress: () => void
+  disabled?: boolean
+}) {
+  const { colors, preferences } = useTheme()
+  const styles = createStyles(colors, preferences.workoutHighContrast)
+  return (
+    <TouchableOpacity
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={styles.smallAction}
+    >
+      <Text style={styles.smallActionText}>{label}</Text>
+    </TouchableOpacity>
+  )
 }
 
 function SetEditor({
@@ -457,6 +688,7 @@ function SetEditor({
         value={notes}
         onChangeText={setNotes}
         placeholder="Observação opcional"
+        maxLength={500}
         style={styles.setNotes}
       />
       {!!error && <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text>}
@@ -591,6 +823,20 @@ const createStyles = (colors: ThemeColors, highContrast = false) => {
   checkedText: { color: onCompleted },
   addSet: { alignItems: 'center', borderTopColor: border, borderTopWidth: borderWidth, justifyContent: 'center', minHeight: 56 },
   addSetText: { color: colors.primary, fontSize: 14, fontWeight: '800' },
+  reference: { borderTopColor: border, borderTopWidth: borderWidth, gap: 4, padding: 16 },
+  referenceTitle: { color: text, fontSize: 15, fontWeight: '900' },
+  referenceText: { color: secondaryText, fontSize: 13, lineHeight: 19 },
+  suggestion: { backgroundColor: colors.surfaceSecondary, borderTopColor: border, borderTopWidth: borderWidth, gap: 6, padding: 16 },
+  suggestionTitle: { color: colors.primary, fontSize: 15, fontWeight: '900' },
+  inlineActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 5 },
+  smallAction: { alignItems: 'center', borderColor: border, borderRadius: 11, borderWidth, justifyContent: 'center', minHeight: 48, paddingHorizontal: 12 },
+  smallActionText: { color: text, fontSize: 13, fontWeight: '800' },
+  substitution: { color: colors.primary, fontSize: 13, fontWeight: '800', marginTop: 4 },
+  substitutionPanel: { borderTopColor: border, borderTopWidth: borderWidth, gap: 8, padding: 16 },
+  substitutionOption: { borderColor: border, borderRadius: 12, borderWidth, minHeight: 56, padding: 12 },
+  substitutionName: { color: text, fontSize: 14, fontWeight: '800' },
+  exerciseNotes: { borderTopColor: border, borderTopWidth: borderWidth, gap: 8, padding: 16 },
+  saved: { color: completed, fontSize: 13, fontWeight: '800' },
   finish: { backgroundColor: surface, borderColor: border, borderRadius: 22, borderWidth, gap: 12, marginTop: 5, padding: 16 },
   input: { backgroundColor: highContrast ? background : colors.surfaceSecondary, borderColor: border, borderRadius: 14, borderWidth, color: text, fontSize: 16, minHeight: 56, paddingHorizontal: 14 },
   primary: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 16, justifyContent: 'center', minHeight: 56, paddingHorizontal: 20 },

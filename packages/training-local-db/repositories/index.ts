@@ -1203,6 +1203,61 @@ function sessionRepository(database: SqlDatabase): WorkoutSessionRepository {
       if (!result.changes) throw notFound('Exercício da sessão')
       return requireSession(sessionId)
     },
+    updateExerciseNotes: async (sessionId, exerciseId, notes) => {
+      const value = workoutNote(notes, 1_000)
+      const result = await database.run(`
+        UPDATE workout_session_exercises SET user_notes = ?
+        WHERE id = ? AND workout_session_id = ?
+          AND EXISTS (
+            SELECT 1 FROM workout_sessions
+            WHERE id = ? AND status IN ('IN_PROGRESS','PAUSED') AND active_slot = 1
+          )
+      `, value, exerciseId, sessionId, sessionId)
+      if (!result.changes) throw invalidTransition()
+      return requireSession(sessionId)
+    },
+    updateSessionNotes: async (sessionId, notes) => {
+      const result = await database.run(`
+        UPDATE workout_sessions SET notes = ?
+        WHERE id = ? AND status IN ('IN_PROGRESS','PAUSED') AND active_slot = 1
+      `, workoutNote(notes, 2_000), sessionId)
+      if (!result.changes) throw invalidTransition()
+      return requireSession(sessionId)
+    },
+    substituteExercise: async (sessionId, exerciseId, replacementId, reason) => {
+      const replacement = await database.first<Row>(`
+        SELECT id, name FROM exercise_definitions
+        WHERE id = ? AND archived = 0
+      `, replacementId)
+      if (!replacement) throw notFound('Exercício substituto')
+      const result = await database.run(`
+        UPDATE workout_session_exercises
+        SET substitute_exercise_definition_id = ?, substitute_name = ?, substitution_reason = ?
+        WHERE id = ? AND workout_session_id = ?
+          AND exercise_definition_id <> ?
+          AND EXISTS (
+            SELECT 1 FROM workout_sessions
+            WHERE id = ? AND status IN ('IN_PROGRESS','PAUSED') AND active_slot = 1
+          )
+      `, replacementId, String(replacement.name), workoutNote(reason, 240), exerciseId, sessionId,
+      replacementId, sessionId)
+      if (!result.changes) throw invalidTransition()
+      return requireSession(sessionId)
+    },
+    undoSubstitution: async (sessionId, exerciseId) => {
+      const result = await database.run(`
+        UPDATE workout_session_exercises
+        SET substitute_exercise_definition_id = NULL, substitute_name = NULL, substitution_reason = NULL
+        WHERE id = ? AND workout_session_id = ?
+          AND substitute_exercise_definition_id IS NOT NULL
+          AND EXISTS (
+            SELECT 1 FROM workout_sessions
+            WHERE id = ? AND status IN ('IN_PROGRESS','PAUSED') AND active_slot = 1
+          )
+      `, exerciseId, sessionId, sessionId)
+      if (!result.changes) throw invalidTransition()
+      return requireSession(sessionId)
+    },
     pause: async (sessionId) => {
       const current = await requireSession(sessionId)
       const paused = pauseWorkoutSession(current)
@@ -1225,8 +1280,16 @@ function sessionRepository(database: SqlDatabase): WorkoutSessionRepository {
     },
     complete: (sessionId, overallRpe, notes) =>
       finishSession(database, sessionId, 'COMPLETED', overallRpe, notes),
-    abandon: (sessionId) => finishSession(database, sessionId, 'ABANDONED', null, ''),
+    abandon: (sessionId) => finishSession(database, sessionId, 'ABANDONED', null, null),
   }
+}
+
+function workoutNote(value: string, limit: number) {
+  const note = value.trim()
+  if (note.length > limit) {
+    throw new DomainError('INVALID_WORKOUT_NOTE', `A anotação deve ter no máximo ${limit} caracteres.`)
+  }
+  return note
 }
 
 async function assertEditableSession(database: SqlDatabase, sessionId: number) {
@@ -1243,12 +1306,12 @@ async function finishSession(
   sessionId: number,
   status: 'COMPLETED' | 'ABANDONED',
   overallRpe: number | null,
-  notes: string,
+  notes: string | null,
 ) {
   return database.transaction(async (transaction) => {
     const session = await loadSession(transaction, sessionId)
     if (!session || !['IN_PROGRESS', 'PAUSED'].includes(session.status)) throw invalidTransition()
-    const finished = finishWorkoutSession(session, status, overallRpe, notes)
+    const finished = finishWorkoutSession(session, status, overallRpe, notes ?? session.notes)
     const result = await transaction.run(`
       UPDATE workout_sessions SET status = ?, active_slot = NULL, completed_at = ?,
         paused_at = NULL, paused_duration_seconds = ?, total_duration_seconds = ?,

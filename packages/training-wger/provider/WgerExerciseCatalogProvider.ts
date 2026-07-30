@@ -4,10 +4,13 @@ import type {
   ExternalExerciseCatalogProvider,
   ExternalExerciseCatalogQuery,
 } from '@training/training-domain'
+import { getExerciseProviderDescriptor } from '@training/training-domain'
 import { WgerClient } from '../client/WgerClient'
 import { mapWgerExercise } from '../mapper/mapWgerExercise'
 
 export class WgerExerciseCatalogProvider implements ExternalExerciseCatalogProvider {
+  readonly descriptor = getExerciseProviderDescriptor('WGER')!
+
   constructor(private readonly client = new WgerClient()) {}
 
   async search(query: ExternalExerciseCatalogQuery, signal?: AbortSignal): Promise<ExternalExerciseCatalogPage> {

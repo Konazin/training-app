@@ -14,6 +14,9 @@ com repositories `expo-sqlite`, sem exigir servidor, VPS, IP, conta ou internet.
 - configurar segunda a domingo, incluindo descanso;
 - iniciar, pausar, retomar, concluir ou abandonar sessões;
 - editar séries e usar cronômetro de descanso;
+- consultar o último desempenho e sugestões locais opt-in durante a sessão;
+- substituir um exercício apenas no snapshot atual e desfazer antes de concluir;
+- salvar anotações de série, exercício e sessão;
 - recuperar uma sessão após fechar o aplicativo;
 - consultar a programação de hoje, progresso semanal e referências de carga anteriores;
 - consultar histórico, duração, volume e taxa de conclusão;
@@ -22,7 +25,8 @@ com repositories `expo-sqlite`, sem exigir servidor, VPS, IP, conta ou internet.
 - escolher entre quatro temas, aparência do sistema e níveis de movimento;
 - usar alto contraste no treino e controlar feedback tátil;
 - mover fichas para uma lixeira local com retenção de sete dias;
-- exportar, validar e restaurar backups com `schemaVersion: 2`.
+- exportar, validar e restaurar backups com `schemaVersion: 2`;
+- receber avisos locais dispensáveis e onboarding offline em instalações novas.
 
 O SQLite `training.db` é a fonte de verdade para treino e biblioteca.
 AsyncStorage guarda o cronômetro transitório e preferências visuais versionadas.
@@ -80,6 +84,10 @@ IDs e dados do usuário em atualizações e nunca consulta o Wger.
 Consulte [biblioteca de exercícios](docs/EXERCISE_LIBRARY.md) e
 [mídia de exercícios](docs/EXERCISE_MEDIA.md).
 
+O primeiro uso também apresenta até três passos locais e dispensáveis. Bancos
+existentes atualizados para 0.9.0 não recebem onboarding forçado; a apresentação
+pode ser reaberta em **Mais → Conhecer o aplicativo**.
+
 ## Backup
 
 Em **Mais**:
@@ -126,9 +134,11 @@ semana local de segunda-feira a domingo. Descanso planejado continua sendo
 descanso mesmo no passado. Um treino vazio abre a configuração, e uma sessão
 ativa ou pausada sempre tem prioridade sobre iniciar outra.
 
-As cargas anteriores são exibidas somente como **Referência anterior**, usando
-séries concluídas do mesmo exercício e dia. Elas não são recomendação de carga
-nem orientação de progressão.
+O treino mostra **Último desempenho** usando snapshots concluídos do mesmo
+exercício, com prioridade para a mesma ficha. Sugestões de progressão são
+determinísticas, explicadas e só afetam a sessão após ação explícita; nunca
+alteram a ficha. Veja [inteligência local](docs/LOCAL_WORKOUT_INTELLIGENCE.md)
+e [anotações de treino](docs/WORKOUT_ANNOTATIONS.md).
 
 As seis métricas ficam em **Progresso** (`History`): sessões, conclusões da
 semana, taxa de conclusão, exercícios, minutos e volume. A taxa considera
@@ -155,6 +165,10 @@ O app continua local-only e não precisa de VPS, login ou chave Wger. A consulta
 só acontece por ação explícita:
 
 **Mais → Integrações → Catálogo Wger → Buscar → Selecionar → Importar**
+
+A tela exibe o status **Manual · Requer internet · Sem sincronização
+automática**. O contrato genérico de capacidades está descrito em
+[arquitetura de providers](docs/PROVIDER_ARCHITECTURE.md).
 
 Somente filtros do catálogo são enviados em requisições GET. Fichas, sessões,
 séries, histórico, notas, backups, IDs SQLite e identificadores do aparelho
@@ -199,3 +213,5 @@ o teste físico em modo avião com
 [o roteiro local-only](docs/LOCAL_ONLY_SMOKE_TEST.md).
 O roteiro específico desta entrega está em
 [smoke Android dos Marcos 4 e 5](docs/MARCO_4_5_ANDROID_SMOKE.md).
+Para 0.9.0, use o [smoke do Marco 6](docs/MARCO_6_ANDROID_SMOKE.md) e consulte
+o [registro do release candidate](docs/RELEASE_CANDIDATE_0_9.md).

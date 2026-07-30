@@ -43,7 +43,7 @@ describe('SQLite local schema', () => {
       'workout_session_exercises', 'workout_set_logs', 'app_settings', 'app_metadata',
       'schema_migrations',
     ]))
-    expect(query(path, 'SELECT COUNT(*) AS value FROM schema_migrations;')[0]?.value).toBe(6)
+    expect(query(path, 'SELECT COUNT(*) AS value FROM schema_migrations;')[0]?.value).toBe(MIGRATIONS.length)
 
     const base = `
       PRAGMA foreign_keys=ON;
@@ -386,7 +386,7 @@ describe('SQLite local schema', () => {
     await runMigrations(database)
     expect((await database.first<{ count: number }>(
       'SELECT COUNT(*) AS count FROM schema_migrations',
-    ))?.count).toBe(6)
+    ))?.count).toBe(MIGRATIONS.length)
     expect((await database.first<{ count: number }>(
       'SELECT COUNT(*) AS count FROM training_plans',
     ))?.count).toBe(before?.count)
@@ -605,7 +605,7 @@ describe('SQLite local schema', () => {
     const beforeSeed = await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM exercise_definitions')
     await runMigrations(database)
     await runMigrations(database)
-    expect((await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM schema_migrations'))?.count).toBe(6)
+    expect((await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM schema_migrations'))?.count).toBe(MIGRATIONS.length)
     expect((await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM exercise_definitions'))?.count)
       .toBe(beforeSeed?.count)
     expect(await database.first<{ name: string }>(
@@ -723,7 +723,7 @@ describe('SQLite local schema', () => {
     }
     expect(await database.first<{ count: number }>(
       'SELECT COUNT(*) AS count FROM schema_migrations',
-    )).toEqual({ count: 6 })
+    )).toEqual({ count: MIGRATIONS.length })
     await database.close()
 
     database = betterDatabase(path, failOn('INSERT INTO training_plan_days', 4))
@@ -918,7 +918,7 @@ describe('SQLite local schema', () => {
     `)
     await runMigrations(database)
     await runMigrations(database)
-    expect(await database.first('SELECT COUNT(*) AS count FROM schema_migrations')).toEqual({ count: 6 })
+    expect(await database.first('SELECT COUNT(*) AS count FROM schema_migrations')).toEqual({ count: MIGRATIONS.length })
     expect(await database.first<{ exercises: number; plans: number; sessions: number }>(`
       SELECT
         (SELECT COUNT(*) FROM exercise_definitions) AS exercises,
@@ -1096,6 +1096,156 @@ describe('SQLite local schema', () => {
       notes: 'Não apagar',
     })
     expect(await repositories.exercises.list({ source: 'BUNDLED' })).toHaveLength(40)
+    await database.close()
+  })
+
+  it('migra 6 para 7 de forma aditiva e reverte falha sem registrar versão parcial', async () => {
+    expect(MIGRATIONS.slice(0, 6).map((migration) => migration.checksum)).toEqual([
+      '9fb6bd88', '2ffe7a7d', '8200ffc4', '38bebaa2', '287de8d5', 'd90185ab',
+    ])
+    const path = newDatabase()
+    let database = betterDatabase(path)
+    await database.exec(`
+      CREATE TABLE schema_migrations (
+        version INTEGER PRIMARY KEY, name TEXT NOT NULL, checksum TEXT NOT NULL, applied_at TEXT NOT NULL
+      )
+    `)
+    for (const migration of MIGRATIONS.slice(0, 6)) {
+      await database.exec(migration.sql)
+      await database.run(
+        'INSERT INTO schema_migrations(version, name, checksum, applied_at) VALUES (?, ?, ?, ?)',
+        migration.version, migration.name, migration.checksum, '2026-07-30T00:00:00.000Z',
+      )
+    }
+    await database.run(
+      'INSERT INTO app_metadata(key, value_json, updated_at) VALUES (?, ?, ?)',
+      APP_METADATA_KEYS.initialized, 'true', '2026-07-30T00:00:00.000Z',
+    )
+    expect((await database.all<{ name: string }>('PRAGMA table_info(workout_session_exercises)'))
+      .map((column) => column.name)).not.toContain('user_notes')
+    await database.close()
+
+    database = betterDatabase(path, failOn('ADD COLUMN user_notes'))
+    await expect(runMigrations(database)).rejects.toThrow('Migration 7')
+    expect(await database.first('SELECT COUNT(*) AS count FROM schema_migrations'))
+      .toEqual({ count: 6 })
+    await database.close()
+
+    database = betterDatabase(path)
+    await runMigrations(database)
+    expect((await database.all<{ name: string }>('PRAGMA table_info(workout_session_exercises)'))
+      .map((column) => column.name)).toEqual(expect.arrayContaining([
+      'user_notes',
+      'substitute_exercise_definition_id',
+      'substitute_name',
+      'substitution_reason',
+    ]))
+    expect(await database.first(
+      'SELECT key FROM app_metadata WHERE key = ?',
+      APP_METADATA_KEYS.onboardingEligible,
+    )).toBeNull()
+    await database.close()
+  })
+
+  it('preserva anotações, substituição, reinício, histórico e backup v2 antigo', async () => {
+    const path = newDatabase()
+    let database = betterDatabase(path)
+    await runMigrations(database)
+    await initializeFirstInstallation(database, seedData())
+    let repositories = createLocalRepositories(database)
+    const plan = (await repositories.plans.list())[0]!
+    const day = plan.days.find((item) => !item.restDay && item.exercises.length)!
+    const replacement = await repositories.exercises.create({
+      name: 'Flexão inclinada',
+      description: '',
+      primaryMuscleGroup: 'Peitoral',
+      secondaryMuscleGroups: [],
+      equipment: 'Peso corporal',
+      category: 'STRENGTH',
+      difficulty: 'Iniciante',
+      instructions: '',
+      notes: 'Nota canônica',
+      unilateral: false,
+      timed: false,
+    })
+    const started = await repositories.sessions.start(plan.id, day.id)
+    const exercise = started.exercises[0]!
+    const set = exercise.sets[0]!
+    await repositories.sessions.updateSet(started.id, exercise.id, set.id, {
+      reps: 8,
+      load: 0,
+      durationSeconds: 0,
+      distance: 0,
+      rpe: 7,
+      completed: true,
+      notes: 'Observação da série',
+    })
+    await repositories.sessions.updateExerciseNotes(started.id, exercise.id, 'Anotação do exercício')
+    await repositories.sessions.updateSessionNotes(started.id, 'Anotação da sessão')
+    const substituted = await repositories.sessions.substituteExercise(
+      started.id,
+      exercise.id,
+      replacement.id,
+      'Mesmo grupo muscular e equipamento semelhante.',
+    )
+    expect(substituted.exercises[0]).toMatchObject({
+      name: 'Flexão',
+      substituteName: 'Flexão inclinada',
+    })
+    await repositories.sessions.undoSubstitution(started.id, exercise.id)
+    await repositories.sessions.pause(started.id)
+    await database.close()
+
+    database = betterDatabase(path)
+    repositories = createLocalRepositories(database)
+    const recovered = await repositories.sessions.getActive()
+    expect(recovered).toMatchObject({ status: 'PAUSED', notes: 'Anotação da sessão' })
+    expect(recovered?.exercises[0]).toMatchObject({
+      userNotes: 'Anotação do exercício',
+      substituteName: null,
+    })
+    expect(recovered?.exercises[0]?.sets[0]?.notes).toBe('Observação da série')
+    await repositories.sessions.resume(started.id)
+    await repositories.sessions.complete(started.id, 7, 'Anotação da sessão')
+    const completed = (await repositories.sessions.getHistory())[0]!
+    expect(completed.exercises[0]?.userNotes).toBe('Anotação do exercício')
+
+    const backup = await repositories.backup.export('0.9.0')
+    await repositories.backup.reset()
+    await repositories.backup.restore(backup)
+    expect((await repositories.sessions.getHistory())[0]?.exercises[0]?.userNotes)
+      .toBe('Anotação do exercício')
+
+    const oldV2 = {
+      ...backup,
+      sessionExercises: backup.sessionExercises.map((row) => {
+        const {
+          user_notes: _userNotes,
+          substitute_exercise_definition_id: _substituteId,
+          substitute_name: _substituteName,
+          substitution_reason: _substitutionReason,
+          ...legacy
+        } = row as Record<string, unknown>
+        return legacy
+      }),
+    }
+    await repositories.backup.restore(oldV2)
+    expect((await repositories.sessions.getHistory())[0]?.exercises[0]?.userNotes).toBe('')
+
+    const abandoned = await repositories.sessions.start(plan.id, day.id)
+    await repositories.sessions.updateExerciseNotes(
+      abandoned.id,
+      abandoned.exercises[0]!.id,
+      'Mantida ao abandonar',
+    )
+    await repositories.sessions.updateSessionNotes(abandoned.id, 'Sessão abandonada com nota')
+    await repositories.sessions.abandon(abandoned.id)
+    expect((await repositories.sessions.getHistory())
+      .find((session) => session.status === 'ABANDONED')).toMatchObject({
+      notes: 'Sessão abandonada com nota',
+      exercises: [{ userNotes: 'Mantida ao abandonar' }],
+    })
+    expect((await repositories.exercises.findById(replacement.id))?.notes).toBe('Nota canônica')
     await database.close()
   })
 })

@@ -158,7 +158,14 @@ export function mapSessionExercise(row: Row, sets: SetLog[]): SessionExercise {
     plannedDurationSeconds: row.planned_duration_seconds == null ? null : num(row.planned_duration_seconds),
     plannedDistance: row.planned_distance == null ? null : num(row.planned_distance),
     restSeconds: num(row.rest_seconds), setType: text(row.set_type) as SessionExercise['setType'],
-    status: text(row.status) as SessionExercise['status'], notes: text(row.notes), sets,
+    status: text(row.status) as SessionExercise['status'], notes: text(row.notes),
+    userNotes: text(row.user_notes),
+    substituteExerciseDefinitionId: row.substitute_exercise_definition_id == null
+      ? null
+      : num(row.substitute_exercise_definition_id),
+    substituteName: row.substitute_name ? text(row.substitute_name) : null,
+    substitutionReason: row.substitution_reason ? text(row.substitution_reason) : null,
+    sets,
   }
 }
 
