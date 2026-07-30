@@ -40,6 +40,20 @@ O APK baixado fica fora do Git em
 
 ## Estado do candidato 0.9.0
 
-O identificador EAS, URL, tamanho e SHA-256 serão registrados somente depois do
-build e das verificações `file`, `sha256sum` e `unzip -t`. O smoke físico
-permanece separado no roteiro do Marco 6.
+O candidato foi gerado pelo EAS a partir do commit
+`7c242e3517ffdcd8a13fa39e266f6db65bd6f13e`:
+
+- build: `9d0d0bcf-e18c-4348-adca-5ff413f8896e`;
+- página:
+  <https://expo.dev/accounts/konaz/projects/training-app/builds/9d0d0bcf-e18c-4348-adca-5ff413f8896e>;
+- download:
+  <https://expo.dev/artifacts/eas/jkyEQmnrnF25M89OydSWOSwORbwUa1da92CM5MnZyjg.apk>;
+- arquivo: `artifacts/training-app-local-0.9.0.apk`;
+- tamanho: `89.850.639 bytes`;
+- SHA-256:
+  `fcacc9b7cc6454aa157f45c1d34f0a79fa747e9eb8254ea39b3d88c1dd51f925`;
+- `file`: APK Android com `gradle app-metadata.properties`;
+- `unzip -t`: nenhum erro nos dados compactados.
+
+Estado: **PRONTO PARA TESTES**. A instalação e o smoke test físico continuam
+pendentes e devem seguir `docs/MARCO_6_ANDROID_SMOKE.md`.
