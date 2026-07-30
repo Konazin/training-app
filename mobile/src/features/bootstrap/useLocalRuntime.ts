@@ -9,6 +9,7 @@ import {
   type SqlDatabase,
 } from '@training/training-local-db'
 import seed from '../../../assets/seeds/exercises.v1.json'
+import { bundledCatalog } from '../exercise-library/bundledCatalog'
 import { createLocalRuntimeManager } from './localRuntime'
 
 export type LocalRuntimeState =
@@ -40,7 +41,10 @@ export function useLocalRuntime(): LocalRuntime {
     }),
     initialize: (opened) => initializeFirstInstallation(opened, seed as SeedData).then(() => undefined),
     createRepositories: createLocalRepositories,
-    afterInitialize: (repositories) => repositories.planTrash.purgeExpired().then(() => undefined),
+    afterInitialize: async (repositories) => {
+      await repositories.catalog.sync(bundledCatalog)
+      await repositories.planTrash.purgeExpired()
+    },
     markStartup: markSuccessfulStartup,
   }))
 

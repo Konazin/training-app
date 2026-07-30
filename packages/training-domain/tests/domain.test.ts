@@ -221,6 +221,7 @@ function exerciseDefinition(): ExerciseDefinition {
     source: 'SYSTEM', externalId: null, sourceUrl: null, licenseName: null, licenseUrl: null,
     author: null, archived: false, createdAt: now.toISOString(), updatedAt: now.toISOString(),
     media: [], primaryVideo: null, primaryImage: null, hasVideo: false, primaryVideoUrl: null,
-    primaryImageUrl: null, custom: false, mediaUrl: '',
+    primaryImageUrl: null, custom: false, mediaUrl: '', aliases: [], favorite: false,
+    lastUsedAt: null, useCount: 0,
   }
 }

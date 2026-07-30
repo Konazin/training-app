@@ -16,7 +16,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
-import type { ExerciseDefinition, ExerciseDefinitionInput } from '@training/training-domain'
+import {
+  EXERCISE_PACKS,
+  type ExerciseDefinition,
+  type ExerciseDefinitionInput,
+} from '@training/training-domain'
 import { FormField } from '../../components/FormField'
 import { PrimaryButton } from '../../components/PrimaryButton'
 import { Screen } from '../../components/Screen'
@@ -25,6 +29,15 @@ import { SelectableChip } from '../../components/SelectableChip'
 import { ThemedTextInput } from '../../components/ThemedTextInput'
 import type { RootStackParamList } from '../../navigation/types'
 import { shared, type ThemeColors, useTheme } from '../../theme'
+import { ExercisePlaceholder } from './ExercisePlaceholder'
+import {
+  filterExerciseLibrary,
+  exerciseCategoryLabel,
+  groupExercisesByMuscle,
+  libraryEmptyMessage,
+  resolveExerciseMedia,
+  type LibraryFilter,
+} from './libraryState'
 
 export function ExerciseLibraryScreen({
   exercises,
@@ -32,27 +45,29 @@ export function ExerciseLibraryScreen({
   onCreate,
   onUpdate,
   onArchive,
+  onFavorite,
 }: {
   exercises: ExerciseDefinition[]
   loading: boolean
   onCreate: (payload: ExerciseDefinitionInput) => Promise<boolean>
   onUpdate: (id: number, payload: ExerciseDefinitionInput) => Promise<boolean>
   onArchive: (id: number) => Promise<boolean>
+  onFavorite: (id: number, favorite: boolean) => Promise<boolean>
 }) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>()
   const { colors } = useTheme()
   const styles = createStyles(colors)
   const [query, setQuery] = useState('')
-  const [category, setCategory] = useState('')
+  const [filter, setFilter] = useState<LibraryFilter>({ kind: 'ALL' })
   const [editing, setEditing] = useState<ExerciseDefinition | null | 'new'>(null)
   const filtered = useMemo(() => {
-    const normalized = query.trim().toLocaleLowerCase('pt-BR')
-    return exercises.filter((exercise) => (
-      (!category || exercise.category === category)
-      && (!normalized || [exercise.name, exercise.primaryMuscleGroup, exercise.equipment]
-        .some((value) => value.toLocaleLowerCase('pt-BR').includes(normalized)))
-    ))
-  }, [category, exercises, query])
+    return filterExerciseLibrary(exercises, query, filter)
+  }, [exercises, filter, query])
+  const muscles = useMemo(() => groupExercisesByMuscle(exercises), [exercises])
+  const equipment = useMemo(() => [...new Set(exercises.map((item) => item.equipment))].sort(), [exercises])
+  const categories = useMemo(() => [...new Set(exercises.map((item) => item.category))].sort(), [exercises])
+  const sources = useMemo(() => [...new Set(exercises.map((item) => item.source))].sort(), [exercises])
+  const emptyMessage = libraryEmptyMessage(exercises.length, query, filter)
 
   return (
     <Screen style={styles.screen}>
@@ -74,40 +89,41 @@ export function ExerciseLibraryScreen({
             style={styles.search}
           />
           <View style={styles.filters}>
-            {['', 'STRENGTH', 'CARDIO', 'MOBILITY', 'ENDURANCE'].map((value) => (
-              <SelectableChip
-                key={value || 'all'}
-                label={value || 'Todos'}
-                selected={category === value}
-                onPress={() => setCategory(value)}
-              />
-            ))}
+            <FilterChip label="Todos" filter={{ kind: 'ALL' }} selected={filter} onSelect={setFilter} />
+            <FilterChip label="Favoritos" filter={{ kind: 'FAVORITES' }} selected={filter} onSelect={setFilter} />
+            <FilterChip label="Recentes" filter={{ kind: 'RECENTS' }} selected={filter} onSelect={setFilter} />
+            <FilterChip label="Com mídia" filter={{ kind: 'MEDIA' }} selected={filter} onSelect={setFilter} />
+            <FilterChip label="Peso corporal" filter={{ kind: 'BODYWEIGHT' }} selected={filter} onSelect={setFilter} />
           </View>
+          <FilterGroup title="PACOTES">
+            {EXERCISE_PACKS.map((pack) => (
+              <FilterChip key={pack.id} label={pack.name} filter={{ kind: 'PACK', value: pack.id }} selected={filter} onSelect={setFilter} />
+            ))}
+          </FilterGroup>
+          <FilterGroup title="GRUPO MUSCULAR">
+            {muscles.map((group) => (
+              <FilterChip key={group.muscle} label={`${group.muscle} (${group.exercises.length})`} filter={{ kind: 'MUSCLE', value: group.muscle }} selected={filter} onSelect={setFilter} />
+            ))}
+          </FilterGroup>
+          <FilterGroup title="EQUIPAMENTO">
+            {equipment.map((value) => <FilterChip key={value} label={value} filter={{ kind: 'EQUIPMENT', value }} selected={filter} onSelect={setFilter} />)}
+          </FilterGroup>
+          <FilterGroup title="CATEGORIA">
+            {categories.map((value) => <FilterChip key={value} label={exerciseCategoryLabel(value)} filter={{ kind: 'CATEGORY', value }} selected={filter} onSelect={setFilter} />)}
+          </FilterGroup>
+          <FilterGroup title="FONTE">
+            {sources.map((value) => <FilterChip key={value} label={sourceLabel(value)} filter={{ kind: 'SOURCE', value }} selected={filter} onSelect={setFilter} />)}
+          </FilterGroup>
         </>}
-        ListEmptyComponent={!loading ? <Text style={styles.empty}>Nenhum exercício encontrado.</Text> : null}
-        renderItem={({ item }) => (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => navigation.navigate('ExerciseDetail', { exerciseId: item.id })}
-            onLongPress={() => setEditing(item)}
-            style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-          >
-            {item.primaryImageUrl
-              ? <Image source={{ uri: item.primaryImageUrl }} style={styles.icon} />
-              : <View style={styles.iconFallback}><Text style={styles.iconText}>⌁</Text></View>}
-            <View style={styles.cardBody}>
-              <Text style={styles.name}>{item.name}</Text>
-              <Text style={styles.meta}>{item.primaryMuscleGroup} · {item.equipment}</Text>
-              <Text style={styles.source}>{item.source}</Text>
-            </View>
-            {item.custom && (
-              <TouchableOpacity accessibilityLabel={`Editar ${item.name}`} accessibilityRole="button" onPress={() => setEditing(item)} style={styles.editButton}>
-                <Text style={styles.edit}>Editar</Text>
-              </TouchableOpacity>
-            )}
-            <Text style={styles.arrow}>›</Text>
-          </Pressable>
-        )}
+        ListEmptyComponent={loading && !exercises.length
+          ? <SkeletonList />
+          : <Text accessibilityLiveRegion="polite" style={styles.empty}>{emptyMessage}</Text>}
+        renderItem={({ item }) => <ExerciseCard
+          exercise={item}
+          onEdit={item.custom ? () => setEditing(item) : undefined}
+          onFavorite={() => void onFavorite(item.id, !item.favorite)}
+          onOpen={() => navigation.navigate('ExerciseDetail', { exerciseId: item.id })}
+        />}
       />
       <TouchableOpacity
         accessibilityLabel="Criar exercício personalizado"
@@ -174,7 +190,7 @@ function ExerciseForm({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.backdrop}>
-        <SafeAreaView edges={['bottom']} style={styles.safeSheet}>
+        <SafeAreaView accessibilityViewIsModal edges={['bottom']} style={styles.safeSheet}>
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheet}>
           <Text style={styles.sheetTitle}>{exercise ? 'Editar exercício' : 'Novo exercício'}</Text>
           <FormField label="Nome" value={name} onChangeText={setName} />
@@ -217,26 +233,128 @@ function ExerciseForm({
   )
 }
 
+function ExerciseCard({
+  exercise,
+  onEdit,
+  onFavorite,
+  onOpen,
+}: {
+  exercise: ExerciseDefinition
+  onEdit?: () => void
+  onFavorite: () => void
+  onOpen: () => void
+}) {
+  const { colors } = useTheme()
+  const styles = createStyles(colors)
+  const media = resolveExerciseMedia(exercise)
+  const [imageFailed, setImageFailed] = useState(false)
+  return (
+    <View style={styles.card}>
+      <Pressable
+        accessibilityLabel={`${exercise.name}, ${exercise.primaryMuscleGroup}, ${exercise.equipment}, fonte ${sourceLabel(exercise.source)}`}
+        accessibilityRole="button"
+        onLongPress={onEdit}
+        onPress={onOpen}
+        style={({ pressed }) => [styles.cardMain, pressed && styles.pressed]}
+      >
+        {media.kind === 'IMAGE' && !imageFailed
+          ? <Image onError={() => setImageFailed(true)} source={{ uri: media.uri }} style={styles.icon} />
+          : <ExercisePlaceholder
+              compact
+              kind={media.kind === 'PLACEHOLDER' || media.kind === 'MISSING'
+                ? media.placeholder
+                : exercise.category === 'CARDIO' ? 'CARDIO' : 'STRENGTH'}
+              missing={imageFailed || media.kind === 'MISSING'}
+            />}
+        <View style={styles.cardBody}>
+          <Text style={styles.name}>{exercise.name}</Text>
+          <Text style={styles.meta}>{exercise.primaryMuscleGroup} · {exercise.equipment}</Text>
+          <Text style={styles.source}>{sourceLabel(exercise.source)} · {exercise.media.length ? 'Com mídia' : 'Sem mídia'}</Text>
+        </View>
+        <Text style={styles.arrow}>›</Text>
+      </Pressable>
+      <Pressable
+        accessibilityLabel={exercise.favorite ? `Remover ${exercise.name} dos favoritos` : `Favoritar ${exercise.name}`}
+        accessibilityRole="button"
+        accessibilityState={{ selected: exercise.favorite }}
+        onPress={onFavorite}
+        style={styles.favorite}
+      >
+        <Text style={styles.favoriteText}>{exercise.favorite ? '★' : '☆'}</Text>
+      </Pressable>
+      {!!onEdit && (
+        <TouchableOpacity accessibilityLabel={`Editar ${exercise.name}`} accessibilityRole="button" onPress={onEdit} style={styles.editButton}>
+          <Text style={styles.edit}>Editar</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  )
+}
+
+function FilterChip({
+  label,
+  filter,
+  selected,
+  onSelect,
+}: {
+  label: string
+  filter: LibraryFilter
+  selected: LibraryFilter
+  onSelect: (filter: LibraryFilter) => void
+}) {
+  const active = filter.kind === selected.kind
+    && (!('value' in filter) || ('value' in selected && filter.value === selected.value))
+  return <SelectableChip label={label} selected={active} onPress={() => onSelect(active ? { kind: 'ALL' } : filter)} />
+}
+
+function FilterGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  const { colors } = useTheme()
+  const styles = createStyles(colors)
+  return (
+    <View style={styles.filterGroup}>
+      <Text style={styles.filterTitle}>{title}</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+        {children}
+      </ScrollView>
+    </View>
+  )
+}
+
+function SkeletonList() {
+  const { colors } = useTheme()
+  const styles = createStyles(colors)
+  return (
+    <View accessibilityLabel="Carregando biblioteca" accessibilityRole="progressbar">
+      {[0, 1, 2].map((item) => <View key={item} style={styles.skeleton}><View style={styles.skeletonIcon} /><View style={styles.skeletonBody} /></View>)}
+    </View>
+  )
+}
+
+function sourceLabel(source: ExerciseDefinition['source']) {
+  return { BUNDLED: 'Integrado', SYSTEM: 'Sistema', CUSTOM: 'Personalizado', WGER: 'Wger' }[source]
+}
+
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   screen: { flex: 1 },
   content: { paddingHorizontal: shared.pagePadding, paddingBottom: 72 },
   search: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, color: colors.textPrimary, fontSize: 16, marginBottom: 10, minHeight: 56, paddingHorizontal: 16 },
   filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
-  card: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 19, borderWidth: 1, flexDirection: 'row', gap: 12, marginBottom: 9, minHeight: 76, padding: 12 },
+  card: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 19, borderWidth: 1, flexDirection: 'row', marginBottom: 9, minHeight: 76, overflow: 'hidden' },
+  cardMain: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 12, minHeight: 76, padding: 12 },
   icon: { backgroundColor: colors.gray200, borderRadius: 14, height: 52, width: 52 },
-  iconFallback: { alignItems: 'center', backgroundColor: colors.nearBlack, borderRadius: 14, height: 52, justifyContent: 'center', width: 52 },
-  iconText: { color: '#fff', fontSize: 18 },
   cardBody: { flex: 1 },
   name: { color: colors.ink, fontSize: 16, fontWeight: '800' },
   meta: { color: colors.textSecondary, fontSize: 14, marginTop: 4 },
   source: { color: colors.textSecondary, fontSize: 12, marginTop: 5 },
   edit: { color: colors.primary, fontSize: 12, fontWeight: '800', padding: 8 },
   editButton: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 },
+  favorite: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 },
+  favoriteText: { color: colors.primary, fontSize: 24 },
   arrow: { color: colors.gray400, fontSize: 25 },
   empty: { color: colors.gray500, padding: 30, textAlign: 'center' },
   fab: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 19, bottom: 24, height: 56, justifyContent: 'center', position: 'absolute', right: 20, width: 56 },
   fabText: { color: colors.onPrimary, fontSize: 22 },
-  backdrop: { backgroundColor: 'rgba(0,0,0,.6)', flex: 1, justifyContent: 'flex-end' },
+  backdrop: { backgroundColor: colors.overlay, flex: 1, justifyContent: 'flex-end' },
   safeSheet: { backgroundColor: colors.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '92%' },
   sheet: { padding: 20, paddingBottom: 30 },
   sheetTitle: { color: colors.ink, fontSize: 22, fontWeight: '700', marginBottom: 20 },
@@ -244,4 +362,10 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   archive: { color: colors.danger, fontSize: 12, fontWeight: '700', paddingTop: 18, textAlign: 'center' },
   error: { color: colors.danger, fontSize: 12, marginBottom: 10 },
   pressed: { opacity: 0.72 },
+  filterGroup: { marginBottom: 12 },
+  filterTitle: { color: colors.textSecondary, fontSize: 12, fontWeight: '900', marginBottom: 6 },
+  filterScroll: { gap: 8, paddingRight: 12 },
+  skeleton: { alignItems: 'center', backgroundColor: colors.surface, borderRadius: 19, flexDirection: 'row', gap: 12, marginBottom: 9, minHeight: 76, padding: 12 },
+  skeletonIcon: { backgroundColor: colors.surfaceSecondary, borderRadius: 14, height: 52, width: 52 },
+  skeletonBody: { backgroundColor: colors.surfaceSecondary, borderRadius: 8, height: 20, width: '60%' },
 })

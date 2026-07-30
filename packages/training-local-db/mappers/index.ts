@@ -29,7 +29,9 @@ export function mapMedia(row: Row): ExerciseMedia {
     id: num(row.id),
     exerciseDefinitionId: num(row.exercise_definition_id),
     type: text(row.type) as ExerciseMedia['type'],
-    source: text(row.source) as ExerciseMedia['source'],
+    source: localUri?.startsWith('placeholder://')
+      ? 'BUNDLED'
+      : text(row.source) as ExerciseMedia['source'],
     externalId: row.external_id ? text(row.external_id) : null,
     remoteUrl,
     localUri,
@@ -53,7 +55,8 @@ export function mapMedia(row: Row): ExerciseMedia {
   }
 }
 
-export function mapExercise(row: Row, media: ExerciseMedia[]): ExerciseDefinition {
+export function mapExercise(row: Row, media: ExerciseMedia[], aliases: string[] = []): ExerciseDefinition {
+  const source = text(row.resolved_source || row.source) as ExerciseDefinition['source']
   return applyMedia({
     id: num(row.id),
     name: text(row.name),
@@ -68,8 +71,10 @@ export function mapExercise(row: Row, media: ExerciseMedia[]): ExerciseDefinitio
     notes: text(row.notes),
     unilateral: bool(row.unilateral),
     timed: bool(row.timed),
-    source: text(row.source) as ExerciseDefinition['source'],
-    externalId: row.external_id ? text(row.external_id) : null,
+    source,
+    externalId: row.catalog_external_id
+      ? text(row.catalog_external_id)
+      : row.external_id ? text(row.external_id) : null,
     sourceUrl: row.source_url ? text(row.source_url) : null,
     licenseName: row.license_name ? text(row.license_name) : null,
     licenseUrl: row.license_url ? text(row.license_url) : null,
@@ -78,8 +83,12 @@ export function mapExercise(row: Row, media: ExerciseMedia[]): ExerciseDefinitio
     createdAt: text(row.created_at),
     updatedAt: text(row.updated_at),
     media,
-    custom: text(row.source) === 'CUSTOM',
+    custom: source === 'CUSTOM',
     mediaUrl: media[0]?.url ?? '',
+    aliases,
+    favorite: bool(row.favorite),
+    lastUsedAt: row.last_used_at ? text(row.last_used_at) : null,
+    useCount: num(row.use_count),
   })
 }
 

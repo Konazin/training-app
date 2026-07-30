@@ -80,6 +80,10 @@ Mídia sem ID, HTTPS ou tipo reconhecido, ou com dimensão/duração negativa, �
 ignorada. Licença e autor específicos da mídia prevalecem sobre os do
 exercício. Arquivos não são baixados.
 
+O mapper e o cliente Wger não participam da sincronização do catálogo
+`BUNDLED`. Importação e atualização continuam disponíveis somente após ação
+explícita na tela da integração.
+
 ## Segurança e falhas
 
 - timeout: 15 s com `AbortController`;

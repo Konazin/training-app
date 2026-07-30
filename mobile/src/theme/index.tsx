@@ -75,6 +75,7 @@ interface ThemeContextValue {
   savePreferences: () => Promise<boolean>
   cancelPreview: () => void
   restoreDefaults: () => void
+  applyImportedPreferences: (preferences: UiPreferences) => Promise<boolean>
   preference: ThemePreference
   setPreference: (preference: ThemePreference) => void
 }
@@ -92,6 +93,7 @@ const ThemeContext = createContext<ThemeContextValue>({
   savePreferences: async () => false,
   cancelPreview: () => undefined,
   restoreDefaults: () => undefined,
+  applyImportedPreferences: async () => false,
   preference: 'system',
   setPreference: () => undefined,
 })
@@ -99,6 +101,7 @@ const ThemeContext = createContext<ThemeContextValue>({
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const systemScheme = useColorScheme()
   const [preferences, setPreferences] = useState<UiPreferences>({ ...defaultUiPreferences })
+  const [savedPreferences, setSavedPreferences] = useState<UiPreferences>({ ...defaultUiPreferences })
   const savedRef = useRef<UiPreferences>({ ...defaultUiPreferences })
   const [ready, setReady] = useState(false)
   const [systemReduceMotion, setSystemReduceMotion] = useState(false)
@@ -111,6 +114,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     ]).then(([stored, reduceMotion]) => {
       if (!mounted) return
       savedRef.current = stored
+      setSavedPreferences(stored)
       setPreferences(stored)
       setSystemReduceMotion(reduceMotion)
       setReady(true)
@@ -132,6 +136,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     try {
       await uiPreferencesRepository.save(preferences)
       savedRef.current = { ...preferences }
+      setSavedPreferences({ ...preferences })
       return true
     } catch {
       return false
@@ -139,6 +144,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [preferences])
   const cancelPreview = useCallback(() => setPreferences(cancelUiPreferencesPreview(savedRef.current)), [])
   const restoreDefaults = useCallback(() => setPreferences(restoreDefaultUiPreferences()), [])
+  const applyImportedPreferences = useCallback(async (imported: UiPreferences) => {
+    try {
+      await uiPreferencesRepository.save(imported)
+      savedRef.current = { ...imported }
+      setSavedPreferences({ ...imported })
+      setPreferences({ ...imported })
+      return true
+    } catch {
+      return false
+    }
+  }, [])
   const setPreference = useCallback((legacy: ThemePreference) => {
     updatePreview({ appearance: legacy.toUpperCase() as AppearancePreference })
   }, [updatePreview])
@@ -150,13 +166,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     isDark,
     ready,
     preferences,
-    savedPreferences: savedRef.current,
+    savedPreferences,
     motion: motionSettings(effectiveMotion),
     previewPreferences,
     updatePreview,
     savePreferences,
     cancelPreview,
     restoreDefaults,
+    applyImportedPreferences,
     preference: preferences.appearance.toLowerCase() as ThemePreference,
     setPreference,
   }), [
@@ -167,7 +184,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     previewPreferences,
     ready,
     restoreDefaults,
+    applyImportedPreferences,
     savePreferences,
+    savedPreferences,
     setPreference,
     updatePreview,
   ])

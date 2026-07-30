@@ -61,6 +61,9 @@ const TABLES = {
     'manually_added', 'notes',
   ],
   app_settings: ['key', 'value_json', 'updated_at'],
+  exercise_aliases: ['id', 'exercise_id', 'alias', 'normalized_alias', 'origin'],
+  exercise_favorites: ['exercise_id', 'created_at'],
+  exercise_recent_usage: ['exercise_id', 'last_used_at', 'use_count'],
 } as const
 
 export function createBackupRepository(database: SqlDatabase): BackupRepository {
@@ -71,6 +74,9 @@ export function createBackupRepository(database: SqlDatabase): BackupRepository 
       await database.transaction(async (transaction) => {
         await deleteUserRows(transaction)
         await insertRows(transaction, 'exercise_definitions', backup.exercises)
+        await insertRows(transaction, 'exercise_aliases', backup.exerciseAliases ?? [])
+        await insertRows(transaction, 'exercise_favorites', backup.exerciseFavorites ?? [])
+        await insertRows(transaction, 'exercise_recent_usage', backup.exerciseRecentUsage ?? [])
         await insertRows(transaction, 'exercise_media', backup.media)
         await insertRows(transaction, 'training_plans', backup.trainingPlans)
         await insertRows(transaction, 'training_plan_days', backup.trainingPlanDays)
@@ -99,6 +105,7 @@ export async function exportBackup(database: SqlDatabase, appVersion: string): P
   const [
     exercises, media, trainingPlans, trainingPlanDays, trainingDayExercises,
     restActivities, sessions, sessionExercises, setLogs, settings,
+    exerciseAliases, exerciseFavorites, exerciseRecentUsage,
   ] = await Promise.all([
     database.all<Row>('SELECT * FROM exercise_definitions ORDER BY id'),
     database.all<Row>('SELECT * FROM exercise_media ORDER BY id'),
@@ -110,6 +117,9 @@ export async function exportBackup(database: SqlDatabase, appVersion: string): P
     database.all<Row>('SELECT * FROM workout_session_exercises ORDER BY id'),
     database.all<Row>('SELECT * FROM workout_set_logs ORDER BY id'),
     database.all<Row>(`SELECT * FROM app_settings WHERE key NOT LIKE 'secret.%' ORDER BY key`),
+    database.all<Row>(`SELECT * FROM exercise_aliases WHERE origin = 'USER' ORDER BY id`),
+    database.all<Row>('SELECT * FROM exercise_favorites ORDER BY exercise_id'),
+    database.all<Row>('SELECT * FROM exercise_recent_usage ORDER BY last_used_at DESC'),
   ])
   return {
     schemaVersion: 2,
@@ -125,6 +135,9 @@ export async function exportBackup(database: SqlDatabase, appVersion: string): P
     sessionExercises,
     setLogs,
     settings,
+    exerciseAliases,
+    exerciseFavorites,
+    exerciseRecentUsage,
   }
 }
 
@@ -155,6 +168,19 @@ export function validateBackup(candidate: unknown): asserts candidate is Trainin
     if (rows.length > limit!) throw invalidBackup(`coleção ${key} excede o limite`)
     rows.forEach((row) => assertPlainObject(row, `linha inválida em ${key}`))
   }
+  for (const [key, limit] of [
+    ['exerciseAliases', BACKUP_LIMITS.exercises * 20],
+    ['exerciseFavorites', BACKUP_LIMITS.exercises],
+    ['exerciseRecentUsage', BACKUP_LIMITS.exercises],
+  ] as const) {
+    const rows = backup[key]
+    if (rows === undefined) continue
+    if (!Array.isArray(rows) || rows.length > limit) throw invalidBackup(`coleção opcional ${key} inválida`)
+    rows.forEach((row) => assertPlainObject(row, `linha inválida em ${key}`))
+  }
+  if (backup.uiPreferences !== undefined && !isUiPreferences(backup.uiPreferences)) {
+    throw invalidBackup('preferências de interface inválidas')
+  }
   if (typeof backup.appVersion !== 'string' || !isIsoTimestamp(backup.exportedAt)) {
     throw invalidBackup('metadados inválidos')
   }
@@ -176,6 +202,9 @@ export function validateBackup(candidate: unknown): asserts candidate is Trainin
   requireReferences(backup.restActivities!, 'training_plan_day_id', dayIds)
   requireReferences(backup.sessionExercises!, 'workout_session_id', sessionIds)
   requireReferences(backup.setLogs!, 'workout_session_exercise_id', sessionExerciseIds)
+  requireReferences(backup.exerciseAliases ?? [], 'exercise_id', exerciseIds)
+  requireReferences(backup.exerciseFavorites ?? [], 'exercise_id', exerciseIds)
+  requireReferences(backup.exerciseRecentUsage ?? [], 'exercise_id', exerciseIds)
 
   assertEnums(backup)
   assertFiniteNumbers(backup)
@@ -208,6 +237,7 @@ export function validateBackup(candidate: unknown): asserts candidate is Trainin
   if (backup.settings!.some((row) => String(value(row, 'key')).startsWith('secret.'))) {
     throw invalidBackup('segredos não podem ser importados')
   }
+  assertLibraryOptionalRows(backup)
 }
 
 async function insertRows(
@@ -264,6 +294,53 @@ function assertPlainObject(value: unknown, reason: string): asserts value is Rec
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw invalidBackup(reason)
   const prototype = Object.getPrototypeOf(value)
   if (prototype !== Object.prototype && prototype !== null) throw invalidBackup('objeto com prototype inesperado')
+}
+
+function isUiPreferences(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const input = value as Record<string, unknown>
+  return ['DARK_BLUE', 'MONOCHROME', 'DRACULA', 'WHITE_BLUE'].includes(String(input.themePreset))
+    && ['SYSTEM', 'LIGHT', 'DARK'].includes(String(input.appearance))
+    && ['SYSTEM', 'FULL', 'REDUCED', 'OFF'].includes(String(input.motion))
+    && typeof input.workoutHighContrast === 'boolean'
+    && typeof input.hapticsEnabled === 'boolean'
+}
+
+function assertLibraryOptionalRows(backup: Partial<TrainingBackup>) {
+  const aliases = backup.exerciseAliases ?? []
+  const favorites = backup.exerciseFavorites ?? []
+  const recents = backup.exerciseRecentUsage ?? []
+  const aliasKeys = new Set<string>()
+  for (const row of aliases) {
+    if (
+      typeof value(row, 'alias') !== 'string'
+      || typeof value(row, 'normalized_alias') !== 'string'
+      || value(row, 'origin') !== 'USER'
+    ) throw invalidBackup('alias opcional inválido')
+    const key = `${String(value(row, 'exercise_id'))}:${String(value(row, 'normalized_alias'))}`
+    if (aliasKeys.has(key)) throw invalidBackup('alias opcional duplicado')
+    aliasKeys.add(key)
+  }
+  const favoriteIds = new Set<number>()
+  for (const row of favorites) {
+    const id = Number(value(row, 'exercise_id'))
+    if (favoriteIds.has(id) || !isIsoTimestamp(value(row, 'created_at'))) {
+      throw invalidBackup('favorito opcional inválido')
+    }
+    favoriteIds.add(id)
+  }
+  const recentIds = new Set<number>()
+  for (const row of recents) {
+    const id = Number(value(row, 'exercise_id'))
+    const count = value(row, 'use_count')
+    if (
+      recentIds.has(id)
+      || !isIsoTimestamp(value(row, 'last_used_at'))
+      || !Number.isInteger(count)
+      || Number(count) < 1
+    ) throw invalidBackup('uso recente opcional inválido')
+    recentIds.add(id)
+  }
 }
 
 function assertEnums(backup: Partial<TrainingBackup>) {

@@ -12,15 +12,22 @@ export function ExerciseVideo({ url, posterUrl, onRetry }: {
   onRetry: () => void
 }) {
   const { colors } = useTheme()
+  const themedStyles = createStyles(colors)
   const focused = useIsFocused()
-  const player = useVideoPlayer(url)
+  const player = useVideoPlayer(url, (created) => {
+    created.loop = false
+    created.pause()
+  })
   const { status, error } = useEvent(player, 'statusChange', { status: player.status })
   const presentation = videoPresentation(status, Boolean(posterUrl))
 
   useEffect(() => {
     if (!focused) player.pause()
-    return () => player.pause()
   }, [focused, player])
+  useEffect(() => () => {
+    player.pause()
+    player.currentTime = 0
+  }, [player])
 
   return (
     <View>
@@ -29,10 +36,10 @@ export function ExerciseVideo({ url, posterUrl, onRetry }: {
         contentFit="contain"
         nativeControls
         player={player}
-        style={styles.video}
-      /> : <View style={styles.failure}>
+        style={[styles.video, { backgroundColor: colors.black }]}
+      /> : <View style={themedStyles.failure}>
         {!!posterUrl && <Image accessibilityLabel="Imagem de demonstração" source={{ uri: posterUrl }} style={styles.poster} />}
-        <Text style={styles.failureText}>
+        <Text style={themedStyles.failureText}>
           {presentation.startsWith('error')
             ? error?.message || 'Não foi possível reproduzir o vídeo.'
             : 'Carregando vídeo…'}
@@ -46,9 +53,12 @@ export function ExerciseVideo({ url, posterUrl, onRetry }: {
 }
 
 const styles = StyleSheet.create({
-  video: { aspectRatio: 16 / 9, backgroundColor: '#000', borderRadius: 18, overflow: 'hidden', width: '100%' },
+  video: { aspectRatio: 16 / 9, borderRadius: 18, overflow: 'hidden', width: '100%' },
   retry: { fontSize: 12, fontWeight: '700', paddingVertical: 12, textAlign: 'center' },
-  failure: { alignItems: 'center', aspectRatio: 16 / 9, backgroundColor: '#111', borderRadius: 18, justifyContent: 'center', overflow: 'hidden' },
   poster: { height: '100%', opacity: 0.5, position: 'absolute', width: '100%' },
-  failureText: { color: '#fff', fontSize: 12, padding: 20, textAlign: 'center' },
+})
+
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
+  failure: { alignItems: 'center', aspectRatio: 16 / 9, backgroundColor: colors.nearBlack, borderColor: colors.border, borderRadius: 18, borderWidth: 1, justifyContent: 'center', overflow: 'hidden' },
+  failureText: { color: colors.white, fontSize: 12, padding: 20, textAlign: 'center' },
 })

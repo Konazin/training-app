@@ -33,6 +33,9 @@ export interface ExerciseLibraryRepository {
   update(id: number, input: ExerciseDefinitionInput): Promise<ExerciseDefinition>
   archive(id: number): Promise<void>
   restore(id: number): Promise<void>
+  setFavorite(id: number, favorite: boolean): Promise<void>
+  recordRecentUsage(id: number, usedAt?: string): Promise<void>
+  updateNotes(id: number, notes: string): Promise<ExerciseDefinition>
 }
 
 export interface TrainingPlanRepository {

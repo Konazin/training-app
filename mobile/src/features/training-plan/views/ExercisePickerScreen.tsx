@@ -12,9 +12,11 @@ import { ExercisePicker } from './ExercisePicker'
 export function ExercisePickerScreen({
   plans,
   library,
+  onFavorite,
 }: {
   plans: TrainingPlan[]
   library: ExerciseDefinition[]
+  onFavorite: (id: number, favorite: boolean) => Promise<boolean>
 }) {
   const route = useRoute<RouteProp<RootStackParamList, 'ExercisePicker'>>()
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>()
@@ -59,7 +61,7 @@ export function ExercisePickerScreen({
           description="Busque na biblioteca antes de configurar."
         />
       </View>
-      <ExercisePicker exercises={library} onSelect={select} />
+      <ExercisePicker exercises={library} onFavorite={onFavorite} onSelect={select} />
     </Screen>
   )
 }

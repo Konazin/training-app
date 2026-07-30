@@ -17,14 +17,16 @@ com repositories `expo-sqlite`, sem exigir servidor, VPS, IP, conta ou internet.
 - recuperar uma sessão após fechar o aplicativo;
 - consultar a programação de hoje, progresso semanal e referências de carga anteriores;
 - consultar histórico, duração, volume e taxa de conclusão;
+- explorar uma biblioteca offline com 40 exercícios em português;
+- buscar por nomes e aliases, filtrar, favoritar e consultar recentes;
 - escolher entre quatro temas, aparência do sistema e níveis de movimento;
 - usar alto contraste no treino e controlar feedback tátil;
 - mover fichas para uma lixeira local com retenção de sete dias;
 - exportar, validar e restaurar backups com `schemaVersion: 2`.
 
-O SQLite `training.db` é a fonte de verdade. AsyncStorage guarda somente o
-cronômetro transitório. Desinstalar o aplicativo apaga o banco local; exporte
-backups regularmente.
+O SQLite `training.db` é a fonte de verdade para treino e biblioteca.
+AsyncStorage guarda o cronômetro transitório e preferências visuais versionadas.
+Desinstalar o aplicativo apaga os dados locais; exporte backups regularmente.
 
 ## Estrutura
 
@@ -70,10 +72,13 @@ Não crie `.env` para o app padrão. `EXPO_PUBLIC_API_URL` e
 
 ## Primeiro uso
 
-No primeiro banco vazio, o app instala um catálogo pequeno de exercícios com
-textos próprios e uma ficha “Calistenia inicial”. O seed não inclui Wger nem
-mídia de terceiros, não roda novamente sobre dados existentes e a ficha
-demonstrativa pode ser editada ou arquivada.
+No primeiro banco vazio, o app sincroniza exatamente 40 exercícios empacotados,
+com textos próprios e mídia ilustrativa neutra, e cria a ficha “Calistenia
+inicial”. A sincronização é offline, transacional e idempotente. Ela preserva
+IDs e dados do usuário em atualizações e nunca consulta o Wger.
+
+Consulte [biblioteca de exercícios](docs/EXERCISE_LIBRARY.md) e
+[mídia de exercícios](docs/EXERCISE_MEDIA.md).
 
 ## Backup
 
@@ -90,7 +95,9 @@ Os cinco backups automáticos mais recentes ficam visíveis em **Mais**, com
 restauração, compartilhamento e exclusão. **Apagar todos os dados** preserva os
 metadados técnicos e impede que o seed reapareça ao reabrir.
 
-Arquivos de backup não contêm tokens, chaves, mídia, cache ou estado do player.
+Backups v2 podem incluir preferências visuais, favoritos, recentes e aliases do
+usuário em campos opcionais; arquivos antigos continuam aceitos. Eles não
+contêm tokens, chaves, arquivos de mídia, cache ou estado do player.
 Veja [backup e restauração](docs/BACKUP_AND_RESTORE.md).
 
 ## Editor, templates e duplicação
@@ -189,4 +196,4 @@ npm run test --workspace=training-mobile
 O export Expo valida o bundle; esta etapa não gera APK. Para o teste físico em
 modo avião, use [o roteiro local-only](docs/LOCAL_ONLY_SMOKE_TEST.md).
 O roteiro específico desta entrega está em
-[smoke Android do Marco 3](docs/MARCO_3_ANDROID_SMOKE.md).
+[smoke Android dos Marcos 4 e 5](docs/MARCO_4_5_ANDROID_SMOKE.md).

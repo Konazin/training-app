@@ -4,7 +4,7 @@
 2. **Editor de ficha, templates e duplicação — Marco 2 IMPLEMENTADO, smoke Android pendente**
 3. **Home semanal e progresso — Marco 3 IMPLEMENTADO, smoke Android pendente**
 4. **Temas, movimento e acessibilidade — Marco 4 EM VALIDAÇÃO**
-5. **Biblioteca inicial e mídia — PLANEJADO**
+5. **Biblioteca inicial e mídia — Marco 5 EM VALIDAÇÃO**
 6. **Providers, inteligência local e release candidate — PLANEJADO**
 
 ## Marco 1 estabilizado
@@ -63,6 +63,21 @@ migração de `react-test-renderer` para Testing Library é dívida técnica.
 
 O Marco 4 permanece em validação até a execução do roteiro em um aparelho ou
 emulador Android com TalkBack, fonte ampliada e redução de movimento.
+
+## Marco 5 em validação
+
+- catálogo offline com 40 exercícios originais em português;
+- sincronização transacional e idempotente por slug estável;
+- migration 6 para catálogo, aliases, favoritos e recentes;
+- busca local normalizada, agrupamento, filtros e quatro packs;
+- biblioteca e seletor com favoritos, recentes e proteção contra toque duplo;
+- mídia resolvida centralmente, placeholders próprios e vídeo sob ação;
+- atribuição externa preservada e notas editáveis separadamente;
+- backup v2 ampliado apenas com campos opcionais;
+- versão mobile 0.8.0, `versionCode` 10.
+
+O Marco 5 permanece em validação até o smoke Android do catálogo, mídia,
+upgrade e backup. O Wger continua manual e não participa do bootstrap.
 
 ## Adiado
 

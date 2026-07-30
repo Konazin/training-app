@@ -16,7 +16,13 @@ import { WEEKDAYS } from '../model'
 import { DomainError } from '../errors'
 
 export function normalizeName(value: string) {
-  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, ' ').toLowerCase()
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
 }
 
 export function validateExercise(input: ExerciseDefinitionInput) {

@@ -11,7 +11,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { NavigationBar } from 'expo-navigation-bar'
 import { StatusBar } from 'expo-status-bar'
 import { type LocalRepositories, type SeedData } from '@training/training-local-db'
-import { calculateHistoryProgress } from '@training/training-domain'
+import { calculateHistoryProgress, type BackupRepository } from '@training/training-domain'
 import seed from './assets/seeds/exercises.v1.json'
 import type { MainTabParamList, RootStackParamList } from './src/navigation/types'
 import { useTrainingController } from './src/controllers/useTrainingController'
@@ -52,6 +52,8 @@ import {
   useRefreshUi,
 } from './src/controllers/useRefreshUi'
 import { systemBarStyle } from './src/theme/uiContracts'
+import { bundledCatalog } from './src/features/exercise-library/bundledCatalog'
+import { isUiPreferences } from './src/theme/preferences'
 
 const Stack = createNativeStackNavigator<RootStackParamList>()
 const Tabs = createBottomTabNavigator<MainTabParamList>()
@@ -100,7 +102,14 @@ function LocalApp({
 }: {
   repositories: LocalRepositories
 }) {
-  const { colors, isDark, motion, preferences } = useTheme()
+  const {
+    applyImportedPreferences,
+    colors,
+    isDark,
+    motion,
+    preferences,
+    savedPreferences,
+  } = useTheme()
   const controller = useTrainingController(repositories.exercises, repositories.dashboard)
   const trainingPlan = useTrainingPlanController(repositories.plans, controller.refresh)
   const workoutSession = useWorkoutSessionController(repositories.sessions, controller.refresh)
@@ -111,11 +120,31 @@ function LocalApp({
     { name: 'dashboard e biblioteca', refresh: controller.refresh },
     { name: 'lixeira e badge', refresh: () => trashRefresh.current() },
   ]), [controller.refresh, trainingPlan.refresh, workoutSession.refresh])
+  const backupRepository = useMemo<BackupRepository>(() => ({
+    export: async (appVersion) => ({
+      ...await repositories.backup.export(appVersion),
+      uiPreferences: savedPreferences,
+    }),
+    restore: async (value) => {
+      await repositories.backup.restore(value)
+      await repositories.catalog.sync(bundledCatalog)
+      if (value.uiPreferences !== undefined && isUiPreferences(value.uiPreferences)) {
+        await applyImportedPreferences(value.uiPreferences)
+      }
+    },
+    reset: async () => {
+      await repositories.backup.reset()
+      await repositories.catalog.sync(bundledCatalog)
+    },
+  }), [applyImportedPreferences, repositories, savedPreferences])
   const backup = useBackupController(
-    repositories.backup,
+    backupRepository,
     repositories.metadata,
     getAppVersion(),
-    () => repositories.maintenance.resetToSeed(seed as SeedData),
+    async () => {
+      await repositories.maintenance.resetToSeed(seed as SeedData)
+      await repositories.catalog.sync(bundledCatalog)
+    },
     refreshAll,
   )
   const trash = useTrainingPlanTrashController(
@@ -194,11 +223,19 @@ function LocalApp({
                     onCreate={controller.createExerciseDefinition}
                     onUpdate={controller.updateExerciseDefinition}
                     onArchive={controller.archiveExerciseDefinition}
+                    onFavorite={controller.setExerciseFavorite}
                   />
                 )}
               </Stack.Screen>
               <Stack.Screen name="ExerciseDetail">
-                {() => <ExerciseDetailScreen exercises={controller.exerciseLibrary} />}
+                {() => (
+                  <ExerciseDetailScreen
+                    exercises={controller.exerciseLibrary}
+                    onFavorite={controller.setExerciseFavorite}
+                    onOpened={controller.registerExerciseRecent}
+                    onUpdateNotes={controller.updateExerciseNotes}
+                  />
+                )}
               </Stack.Screen>
               <Stack.Screen name="Integrations" component={IntegrationsScreen} />
               <Stack.Screen name="WgerIntegration">
@@ -249,7 +286,13 @@ function LocalApp({
                 )}
               </Stack.Screen>
               <Stack.Screen name="ExercisePicker">
-                {() => <ExercisePickerScreen plans={trainingPlan.trainingPlans} library={controller.exerciseLibrary} />}
+                {() => (
+                  <ExercisePickerScreen
+                    plans={trainingPlan.trainingPlans}
+                    library={controller.exerciseLibrary}
+                    onFavorite={controller.setExerciseFavorite}
+                  />
+                )}
               </Stack.Screen>
               <Stack.Screen name="ArchivedTrainingPlans">
                 {() => (

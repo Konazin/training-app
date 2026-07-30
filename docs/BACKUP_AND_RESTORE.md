@@ -8,9 +8,15 @@ O nome físico inclui a data de criação:
 - exportação manual: `training-backup-<timestamp>.json`;
 - backup automático: `training-auto-backup-<timestamp>.json`.
 
-Ele contém versão, versão do app, data de exportação, exercícios, metadados de
-mídia, fichas, dias, configurações, atividades, sessões, snapshots, séries e
-preferências. A v2 inclui também fichas na lixeira e seus prazos.
+Ele contém versão, versão do app, data de exportação, exercícios do usuário ou
+importados, metadados de mídia, fichas, dias, configurações, atividades,
+sessões, snapshots, séries e preferências. A v2 inclui também fichas na lixeira
+e seus prazos.
+
+Campos opcionais compatíveis com a v2 guardam preferências visuais, favoritos,
+uso recente e aliases criados pelo usuário. Backups v2 antigos sem esses campos
+usam padrões seguros. O catálogo canônico `BUNDLED` não precisa ser repetido no
+arquivo: ele é sincronizado localmente depois da restauração.
 
 Não contém chaves, tokens, arquivos de vídeo, caches ou estado do player.
 
@@ -42,9 +48,11 @@ o app:
 5. valida o ciclo de vida das fichas na v2;
 6. cria um backup automático do estado atual;
 7. restaura tudo em uma transação;
-8. remove fichas cujo prazo já venceu, preservando sessões e snapshots.
+8. remove fichas cujo prazo já venceu, preservando sessões e snapshots;
+9. sincroniza novamente o catálogo empacotado e aplica preferências opcionais.
 
 JSON inválido não toca no banco. Erros durante a transação fazem rollback.
+Campos opcionais malformados também são rejeitados antes da troca de dados.
 
 ## Backups automáticos
 
@@ -57,9 +65,9 @@ estado atual.
 ## Apagar ou recriar
 
 As duas ações exigem confirmação e geram backup automático. **Apagar** remove
-somente dados do usuário, preserva migrations/metadados e suprime o seed nas
-próximas aberturas. **Recriar dados iniciais** apaga os dados do usuário,
-reinstala catálogo/ficha demonstrativa e reativa explicitamente o seed.
+dados do usuário, preserva migrations/metadados e reinstala apenas o catálogo
+canônico offline. **Recriar dados iniciais** reinstala também a ficha
+demonstrativa e reativa explicitamente o seed.
 
 Esvaziar a lixeira só prossegue após o backup automático ter sido criado. Uma
 falha no backup cancela a exclusão. Se apenas a atualização da tela falhar

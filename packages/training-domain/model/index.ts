@@ -12,9 +12,9 @@ export type Weekday = typeof WEEKDAYS[number]
 export type ExerciseCategory =
   | 'STRENGTH' | 'HYPERTROPHY' | 'ENDURANCE' | 'CARDIO'
   | 'MOBILITY' | 'STRETCHING' | 'TECHNIQUE' | 'RECOVERY'
-export type ExerciseSource = 'SYSTEM' | 'CUSTOM' | 'WGER'
+export type ExerciseSource = 'SYSTEM' | 'BUNDLED' | 'CUSTOM' | 'WGER'
 export type ExerciseMediaType = 'IMAGE' | 'VIDEO'
-export type ExerciseMediaSource = 'SYSTEM' | 'CUSTOM' | 'WGER' | 'LEGACY'
+export type ExerciseMediaSource = 'SYSTEM' | 'BUNDLED' | 'CUSTOM' | 'WGER' | 'LEGACY'
 export type SetType =
   | 'NORMAL' | 'WARM_UP' | 'DROP_SET' | 'BI_SET'
   | 'CIRCUIT' | 'TO_FAILURE' | 'CONTROLLED_TEMPO'
@@ -94,6 +94,10 @@ export interface ExerciseDefinition {
   custom: boolean
   /** Campo legado aceito apenas na borda visual. */
   mediaUrl: string
+  aliases: string[]
+  favorite: boolean
+  lastUsedAt: string | null
+  useCount: number
 }
 
 export interface ExerciseDefinitionInput {
@@ -390,6 +394,9 @@ export interface ExerciseLibraryQuery {
   category?: ExerciseCategory
   source?: ExerciseSource
   hasVideo?: boolean
+  hasMedia?: boolean
+  favorite?: boolean
+  recent?: boolean
   includeArchived?: boolean
 }
 
@@ -407,4 +414,8 @@ export interface TrainingBackup {
   sessionExercises: unknown[]
   setLogs: unknown[]
   settings: unknown[]
+  exerciseAliases?: unknown[]
+  exerciseFavorites?: unknown[]
+  exerciseRecentUsage?: unknown[]
+  uiPreferences?: unknown
 }

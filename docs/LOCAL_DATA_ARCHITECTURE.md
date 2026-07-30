@@ -31,6 +31,11 @@ instalação de um banco que o usuário apagou; `seed.suppressed` impede o seed 
 reaparecer depois de **Apagar todos os dados**. Somente a primeira instalação
 ou **Recriar dados iniciais** executa o seed.
 
+Depois do seed, o catálogo TypeScript v2 sincroniza 40 exercícios `BUNDLED` por
+slug estável. A operação é transacional, não usa IDs numéricos fixos e não faz
+rede. Atualizações canônicas preservam ID, notas, arquivamento, favoritos e
+recentes; exercícios `CUSTOM` e `WGER` não são alterados.
+
 ## Integridade
 
 - IDs são `INTEGER PRIMARY KEY`;
@@ -47,21 +52,24 @@ ou **Recriar dados iniciais** executa o seed.
 
 As migrations publicadas não são reescritas. A migration 3 adiciona
 `app_metadata(key, value_json, updated_at)`, preservada por reset e restore.
+As migrations 1 a 5 permanecem byte a byte iguais. A migration 6 adiciona
+`exercise_catalog_entries`, `exercise_aliases`, `exercise_favorites` e
+`exercise_recent_usage`, com chaves estrangeiras em cascata, unicidade e
+índices de busca/ordenação.
 Falhas de migration, seed, composição de repositories ou registro de startup
 fecham a conexão antes de permitir retry.
 
 ## Estado transitório
 
-AsyncStorage contém somente o cronômetro de descanso. O timestamp, ID da sessão,
-exercício e série permitem retomada após processo morto. Séries e estado da
-sessão permanecem exclusivamente no SQLite.
+AsyncStorage contém o cronômetro de descanso e um payload versionado de
+preferências visuais. O timestamp, ID da sessão, exercício e série permitem
+retomada após processo morto. Séries e estado da sessão permanecem
+exclusivamente no SQLite.
 
 ## Integrações futuras
 
-Wger, IA, saúde e backup remoto são portas sem implementação real. Nenhuma
-integração roda no bootstrap ou background. Um provedor futuro deverá partir
-de ação explícita, explicar dados enviados, mostrar preview, validar a resposta
-e persistir somente após confirmação.
+Wger é uma integração manual; IA, saúde e backup remoto permanecem sem
+implementação real. Nenhuma integração roda no bootstrap ou background.
 
 Segredos futuros usam a porta `SecretsRepository` e deverão ser implementados
 com SecureStore. Eles não podem entrar em SQLite, AsyncStorage, `EXPO_PUBLIC_*`

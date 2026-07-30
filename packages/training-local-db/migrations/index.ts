@@ -271,12 +271,52 @@ BEGIN
 END;
 `
 
+const bundledExerciseLibrary = `
+CREATE TABLE exercise_catalog_entries (
+  exercise_id INTEGER PRIMARY KEY REFERENCES exercise_definitions(id) ON DELETE CASCADE,
+  source TEXT NOT NULL CHECK (source = 'BUNDLED'),
+  external_id TEXT NOT NULL,
+  catalog_version INTEGER NOT NULL CHECK (catalog_version > 0),
+  placeholder_kind TEXT NOT NULL CHECK (placeholder_kind IN ('STRENGTH','MOBILITY','CARDIO','BODYWEIGHT','EQUIPMENT')),
+  synced_at TEXT NOT NULL,
+  UNIQUE(source, external_id)
+);
+
+CREATE TABLE exercise_aliases (
+  id INTEGER PRIMARY KEY,
+  exercise_id INTEGER NOT NULL REFERENCES exercise_definitions(id) ON DELETE CASCADE,
+  alias TEXT NOT NULL,
+  normalized_alias TEXT NOT NULL,
+  origin TEXT NOT NULL DEFAULT 'USER' CHECK (origin IN ('BUNDLED','USER')),
+  UNIQUE(exercise_id, normalized_alias)
+);
+
+CREATE TABLE exercise_favorites (
+  exercise_id INTEGER PRIMARY KEY REFERENCES exercise_definitions(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE exercise_recent_usage (
+  exercise_id INTEGER PRIMARY KEY REFERENCES exercise_definitions(id) ON DELETE CASCADE,
+  last_used_at TEXT NOT NULL,
+  use_count INTEGER NOT NULL DEFAULT 1 CHECK (use_count > 0)
+);
+
+CREATE INDEX exercise_alias_search
+  ON exercise_aliases(normalized_alias, exercise_id);
+CREATE INDEX exercise_recent_order
+  ON exercise_recent_usage(last_used_at DESC, exercise_id);
+CREATE INDEX exercise_catalog_lookup
+  ON exercise_catalog_entries(source, external_id);
+`
+
 export const MIGRATIONS: Migration[] = [
   migration(1, 'local_training_schema', schema),
   migration(2, 'local_query_indexes', indexes),
   migration(3, 'app_installation_metadata', appMetadata),
   migration(4, 'external_exercise_indexes', externalExerciseIndexes),
   migration(5, 'training_plan_trash', trainingPlanTrash),
+  migration(6, 'bundled_exercise_library', bundledExerciseLibrary),
 ]
 
 export async function runMigrations(database: SqlDatabase, onProgress?: (progress: MigrationProgress) => void) {

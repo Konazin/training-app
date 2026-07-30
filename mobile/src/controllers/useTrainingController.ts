@@ -76,6 +76,39 @@ export function useTrainingController(
     }
   }, [exercises])
 
+  const setExerciseFavorite = useCallback(async (id: number, favorite: boolean) => {
+    try {
+      await exercises.setFavorite(id, favorite)
+      setExerciseLibrary(await exercises.list())
+      return true
+    } catch (cause) {
+      setMessage(messageFrom(cause))
+      return false
+    }
+  }, [exercises])
+
+  const registerExerciseRecent = useCallback(async (id: number) => {
+    try {
+      await exercises.recordRecentUsage(id)
+      setExerciseLibrary(await exercises.list())
+      return true
+    } catch (cause) {
+      setMessage(messageFrom(cause))
+      return false
+    }
+  }, [exercises])
+
+  const updateExerciseNotes = useCallback(async (id: number, notes: string) => {
+    try {
+      await exercises.updateNotes(id, notes)
+      setExerciseLibrary(await exercises.list())
+      return true
+    } catch (cause) {
+      setMessage(messageFrom(cause))
+      return false
+    }
+  }, [exercises])
+
   return {
     exerciseLibrary,
     dashboard,
@@ -85,6 +118,9 @@ export function useTrainingController(
     createExerciseDefinition,
     updateExerciseDefinition,
     archiveExerciseDefinition,
+    setExerciseFavorite,
+    registerExerciseRecent,
+    updateExerciseNotes,
   }
 }
 

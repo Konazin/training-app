@@ -1,11 +1,15 @@
 import { describe, expect, test } from 'vitest'
 import {
   attributionLabel,
+  filterExerciseLibrary,
+  groupExercisesByMuscle,
+  libraryEmptyMessage,
   mergeExercisePages,
+  resolveExerciseMedia,
   resolveMediaAttribution,
   videoPresentation,
 } from './libraryState'
-import type { ExerciseDefinition } from '../../models/training'
+import type { ExerciseDefinition, ExerciseMedia } from '../../models/training'
 
 describe('estado da biblioteca', () => {
   test('pagina sem duplicar exercícios e permite substituir nos filtros', () => {
@@ -38,4 +42,119 @@ describe('estado da biblioteca', () => {
     expect(attributionLabel(resolved)).toBe('Autor do vídeo • CC')
     expect(attributionLabel({})).toBe('Informação não fornecida pela fonte')
   })
+
+  test('busca aliases sem acento e filtra favoritos, músculos, equipamentos e recentes', () => {
+    const items = [
+      exercise(1, { name: 'Puxada à frente', normalizedName: 'puxada a frente', aliases: ['puxador frente'], primaryMuscleGroup: 'Costas', equipment: 'Máquina', favorite: true }),
+      exercise(2, { name: 'Flexão de braços', normalizedName: 'flexao de bracos', aliases: ['apoio'], primaryMuscleGroup: 'Peito', equipment: 'Peso corporal', lastUsedAt: '2026-07-30T12:00:00.000Z' }),
+      exercise(3, { name: 'Supino com halteres', normalizedName: 'supino com halteres', aliases: ['dumbbell press'], primaryMuscleGroup: 'Peito', equipment: 'Halteres', lastUsedAt: '2026-07-30T13:00:00.000Z' }),
+    ]
+    expect(filterExerciseLibrary(items, 'puxador', { kind: 'ALL' }).map((item) => item.id)).toEqual([1])
+    expect(filterExerciseLibrary(items, '', { kind: 'FAVORITES' }).map((item) => item.id)).toEqual([1])
+    expect(filterExerciseLibrary(items, '', { kind: 'MUSCLE', value: 'Peito' })).toHaveLength(2)
+    expect(filterExerciseLibrary(items, '', { kind: 'EQUIPMENT', value: 'Halteres' })[0]?.id).toBe(3)
+    expect(filterExerciseLibrary(items, '', { kind: 'RECENTS' }).map((item) => item.id)).toEqual([3, 2])
+    const manyRecents = Array.from({ length: 25 }, (_, index) => exercise(index + 10, {
+      lastUsedAt: `2026-07-${String(index + 1).padStart(2, '0')}T12:00:00.000Z`,
+    }))
+    expect(filterExerciseLibrary(manyRecents, '', { kind: 'RECENTS' })).toHaveLength(20)
+    expect(groupExercisesByMuscle(items).find((group) => group.muscle === 'Peito')?.exercises).toHaveLength(2)
+  })
+
+  test('resolve placeholder, imagem local, vídeo remoto e ausência sem colapsar', () => {
+    const placeholder = media({ localUri: 'placeholder://mobility', source: 'BUNDLED' })
+    expect(resolveExerciseMedia(exercise(1, { media: [placeholder] }))).toMatchObject({
+      kind: 'PLACEHOLDER',
+      placeholder: 'MOBILITY',
+    })
+    const image = media({ localUri: 'file:///imagem.png' })
+    expect(resolveExerciseMedia(exercise(2, { media: [image] }))).toMatchObject({
+      kind: 'IMAGE',
+      local: true,
+    })
+    const video = media({ type: 'VIDEO', localUri: null, remoteUrl: 'https://video.test/a.mp4' })
+    expect(resolveExerciseMedia(exercise(3, { media: [video] }), 'VIDEO')).toMatchObject({
+      kind: 'VIDEO',
+      local: false,
+    })
+    expect(resolveExerciseMedia(exercise(4))).toMatchObject({ kind: 'MISSING' })
+  })
+
+  test('diferencia estados vazios', () => {
+    expect(libraryEmptyMessage(0, '', { kind: 'ALL' })).toContain('vazia')
+    expect(libraryEmptyMessage(2, 'nada', { kind: 'ALL' })).toContain('busca')
+    expect(libraryEmptyMessage(2, '', { kind: 'FAVORITES' })).toContain('favorito')
+    expect(libraryEmptyMessage(2, '', { kind: 'RECENTS' })).toContain('recentemente')
+    expect(libraryEmptyMessage(2, '', { kind: 'MEDIA' })).toContain('filtros')
+  })
 })
+
+function exercise(id: number, overrides: Partial<ExerciseDefinition> = {}): ExerciseDefinition {
+  return {
+    id,
+    name: `Exercício ${id}`,
+    normalizedName: `exercicio ${id}`,
+    description: '',
+    primaryMuscleGroup: 'Geral',
+    secondaryMuscleGroups: [],
+    equipment: 'Sem equipamento',
+    category: 'STRENGTH',
+    difficulty: 'Iniciante',
+    instructions: '',
+    notes: '',
+    unilateral: false,
+    timed: false,
+    source: 'BUNDLED',
+    externalId: `exercise_${id}`,
+    sourceUrl: null,
+    licenseName: null,
+    licenseUrl: null,
+    author: null,
+    archived: false,
+    createdAt: '',
+    updatedAt: '',
+    media: [],
+    primaryVideo: null,
+    primaryImage: null,
+    hasVideo: false,
+    primaryVideoUrl: null,
+    primaryImageUrl: null,
+    custom: false,
+    mediaUrl: '',
+    aliases: [],
+    favorite: false,
+    lastUsedAt: null,
+    useCount: 0,
+    ...overrides,
+  }
+}
+
+function media(overrides: Partial<ExerciseMedia> = {}): ExerciseMedia {
+  return {
+    id: 1,
+    exerciseDefinitionId: 1,
+    type: 'IMAGE',
+    source: 'BUNDLED',
+    externalId: null,
+    remoteUrl: null,
+    localUri: null,
+    thumbnailRemoteUrl: null,
+    thumbnailLocalUri: null,
+    mimeType: null,
+    width: null,
+    height: null,
+    durationSeconds: null,
+    main: true,
+    sortOrder: 0,
+    licenseName: null,
+    licenseUrl: null,
+    author: 'Ilustração genérica do aplicativo',
+    sourceUrl: null,
+    downloadedAt: null,
+    createdAt: '',
+    updatedAt: '',
+    url: '',
+    thumbnailUrl: null,
+    ...overrides,
+  }
+}

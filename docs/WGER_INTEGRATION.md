@@ -47,6 +47,9 @@ Imagens e vídeos não são baixados nesta versão. Portanto, mídia remota pode
 ficar indisponível sem internet. Vídeos nunca iniciam automaticamente e sua
 indisponibilidade não bloqueia o treino.
 
+O catálogo empacotado `BUNDLED` é separado do Wger. A sincronização offline do
+aplicativo não consulta, substitui ou mescla silenciosamente itens Wger.
+
 ## Licenças e atribuição
 
 Cada exercício e mídia preserva a licença e autoria fornecidas pelo Wger. Abra
@@ -68,6 +71,6 @@ licença global.
 
 ## Origens da biblioteca
 
-- **SYSTEM:** catálogo inicial do app;
+- **BUNDLED:** catálogo canônico empacotado do app;
 - **CUSTOM:** criado e editado pelo usuário;
 - **WGER:** cópia importada do catálogo público, com origem e atribuição.

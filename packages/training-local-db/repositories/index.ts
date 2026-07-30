@@ -12,6 +12,7 @@ import {
   nextTrainingPlanCopyName,
   finishWorkoutSession,
   normalizeName,
+  rankExerciseSearch,
   notFound,
   pauseWorkoutSession,
   reorder,
@@ -65,6 +66,7 @@ import {
   type AppMetadataRepository,
 } from '../database/installation'
 import type { SeedData } from '../database/seed'
+import { syncBundledCatalog, type BundledCatalog, type CatalogSyncResult } from '../database/catalog'
 
 export interface LocalRepositories {
   exercises: ExerciseLibraryRepository
@@ -81,6 +83,9 @@ export interface LocalRepositories {
   maintenance: {
     clearUserData(): Promise<void>
     resetToSeed(seed: SeedData): Promise<void>
+  }
+  catalog: {
+    sync(catalog: BundledCatalog): Promise<CatalogSyncResult>
   }
 }
 
@@ -107,6 +112,9 @@ export function createLocalRepositories(database: SqlDatabase): LocalRepositorie
     maintenance: {
       clearUserData: () => clearUserData(database),
       resetToSeed: (seed) => resetToSeed(database, seed),
+    },
+    catalog: {
+      sync: (catalog) => syncBundledCatalog(database, catalog),
     },
   }
 }
@@ -355,6 +363,31 @@ function exerciseRepository(database: SqlDatabase): ExerciseLibraryRepository {
     },
     archive: async (id) => setExerciseArchived(database, id, true),
     restore: async (id) => setExerciseArchived(database, id, false),
+    setFavorite: async (id, favorite) => {
+      await requireExercise(database, id)
+      if (favorite) {
+        await database.run(`
+          INSERT INTO exercise_favorites(exercise_id, created_at) VALUES (?, ?)
+          ON CONFLICT(exercise_id) DO NOTHING
+        `, id, new Date().toISOString())
+      } else {
+        await database.run('DELETE FROM exercise_favorites WHERE exercise_id = ?', id)
+      }
+    },
+    recordRecentUsage: (id, usedAt) => recordRecentUsage(database, id, usedAt),
+    updateNotes: async (id, notes) => {
+      if (notes.length > 4_000) {
+        throw new DomainError('INVALID_EXERCISE_NOTES', 'Use no máximo 4.000 caracteres nas notas.')
+      }
+      const result = await database.run(
+        'UPDATE exercise_definitions SET notes = ?, updated_at = ? WHERE id = ?',
+        notes.trim(),
+        new Date().toISOString(),
+        id,
+      )
+      if (!result.changes) throw notFound('Exercício')
+      return (await loadExercise(database, id))!
+    },
   }
 }
 
@@ -386,59 +419,122 @@ async function setExerciseArchived(database: SqlDatabase, id: number, archived: 
 async function loadExercises(database: SqlDatabase, query: ExerciseLibraryQuery = {}) {
   const clauses: string[] = []
   const params: BindValue[] = []
-  if (!query.includeArchived) clauses.push('archived = 0')
-  if (query.query?.trim()) {
-    clauses.push('(normalized_name LIKE ? OR lower(description) LIKE ?)')
-    const value = `%${normalizeName(query.query)}%`
-    params.push(value, value)
-  }
+  if (!query.includeArchived) clauses.push('definition.archived = 0')
   if (query.muscle?.trim()) {
-    clauses.push('lower(primary_muscle_group) LIKE ?')
+    clauses.push('lower(definition.primary_muscle_group) LIKE ?')
     params.push(`%${query.muscle.trim().toLowerCase()}%`)
   }
   if (query.equipment?.trim()) {
-    clauses.push('lower(equipment) LIKE ?')
+    clauses.push('lower(definition.equipment) LIKE ?')
     params.push(`%${query.equipment.trim().toLowerCase()}%`)
   }
   if (query.category) {
-    clauses.push('category = ?')
+    clauses.push('definition.category = ?')
     params.push(query.category)
   }
   if (query.source) {
-    clauses.push('source = ?')
-    params.push(query.source)
+    if (query.source === 'BUNDLED') clauses.push(`catalog.source = 'BUNDLED'`)
+    else {
+      clauses.push('definition.source = ? AND catalog.exercise_id IS NULL')
+      params.push(query.source)
+    }
   }
   if (query.hasVideo) {
     clauses.push(`EXISTS (
       SELECT 1 FROM exercise_media media
-      WHERE media.exercise_definition_id = exercise_definitions.id AND media.type = 'VIDEO'
+      WHERE media.exercise_definition_id = definition.id AND media.type = 'VIDEO'
     )`)
   }
+  if (query.hasMedia) clauses.push(`EXISTS (
+    SELECT 1 FROM exercise_media media WHERE media.exercise_definition_id = definition.id
+  )`)
+  if (query.favorite) clauses.push('favorite.exercise_id IS NOT NULL')
+  if (query.recent) clauses.push('recent.exercise_id IS NOT NULL')
   const rows = await database.all<Row>(
-    `SELECT * FROM exercise_definitions ${clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''} ORDER BY name`,
+    `SELECT definition.*,
+       CASE WHEN catalog.exercise_id IS NOT NULL THEN 'BUNDLED' ELSE definition.source END AS resolved_source,
+       catalog.external_id AS catalog_external_id,
+       CASE WHEN favorite.exercise_id IS NOT NULL THEN 1 ELSE 0 END AS favorite,
+       recent.last_used_at,
+       COALESCE(recent.use_count, 0) AS use_count
+     FROM exercise_definitions definition
+     LEFT JOIN exercise_catalog_entries catalog ON catalog.exercise_id = definition.id
+     LEFT JOIN exercise_favorites favorite ON favorite.exercise_id = definition.id
+     LEFT JOIN exercise_recent_usage recent ON recent.exercise_id = definition.id
+     ${clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''}
+     ORDER BY ${query.recent ? 'recent.last_used_at DESC, ' : ''}definition.name`,
     ...params,
   )
-  const mediaRows = rows.length
-    ? await database.all<Row>(
+  const [mediaRows, aliasRows] = rows.length
+    ? await Promise.all([
+      database.all<Row>(
       `SELECT * FROM exercise_media WHERE exercise_definition_id IN (${rows.map(() => '?').join(',')})
        ORDER BY exercise_definition_id, is_main DESC, sort_order`,
       ...rows.map((row) => Number(row.id)),
-    )
-    : []
-  return rows.map((row) => mapExercise(
+      ),
+      database.all<{ exercise_id: number; alias: string }>(
+        `SELECT exercise_id, alias FROM exercise_aliases
+         WHERE exercise_id IN (${rows.map(() => '?').join(',')})
+         ORDER BY exercise_id, normalized_alias`,
+        ...rows.map((row) => Number(row.id)),
+      ),
+    ])
+    : [[], []]
+  const exercises = rows.map((row) => mapExercise(
     row,
     mediaRows.filter((media) => Number(media.exercise_definition_id) === Number(row.id)).map(mapMedia),
+    aliasRows.filter((alias) => alias.exercise_id === Number(row.id)).map((alias) => alias.alias),
   ))
+  return query.query?.trim() ? rankExerciseSearch(exercises, query.query) : exercises
 }
 
 async function loadExercise(database: SqlDatabase, id: number) {
-  const row = await database.first<Row>('SELECT * FROM exercise_definitions WHERE id = ?', id)
+  const row = await database.first<Row>(`
+    SELECT definition.*,
+      CASE WHEN catalog.exercise_id IS NOT NULL THEN 'BUNDLED' ELSE definition.source END AS resolved_source,
+      catalog.external_id AS catalog_external_id,
+      CASE WHEN favorite.exercise_id IS NOT NULL THEN 1 ELSE 0 END AS favorite,
+      recent.last_used_at,
+      COALESCE(recent.use_count, 0) AS use_count
+    FROM exercise_definitions definition
+    LEFT JOIN exercise_catalog_entries catalog ON catalog.exercise_id = definition.id
+    LEFT JOIN exercise_favorites favorite ON favorite.exercise_id = definition.id
+    LEFT JOIN exercise_recent_usage recent ON recent.exercise_id = definition.id
+    WHERE definition.id = ?
+  `, id)
   if (!row) return null
-  const media = await database.all<Row>(
-    'SELECT * FROM exercise_media WHERE exercise_definition_id = ? ORDER BY is_main DESC, sort_order',
-    id,
-  )
-  return mapExercise(row, media.map(mapMedia))
+  const [media, aliases] = await Promise.all([
+    database.all<Row>(
+      'SELECT * FROM exercise_media WHERE exercise_definition_id = ? ORDER BY is_main DESC, sort_order',
+      id,
+    ),
+    database.all<{ alias: string }>(
+      'SELECT alias FROM exercise_aliases WHERE exercise_id = ? ORDER BY normalized_alias',
+      id,
+    ),
+  ])
+  return mapExercise(row, media.map(mapMedia), aliases.map((alias) => alias.alias))
+}
+
+async function requireExercise(database: SqlDatabase, id: number) {
+  if (!await database.first('SELECT id FROM exercise_definitions WHERE id = ?', id)) {
+    throw notFound('Exercício')
+  }
+}
+
+async function recordRecentUsage(database: SqlDatabase, id: number, usedAt = new Date().toISOString()) {
+  await requireExercise(database, id)
+  const parsed = new Date(usedAt)
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString() !== usedAt) {
+    throw new DomainError('INVALID_DATE', 'Data de uso recente inválida.')
+  }
+  await database.run(`
+    INSERT INTO exercise_recent_usage(exercise_id, last_used_at, use_count)
+    VALUES (?, ?, 1)
+    ON CONFLICT(exercise_id) DO UPDATE SET
+      last_used_at = excluded.last_used_at,
+      use_count = exercise_recent_usage.use_count + 1
+  `, id, usedAt)
 }
 
 function planRepository(database: SqlDatabase): LocalRepositories['plans'] {
@@ -607,6 +703,7 @@ function planRepository(database: SqlDatabase): LocalRepositories['plans'] {
         ...input,
         sortOrder: (last?.value ?? -1) + 1,
       })
+      await recordRecentUsage(transaction, input.exerciseDefinitionId)
       return (await loadPlan(transaction, planId))!
     }),
     updateExercise: async (planId, dayId, exerciseId, input) => {

@@ -5,10 +5,12 @@ import { spawnSync } from 'node:child_process'
 import Database from 'better-sqlite3'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  BUNDLED_EXERCISES,
   TRAINING_PLAN_TEMPLATES,
   type ExternalExerciseCandidate,
   type TrainingBackup,
 } from '@training/training-domain'
+import { syncBundledCatalog } from '../database/catalog'
 import { MIGRATIONS, runMigrations } from '../migrations'
 import { validateBackup } from '../backup'
 import type { SqlDatabase } from '../database'
@@ -41,7 +43,7 @@ describe('SQLite local schema', () => {
       'workout_session_exercises', 'workout_set_logs', 'app_settings', 'app_metadata',
       'schema_migrations',
     ]))
-    expect(query(path, 'SELECT COUNT(*) AS value FROM schema_migrations;')[0]?.value).toBe(5)
+    expect(query(path, 'SELECT COUNT(*) AS value FROM schema_migrations;')[0]?.value).toBe(6)
 
     const base = `
       PRAGMA foreign_keys=ON;
@@ -384,7 +386,7 @@ describe('SQLite local schema', () => {
     await runMigrations(database)
     expect((await database.first<{ count: number }>(
       'SELECT COUNT(*) AS count FROM schema_migrations',
-    ))?.count).toBe(5)
+    ))?.count).toBe(6)
     expect((await database.first<{ count: number }>(
       'SELECT COUNT(*) AS count FROM training_plans',
     ))?.count).toBe(before?.count)
@@ -603,7 +605,7 @@ describe('SQLite local schema', () => {
     const beforeSeed = await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM exercise_definitions')
     await runMigrations(database)
     await runMigrations(database)
-    expect((await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM schema_migrations'))?.count).toBe(5)
+    expect((await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM schema_migrations'))?.count).toBe(6)
     expect((await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM exercise_definitions'))?.count)
       .toBe(beforeSeed?.count)
     expect(await database.first<{ name: string }>(
@@ -721,7 +723,7 @@ describe('SQLite local schema', () => {
     }
     expect(await database.first<{ count: number }>(
       'SELECT COUNT(*) AS count FROM schema_migrations',
-    )).toEqual({ count: 5 })
+    )).toEqual({ count: 6 })
     await database.close()
 
     database = betterDatabase(path, failOn('INSERT INTO training_plan_days', 4))
@@ -886,6 +888,184 @@ describe('SQLite local schema', () => {
     expect(await database.first<{ count: number }>(
       'SELECT COUNT(*) AS count FROM training_plan_days',
     )).toEqual({ count: 7 })
+    await database.close()
+  })
+
+  it('migra 5 para 6 sem alterar checksums publicados e cria constraints da biblioteca', async () => {
+    expect(MIGRATIONS.slice(0, 5).map((item) => item.checksum)).toEqual([
+      '9fb6bd88', '2ffe7a7d', '8200ffc4', '38bebaa2', '287de8d5',
+    ])
+    const path = newDatabase()
+    const database = betterDatabase(path)
+    await database.exec(`
+      CREATE TABLE schema_migrations (
+        version INTEGER PRIMARY KEY, name TEXT NOT NULL, checksum TEXT NOT NULL, applied_at TEXT NOT NULL
+      )
+    `)
+    for (const migration of MIGRATIONS.slice(0, 5)) {
+      await database.exec(migration.sql)
+      await database.run(
+        'INSERT INTO schema_migrations VALUES (?, ?, ?, ?)',
+        migration.version, migration.name, migration.checksum, '2026-07-30T00:00:00.000Z',
+      )
+    }
+    await initializeFirstInstallation(database, bundledSeedData())
+    const before = await database.first<{ exercises: number; plans: number; sessions: number }>(`
+      SELECT
+        (SELECT COUNT(*) FROM exercise_definitions) AS exercises,
+        (SELECT COUNT(*) FROM training_plans) AS plans,
+        (SELECT COUNT(*) FROM workout_sessions) AS sessions
+    `)
+    await runMigrations(database)
+    await runMigrations(database)
+    expect(await database.first('SELECT COUNT(*) AS count FROM schema_migrations')).toEqual({ count: 6 })
+    expect(await database.first<{ exercises: number; plans: number; sessions: number }>(`
+      SELECT
+        (SELECT COUNT(*) FROM exercise_definitions) AS exercises,
+        (SELECT COUNT(*) FROM training_plans) AS plans,
+        (SELECT COUNT(*) FROM workout_sessions) AS sessions
+    `)).toEqual(before)
+    for (const table of ['exercise_catalog_entries', 'exercise_aliases', 'exercise_favorites', 'exercise_recent_usage']) {
+      expect(await database.first(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`, table)).toBeTruthy()
+    }
+    await database.run(
+      `INSERT INTO exercise_aliases(exercise_id, alias, normalized_alias, origin) VALUES (1, 'Teste', 'teste', 'USER')`,
+    )
+    await expect(database.run(
+      `INSERT INTO exercise_aliases(exercise_id, alias, normalized_alias, origin) VALUES (1, 'TESTE', 'teste', 'USER')`,
+    )).rejects.toThrow('UNIQUE')
+    await expect(database.run(
+      `INSERT INTO exercise_favorites(exercise_id, created_at) VALUES (9999, ?)`,
+      '2026-07-30T00:00:00.000Z',
+    )).rejects.toThrow('FOREIGN KEY')
+    await database.close()
+  })
+
+  it('sincroniza catálogo, preserva dados do usuário e mantém favoritos, recentes e backup v2', async () => {
+    const path = newDatabase()
+    let database = betterDatabase(path)
+    await runMigrations(database)
+    await initializeFirstInstallation(database, bundledSeedData())
+    let repositories = createLocalRepositories(database)
+    const legacy = await repositories.exercises.findById(1)
+    const custom = await repositories.exercises.create({
+      name: 'Exercício do usuário', description: 'Não alterar', primaryMuscleGroup: 'Teste',
+      secondaryMuscleGroups: [], equipment: 'Livre', category: 'STRENGTH',
+      difficulty: 'Livre', instructions: 'Do usuário', notes: 'Nota customizada',
+      unilateral: false, timed: false,
+    })
+    await repositories.externalExerciseImport.importSelected([wgerCandidate()])
+
+    const first = await syncBundledCatalog(database, bundledCatalog())
+    expect(first.created).toBe(39)
+    expect((await repositories.exercises.list({ source: 'BUNDLED' }))).toHaveLength(40)
+    expect((await repositories.exercises.search('puxador frente'))[0]?.externalId)
+      .toBe('puxada_frente_maquina')
+    expect(await repositories.exercises.list({ muscle: 'Tríceps' })).not.toHaveLength(0)
+    expect(await repositories.exercises.list({ equipment: 'Máquina' })).not.toHaveLength(0)
+    const pushUp = (await repositories.exercises.list({ source: 'BUNDLED' }))
+      .find((item) => item.externalId === 'flexao_bracos')!
+    expect(pushUp.id).toBe(legacy?.id)
+    await repositories.exercises.updateNotes(pushUp.id, 'Minha observação')
+    await repositories.exercises.setFavorite(pushUp.id, true)
+    await repositories.exercises.recordRecentUsage(pushUp.id, '2026-07-30T10:00:00.000Z')
+    await repositories.exercises.recordRecentUsage(pushUp.id, '2026-07-30T11:00:00.000Z')
+    await database.run(`
+      INSERT INTO exercise_aliases(exercise_id, alias, normalized_alias, origin)
+      VALUES (?, 'Meu apoio', 'meu apoio', 'USER')
+    `, pushUp.id)
+    const recentFromPlan = (await repositories.exercises.list({ source: 'BUNDLED' }))
+      .find((item) => item.externalId === 'supino_reto_halteres')!
+    const plan = (await repositories.plans.list())[0]!
+    await repositories.plans.addExercise(plan.id, plan.days[0]!.id, {
+      exerciseDefinitionId: recentFromPlan.id,
+      sets: 2, minReps: 6, maxReps: 10, plannedLoad: null,
+      plannedDurationSeconds: null, plannedDistance: null, restSeconds: 60,
+      plannedRpe: null, setType: 'NORMAL', notes: '', alternativeExerciseId: null,
+    })
+    expect((await repositories.exercises.findById(recentFromPlan.id))?.useCount).toBe(1)
+    const archived = (await repositories.exercises.list({ source: 'BUNDLED' }))
+      .find((item) => item.externalId === 'supino_reto_barra')!
+    await repositories.exercises.archive(archived.id)
+
+    expect(await syncBundledCatalog(database, bundledCatalog())).toEqual({ created: 0, updated: 0 })
+    const changed = bundledCatalog()
+    changed.version = 3
+    changed.exercises = changed.exercises.map((item) => item.slug === 'flexao_bracos'
+      ? Object.freeze({
+          ...item,
+          name: 'Flexão de braços atualizada',
+          normalizedName: 'flexao de bracos atualizada',
+        })
+      : item)
+    await syncBundledCatalog(database, changed)
+    const preserved = await repositories.exercises.findById(pushUp.id)
+    expect(preserved).toMatchObject({
+      id: pushUp.id,
+      name: 'Flexão de braços atualizada',
+      notes: 'Minha observação',
+      favorite: true,
+      useCount: 2,
+      lastUsedAt: '2026-07-30T11:00:00.000Z',
+    })
+    expect((await repositories.exercises.findById(archived.id))?.archived).toBe(true)
+    expect(await repositories.exercises.findById(custom.id)).toMatchObject({
+      name: 'Exercício do usuário', notes: 'Nota customizada', source: 'CUSTOM',
+    })
+    expect((await repositories.exercises.list({ source: 'WGER', includeArchived: true }))[0])
+      .toMatchObject({ externalId: '983', name: 'Rosca sem peso' })
+
+    const backup = await repositories.backup.export('0.8.0')
+    expect(backup.schemaVersion).toBe(2)
+    expect(backup.exerciseFavorites).toHaveLength(1)
+    expect(backup.exerciseRecentUsage).toHaveLength(2)
+    expect(backup.exerciseAliases).toHaveLength(1)
+    const backupWithUi = {
+      ...backup,
+      uiPreferences: {
+        themePreset: 'DRACULA',
+        appearance: 'DARK',
+        motion: 'REDUCED',
+        workoutHighContrast: true,
+        hapticsEnabled: false,
+      },
+    }
+    await repositories.backup.reset()
+    await repositories.backup.restore(backupWithUi)
+    await syncBundledCatalog(database, bundledCatalog())
+    expect((await repositories.exercises.findById(pushUp.id))?.favorite).toBe(true)
+    const oldV2 = { ...backup }
+    delete oldV2.exerciseAliases
+    delete oldV2.exerciseFavorites
+    delete oldV2.exerciseRecentUsage
+    await repositories.backup.restore(oldV2)
+    await syncBundledCatalog(database, bundledCatalog())
+    expect(await repositories.exercises.list({ source: 'BUNDLED', includeArchived: true })).toHaveLength(40)
+    await expect(repositories.backup.restore({
+      ...backup,
+      exerciseFavorites: [{ exercise_id: pushUp.id, created_at: 'inválido' }],
+    })).rejects.toThrow('favorito')
+    await expect(repositories.backup.restore({
+      ...backup,
+      uiPreferences: { themePreset: 'QUALQUER' },
+    })).rejects.toThrow('preferências')
+
+    await database.close()
+    database = betterDatabase(path)
+    repositories = createLocalRepositories(database)
+    expect(await repositories.exercises.list({ source: 'BUNDLED', includeArchived: true })).toHaveLength(40)
+    await database.close()
+  })
+
+  it('reverte integralmente uma sincronização interrompida', async () => {
+    const path = newDatabase()
+    let database = betterDatabase(path)
+    await runMigrations(database)
+    await database.close()
+    database = betterDatabase(path, failOn('INSERT INTO exercise_catalog_entries', 2))
+    await expect(syncBundledCatalog(database, bundledCatalog())).rejects.toThrow('injetada')
+    expect(await database.first('SELECT COUNT(*) AS count FROM exercise_definitions')).toEqual({ count: 0 })
+    expect(await database.first('SELECT COUNT(*) AS count FROM exercise_catalog_entries')).toEqual({ count: 0 })
     await database.close()
   })
 })
@@ -1082,5 +1262,30 @@ function seedData(): SeedData {
         },
       },
     },
+  }
+}
+
+function bundledCatalog() {
+  return { version: 2, exercises: [...BUNDLED_EXERCISES] }
+}
+
+function bundledSeedData(): SeedData {
+  const first = BUNDLED_EXERCISES[0]!
+  return {
+    ...seedData(),
+    exercises: [{
+      key: 'push_up',
+      name: first.name,
+      description: first.description,
+      primaryMuscleGroup: first.primaryMuscleGroup,
+      secondaryMuscleGroups: [...first.secondaryMuscleGroups],
+      equipment: first.equipment,
+      category: first.category,
+      difficulty: first.difficulty,
+      instructions: first.instructions,
+      notes: '',
+      unilateral: first.unilateral,
+      timed: first.timed,
+    }],
   }
 }

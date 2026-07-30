@@ -226,6 +226,10 @@ function exercise(id: number): ExerciseDefinition {
     primaryImageUrl: null,
     custom: true,
     mediaUrl: '',
+    aliases: [],
+    favorite: false,
+    lastUsedAt: null,
+    useCount: 0,
   }
 }
 
