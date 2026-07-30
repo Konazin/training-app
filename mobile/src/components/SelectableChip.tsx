@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { shared, type ThemeColors, useTheme } from '../theme'
 import { typography } from '../theme/typography'
-import { selectableChipColors } from '../theme/uiContracts'
+import { pressedChipColors, selectableChipColors } from '../theme/uiContracts'
 
 export function getSelectableChipColors(colors: ThemeColors, selected: boolean) {
   return selectableChipColors(colors, selected)
@@ -20,6 +20,7 @@ export function SelectableChip({
 }) {
   const { colors } = useTheme()
   const palette = getSelectableChipColors(colors, selected)
+  const pressedPalette = pressedChipColors(colors)
   return (
     <Pressable
       accessibilityRole="button"
@@ -28,13 +29,19 @@ export function SelectableChip({
       onPress={onPress}
       style={({ pressed }) => [
         styles.chip,
-        { backgroundColor: palette.backgroundColor, borderColor: palette.borderColor },
-        pressed && { backgroundColor: colors.primaryPressed },
+        {
+          backgroundColor: pressed ? pressedPalette.backgroundColor : palette.backgroundColor,
+          borderColor: pressed ? pressedPalette.borderColor : palette.borderColor,
+        },
         disabled && styles.disabled,
       ]}
     >
-      {selected && <View accessibilityElementsHidden style={[styles.check, { borderColor: colors.onPrimary }]} />}
-      <Text style={[styles.label, { color: palette.color }]}>{label}</Text>
+      {({ pressed }) => (
+        <>
+          {selected && <View accessibilityElementsHidden style={[styles.check, { borderColor: colors.onPrimary }]} />}
+          <Text style={[styles.label, { color: pressed ? pressedPalette.color : palette.color }]}>{label}</Text>
+        </>
+      )}
     </Pressable>
   )
 }

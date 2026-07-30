@@ -26,6 +26,8 @@ import { LibraryScreen } from './src/screens/LibraryScreen'
 import { HomeScreen } from './src/screens/HomeScreen'
 import { HistoryScreen } from './src/screens/HistoryScreen'
 import { MoreScreen } from './src/screens/MoreScreen'
+import { IntegrationsScreen } from './src/screens/IntegrationsScreen'
+import { WgerIntegrationScreen } from './src/features/wger/WgerIntegrationScreen'
 import { ThemeProvider, useTheme } from './src/theme'
 import { useAppBootstrap } from './src/features/bootstrap/useAppBootstrap'
 import { useLocalRuntime } from './src/features/bootstrap/useLocalRuntime'
@@ -106,7 +108,13 @@ function LocalApp({
     () => repositories.maintenance.resetToSeed(seed as SeedData),
     refreshAll,
   )
-  const message = workoutSession.message || trainingPlan.message || controller.message || backup.message
+  const notification = workoutSession.message
+    ? { message: workoutSession.message, kind: 'error' as const }
+    : trainingPlan.message
+      ? { message: trainingPlan.message, kind: 'error' as const }
+      : controller.message
+        ? { message: controller.message, kind: 'error' as const }
+        : { message: backup.message, kind: backup.messageKind }
   const navigationTheme = useMemo<NavigationTheme>(() => ({
     ...DefaultTheme,
     dark: isDark,
@@ -164,6 +172,16 @@ function LocalApp({
               </Stack.Screen>
               <Stack.Screen name="ExerciseDetail">
                 {() => <ExerciseDetailScreen exercises={controller.exerciseLibrary} />}
+              </Stack.Screen>
+              <Stack.Screen name="Integrations" component={IntegrationsScreen} />
+              <Stack.Screen name="WgerIntegration">
+                {() => (
+                  <WgerIntegrationScreen
+                    imports={repositories.externalExerciseImport}
+                    exercises={repositories.exercises}
+                    onImported={controller.refresh}
+                  />
+                )}
               </Stack.Screen>
               <Stack.Screen name="TrainingPlanEditor">
                 {() => (
@@ -257,7 +275,7 @@ function LocalApp({
               </Stack.Screen>
             </Stack.Navigator>
       </NavigationContainer>
-      <Toast message={message} />
+      <Toast message={notification.message} kind={notification.kind} />
     </>
   )
 }
@@ -339,6 +357,7 @@ function MainTabs({
           <MoreScreen
             busy={backup.busy}
             onLibrary={() => navigation.navigate('Library')}
+            onIntegrations={() => navigation.navigate('Integrations')}
             onExport={() => void backup.exportBackup()}
             onImport={() => void backup.importBackup()}
             onErase={() => void backup.eraseAll()}

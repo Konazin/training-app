@@ -6,13 +6,17 @@ import type {
   BackupRepository,
   DashboardRepository,
   ExerciseLibraryRepository,
+  ExternalExerciseCandidate,
+  ExternalExerciseImportRepository,
   WorkoutSession,
   WorkoutSessionRepository,
 } from '@training/training-domain'
+import { WgerExerciseCatalogProvider, WgerHttpError } from '@training/training-wger'
 import type { AppMetadataRepository } from '@training/training-local-db'
 import { useTrainingController } from './useTrainingController'
 import { useWorkoutSessionController } from './useWorkoutSessionController'
 import { useBackupController } from './useBackupController'
+import { useWgerIntegrationController } from '../features/wger/useWgerIntegrationController'
 
 const mocks = vi.hoisted(() => ({
   storage: {
@@ -161,6 +165,57 @@ describe('controllers locais', () => {
     expect(changed).toHaveBeenCalledTimes(2)
     hook.unmount()
   })
+
+  it('busca, ignora resposta antiga, seleciona, importa e isola falha offline do Wger', async () => {
+    const first = deferred<ReturnType<WgerExerciseCatalogProvider['search']>>()
+    const second = deferred<ReturnType<WgerExerciseCatalogProvider['search']>>()
+    const candidateA = wgerCandidate('1', 'Antigo')
+    const candidateB = wgerCandidate('2', 'Atual')
+    const provider = {
+      search: vi.fn()
+        .mockReturnValueOnce(first.promise)
+        .mockReturnValueOnce(second.promise)
+        .mockRejectedValueOnce(new WgerHttpError('OFFLINE', 'Sem internet')),
+      findByExternalId: vi.fn(),
+    } as unknown as WgerExerciseCatalogProvider
+    const imports = {
+      previewExisting: vi.fn(async () => []),
+      importSelected: vi.fn(async () => ({
+        created: 1, updated: 0, unchanged: 0, skipped: 0, failed: 0,
+        warnings: [], affectedIds: [10],
+      })),
+    } as unknown as ExternalExerciseImportRepository
+    const exercises = {
+      list: vi.fn(async () => []),
+    } as unknown as ExerciseLibraryRepository
+    const changed = vi.fn(async () => {})
+    const hook = await renderController(() => useWgerIntegrationController(
+      imports, exercises, changed, provider,
+    ))
+
+    let oldRequest!: Promise<boolean>
+    let newRequest!: Promise<boolean>
+    await act(async () => {
+      oldRequest = hook.current.search(1)
+      newRequest = hook.current.search(2)
+      second.resolve(page(candidateB, 2))
+      await newRequest
+      first.resolve(page(candidateA, 1))
+      await oldRequest
+    })
+    expect(hook.current.items.map((item) => item.name)).toEqual(['Atual'])
+    act(() => hook.current.toggle(candidateB))
+    expect(hook.current.selected.size).toBe(1)
+    await act(async () => { await hook.current.importSelected() })
+    expect(imports.importSelected).toHaveBeenCalledWith([candidateB])
+    expect(hook.current.phase).toBe('success')
+    expect(changed).toHaveBeenCalled()
+
+    await act(async () => { await hook.current.search(1) })
+    expect(hook.current.phase).toBe('offline')
+    expect(hook.current.message).toMatchObject({ kind: 'error', text: 'Sem internet' })
+    hook.unmount()
+  })
 })
 
 async function renderController<T>(useController: () => T) {
@@ -190,4 +245,32 @@ function session(status: WorkoutSession['status']): WorkoutSession {
     pausedDurationSeconds: 0, status, totalDurationSeconds: 0, overallRpe: null,
     notes: '', completedSets: 0, totalPlannedSets: 0, totalVolume: 0, exercises: [],
   }
+}
+
+function wgerCandidate(externalId: string, name: string): ExternalExerciseCandidate {
+  return {
+    provider: 'WGER', externalId, name, description: '', primaryMuscleGroup: 'Bíceps',
+    secondaryMuscleGroups: [], equipment: 'Corpo', category: 'STRENGTH',
+    difficulty: 'Não informado', instructions: '', unilateral: false, timed: false,
+    sourceUrl: `https://wger.de/en/exercise/${externalId}/view`,
+    licenseName: null, licenseUrl: null, author: null, media: [], warnings: [],
+    language: 'pt', original: {},
+  }
+}
+
+function page(item: ExternalExerciseCandidate, pageNumber: number) {
+  return {
+    items: [item],
+    page: pageNumber,
+    pageSize: 20,
+    total: 2,
+    hasNext: pageNumber === 1,
+    hasPrevious: pageNumber > 1,
+  }
+}
+
+function deferred<T extends Promise<unknown>>() {
+  let resolve!: (value: Awaited<T>) => void
+  const promise = new Promise<Awaited<T>>((done) => { resolve = done })
+  return { promise, resolve }
 }

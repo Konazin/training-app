@@ -21,6 +21,23 @@ export function selectableChipColors(colors: ThemeColors, selected: boolean) {
     : { backgroundColor: colors.surface, borderColor: colors.border, color: colors.textPrimary, indicator: false }
 }
 
+export function pressedChipColors(colors: ThemeColors) {
+  return { backgroundColor: colors.primaryPressed, borderColor: colors.primaryPressed, color: colors.onPrimary }
+}
+
+export function feedbackColors(colors: ThemeColors, kind: 'info' | 'success' | 'warning' | 'error') {
+  return {
+    info: { background: colors.surface, border: colors.focus, text: colors.textPrimary },
+    success: { background: colors.successSurface, border: colors.success, text: colors.textPrimary },
+    warning: { background: colors.surfaceSecondary, border: colors.warning, text: colors.textPrimary },
+    error: { background: colors.dangerSurface, border: colors.danger, text: colors.textPrimary },
+  }[kind]
+}
+
+export function reorderControlColors(colors: ThemeColors, enabled: boolean) {
+  return { color: colors.textPrimary, opacity: enabled ? 1 : 0.2 }
+}
+
 export function formFieldColors(colors: ThemeColors, focused: boolean, error: boolean, disabled: boolean) {
   return {
     backgroundColor: disabled ? colors.surfaceSecondary : colors.surface,

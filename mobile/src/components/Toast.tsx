@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Keyboard, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { shared, useTheme } from '../theme'
 import { typography } from '../theme/typography'
+import { feedbackColors } from '../theme/uiContracts'
 
-type ToastKind = 'info' | 'success' | 'error'
+export type ToastKind = 'info' | 'success' | 'warning' | 'error'
 
 export function Toast({ message, kind = 'info' }: { message: string; kind?: ToastKind }) {
   const { colors } = useTheme()
   const insets = useSafeAreaInsets()
   const [visible, setVisible] = useState(false)
+  const [keyboardHeight, setKeyboardHeight] = useState(0)
 
   useEffect(() => {
     setVisible(Boolean(message))
@@ -17,21 +19,35 @@ export function Toast({ message, kind = 'info' }: { message: string; kind?: Toas
     const timer = setTimeout(() => setVisible(false), 4500)
     return () => clearTimeout(timer)
   }, [message])
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', (event) => {
+      setKeyboardHeight(Platform.OS === 'ios' ? event.endCoordinates.height : 0)
+    })
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0))
+    return () => {
+      show.remove()
+      hide.remove()
+    }
+  }, [])
 
   if (!message || !visible) return null
-  const palette = {
-    info: { background: colors.surface, border: colors.focus },
-    success: { background: colors.successSurface, border: colors.success },
-    error: { background: colors.dangerSurface, border: colors.danger },
-  }[kind]
+  const palette = toastColors(colors, kind)
   return (
-    <View accessibilityLiveRegion="polite" style={[styles.toast, { backgroundColor: palette.background, borderColor: palette.border, top: insets.top + shared.spacing.sm }]}>
-      <Text style={[styles.message, { color: colors.textPrimary }]}>{message}</Text>
+    <View accessibilityLiveRegion={kind === 'error' ? 'assertive' : 'polite'} style={[styles.toast, {
+      backgroundColor: palette.background,
+      borderColor: palette.border,
+      bottom: keyboardHeight + insets.bottom + 76,
+    }]}>
+      <Text style={[styles.message, { color: palette.text }]}>{message}</Text>
       <Pressable accessibilityLabel="Fechar mensagem" accessibilityRole="button" hitSlop={8} onPress={() => setVisible(false)} style={styles.close}>
-        <Text style={[styles.closeText, { color: colors.textSecondary }]}>×</Text>
+        <Text style={[styles.closeText, { color: palette.text }]}>×</Text>
       </Pressable>
     </View>
   )
+}
+
+export function toastColors(colors: ReturnType<typeof useTheme>['colors'], kind: ToastKind) {
+  return feedbackColors(colors, kind)
 }
 
 const styles = StyleSheet.create({

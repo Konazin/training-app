@@ -6,7 +6,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   Vibration,
   View,
@@ -26,6 +25,7 @@ import { Screen, ScreenScrollView } from '../../../components/Screen'
 import { type ThemeColors, useTheme } from '../../../theme'
 import { ExerciseVideo } from '../../exercise-library/ExerciseVideo'
 import { attributionLabel, resolveMediaAttribution } from '../../exercise-library/libraryState'
+import { ThemedTextInput } from '../../../components/ThemedTextInput'
 
 interface Props {
   session: WorkoutSession | null
@@ -278,25 +278,19 @@ export function WorkoutSessionScreen(props: Props) {
       ))}
 
       <View style={styles.finish}>
-        <TextInput
+        <ThemedTextInput
           accessibilityLabel="RPE geral"
-          cursorColor={colors.primary}
-          selectionColor={colors.focus}
           value={rpe}
           onChangeText={setRpe}
           keyboardType="decimal-pad"
           placeholder="RPE geral (1–10)"
-          placeholderTextColor={colors.gray400}
           style={styles.input}
         />
-        <TextInput
+        <ThemedTextInput
           accessibilityLabel="Observações da sessão"
-          cursorColor={colors.primary}
-          selectionColor={colors.focus}
           value={notes}
           onChangeText={setNotes}
           placeholder="Observações da sessão"
-          placeholderTextColor={colors.gray400}
           style={styles.input}
         />
         {!!errors.session && <Text style={styles.error}>{errors.session}</Text>}
@@ -415,14 +409,11 @@ function SetEditor({
         {cardio && <SetField label="DISTÂNCIA KM" value={distance} onChange={setDistance} decimal />}
         <SetField label="RPE" value={rpe} onChange={setRpe} decimal />
       </View>
-      <TextInput
+      <ThemedTextInput
         accessibilityLabel="Observação da série"
-        cursorColor={colors.primary}
-        selectionColor={colors.focus}
         value={notes}
         onChangeText={setNotes}
         placeholder="Observação opcional"
-        placeholderTextColor={colors.gray400}
         style={styles.setNotes}
       />
       {!!error && <Text style={styles.error}>{error}</Text>}
@@ -468,10 +459,8 @@ function SetField({
   return (
     <View style={styles.field}>
       <Text style={styles.setLabel}>{label}</Text>
-      <TextInput
+      <ThemedTextInput
         accessibilityLabel={label}
-        cursorColor={colors.primary}
-        selectionColor={colors.focus}
         value={value}
         onChangeText={onChange}
         keyboardType={decimal ? 'decimal-pad' : 'number-pad'}

@@ -106,6 +106,86 @@ export interface ExerciseDefinitionInput {
   timed: boolean
 }
 
+export interface ExternalExerciseCatalogQuery {
+  page: number
+  pageSize: number
+  language: string
+  fallbackLanguage: string
+  text: string
+  categoryIds: number[]
+  muscleIds: number[]
+  equipmentIds: number[]
+  onlyWithImage: boolean
+  onlyWithVideo: boolean
+}
+
+export interface ExternalExerciseMediaCandidate {
+  type: ExerciseMediaType
+  source: ExerciseMediaSource
+  externalId: string
+  remoteUrl: string
+  thumbnailRemoteUrl: string | null
+  mimeType: string | null
+  width: number | null
+  height: number | null
+  durationSeconds: number | null
+  main: boolean
+  sortOrder: number
+  licenseName: string | null
+  licenseUrl: string | null
+  author: string | null
+  sourceUrl: string | null
+}
+
+export interface ExternalExerciseCandidate {
+  provider: 'WGER'
+  externalId: string
+  name: string
+  description: string
+  primaryMuscleGroup: string
+  secondaryMuscleGroups: string[]
+  equipment: string
+  category: ExerciseCategory
+  difficulty: string
+  instructions: string
+  unilateral: boolean
+  timed: boolean
+  sourceUrl: string
+  licenseName: string | null
+  licenseUrl: string | null
+  author: string | null
+  media: ExternalExerciseMediaCandidate[]
+  warnings: string[]
+  language: string
+  original: unknown
+}
+
+export interface ExternalExerciseCatalogPage {
+  items: ExternalExerciseCandidate[]
+  page: number
+  pageSize: number
+  total: number
+  hasNext: boolean
+  hasPrevious: boolean
+  nextCursor?: string
+}
+
+export interface ExternalExerciseImportPreview {
+  externalId: string
+  existingId: number | null
+  alreadyImported: boolean
+}
+
+export interface ExternalExerciseImportResult {
+  created: number
+  updated: number
+  unchanged: number
+  skipped: number
+  failed: number
+  warnings: string[]
+  affectedIds: number[]
+}
+
 export interface DayExerciseConfigInput {
   sets: number
   minReps: number

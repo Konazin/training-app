@@ -11,6 +11,8 @@ export type RootStackParamList = {
   MainTabs: NavigatorScreenParams<MainTabParamList> | undefined
   Library: undefined
   ExerciseDetail: { exerciseId: number }
+  Integrations: undefined
+  WgerIntegration: undefined
   Session: undefined
   ArchivedTrainingPlans: undefined
   ExercisePicker: { planId: number; dayId: number }

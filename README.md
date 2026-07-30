@@ -26,6 +26,7 @@ mobile/                         # app padrão local-only
 packages/
 ├── training-domain/            # modelos, regras, portas e serviços TypeScript puros
 ├── training-local-db/          # expo-sqlite, migrations, mappers, seed e backup
+├── training-wger/              # cliente público, parser e mapper Wger sem React
 ├── training-contracts/         # reexports temporários do domínio
 ├── mobile-api/                 # infraestrutura HTTP opcional/legada
 └── workout-session-core/       # suporte HTTP do app Umamusume legado
@@ -81,12 +82,26 @@ metadados técnicos e impede que o seed reapareça ao reabrir.
 Arquivos de backup não contêm tokens, chaves, mídia, cache ou estado do player.
 Veja [backup e restauração](docs/BACKUP_AND_RESTORE.md).
 
+## Integração opcional Wger
+
+O app continua local-only e não precisa de VPS, login ou chave Wger. A consulta
+só acontece por ação explícita:
+
+**Mais → Integrações → Catálogo Wger → Buscar → Selecionar → Importar**
+
+Somente filtros do catálogo são enviados em requisições GET. Fichas, sessões,
+séries, histórico, notas, backups, IDs SQLite e identificadores do aparelho
+nunca são enviados. A cópia importada fica no SQLite e pode ser usada em fichas
+e sessões sem conexão. Imagens e vídeos são apenas URLs nesta versão e podem
+exigir internet. Veja [uso da integração](docs/WGER_INTEGRATION.md) e
+[contrato técnico](docs/WGER_API_CONTRACT.md).
+
 ## Internet e componentes opcionais
 
-O app padrão não realiza rede no bootstrap nem para operações principais.
-Somente vídeos remotos, quando o usuário toca em reproduzir, podem exigir
-internet. Wger, IA, Health Connect e backup remoto possuem apenas portas de
-domínio para integrações futuras com consentimento explícito.
+O app padrão não realiza rede no bootstrap nem para operações principais. O
+Wger é consultado somente na tela da integração; mídia remota só carrega quando
+necessária e vídeos exigem ação explícita. IA, Health Connect e backup remoto
+continuam fora do runtime padrão.
 
 O backend Java, PostgreSQL, Docker e a interface web são opcionais e não fazem
 parte do runtime do app padrão. Consulte [servidor opcional](docs/OPTIONAL_SERVER.md).
@@ -100,6 +115,8 @@ npm run typecheck --workspace=@training/training-domain
 npm run test --workspace=@training/training-domain
 npm run typecheck --workspace=@training/training-local-db
 npm run test --workspace=@training/training-local-db
+npm run typecheck --workspace=@training/training-wger
+npm run test --workspace=@training/training-wger
 npm run typecheck --workspace=training-mobile
 npm run test --workspace=training-mobile
 npm run typecheck --workspace=umamusume-mobile

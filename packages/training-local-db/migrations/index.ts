@@ -214,10 +214,19 @@ CREATE TABLE app_metadata (
 );
 `
 
+const externalExerciseIndexes = `
+CREATE UNIQUE INDEX exercise_media_source_external
+  ON exercise_media(source, external_id)
+  WHERE external_id IS NOT NULL;
+CREATE INDEX exercise_definition_external_lookup
+  ON exercise_definitions(source, external_id, archived);
+`
+
 export const MIGRATIONS: Migration[] = [
   migration(1, 'local_training_schema', schema),
   migration(2, 'local_query_indexes', indexes),
   migration(3, 'app_installation_metadata', appMetadata),
+  migration(4, 'external_exercise_indexes', externalExerciseIndexes),
 ]
 
 export async function runMigrations(database: SqlDatabase, onProgress?: (progress: MigrationProgress) => void) {

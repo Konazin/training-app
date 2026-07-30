@@ -13,6 +13,7 @@ export function useBackupController(
 ) {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+  const [messageKind, setMessageKind] = useState<'success' | 'error'>('success')
   const [automaticBackups, setAutomaticBackups] = useState<AutomaticBackupInfo[]>([])
   const automatic = useMemo(
     () => createAutomaticBackupService(repository, metadata, appVersion),
@@ -32,9 +33,13 @@ export function useBackupController(
     try {
       const result = await operation()
       await refreshBackups()
-      if (result) setMessage(result)
+      if (result) {
+        setMessageKind('success')
+        setMessage(result)
+      }
       return true
     } catch (cause) {
+      setMessageKind('error')
       setMessage(cause instanceof Error ? cause.message : 'Falha na operação local.')
       return false
     } finally {
@@ -45,6 +50,7 @@ export function useBackupController(
   return {
     busy,
     message,
+    messageKind,
     automaticBackups,
     exportBackup: () => run(async () => {
       await shareBackup(repository, appVersion)

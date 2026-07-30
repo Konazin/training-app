@@ -1,740 +1,1184 @@
 Continue o desenvolvimento do repositório `training-app` a partir do commit:
 
-63ac4463495e266d85dc8c28ca4299ed68967f64
+c4bce5b7e19306db2770657dcd4d0887be21ac32
 
-Esta etapa é uma sprint de usabilidade e interface do aplicativo padrão
-local-only.
+Esta sprint deve implementar a primeira integração externa real do aplicativo
+local-only: importação explícita de exercícios do catálogo público Wger para o
+SQLite do aparelho.
 
-Trabalhe apenas em:
+Também deve corrigir os problemas visuais residuais encontrados na revisão da
+versão 0.2.1.
 
-mobile/
+O aplicativo continua local-only:
 
-Não alterar:
+- nenhuma VPS;
+- nenhum backend próprio;
+- nenhum login obrigatório;
+- nenhuma chamada de rede no bootstrap;
+- nenhuma sincronização silenciosa;
+- nenhum dado de treino enviado para fora;
+- nenhuma dependência de internet após o exercício ser importado, exceto mídia
+  remota que não tenha sido baixada.
 
-- regras de domínio;
-- schema SQLite;
-- migrations;
-- repositories;
-- backup;
-- backend;
-- web;
-- umamusume-mobile.
+A rede deve ser usada somente quando o usuário abrir a integração e iniciar uma
+busca ou atualização.
 
-O objetivo é corrigir problemas observados em aparelho Android real:
+Ao final, preparar e gerar o APK preview:
 
-- interface pequena demais;
-- textos difíceis de ler;
-- conteúdo encostando ou entrando sob a barra superior;
-- elementos desaparecendo ao rolar para o topo;
-- contraste ruim;
-- seleção preta sobre fundo preto;
-- estados selecionados pouco distinguíveis;
-- áreas de toque pequenas.
-
-Ao final, gerar uma nova versão preview:
-
-- version: 0.2.1
-- android.versionCode: 4
+- version: 0.3.0
+- android.versionCode: 5
 
 ==================================================
-1. SAFE AREA GLOBAL
+1. OBJETIVO DO FLUXO
 ==================================================
 
-Mover `SafeAreaProvider` para o topo absoluto do aplicativo, envolvendo:
+O usuário deve conseguir:
 
-- ErrorBoundary;
-- ThemeProvider;
-- bootstrap;
-- runtime;
-- navegação.
+1. abrir Mais;
+2. abrir Integrações;
+3. escolher Wger;
+4. ler claramente o que será consultado e salvo;
+5. iniciar a consulta;
+6. navegar pelos exercícios retornados;
+7. filtrar e buscar nos resultados;
+8. abrir uma prévia;
+9. selecionar exercícios;
+10. importar os selecionados;
+11. fechar o aplicativo;
+12. abrir em modo avião;
+13. encontrar os exercícios importados na biblioteca;
+14. adicioná-los à ficha;
+15. iniciar e concluir uma sessão com eles.
 
-Não criar SafeAreaProvider apenas depois do bootstrap.
-
-Criar componente reutilizável:
-
-mobile/src/components/Screen.tsx
-
-Responsabilidades:
-
-- respeitar safe area superior;
-- respeitar safe area inferior quando não houver tab bar;
-- fundo do tema;
-- flex: 1;
-- comportamento consistente Android/iOS;
-- suporte a ScrollView e conteúdo fixo;
-- suporte a teclado.
-
-Usar `useSafeAreaInsets`.
-
-Não depender somente de um SafeAreaView externo envolvendo toda a navegação.
-
-Cada tela principal deve usar `Screen` ou `ScreenScrollView`.
+Nenhuma etapa normal do app deve depender do Wger.
 
 ==================================================
-2. EDGE-TO-EDGE E STATUS BAR
+2. ARQUITETURA
 ==================================================
 
-Configurar corretamente Android edge-to-edge.
+Criar package:
+
+packages/training-wger/
+
+Estrutura sugerida:
+
+packages/training-wger/
+├── client/
+│   ├── WgerClient.ts
+│   ├── WgerHttpError.ts
+│   └── types.ts
+├── mapper/
+│   ├── mapWgerExercise.ts
+│   ├── language.ts
+│   ├── category.ts
+│   └── sanitizeText.ts
+├── provider/
+│   └── WgerExerciseCatalogProvider.ts
+├── fixtures/
+├── tests/
+├── index.ts
+├── package.json
+└── tsconfig.json
+
+Dependências permitidas:
+
+- @training/training-domain;
+- APIs padrão do JavaScript;
+- fetch injetado.
+
+Não depender de:
+
+- React;
+- React Native;
+- Expo;
+- SQLite;
+- backend Spring;
+- Axios;
+- DOMParser;
+- bibliotecas HTML pesadas.
+
+O package deve ser reutilizável e testável em Node.
+
+==================================================
+3. CONTRATOS DO DOMÍNIO
+==================================================
+
+Substituir o placeholder atual:
+
+ExternalExerciseCatalogProvider.preview(
+  filters: Record<string, unknown>
+): Promise<ExerciseDefinitionInput[]>
+
+por tipos explícitos.
+
+Criar:
+
+ExternalExerciseCatalogQuery
+
+Campos:
+
+- page;
+- pageSize;
+- language;
+- fallbackLanguage;
+- text;
+- categoryIds;
+- muscleIds;
+- equipmentIds;
+- onlyWithImage;
+- onlyWithVideo.
+
+Criar:
+
+ExternalExerciseMediaCandidate
+
+Campos:
+
+- type;
+- source;
+- externalId;
+- remoteUrl;
+- thumbnailRemoteUrl;
+- mimeType;
+- width;
+- height;
+- durationSeconds;
+- main;
+- sortOrder;
+- licenseName;
+- licenseUrl;
+- author;
+- sourceUrl.
+
+Criar:
+
+ExternalExerciseCandidate
+
+Campos:
+
+- provider;
+- externalId;
+- name;
+- description;
+- primaryMuscleGroup;
+- secondaryMuscleGroups;
+- equipment;
+- category;
+- difficulty;
+- instructions;
+- unilateral;
+- timed;
+- sourceUrl;
+- licenseName;
+- licenseUrl;
+- author;
+- media;
+- warnings.
+
+Criar:
+
+ExternalExerciseCatalogPage
+
+Campos:
+
+- items;
+- page;
+- pageSize;
+- total;
+- hasNext;
+- hasPrevious;
+- nextCursor opcional.
+
+Interface:
+
+ExternalExerciseCatalogProvider {
+  search(query: ExternalExerciseCatalogQuery):
+    Promise<ExternalExerciseCatalogPage>
+
+  findByExternalId(externalId: string, language?: string):
+    Promise<ExternalExerciseCandidate | null>
+}
+
+Não usar ExerciseDefinitionInput como representação de um exercício externo,
+porque esse tipo não possui origem, externalId, licença ou mídia.
+
+==================================================
+4. CONTRATO WGER
+==================================================
+
+Usar por padrão:
+
+https://wger.de/api/v2
+
+Consultar o OpenAPI atual antes de implementar:
+
+https://wger.de/api/v2/schema
+
+Endpoint principal esperado:
+
+/exerciseinfo/
+
+Não assumir campos pela memória ou pelo backend Java antigo.
+
+Antes de escrever DTOs:
+
+1. baixar ou consultar o OpenAPI;
+2. localizar o schema real de exerciseinfo;
+3. documentar os campos utilizados;
+4. salvar fixtures representativas;
+5. implementar parser defensivo.
+
+Não consultar o OpenAPI durante o uso normal do aplicativo.
+
+O runtime deve usar apenas endpoints necessários ao catálogo.
+
+==================================================
+5. SEGURANÇA DO CLIENTE
+==================================================
+
+Configuração padrão:
+
+WGER_BASE_URL=https://wger.de/api/v2
+WGER_TIMEOUT_MS=15000
+WGER_PAGE_SIZE=20
+WGER_MAX_PAGE_SIZE=50
+WGER_MAX_PAGES_PER_ACTION=5
 
 Regras:
 
-- conteúdo nunca fica atrás da barra de status;
-- conteúdo nunca fica atrás da barra de navegação;
-- status bar deve combinar com o tema;
-- barra de navegação Android deve combinar com o fundo ou tab bar;
-- mudar tema deve atualizar ambas.
+- somente HTTPS;
+- aceitar apenas origem wger.de nesta versão;
+- não seguir paginação para outro host;
+- validar a URL de `next`;
+- timeout com AbortController;
+- aceitar somente JSON;
+- rejeitar resposta excessivamente grande;
+- não registrar corpo completo da resposta;
+- não registrar dados sensíveis;
+- não usar token;
+- não solicitar chave de API;
+- não enviar fichas, sessões, histórico ou identificadores locais.
 
-Usar APIs Expo compatíveis com SDK atual.
+Headers:
 
-Não aplicar padding superior duplicado.
+- Accept: application/json;
+- Accept-Language quando aplicável.
 
-Testar em aparelhos com:
-
-- notch;
-- câmera central;
-- barra de status alta;
-- navegação por gestos;
-- navegação por três botões.
-
-==================================================
-3. REMOVER ELEMENTOS ABSOLUTOS DO TOPO
-==================================================
-
-Remover o botão de tema absoluto com:
-
-top: 7
-
-Remover mensagens absolutas com:
-
-top: 8
-
-O botão de tema deve ficar em:
-
-- tela “Mais”;
-- ou ação explícita de um header que tenha espaço reservado.
-
-Não manter botão flutuante sobre títulos ou conteúdo.
-
-Mensagens globais devem usar um componente Toast/Snackbar:
-
-- posicionado usando safe area;
-- abaixo da barra superior;
-- sem cobrir títulos;
-- desaparecimento automático;
-- botão fechar;
-- suporte a sucesso, erro e informação;
-- contraste adequado;
-- texto mínimo de 14 px.
+Não inventar User-Agent proibido pelo ambiente React Native.
 
 ==================================================
-4. ESCALA TIPOGRÁFICA
+6. PAGINAÇÃO E ERROS
 ==================================================
 
-Criar tokens centralizados:
+O cliente deve interpretar:
 
-mobile/src/theme/typography.ts
+- count;
+- next;
+- previous;
+- results.
 
-Escala mínima:
+Tratar explicitamente:
 
-- caption: 12
-- labelSmall: 13
-- label: 14
-- bodySmall: 14
-- body: 16
-- bodyLarge: 18
-- titleSmall: 20
-- title: 26
-- display: 34
+- offline;
+- timeout;
+- DNS;
+- HTTP 400;
+- HTTP 404;
+- HTTP 429;
+- HTTP 500–599;
+- JSON inválido;
+- schema incompatível;
+- resposta vazia.
 
-Nenhum texto informativo deve usar menos de 12 px.
+Para 429:
 
-Exceções:
+- ler Retry-After;
+- mostrar tempo aproximado;
+- não repetir automaticamente.
 
-- nenhuma para labels da tab bar;
-- nenhuma para metadados importantes;
-- nenhuma para botões.
+Não implementar retry automático agressivo.
 
-Remover fontSize espalhado de:
-
-- 7;
-- 8;
-- 9;
-- 10;
-- 11;
-
-salvo casos extremamente justificados e documentados.
-
-Usar lineHeight coerente:
-
-- body 16 → lineHeight mínimo 22;
-- body 14 → lineHeight mínimo 20;
-- títulos sem corte vertical.
+Permitir apenas retry manual iniciado pelo usuário.
 
 ==================================================
-5. FONT SCALING
+7. IDIOMAS
 ==================================================
 
-Permitir escala de fonte do sistema.
+Seleção da tradução:
 
-Não usar:
+1. pt-br exato;
+2. pt exato;
+3. en exato;
+4. primeira tradução válida.
 
-allowFontScaling={false}
+Normalizar:
 
-Garantir funcionamento com:
+- maiúsculas/minúsculas;
+- hífen e underscore;
+- espaços.
 
-- escala 1.0;
-- escala 1.15;
-- escala 1.30.
+Nunca usar tradução sem nome.
 
-Textos não podem:
+Quando português não existir:
 
-- cortar;
-- sair dos cards;
-- sobrepor botões;
-- desaparecer.
+- mostrar indicador “Tradução em inglês”;
+- preservar o idioma original no candidate;
+- não esconder que houve fallback.
 
-Usar:
+Adicionar testes para:
 
-- flexShrink;
-- numberOfLines somente quando realmente necessário;
-- minHeight em vez de height fixa para conteúdo textual.
-
-==================================================
-6. TOKENS DE ESPAÇAMENTO
-==================================================
-
-Expandir `shared` com tokens:
-
-spacing:
-- xs: 4
-- sm: 8
-- md: 12
-- lg: 16
-- xl: 20
-- xxl: 24
-- xxxl: 32
-
-touchTarget:
-- minimum: 48
-
-screen:
-- horizontalPadding: 20
-- topSpacing: 16
-- bottomSpacing: 120
-
-Evitar números arbitrários espalhados.
-
-Cards principais devem ter:
-
-- padding mínimo 16;
-- gap mínimo 12;
-- borda ou contraste visível;
-- raio entre 16 e 22.
+- pt-br;
+- pt;
+- en;
+- fallback;
+- tradução vazia;
+- múltiplas traduções incompletas.
 
 ==================================================
-7. ÁREAS DE TOQUE
+8. TEXTO E HTML
 ==================================================
 
-Todos os elementos interativos devem possuir:
+Descrição e instruções vindas do Wger podem conter formatação.
 
-- largura ou altura mínima de 48 dp;
-- `hitSlop` quando visualmente menores;
-- estado pressed;
-- estado disabled;
-- accessibilityRole;
-- accessibilityLabel quando necessário.
+Armazenar texto plano sanitizado.
 
-Corrigir especialmente:
+Suportar ao menos:
 
-- botão de tema;
-- links;
-- chips;
-- botões de editar;
-- setas;
-- controles da sessão;
-- abas;
-- ações de backup.
+- parágrafos;
+- quebras de linha;
+- listas;
+- entidades HTML comuns.
 
-Não usar apenas texto pequeno como área clicável.
+Remover:
 
-==================================================
-8. PALETA
-==================================================
+- tags;
+- scripts;
+- estilos;
+- URLs javascript:;
+- caracteres de controle;
+- espaços repetidos excessivos.
 
-Reformular a paleta mantendo estilo sóbrio.
-
-Tema claro sugerido:
-
-- background: #F5F6F8
-- surface: #FFFFFF
-- surfaceSecondary: #ECEFF3
-- textPrimary: #16181D
-- textSecondary: #5F6673
-- border: #D9DEE7
-- primary: #2563EB
-- primaryPressed: #1D4ED8
-- onPrimary: #FFFFFF
-- success: #15803D
-- warning: #B45309
-- danger: #B91C1C
-- focus: #60A5FA
-
-Tema escuro sugerido:
-
-- background: #101216
-- surface: #181B21
-- surfaceSecondary: #232730
-- textPrimary: #F4F6F8
-- textSecondary: #AEB6C3
-- border: #343A46
-- primary: #60A5FA
-- primaryPressed: #3B82F6
-- onPrimary: #08111F
-- success: #4ADE80
-- warning: #FBBF24
-- danger: #F87171
-- focus: #93C5FD
-
-Não usar o mesmo `nearBlack` como solução universal para:
-
-- tab bar;
-- chips;
-- cards;
-- seleções;
-- badges;
-- mensagens.
-
-Criar tokens semânticos em vez de tons numerados genéricos.
+Não renderizar HTML remoto em WebView.
 
 ==================================================
-9. CONTRASTE
+9. MAPEAMENTO DE EXERCÍCIOS
 ==================================================
 
-Garantir contraste mínimo aproximado WCAG AA:
+Mapear:
 
-- texto normal: 4.5:1;
-- texto grande: 3:1;
-- controles e bordas relevantes: 3:1.
+- ID ou UUID Wger para externalId estável;
+- tradução escolhida para name, description e instructions;
+- músculos para primaryMuscleGroup e secondaryMuscleGroups;
+- equipamentos para equipment;
+- imagens;
+- vídeos;
+- licença;
+- autoria;
+- objeto original;
+- sourceUrl.
 
-Criar testes unitários para calcular contraste dos pares principais:
+Categoria local:
 
-- texto/fundo;
-- texto secundário/fundo;
-- botão primário/texto;
-- chip selecionado/texto;
-- erro/fundo;
-- tab ativa/fundo.
+- CARDIO quando explicitamente cardio;
+- MOBILITY quando explicitamente mobilidade;
+- STRETCHING quando explicitamente alongamento;
+- RECOVERY quando explicitamente recuperação;
+- TECHNIQUE quando explicitamente técnica;
+- STRENGTH como fallback para exercícios resistidos.
 
-Não aceitar preto sobre preto, branco sobre branco ou cinza quase invisível.
+Não usar região corporal do Wger como categoria local.
 
-==================================================
-10. INPUTS
-==================================================
+Difficulty:
 
-Atualizar `FormField`.
+- usar valor remoto somente quando existir e for compreensível;
+- caso contrário usar “Não informado”.
 
-Adicionar:
+Unilateral e timed devem ser inferidos apenas quando o contrato remoto fornecer
+informação confiável.
 
-- `selectionColor={colors.focus}`;
-- `cursorColor={colors.primary}` no Android;
-- fundo claramente diferente da tela;
-- texto mínimo 16 px;
-- label mínimo 14 px;
-- placeholder com contraste legível;
-- borderWidth 1;
-- borda de foco destacada;
-- borda de erro;
-- mensagem de erro associada;
-- padding vertical suficiente;
-- minHeight 56.
-
-Criar estados:
-
-- default;
-- focused;
-- error;
-- disabled.
-
-Não usar seleção ou cursor preto no tema escuro.
-
-Para multiline:
-
-- minHeight 120;
-- padding superior 15;
-- textAlignVertical top.
+Não inferir com base apenas no nome.
 
 ==================================================
-11. SELEÇÕES, CHIPS E FILTROS
+10. MÍDIAS
 ==================================================
 
-Criar componente reutilizável:
+Importar apenas metadados e URLs.
 
-SelectableChip
+Não baixar arquivos nesta sprint.
 
-Estados:
+Rejeitar mídia quando:
 
-default:
-- fundo surface;
-- texto textPrimary;
-- borda border.
+- não possui ID externo;
+- URL não é HTTPS;
+- URL está vazia;
+- tipo é desconhecido;
+- largura é negativa;
+- altura é negativa;
+- duração é negativa.
 
-selected:
-- fundo primary;
-- texto onPrimary;
-- borda primary.
+Preservar:
 
-pressed:
-- fundo primaryPressed.
+- licença específica da mídia;
+- autor específico;
+- sourceUrl;
+- thumbnail;
+- ordem;
+- mídia principal.
 
-disabled:
-- opacidade reduzida;
-- ainda legível.
+Não usar URL direta do arquivo como sourceUrl quando existir página ou objeto
+original.
 
-Adicionar ícone ou check visual no estado selecionado.
+Não carregar vídeos:
 
-Não depender apenas da mudança de cor.
+- durante busca;
+- durante lista;
+- durante bootstrap.
 
-Corrigir:
-
-- seleção de ficha;
-- filtros da biblioteca;
-- seleção de categoria;
-- seleção de dificuldade;
-- status de exercício;
-- qualquer chip horizontal.
-
-No chip de ficha selecionado:
-
-- nome;
-- categoria;
-- indicação “ativa”;
-
-todos devem mudar para cores compatíveis com o fundo selecionado.
-
-Hoje somente o nome recebe estilo inverso. Corrigir também os metadados.
+Vídeo só pode carregar após ação explícita na tela de detalhe.
 
 ==================================================
-12. TAB BAR
+11. REPOSITORY DE IMPORTAÇÃO
 ==================================================
 
-Redesenhar a tab bar.
+Criar interface:
 
-Requisitos:
+ExternalExerciseImportRepository
 
-- altura deve considerar safe area inferior;
-- altura visual mínima 64, além do inset inferior;
-- label mínimo 12 px;
-- ícone mínimo 22 px;
-- item ativo claramente visível;
-- não usar texto em símbolo Unicode como ícone definitivo.
+Métodos:
 
-Usar uma biblioteca já disponível ou ícones Expo compatíveis, preferencialmente:
+previewExisting(candidates):
+  Promise<ExternalExerciseImportPreview[]>
 
-@expo/vector-icons
+importSelected(candidates):
+  Promise<ExternalExerciseImportResult>
 
-Abas:
+refreshImported(provider):
+  Promise<ExternalExerciseImportResult>
 
-- Hoje;
-- Ficha;
-- Histórico;
-- Mais.
+Tipos de resultado:
 
-Estado ativo:
+- created;
+- updated;
+- unchanged;
+- skipped;
+- failed;
+- warnings;
+- affectedIds.
 
-- ícone e texto em primary;
-- fundo opcional discreto;
-- não usar texto branco sobre fundo quase preto sem distinção entre itens.
+Adicionar ao LocalRepositories:
 
-Estado inativo:
+externalExerciseImport
 
-- textSecondary.
-
-==================================================
-13. HEADERS
-==================================================
-
-Atualizar `ScreenHeader`.
-
-Requisitos:
-
-- padding superior fornecido pelo Screen;
-- eyebrow mínimo 12 px;
-- título entre 28 e 34 px;
-- descrição mínima 15 px;
-- action com touch target 48;
-- action não pode apertar ou cortar título;
-- título deve suportar duas linhas;
-- espaço inferior mínimo 24.
-
-Não colocar controles flutuando sobre o header.
+Não misturar essa operação com create(), que deve continuar criando exercício
+CUSTOM.
 
 ==================================================
-14. SCROLL
+12. UPSERT LOCAL
 ==================================================
 
-Corrigir todas as telas roláveis.
+Importar Wger com:
 
-Usar:
+source = 'WGER'
 
-- `contentInsetAdjustmentBehavior="automatic"` em iOS;
-- paddingBottom suficiente para tab bar;
-- `keyboardShouldPersistTaps="handled"` em formulários;
-- `keyboardDismissMode` apropriado;
-- `showsVerticalScrollIndicator={false}` somente quando não prejudicar uso.
+Chave lógica:
 
-O primeiro conteúdo nunca pode começar atrás da status bar.
+(source, external_id)
 
-Ao rolar para o topo:
+Regras:
 
-- header deve permanecer totalmente visível;
-- overscroll não deve revelar fundo de cor errada;
-- nenhum botão deve sumir atrás da câmera ou barra.
+- exercício existente mantém o mesmo ID SQLite;
+- referências em fichas continuam válidas;
+- importar novamente não cria duplicata;
+- campos remotos podem ser atualizados;
+- archived local deve ser preservado;
+- exercícios CUSTOM nunca são alterados;
+- exercícios SYSTEM nunca são alterados;
+- notas pessoais locais não devem ser apagadas sem decisão explícita;
+- mídias são atualizadas por source + externalId;
+- IDs de mídia existentes devem ser preservados.
+
+Executar o lote inteiro em transação.
+
+Falha de banco durante o lote:
+
+- rollback completo;
+- nenhum exercício parcial;
+- nenhuma mídia órfã.
 
 ==================================================
-15. COMPONENTE SCREENSCROLLVIEW
+13. MIGRATION SQLITE
+==================================================
+
+Não editar migrations 1, 2 ou 3.
+
+Criar migration 4.
+
+Adicionar índice único parcial de mídia:
+
+CREATE UNIQUE INDEX ... ON exercise_media(source, external_id)
+WHERE external_id IS NOT NULL;
+
+Antes de criar o índice:
+
+- verificar fixtures e testes;
+- garantir que não existam duplicatas introduzidas pelo seed.
+
+Criar também índice de consulta:
+
+exercise_definitions(source, external_id, archived)
+
+Não usar IF NOT EXISTS para esconder histórico inconsistente.
+
+Testar upgrade:
+
+- banco na migration 3;
+- aplicar migration 4;
+- preservar exercícios, fichas, sessões e backups;
+- segunda inicialização;
+- checksum imutável.
+
+==================================================
+14. ATUALIZAÇÃO DE IMPORTADOS
+==================================================
+
+Criar ação:
+
+“Atualizar exercícios importados”
+
+Fluxo:
+
+1. carregar IDs Wger locais;
+2. consultar detalhes atuais;
+3. mostrar quantos serão atualizados;
+4. usuário confirma;
+5. aplicar upsert;
+6. preservar IDs SQLite;
+7. informar criados, atualizados, inalterados e falhas.
+
+Não executar automaticamente.
+
+Não apagar exercícios locais caso o Wger esteja indisponível.
+
+Caso um item remoto não seja encontrado:
+
+- manter item local;
+- registrar aviso;
+- não arquivar silenciosamente.
+
+==================================================
+15. TELA DE INTEGRAÇÕES
+==================================================
+
+Criar rota:
+
+Integrations
+
+Na tela Mais, adicionar:
+
+INTEGRAÇÕES
+- Catálogo Wger
+
+Detalhes:
+
+“Busca exercícios públicos e salva uma cópia no aparelho.”
+
+Não colocar a ação de rede diretamente no bootstrap ou na Home.
+
+==================================================
+16. TELA WGER
 ==================================================
 
 Criar:
 
-ScreenScrollView
+WgerIntegrationScreen
 
-Deve encapsular:
+Estados:
 
-- safe area;
-- ScrollView;
-- background;
-- padding horizontal;
-- padding superior;
-- padding inferior;
+- explicação;
+- pronto;
+- carregando;
+- resultados;
+- importando;
+- sucesso;
+- parcial;
+- erro;
+- offline.
+
+No primeiro uso, mostrar:
+
+- o app fará requisições GET ao Wger;
+- nenhum treino será enviado;
+- exercícios escolhidos serão salvos no aparelho;
+- imagens e vídeos podem depender de internet;
+- cada item mantém licença e atribuição;
+- o usuário controla quando consultar e importar.
+
+Botão principal:
+
+“Buscar exercícios”
+
+Filtros iniciais:
+
+- texto;
+- somente com imagem;
+- somente com vídeo;
+- idioma;
+- quantidade por página.
+
+Não mostrar filtros remotos que o OpenAPI não suporte.
+
+Busca textual pode ser local sobre os resultados carregados caso o endpoint não
+ofereça busca textual oficial.
+
+==================================================
+17. RESULTADOS E SELEÇÃO
+==================================================
+
+Cada resultado deve mostrar:
+
+- checkbox;
+- nome;
+- músculo principal;
+- equipamento;
+- categoria mapeada;
+- idioma;
+- indicador de imagem;
+- indicador de vídeo;
+- origem Wger;
+- aviso de item já importado.
+
+Ações:
+
+- selecionar;
+- selecionar página;
+- limpar seleção;
+- abrir detalhes;
+- importar selecionados;
+- próxima página;
+- página anterior.
+
+Não importar automaticamente ao marcar.
+
+Não selecionar todos os resultados globais sem o usuário saber quantos serão
+importados.
+
+==================================================
+18. PRÉ-VISUALIZAÇÃO
+==================================================
+
+Tela ou modal deve mostrar:
+
+- nome;
+- descrição;
+- instruções;
+- músculos;
+- equipamentos;
+- categoria local;
+- mídia principal;
+- autor;
+- licença;
+- fonte original;
+- avisos do mapper.
+
+Não reproduzir vídeo automaticamente.
+
+Permitir editar antes da importação apenas:
+
+- categoria local;
+- dificuldade;
+- músculo principal;
+- equipamento.
+
+Não permitir alterar:
+
+- externalId;
+- origem;
+- licença;
+- autoria;
+- URLs da fonte.
+
+==================================================
+19. EXPERIÊNCIA OFFLINE
+==================================================
+
+Em modo avião:
+
+- botão Wger permanece visível;
+- tocar mostra mensagem clara;
+- banco local não é modificado;
+- biblioteca local continua funcionando;
+- fichas e sessões continuam funcionando;
+- exercícios anteriormente importados continuam visíveis;
+- vídeos remotos mostram indisponibilidade sem bloquear treino.
+
+Não usar a falha externa como erro global do aplicativo.
+
+==================================================
+20. CORRIGIR INPUTS VISUAIS RESTANTES
+==================================================
+
+Criar componente:
+
+ThemedTextInput
+
+Responsabilidades:
+
+- cursorColor;
+- selectionColor;
+- placeholder;
+- foco;
+- erro;
+- disabled;
+- tamanho mínimo;
+- acessibilidade.
+
+Migrar todos os TextInput avulsos, incluindo:
+
+- busca da biblioteca;
+- busca do ExercisePicker;
+- busca Wger;
+- campos da sessão;
+- campos de série;
+- campos dos modais.
+
+Nenhum TextInput escuro deve depender das cores padrão do Android.
+
+==================================================
+21. CORRIGIR TOAST
+==================================================
+
+O Toast atual não pode cobrir o ScreenHeader.
+
+Escolher uma abordagem:
+
+- snackbar inferior acima da tab bar;
+- ou container de layout que reserve espaço.
+
+Preferir snackbar inferior.
+
+Considerar:
+
+- safe area inferior;
+- altura da tab bar;
 - teclado;
-- refresh control opcional;
-- conteúdo acessível.
+- tela Session sem tab bar;
+- modal.
 
-Migrar telas principais:
+Suportar tipos:
 
-- HomeScreen;
-- TrainingPlanView;
-- HistoryScreen;
-- MoreScreen;
-- LibraryScreen;
-- TrainingPlanEditorScreen;
-- TrainingPlanDayScreen;
-- DayExerciseEditorScreen;
-- RestActivityEditorScreen;
-- WorkoutSessionScreen;
-- ExerciseDetailScreen;
-- ArchivedTrainingPlansScreen.
+- info;
+- success;
+- warning;
+- error.
 
-Não deixar cada tela reinventar seu padding.
+A origem da mensagem deve informar o tipo correto.
+
+Não tratar erro como info.
 
 ==================================================
-16. TELA DE SESSÃO
+22. MODAIS E SAFE AREA
 ==================================================
 
-A sessão é a tela mais importante.
+Corrigir o modal de exercício e novos modais Wger.
 
-Aumentar:
+Todos devem possuir:
 
-- nome do exercício;
-- números das séries;
-- campos de carga e repetição;
-- botões;
-- cronômetro;
-- status.
+- SafeAreaView ou insets explícitos;
+- KeyboardAvoidingView;
+- conteúdo rolável;
+- padding inferior real;
+- botão fechar acessível;
+- suporte a tela pequena;
+- suporte a teclado aberto.
 
-Requisitos:
-
-- campos numéricos mínimo 56 de altura;
-- texto mínimo 16;
-- botões concluir/salvar claros;
-- séries separadas visualmente;
-- sessão pausada claramente identificada;
-- cronômetro visível a distância;
-- área inferior não coberta pela barra de navegação;
-- modal de vídeo respeitando safe area.
-
-Não reduzir informação importante para caber em uma única tela.
-
-Rolagem é preferível a texto microscópico.
+Nenhum botão pode ficar escondido atrás da barra gestual.
 
 ==================================================
-17. HOME
+23. CONTRASTE RESIDUAL
 ==================================================
 
-A Home atual possui diversas métricas pequenas.
+Corrigir:
 
-Redesenhar sem alterar dados:
+- setas de reordenação sem cor de tema;
+- chip pressionado com texto incompatível;
+- textos pequenos usando gray400 no tema claro;
+- nomes de ficha com apenas 12 px;
+- nomes de exercício com apenas 13 px.
 
-- saudação;
-- ficha ativa;
-- sessão ativa;
-- treino do dia;
-- métricas;
-- histórico recente.
+Mínimos:
 
-Métricas devem usar:
+- nomes de exercícios: 16 px;
+- nomes de fichas: 15 px;
+- metadados principais: 14 px.
 
-- título mínimo 12;
-- valor mínimo 22;
-- card com padding 16.
+Adicionar testes de contraste para:
 
-Evitar três cards apertados quando a largura for insuficiente.
-
-Em telas estreitas:
-
-- usar duas colunas;
-- ou lista horizontal acessível.
+- chip pressionado;
+- gray400 ou seu substituto;
+- botões de reordenação;
+- Snackbar;
+- estados offline, erro e sucesso.
 
 ==================================================
-18. RESPONSIVIDADE
+24. CONTROLLER DA INTEGRAÇÃO
 ==================================================
 
-Testar layouts em larguras:
+Criar hook:
 
-- 320;
-- 360;
-- 375;
-- 390;
-- 412;
-- 430;
-- 480.
+useWgerIntegrationController
 
-Não assumir largura fixa.
+Responsabilidades:
 
-Usar:
+- query;
+- página;
+- resultados;
+- seleção;
+- preview;
+- carregamento;
+- cancelamento;
+- importação;
+- atualização;
+- mensagens;
+- erros.
 
-- flexWrap;
-- minWidth;
-- maxWidth;
-- useWindowDimensions quando necessário.
+Cancelar requisição quando:
 
-Nenhum texto ou botão deve sair da tela em 320–360 px.
+- usuário sai da tela;
+- inicia nova busca;
+- altera página antes da resposta;
+- fecha o app.
 
-==================================================
-19. TEMA
-==================================================
+Evitar resposta antiga substituindo uma busca nova.
 
-Mover alternância de tema para a tela Mais.
-
-Opções:
-
-- Sistema;
-- Claro;
-- Escuro.
-
-Persistir escolha em SettingsRepository ou AsyncStorage de preferência.
-
-Não manter somente um toggle binário que esquece o valor ao fechar.
-
-O padrão deve ser:
-
-Sistema.
-
-A StatusBar e a navigation bar devem acompanhar a seleção.
+Usar request ID ou AbortController.
 
 ==================================================
-20. ACESSIBILIDADE
+25. PRIVACIDADE
 ==================================================
 
-Adicionar:
+Nenhum dado local deve ser enviado.
 
-- accessibilityRole;
-- accessibilityState selected/disabled;
-- accessibilityLabel;
-- accessibilityHint quando necessário.
+Adicionar teste garantindo que a URL e o body das requisições não contêm:
 
-Chips selecionados devem expor:
+- nomes de fichas;
+- sessões;
+- séries;
+- histórico;
+- notas;
+- IDs SQLite;
+- backups;
+- configurações;
+- identificador do dispositivo.
 
-accessibilityState={{ selected: true }}
-
-Inputs devem possuir labels acessíveis.
-
-Botões com apenas ícone devem possuir nome legível.
-
-==================================================
-21. TESTES VISUAIS E DE ESTILO
-==================================================
-
-Adicionar testes para funções e componentes críticos:
-
-- paleta possui contraste mínimo;
-- SelectableChip muda fundo e texto;
-- FormField usa cursor/selection compatível;
-- tab ativa e inativa possuem cores diferentes;
-- textos não usam fontSize abaixo de 12;
-- touch targets importantes têm mínimo 48;
-- Screen aplica inset superior;
-- Screen aplica inset inferior;
-- tema sistema/claro/escuro;
-- estado selecionado possui indicador além da cor.
-
-Criar script que procure fontSize numérico abaixo de 12 em `mobile/src`.
-
-Permitir uma allowlist pequena e documentada somente quando estritamente
-necessário.
+As consultas devem conter apenas filtros do catálogo.
 
 ==================================================
-22. SMOKE TEST EM APARELHO
+26. LICENÇAS E ATRIBUIÇÃO
 ==================================================
 
-Executar no aparelho onde os problemas foram observados.
+Preservar licença individual do exercício e das mídias.
 
-Validar:
+Na biblioteca e detalhe:
 
+- mostrar origem Wger;
+- mostrar autor quando fornecido;
+- mostrar licença quando fornecida;
+- permitir abrir fonte original;
+- permitir abrir licença;
+- mostrar “Informação não fornecida pela fonte” quando ausente.
+
+Não aplicar uma única licença global a todos os itens.
+
+Não remover atribuição durante atualização.
+
+==================================================
+27. DOCUMENTAÇÃO DO USUÁRIO
+==================================================
+
+Criar:
+
+docs/WGER_INTEGRATION.md
+
+Documentar:
+
+- o que é Wger;
+- por que internet é necessária somente durante consulta;
+- o que o app envia;
+- o que o app não envia;
+- como abrir a integração;
+- como buscar;
+- como selecionar;
+- como importar;
+- como atualizar;
+- como usar offline;
+- comportamento de imagens e vídeos;
+- licenças e atribuição;
+- erros comuns;
+- timeout;
+- limite de requisições;
+- indisponibilidade;
+- remoção de exercícios;
+- diferenças entre CUSTOM, SYSTEM e WGER.
+
+Não afirmar que vídeos ficam offline.
+
+==================================================
+28. DOCUMENTAÇÃO TÉCNICA
+==================================================
+
+Criar:
+
+docs/WGER_API_CONTRACT.md
+
+Registrar:
+
+- data da verificação;
+- base URL;
+- endpoint;
+- paginação;
+- campos utilizados;
+- seleção de idioma;
+- mapeamento de categoria;
+- validação de URLs;
+- tratamento de licença;
+- política de timeout;
+- política de 429;
+- política de retries;
+- fixtures;
+- limitações conhecidas.
+
+Adicionar exemplo sanitizado de resposta.
+
+Não copiar uma resposta enorme da API.
+
+==================================================
+29. README
+==================================================
+
+Atualizar o README:
+
+- app continua local-only;
+- Wger é integração opcional;
+- nenhuma VPS é necessária;
+- nenhuma chave Wger é necessária para catálogo público;
+- consulta só ocorre por ação do usuário;
+- dados importados ficam no SQLite;
+- mídia remota pode exigir internet.
+
+Adicionar fluxo resumido:
+
+Mais
+→ Integrações
+→ Catálogo Wger
+→ Buscar
+→ Selecionar
+→ Importar
+
+==================================================
+30. TESTES DO CLIENTE WGER
+==================================================
+
+Não chamar Wger real no CI.
+
+Usar fixtures.
+
+Cobrir:
+
+- resposta paginada;
+- próxima página;
+- página anterior;
+- host inválido em next;
+- timeout;
+- abort;
+- offline;
+- 429 com Retry-After;
+- 500;
+- JSON inválido;
+- schema incompleto;
+- resposta vazia;
+- limite de página;
+- URL não HTTPS.
+
+==================================================
+31. TESTES DO MAPPER
+==================================================
+
+Cobrir:
+
+- pt-br;
+- pt;
+- inglês;
+- fallback;
+- HTML;
+- listas;
+- entidades;
+- músculos;
+- equipamentos;
+- categoria;
+- licença;
+- autor;
+- imagem;
+- vídeo;
+- mídia inválida;
+- exercício sem nome;
+- exercício sem músculo;
+- URLs HTTP;
+- campos desconhecidos.
+
+Um item incompleto deve retornar aviso ou ser rejeitado de maneira explícita.
+
+Não inventar dados silenciosamente.
+
+==================================================
+32. TESTES SQLITE
+==================================================
+
+Cobrir:
+
+- importar um exercício;
+- importar mídia;
+- reimportar sem duplicar;
+- manter ID local;
+- atualizar conteúdo;
+- preservar archived;
+- preservar CUSTOM;
+- preservar SYSTEM;
+- rollback de lote;
+- mídia inválida ignorada;
+- migration 3 para 4;
+- índice único;
+- segunda inicialização;
+- ficha usando exercício importado;
+- sessão usando snapshot;
+- exercício remoto atualizado sem alterar sessão histórica.
+
+==================================================
+33. TESTES MOBILE
+==================================================
+
+Cobrir:
+
+- abrir Integrações;
+- consentimento;
+- busca;
+- cancelar busca;
+- erro offline;
+- resultado;
+- seleção;
+- selecionar página;
+- limpar seleção;
+- preview;
+- importar;
+- reimportar;
+- atualizar importados;
+- mensagem parcial;
+- voltar durante requisição;
+- resposta antiga ignorada;
+- Snackbar não cobrindo header;
+- modal com teclado;
+- ThemedTextInput no tema escuro.
+
+==================================================
+34. TESTE REAL DA API
+==================================================
+
+Após os testes automatizados, executar manualmente:
+
+1. abrir OpenAPI atual;
+2. confirmar endpoint e campos;
+3. fazer uma consulta com pageSize 5;
+4. verificar português;
+5. verificar fallback inglês;
+6. verificar exercício com imagem;
+7. verificar exercício com vídeo;
+8. selecionar três exercícios;
+9. importar;
+10. fechar o app;
+11. ativar modo avião;
+12. abrir biblioteca;
+13. adicionar exercício importado à ficha;
+14. iniciar treino;
+15. concluir série;
+16. concluir sessão;
+17. reativar internet;
+18. atualizar os importados;
+19. confirmar IDs locais preservados;
+20. reimportar e confirmar ausência de duplicatas.
+
+Registrar em:
+
+docs/WGER_REAL_SMOKE_TEST.md
+
+Não colocar dados pessoais.
+
+==================================================
+35. SMOKE VISUAL
+==================================================
+
+No mesmo aparelho, validar:
+
+- topo;
 - status bar;
-- câmera/notch;
-- topo de todas as telas;
 - tab bar;
-- teclado aberto;
-- modo claro;
-- modo escuro;
-- seleção de texto;
+- tema claro;
+- tema escuro;
 - cursor;
-- chips selecionados;
-- formulários;
-- sessão;
-- rolagem;
-- navegação por gestos;
-- fonte padrão;
-- fonte aumentada.
-
-Registrar screenshots em:
-
-docs/ui-smoke/
-
-Não incluir informações pessoais.
-
-==================================================
-23. VERSÃO
-==================================================
+- seleção de texto;
+- Snackbar;
+- modal de exercício;
+- modal Wger;
+- busca;
+- chips;
+- setas;
+- teclado;
+- fonte aumentada;
+- nomes de exercícios;
+- nomes de fichas.
 
 Atualizar:
 
-mobile/app.json:
-- version 0.2.1
-- android.versionCode 4
-
-mobile/package.json:
-- version 0.2.1
-
-Não alterar package, slug, scheme ou projectId.
+docs/ui-smoke/
 
 ==================================================
-24. VALIDAÇÃO
+36. VERSÃO
+==================================================
+
+Atualizar somente o app padrão:
+
+mobile/app.json:
+- version 0.3.0
+- android.versionCode 5
+
+mobile/package.json:
+- version 0.3.0
+
+Não alterar:
+
+- package;
+- slug;
+- scheme;
+- projectId;
+- Umamusume.
+
+==================================================
+37. VALIDAÇÃO
 ==================================================
 
 Executar:
 
 npm ci
 
-npm run typecheck --workspace=training-mobile
-npm run test --workspace=training-mobile
-
 npm run typecheck --workspace=@training/training-domain
 npm run test --workspace=@training/training-domain
 
 npm run typecheck --workspace=@training/training-local-db
 npm run test --workspace=@training/training-local-db
+
+npm run typecheck --workspace=@training/training-wger
+npm run test --workspace=@training/training-wger
+
+npm run typecheck --workspace=training-mobile
+npm run test --workspace=training-mobile
 
 npm run typecheck --workspace=umamusume-mobile
 
@@ -746,15 +1190,35 @@ EXPO_NO_TELEMETRY=1 npm exec --workspace=training-mobile -- expo export \
 
 git diff --check
 
-Não alterar regras ou dados para fazer testes visuais passarem.
+Não declarar conclusão se qualquer comando falhar.
 
 ==================================================
-25. BUILD
+38. APK
 ==================================================
 
-Somente após validação:
+Após validações e smoke real:
 
 cd mobile
+
+npx eas-cli@latest build:inspect \
+  --platform android \
+  --stage pre-build \
+  --profile preview \
+  --output .eas-inspect \
+  --force
+
+Confirmar:
+
+- package com.konazin.trainingapp;
+- versionName 0.3.0;
+- versionCode 5;
+- sem URL de backend próprio;
+- sem token;
+- Wger somente HTTPS;
+- SQLite presente;
+- buildType APK.
+
+Gerar:
 
 npx eas-cli@latest build \
   --platform android \
@@ -762,39 +1226,74 @@ npx eas-cli@latest build \
   --non-interactive \
   --json
 
-Gerar APK:
+Baixar como:
 
-artifacts/training-app-local-0.2.1.apk
+artifacts/training-app-local-0.3.0.apk
 
-Registrar:
+Calcular SHA-256.
 
-- build ID;
-- URL;
-- tamanho;
-- SHA-256.
+Não adicionar APK ao Git.
 
 ==================================================
-26. ENTREGA
+39. CRITÉRIOS DE CONCLUSÃO
+==================================================
+
+APROVADO:
+
+- app funciona offline;
+- Wger só é chamado por ação explícita;
+- consulta real funciona;
+- importação persiste no SQLite;
+- duplicatas não são criadas;
+- atribuição é preservada;
+- exercício importado funciona em ficha e sessão;
+- problemas visuais residuais foram corrigidos;
+- testes passam;
+- export passa;
+- APK foi gerado.
+
+CÓDIGO APROVADO, BUILD BLOQUEADO:
+
+- código, testes e consulta real passam;
+- EAS está bloqueado somente por autenticação ou credencial.
+
+REPROVADO:
+
+- importação altera dados em erro;
+- importação cria duplicatas;
+- app depende da API para abrir;
+- item importado desaparece offline;
+- licença ou autoria é perdida;
+- qualquer teste obrigatório falha.
+
+==================================================
+40. ENTREGA
 ==================================================
 
 Informar:
 
-1. causa dos problemas de safe area;
-2. estrutura Screen criada;
-3. escala tipográfica;
-4. paleta nova;
-5. contraste validado;
-6. inputs corrigidos;
-7. seleções corrigidas;
-8. tab bar corrigida;
-9. telas migradas;
-10. responsividade testada;
-11. aparelhos/larguras testados;
-12. versão;
-13. resultados dos testes;
-14. build ID;
-15. APK;
-16. SHA-256;
-17. limitações restantes.
+1. commit final;
+2. endpoint Wger validado;
+3. data da validação do OpenAPI;
+4. contratos criados;
+5. estratégia de idioma;
+6. estratégia de mapeamento;
+7. estratégia de upsert;
+8. migration criada;
+9. fluxo visual;
+10. dados enviados ao Wger;
+11. dados nunca enviados;
+12. testes automatizados;
+13. resultado da consulta real;
+14. quantidade importada;
+15. teste offline;
+16. resultado visual;
+17. versão e versionCode;
+18. build ID;
+19. URL do build;
+20. caminho do APK;
+21. tamanho;
+22. SHA-256;
+23. limitações restantes.
 
-Não implementar novas features.
+Não implementar IA, Health Connect, nuvem ou download de vídeo nesta sprint.

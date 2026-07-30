@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import Database from 'better-sqlite3'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { TrainingBackup } from '@training/training-domain'
+import type { ExternalExerciseCandidate, TrainingBackup } from '@training/training-domain'
 import { MIGRATIONS, runMigrations } from '../migrations'
 import { validateBackup } from '../backup'
 import type { SqlDatabase } from '../database'
@@ -37,7 +37,7 @@ describe('SQLite local schema', () => {
       'workout_session_exercises', 'workout_set_logs', 'app_settings', 'app_metadata',
       'schema_migrations',
     ]))
-    expect(query(path, 'SELECT COUNT(*) AS value FROM schema_migrations;')[0]?.value).toBe(3)
+    expect(query(path, 'SELECT COUNT(*) AS value FROM schema_migrations;')[0]?.value).toBe(4)
 
     const base = `
       PRAGMA foreign_keys=ON;
@@ -328,6 +328,113 @@ describe('SQLite local schema', () => {
     expect(await repositories.plans.list()).toHaveLength(1)
     await database.close()
   })
+
+  it('migra 3 para 4 e faz upsert Wger transacional preservando IDs e dados locais', async () => {
+    const path = newDatabase()
+    let database = betterDatabase(path)
+    await database.exec(`
+      CREATE TABLE schema_migrations (
+        version INTEGER PRIMARY KEY, name TEXT NOT NULL, checksum TEXT NOT NULL, applied_at TEXT NOT NULL
+      );
+    `)
+    for (const migration of MIGRATIONS.slice(0, 3)) {
+      await database.exec(migration.sql)
+      await database.run(
+        'INSERT INTO schema_migrations VALUES (?, ?, ?, ?)',
+        migration.version, migration.name, migration.checksum, '2026-07-29T00:00:00.000Z',
+      )
+    }
+    await initializeFirstInstallation(database, seedData())
+    const beforeSeed = await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM exercise_definitions')
+    await runMigrations(database)
+    await runMigrations(database)
+    expect((await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM schema_migrations'))?.count).toBe(4)
+    expect((await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM exercise_definitions'))?.count)
+      .toBe(beforeSeed?.count)
+    expect(await database.first<{ name: string }>(
+      `SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'exercise_media_source_external'`,
+    )).toBeTruthy()
+
+    let repositories = createLocalRepositories(database)
+    const candidate = wgerCandidate()
+    expect(await repositories.externalExerciseImport.previewExisting([candidate])).toEqual([{
+      externalId: '983', existingId: null, alreadyImported: false,
+    }])
+    const created = await repositories.externalExerciseImport.importSelected([candidate])
+    expect(created).toMatchObject({ created: 1, updated: 0, unchanged: 0 })
+    const imported = (await repositories.exercises.list({ source: 'WGER', includeArchived: true }))[0]!
+    expect(imported).toMatchObject({
+      id: created.affectedIds[0],
+      source: 'WGER',
+      externalId: '983',
+      name: 'Rosca sem peso',
+    })
+    expect(imported.media).toHaveLength(1)
+    const mediaId = imported.media[0]!.id
+    const plan = (await repositories.plans.list())[0]!
+    const day = plan.days[0]!
+    await repositories.plans.addExercise(plan.id, day.id, {
+      exerciseDefinitionId: imported.id,
+      sets: 1,
+      minReps: 5,
+      maxReps: 10,
+      plannedLoad: null,
+      plannedDurationSeconds: null,
+      plannedDistance: null,
+      restSeconds: 30,
+      plannedRpe: null,
+      setType: 'NORMAL',
+      notes: '',
+      alternativeExerciseId: null,
+    })
+    const session = await repositories.sessions.start(plan.id, day.id)
+    expect(session.exercises.some((item) => item.exerciseDefinitionId === imported.id)).toBe(true)
+    await repositories.sessions.complete(session.id, null, '')
+
+    const unchanged = await repositories.externalExerciseImport.importSelected([candidate])
+    expect(unchanged).toMatchObject({ created: 0, updated: 0, unchanged: 1 })
+    await repositories.exercises.archive(imported.id)
+    await database.run('UPDATE exercise_definitions SET notes = ? WHERE id = ?', 'Nota pessoal', imported.id)
+    const updated = await repositories.externalExerciseImport.importSelected([{
+      ...candidate,
+      name: 'Rosca atualizada',
+      media: [{ ...candidate.media[0]!, remoteUrl: 'https://wger.de/media/updated.png' }],
+    }])
+    expect(updated).toMatchObject({ created: 0, updated: 1, unchanged: 0 })
+    const after = await repositories.exercises.findById(imported.id)
+    expect(after).toMatchObject({
+      id: imported.id,
+      name: 'Rosca atualizada',
+      archived: true,
+      notes: 'Nota pessoal',
+    })
+    expect(after?.media[0]).toMatchObject({ id: mediaId, remoteUrl: 'https://wger.de/media/updated.png' })
+    expect((await repositories.sessions.getHistory())[0]?.exercises
+      .find((item) => item.exerciseDefinitionId === imported.id)?.name).toBe('Rosca sem peso')
+    const invalidMedia = await repositories.externalExerciseImport.importSelected([{
+      ...candidate,
+      externalId: '985',
+      name: 'Mídia inválida',
+      media: [{ ...candidate.media[0]!, externalId: 'media-985', remoteUrl: 'http://inseguro.test/a.png' }],
+    }])
+    expect((await repositories.exercises.findById(invalidMedia.affectedIds[0]!))?.media).toHaveLength(0)
+    expect((await repositories.exercises.list({ source: 'CUSTOM', includeArchived: true }))).toHaveLength(0)
+    expect((await repositories.exercises.list({ source: 'SYSTEM', includeArchived: true }))).toHaveLength(1)
+    await database.close()
+
+    database = betterDatabase(path, failOn('INSERT INTO exercise_media'))
+    repositories = createLocalRepositories(database)
+    await expect(repositories.externalExerciseImport.importSelected([{
+      ...candidate,
+      externalId: '984',
+      name: 'Falha',
+      media: [{ ...candidate.media[0]!, externalId: 'media-984' }],
+    }])).rejects.toThrow('injetada')
+    expect(await database.first<{ id: number }>(
+      `SELECT id FROM exercise_definitions WHERE source = 'WGER' AND external_id = '984'`,
+    )).toBeNull()
+    await database.close()
+  })
 })
 
 function newDatabase() {
@@ -386,6 +493,47 @@ function validBackup(): TrainingBackup {
     }],
     setLogs: [{ id: 9, workout_session_exercise_id: 8, set_number: 1, reps: 0 }],
     settings: [],
+  }
+}
+
+function wgerCandidate(): ExternalExerciseCandidate {
+  return {
+    provider: 'WGER',
+    externalId: '983',
+    name: 'Rosca sem peso',
+    description: 'Descrição',
+    primaryMuscleGroup: 'Bíceps',
+    secondaryMuscleGroups: [],
+    equipment: 'Peso corporal',
+    category: 'STRENGTH',
+    difficulty: 'Não informado',
+    instructions: 'Instruções',
+    unilateral: false,
+    timed: false,
+    sourceUrl: 'https://wger.de/en/exercise/983/view',
+    licenseName: 'CC-BY-SA 4',
+    licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
+    author: 'wger.de',
+    media: [{
+      type: 'IMAGE',
+      source: 'WGER',
+      externalId: 'media-983',
+      remoteUrl: 'https://wger.de/media/example.png',
+      thumbnailRemoteUrl: null,
+      mimeType: 'image/png',
+      width: null,
+      height: null,
+      durationSeconds: null,
+      main: true,
+      sortOrder: 0,
+      licenseName: 'CC-BY-SA 4',
+      licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
+      author: 'wger.de',
+      sourceUrl: 'https://wger.de/en/exercise/983/view',
+    }],
+    warnings: [],
+    language: 'pt',
+    original: {},
   }
 }
 

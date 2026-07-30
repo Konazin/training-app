@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import type { ExerciseDefinition } from '../../../models/training'
 import { SelectableChip } from '../../../components/SelectableChip'
+import { ThemedTextInput } from '../../../components/ThemedTextInput'
 import { shared, type ThemeColors, useTheme } from '../../../theme'
 
 export function ExercisePicker({
@@ -43,10 +44,9 @@ export function ExercisePicker({
       contentContainerStyle={[styles.content, !filtered.length && styles.emptyContent]}
       ListHeaderComponent={(
         <View>
-          <TextInput
+          <ThemedTextInput
             accessibilityLabel="Buscar exercício"
             placeholder="Nome, grupo muscular ou equipamento"
-            placeholderTextColor={colors.gray400}
             style={styles.search}
             value={query}
             onChangeText={setQuery}

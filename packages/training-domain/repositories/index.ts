@@ -6,6 +6,11 @@ import type {
   ExerciseDefinition,
   ExerciseDefinitionInput,
   ExerciseLibraryQuery,
+  ExternalExerciseCandidate,
+  ExternalExerciseCatalogPage,
+  ExternalExerciseCatalogQuery,
+  ExternalExerciseImportPreview,
+  ExternalExerciseImportResult,
   RestActivityInput,
   SessionExerciseStatus,
   SetLogInput,
@@ -84,7 +89,14 @@ export interface SecretsRepository {
 }
 
 export interface ExternalExerciseCatalogProvider {
-  preview(filters: Record<string, unknown>): Promise<ExerciseDefinitionInput[]>
+  search(query: ExternalExerciseCatalogQuery): Promise<ExternalExerciseCatalogPage>
+  findByExternalId(externalId: string, language?: string): Promise<ExternalExerciseCandidate | null>
+}
+
+export interface ExternalExerciseImportRepository {
+  previewExisting(candidates: ExternalExerciseCandidate[]): Promise<ExternalExerciseImportPreview[]>
+  importSelected(candidates: ExternalExerciseCandidate[]): Promise<ExternalExerciseImportResult>
+  refreshImported(provider: ExternalExerciseCandidate['provider']): Promise<ExternalExerciseImportResult>
 }
 export interface AiTrainingPlanProvider {
   preview(input: Record<string, unknown>): Promise<TrainingPlanInput>

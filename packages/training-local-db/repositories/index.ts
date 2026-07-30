@@ -24,6 +24,9 @@ import {
   type DashboardRepository,
   type DayExerciseConfigInput,
   type ExerciseDefinitionInput,
+  type ExternalExerciseCandidate,
+  type ExternalExerciseImportRepository,
+  type ExternalExerciseImportResult,
   type ExerciseLibraryQuery,
   type ExerciseLibraryRepository,
   type SetLogInput,
@@ -57,6 +60,7 @@ import type { SeedData } from '../database/seed'
 
 export interface LocalRepositories {
   exercises: ExerciseLibraryRepository
+  externalExerciseImport: ExternalExerciseImportRepository
   plans: TrainingPlanRepository & {
     reorderRestActivities(planId: number, dayId: number, activityIds: number[]): Promise<TrainingPlan>
   }
@@ -77,6 +81,7 @@ export function createLocalRepositories(database: SqlDatabase): LocalRepositorie
   const sessions = sessionRepository(database)
   return {
     exercises,
+    externalExerciseImport: externalExerciseImportRepository(database),
     plans,
     sessions,
     dashboard: {
@@ -93,6 +98,225 @@ export function createLocalRepositories(database: SqlDatabase): LocalRepositorie
       resetToSeed: (seed) => resetToSeed(database, seed),
     },
   }
+}
+
+function externalExerciseImportRepository(database: SqlDatabase): ExternalExerciseImportRepository {
+  return {
+    previewExisting: async (candidates) => {
+      const externalIds = uniqueCandidates(candidates).map((item) => item.externalId)
+      if (!externalIds.length) return []
+      const rows = await database.all<{ id: number; external_id: string }>(
+        `SELECT id, external_id FROM exercise_definitions
+         WHERE source = 'WGER' AND external_id IN (${externalIds.map(() => '?').join(',')})`,
+        ...externalIds,
+      )
+      const ids = new Map(rows.map((row) => [row.external_id, row.id]))
+      return externalIds.map((externalId) => ({
+        externalId,
+        existingId: ids.get(externalId) ?? null,
+        alreadyImported: ids.has(externalId),
+      }))
+    },
+    importSelected: (candidates) => database.transaction(async (transaction) => {
+      const result: ExternalExerciseImportResult = emptyImportResult()
+      const selected = uniqueCandidates(candidates)
+      result.skipped = candidates.length - selected.length
+      for (const candidate of selected) {
+        const existing = await transaction.first<{ id: number }>(
+          `SELECT id FROM exercise_definitions WHERE source = 'WGER' AND external_id = ?`,
+          candidate.externalId,
+        )
+        const before = existing ? await loadExercise(transaction, existing.id) : null
+        const unchanged = before ? importedExerciseMatches(before, candidate) : false
+        const exerciseId = await upsertImportedExercise(transaction, candidate, existing?.id)
+        await upsertImportedMedia(transaction, exerciseId, candidate)
+        if (!existing) result.created += 1
+        else if (unchanged) result.unchanged += 1
+        else result.updated += 1
+        result.affectedIds.push(exerciseId)
+        result.warnings.push(...candidate.warnings.map((warning) => `${candidate.name}: ${warning}`))
+      }
+      return result
+    }),
+    refreshImported: async (provider) => {
+      const row = await database.first<{ count: number }>(
+        'SELECT COUNT(*) AS count FROM exercise_definitions WHERE source = ?',
+        provider,
+      )
+      return { ...emptyImportResult(), unchanged: row?.count ?? 0 }
+    },
+  }
+}
+
+async function upsertImportedExercise(
+  database: SqlDatabase,
+  candidate: ExternalExerciseCandidate,
+  existingId?: number,
+) {
+  const timestamp = new Date().toISOString()
+  if (existingId) {
+    await database.run(`
+      UPDATE exercise_definitions SET
+        name = ?, normalized_name = ?, description = ?, primary_muscle_group = ?,
+        secondary_muscle_groups_json = ?, equipment = ?, category = ?, difficulty = ?,
+        instructions = ?, unilateral = ?, timed = ?, source_url = ?, license_name = ?,
+        license_url = ?, author = ?, updated_at = ?
+      WHERE id = ? AND source = 'WGER'
+    `, candidate.name, normalizeName(candidate.name), candidate.description,
+    candidate.primaryMuscleGroup, serializeJson(candidate.secondaryMuscleGroups),
+    candidate.equipment, candidate.category, candidate.difficulty, candidate.instructions,
+    Number(candidate.unilateral), Number(candidate.timed), candidate.sourceUrl,
+    candidate.licenseName, candidate.licenseUrl, candidate.author, timestamp, existingId)
+    return existingId
+  }
+  const inserted = await database.run(`
+    INSERT INTO exercise_definitions(
+      name, normalized_name, description, primary_muscle_group, secondary_muscle_groups_json,
+      equipment, category, difficulty, instructions, notes, unilateral, timed, source,
+      external_id, source_url, license_name, license_url, author, archived, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, 'WGER', ?, ?, ?, ?, ?, 0, ?, ?)
+  `, candidate.name, normalizeName(candidate.name), candidate.description,
+  candidate.primaryMuscleGroup, serializeJson(candidate.secondaryMuscleGroups),
+  candidate.equipment, candidate.category, candidate.difficulty, candidate.instructions,
+  Number(candidate.unilateral), Number(candidate.timed), candidate.externalId,
+  candidate.sourceUrl, candidate.licenseName, candidate.licenseUrl, candidate.author,
+  timestamp, timestamp)
+  return inserted.lastInsertRowId
+}
+
+async function upsertImportedMedia(
+  database: SqlDatabase,
+  exerciseId: number,
+  candidate: ExternalExerciseCandidate,
+) {
+  const timestamp = new Date().toISOString()
+  const mediaCandidates = candidate.media.filter(isValidImportedMedia)
+  const mediaIds = mediaCandidates.map((media) => media.externalId)
+  if (mediaIds.length) {
+    await database.run(
+      `DELETE FROM exercise_media
+       WHERE exercise_definition_id = ? AND source = 'WGER'
+         AND external_id NOT IN (${mediaIds.map(() => '?').join(',')})`,
+      exerciseId,
+      ...mediaIds,
+    )
+  } else {
+    await database.run(
+      `DELETE FROM exercise_media WHERE exercise_definition_id = ? AND source = 'WGER'`,
+      exerciseId,
+    )
+  }
+  for (const media of mediaCandidates) {
+    await database.run(`
+      INSERT INTO exercise_media(
+        exercise_definition_id, type, source, external_id, remote_url, thumbnail_remote_url,
+        mime_type, width, height, duration_seconds, is_main, sort_order, license_name,
+        license_url, author, source_url, created_at, updated_at
+      ) VALUES (?, ?, 'WGER', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(source, external_id) WHERE external_id IS NOT NULL DO UPDATE SET
+        exercise_definition_id = excluded.exercise_definition_id,
+        type = excluded.type,
+        remote_url = excluded.remote_url,
+        thumbnail_remote_url = excluded.thumbnail_remote_url,
+        mime_type = excluded.mime_type,
+        width = excluded.width,
+        height = excluded.height,
+        duration_seconds = excluded.duration_seconds,
+        is_main = excluded.is_main,
+        sort_order = excluded.sort_order,
+        license_name = excluded.license_name,
+        license_url = excluded.license_url,
+        author = excluded.author,
+        source_url = excluded.source_url,
+        updated_at = excluded.updated_at
+    `, exerciseId, media.type, media.externalId, media.remoteUrl, media.thumbnailRemoteUrl,
+    media.mimeType, media.width, media.height, media.durationSeconds, Number(media.main),
+    media.sortOrder, media.licenseName, media.licenseUrl, media.author, media.sourceUrl,
+    timestamp, timestamp)
+  }
+}
+
+function isValidImportedMedia(media: ExternalExerciseCandidate['media'][number]) {
+  if (media.source !== 'WGER' || !media.externalId.trim()) return false
+  if (!['IMAGE', 'VIDEO'].includes(media.type)) return false
+  try {
+    if (new URL(media.remoteUrl).protocol !== 'https:') return false
+  } catch {
+    return false
+  }
+  return [media.width, media.height, media.durationSeconds]
+    .every((value) => value == null || (Number.isFinite(value) && value >= 0))
+}
+
+function uniqueCandidates(candidates: ExternalExerciseCandidate[]) {
+  const unique = new Map<string, ExternalExerciseCandidate>()
+  for (const candidate of candidates) {
+    if (candidate.provider === 'WGER' && /^\d+$/.test(candidate.externalId) && candidate.name.trim()) {
+      unique.set(candidate.externalId, candidate)
+    }
+  }
+  return [...unique.values()]
+}
+
+function emptyImportResult(): ExternalExerciseImportResult {
+  return {
+    created: 0,
+    updated: 0,
+    unchanged: 0,
+    skipped: 0,
+    failed: 0,
+    warnings: [],
+    affectedIds: [],
+  }
+}
+
+function importedExerciseMatches(
+  current: Awaited<ReturnType<typeof loadExercise>>,
+  candidate: ExternalExerciseCandidate,
+) {
+  if (!current) return false
+  const currentMedia = current.media.filter((item) => item.source === 'WGER').map((item) => ({
+    type: item.type, externalId: item.externalId, remoteUrl: item.remoteUrl,
+    thumbnailRemoteUrl: item.thumbnailRemoteUrl, mimeType: item.mimeType,
+    width: item.width, height: item.height, durationSeconds: item.durationSeconds,
+    main: item.main, sortOrder: item.sortOrder, licenseName: item.licenseName,
+    licenseUrl: item.licenseUrl, author: item.author, sourceUrl: item.sourceUrl,
+  }))
+  const candidateMedia = candidate.media.filter(isValidImportedMedia)
+    .map(({ source: _source, ...item }) => item)
+  return JSON.stringify({
+    name: current.name,
+    description: current.description,
+    primaryMuscleGroup: current.primaryMuscleGroup,
+    secondaryMuscleGroups: current.secondaryMuscleGroups,
+    equipment: current.equipment,
+    category: current.category,
+    difficulty: current.difficulty,
+    instructions: current.instructions,
+    unilateral: current.unilateral,
+    timed: current.timed,
+    sourceUrl: current.sourceUrl,
+    licenseName: current.licenseName,
+    licenseUrl: current.licenseUrl,
+    author: current.author,
+    media: currentMedia,
+  }) === JSON.stringify({
+    name: candidate.name,
+    description: candidate.description,
+    primaryMuscleGroup: candidate.primaryMuscleGroup,
+    secondaryMuscleGroups: candidate.secondaryMuscleGroups,
+    equipment: candidate.equipment,
+    category: candidate.category,
+    difficulty: candidate.difficulty,
+    instructions: candidate.instructions,
+    unilateral: candidate.unilateral,
+    timed: candidate.timed,
+    sourceUrl: candidate.sourceUrl,
+    licenseName: candidate.licenseName,
+    licenseUrl: candidate.licenseUrl,
+    author: candidate.author,
+    media: candidateMedia,
+  })
 }
 
 function exerciseRepository(database: SqlDatabase): ExerciseLibraryRepository {

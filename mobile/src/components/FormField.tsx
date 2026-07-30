@@ -1,8 +1,9 @@
-import { useState, type ComponentProps } from 'react'
-import { Platform, StyleSheet, Text, TextInput, View } from 'react-native'
+import type { ComponentProps } from 'react'
+import { StyleSheet, Text, TextInput, View } from 'react-native'
 import { type ThemeColors, useTheme } from '../theme'
 import { typography } from '../theme/typography'
 import { formFieldColors } from '../theme/uiContracts'
+import { ThemedTextInput } from './ThemedTextInput'
 
 interface Props extends ComponentProps<typeof TextInput> {
   label: string
@@ -17,34 +18,22 @@ export function getFormFieldColors(colors: ThemeColors, focused: boolean, error:
 export function FormField({ label, multiline, style, error, disabled = false, onBlur, onFocus, ...props }: Props) {
   const { colors } = useTheme()
   const styles = createStyles(colors)
-  const [focused, setFocused] = useState(false)
-  const palette = getFormFieldColors(colors, focused, Boolean(error), disabled)
   const errorId = `${props.nativeID ?? label}-error`
   return (
     <View style={styles.wrapper}>
       <Text nativeID={`${props.nativeID ?? label}-label`} style={styles.label}>{label}</Text>
-      <TextInput
+      <ThemedTextInput
         accessibilityLabel={props.accessibilityLabel ?? label}
         accessibilityState={{ disabled }}
         aria-describedby={error ? errorId : undefined}
-        cursorColor={Platform.OS === 'android' ? palette.cursorColor : undefined}
-        editable={!disabled && props.editable !== false}
-        onBlur={(event) => {
-          setFocused(false)
-          onBlur?.(event)
-        }}
-        onFocus={(event) => {
-          setFocused(true)
-          onFocus?.(event)
-        }}
-        placeholderTextColor={colors.gray400}
-        selectionColor={palette.selectionColor}
+        disabled={disabled}
+        error={Boolean(error)}
+        onBlur={onBlur}
+        onFocus={onFocus}
         multiline={multiline}
         style={[
           styles.input,
-          palette,
           multiline && styles.multiline,
-          disabled && styles.disabled,
           style,
         ]}
         {...props}
@@ -80,6 +69,5 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingTop: 15,
     textAlignVertical: 'top',
   },
-  disabled: { opacity: 0.7 },
   error: { ...typography.caption, color: colors.danger, marginTop: 6 },
 })

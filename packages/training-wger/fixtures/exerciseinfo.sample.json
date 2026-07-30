@@ -1,0 +1,50 @@
+{
+  "count": 1,
+  "next": null,
+  "previous": null,
+  "results": [{
+    "id": 983,
+    "uuid": "b923d27b-92e0-47d1-8709-a42b10da4153",
+    "category": { "id": 8, "name": "Arms" },
+    "muscles": [{ "id": 1, "name": "Biceps brachii", "name_en": "Biceps" }],
+    "muscles_secondary": [],
+    "equipment": [{ "id": 7, "name": "none (bodyweight exercise)" }],
+    "license": {
+      "id": 2,
+      "full_name": "Creative Commons Attribution Share Alike 4",
+      "short_name": "CC-BY-SA 4",
+      "url": "https://creativecommons.org/licenses/by-sa/4.0/deed.en"
+    },
+    "license_author": "wger.de",
+    "images": [{
+      "id": 698,
+      "uuid": "74041371-1019-4f89-9ebe-cec792484a46",
+      "image": "https://wger.de/media/exercise-images/983/example.png",
+      "thumbnails": { "medium": "https://wger.de/media/exercise-images/983/example.thumb.png" },
+      "is_main": true,
+      "license": 2,
+      "license_author": "wger.de"
+    }],
+    "translations": [
+      {
+        "id": 1,
+        "name": "Rosca sem peso",
+        "description": "<p>Flexione o braço.</p><ol><li>Suba</li><li>Desça</li></ol>",
+        "description_source": "Flexione o braço.\n1. Suba\n2. Desça",
+        "language": 7,
+        "license": 2,
+        "license_author": "wger.de"
+      },
+      {
+        "id": 2,
+        "name": "Bodyweight curl",
+        "description": "<p>Curl your arm.</p>",
+        "description_source": "Curl your arm.",
+        "language": 2,
+        "license": 2,
+        "license_author": "wger.de"
+      }
+    ],
+    "videos": []
+  }]
+}

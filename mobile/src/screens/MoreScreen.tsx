@@ -8,6 +8,7 @@ import type { AutomaticBackupInfo } from '@training/training-domain'
 
 export function MoreScreen({
   busy,
+  onIntegrations,
   onLibrary,
   onExport,
   onImport,
@@ -20,6 +21,7 @@ export function MoreScreen({
   onDeleteAllAutomatic,
 }: {
   busy: boolean
+  onIntegrations: () => void
   onLibrary: () => void
   onExport: () => void
   onImport: () => void
@@ -68,6 +70,13 @@ export function MoreScreen({
       </View>
       <Text style={styles.section}>CONTEÚDO</Text>
       <MenuItem label="Biblioteca de exercícios" detail="Criar e editar" onPress={onLibrary} disabled={busy} />
+      <Text style={styles.section}>INTEGRAÇÕES</Text>
+      <MenuItem
+        label="Catálogo Wger"
+        detail="Busca exercícios públicos e salva uma cópia no aparelho."
+        onPress={onIntegrations}
+        disabled={busy}
+      />
       <Text style={styles.section}>BACKUP</Text>
       <MenuItem label="Exportar backup" detail="training-backup-v1.json" onPress={onExport} disabled={busy} />
       <MenuItem label="Importar backup" detail="Validar e restaurar" onPress={onImport} disabled={busy} />

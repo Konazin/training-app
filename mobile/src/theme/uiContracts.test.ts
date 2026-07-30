@@ -5,6 +5,9 @@ import { shared } from './tokens'
 import {
   contrastRatio,
   formFieldColors,
+  feedbackColors,
+  pressedChipColors,
+  reorderControlColors,
   resolvedDarkTheme,
   screenPadding,
   selectableChipColors,
@@ -29,6 +32,18 @@ describe.each([
     expect(selected.backgroundColor).not.toBe(normal.backgroundColor)
     expect(selected.color).not.toBe(normal.color)
     expect(selected.indicator).toBe(true)
+    const pressed = pressedChipColors(colors)
+    expect(contrastRatio(pressed.color, pressed.backgroundColor)).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('mantém contraste de metadados, reordenação e feedbacks', () => {
+    expect(contrastRatio(colors.gray400, colors.background)).toBeGreaterThanOrEqual(4.5)
+    expect(contrastRatio(reorderControlColors(colors, true).color, colors.background)).toBeGreaterThanOrEqual(4.5)
+    for (const kind of ['info', 'success', 'warning', 'error'] as const) {
+      const feedback = feedbackColors(colors, kind)
+      expect(contrastRatio(feedback.text, feedback.background)).toBeGreaterThanOrEqual(4.5)
+      expect(feedback.border).not.toBe(feedback.background)
+    }
   })
 
   it('usa cursor, seleção, foco e erro sem preto fixo', () => {

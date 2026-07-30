@@ -10,6 +10,7 @@ import type { RootStackParamList } from '../../../navigation/types'
 import { useUnsavedChangesGuard } from '../../../navigation/useUnsavedChangesGuard'
 import type { TrainingPlan } from '../model/trainingPlan'
 import { shared, type ThemeColors, useTheme } from '../../../theme'
+import { reorderControlColors } from '../../../theme/uiContracts'
 
 const labels = {
   MONDAY: 'Segunda-feira',
@@ -290,10 +291,13 @@ function OrderButtons({
   onUp: () => void
   onDown: () => void
 }) {
+  const { colors } = useTheme()
+  const upColors = reorderControlColors(colors, up && !busy)
+  const downColors = reorderControlColors(colors, down && !busy)
   return (
     <View style={{ flexDirection: 'row' }}>
-      <TouchableOpacity accessibilityLabel="Mover para cima" accessibilityRole="button" disabled={!up || busy} onPress={onUp} style={{ alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 }}><Text style={{ opacity: up && !busy ? 1 : 0.2 }}>↑</Text></TouchableOpacity>
-      <TouchableOpacity accessibilityLabel="Mover para baixo" accessibilityRole="button" disabled={!down || busy} onPress={onDown} style={{ alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 }}><Text style={{ opacity: down && !busy ? 1 : 0.2 }}>↓</Text></TouchableOpacity>
+      <TouchableOpacity accessibilityLabel="Mover para cima" accessibilityRole="button" disabled={!up || busy} onPress={onUp} style={{ alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 }}><Text style={upColors}>↑</Text></TouchableOpacity>
+      <TouchableOpacity accessibilityLabel="Mover para baixo" accessibilityRole="button" disabled={!down || busy} onPress={onDown} style={{ alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 }}><Text style={downColors}>↓</Text></TouchableOpacity>
     </View>
   )
 }

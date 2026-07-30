@@ -3,14 +3,17 @@ import {
   Alert,
   FlatList,
   Image,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import type { ExerciseDefinition, ExerciseDefinitionInput } from '@training/training-domain'
@@ -19,6 +22,7 @@ import { PrimaryButton } from '../../components/PrimaryButton'
 import { Screen } from '../../components/Screen'
 import { ScreenHeader } from '../../components/ScreenHeader'
 import { SelectableChip } from '../../components/SelectableChip'
+import { ThemedTextInput } from '../../components/ThemedTextInput'
 import type { RootStackParamList } from '../../navigation/types'
 import { shared, type ThemeColors, useTheme } from '../../theme'
 
@@ -62,12 +66,11 @@ export function ExerciseLibraryScreen({
             title={'Biblioteca de\nexercícios'}
             description="Crie, edite e use exercícios sem conexão."
           />
-          <TextInput
+          <ThemedTextInput
             accessibilityLabel="Buscar exercício"
             value={query}
             onChangeText={setQuery}
             placeholder="Nome, músculo ou equipamento"
-            placeholderTextColor={colors.gray400}
             style={styles.search}
           />
           <View style={styles.filters}>
@@ -170,8 +173,9 @@ function ExerciseForm({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <View style={styles.sheet}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.backdrop}>
+        <SafeAreaView edges={['bottom']} style={styles.safeSheet}>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheet}>
           <Text style={styles.sheetTitle}>{exercise ? 'Editar exercício' : 'Novo exercício'}</Text>
           <FormField label="Nome" value={name} onChangeText={setName} />
           <FormField
@@ -206,8 +210,9 @@ function ExerciseForm({
           }} />
           {!!onArchive && <TouchableOpacity accessibilityRole="button" onPress={onArchive}><Text style={styles.archive}>Arquivar</Text></TouchableOpacity>}
           <TouchableOpacity accessibilityRole="button" onPress={onClose}><Text style={styles.cancel}>Cancelar</Text></TouchableOpacity>
-        </View>
-      </View>
+          </ScrollView>
+        </SafeAreaView>
+      </KeyboardAvoidingView>
     </Modal>
   )
 }
@@ -222,9 +227,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   iconFallback: { alignItems: 'center', backgroundColor: colors.nearBlack, borderRadius: 14, height: 52, justifyContent: 'center', width: 52 },
   iconText: { color: '#fff', fontSize: 18 },
   cardBody: { flex: 1 },
-  name: { color: colors.ink, fontSize: 13, fontWeight: '800' },
-  meta: { color: colors.gray500, fontSize: 12, marginTop: 4 },
-  source: { color: colors.gray400, fontSize: 12, marginTop: 5 },
+  name: { color: colors.ink, fontSize: 16, fontWeight: '800' },
+  meta: { color: colors.textSecondary, fontSize: 14, marginTop: 4 },
+  source: { color: colors.textSecondary, fontSize: 12, marginTop: 5 },
   edit: { color: colors.primary, fontSize: 12, fontWeight: '800', padding: 8 },
   editButton: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 },
   arrow: { color: colors.gray400, fontSize: 25 },
@@ -232,7 +237,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   fab: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 19, bottom: 24, height: 56, justifyContent: 'center', position: 'absolute', right: 20, width: 56 },
   fabText: { color: colors.onPrimary, fontSize: 22 },
   backdrop: { backgroundColor: 'rgba(0,0,0,.6)', flex: 1, justifyContent: 'flex-end' },
-  sheet: { backgroundColor: colors.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 20, paddingBottom: 30 },
+  safeSheet: { backgroundColor: colors.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '92%' },
+  sheet: { padding: 20, paddingBottom: 30 },
   sheetTitle: { color: colors.ink, fontSize: 22, fontWeight: '700', marginBottom: 20 },
   cancel: { color: colors.gray500, fontSize: 12, fontWeight: '700', padding: 15, textAlign: 'center' },
   archive: { color: colors.danger, fontSize: 12, fontWeight: '700', paddingTop: 18, textAlign: 'center' },
