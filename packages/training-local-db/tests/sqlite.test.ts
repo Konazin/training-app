@@ -4,7 +4,11 @@ import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import Database from 'better-sqlite3'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { ExternalExerciseCandidate, TrainingBackup } from '@training/training-domain'
+import {
+  TRAINING_PLAN_TEMPLATES,
+  type ExternalExerciseCandidate,
+  type TrainingBackup,
+} from '@training/training-domain'
 import { MIGRATIONS, runMigrations } from '../migrations'
 import { validateBackup } from '../backup'
 import type { SqlDatabase } from '../database'
@@ -197,7 +201,7 @@ describe('SQLite local schema', () => {
     fail = failOn('INSERT INTO rest_activities')
     database = betterDatabase(path, fail)
     repositories = createLocalRepositories(database)
-    await expect(repositories.plans.duplicate(initialPlan.id)).rejects.toThrow('injetada')
+    await expect(repositories.plans.duplicate(initialPlan.id, 'COMPLETE')).rejects.toThrow('injetada')
     expect(await repositories.plans.list()).toHaveLength(initialPlanCount)
     await database.close()
 
@@ -684,6 +688,171 @@ describe('SQLite local schema', () => {
     expect(await database.first<{ id: number }>(
       `SELECT id FROM exercise_definitions WHERE source = 'WGER' AND external_id = '984'`,
     )).toBeNull()
+    await database.close()
+  })
+
+  it('cria todos os templates com sete dias em uma transação e mantém migration 5', async () => {
+    const path = newDatabase()
+    let database = betterDatabase(path)
+    await runMigrations(database)
+    let repositories = createLocalRepositories(database)
+    for (const template of TRAINING_PLAN_TEMPLATES) {
+      const plan = await repositories.plans.createWithDays({
+        plan: {
+          name: template.name,
+          description: template.description,
+          category: template.category || 'Mista',
+          difficulty: template.difficulty || 'Adaptável',
+        },
+        days: template.days,
+        templateId: template.id,
+      })
+      expect(plan.days).toHaveLength(7)
+      expect(plan.days.map((day) => day.weekday)).toEqual([
+        'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY',
+      ])
+      expect(plan).toMatchObject({
+        active: false,
+        archived: false,
+        deletedAt: null,
+        purgeAt: null,
+      })
+      expect(plan.days.flatMap((day) => day.exercises)).toHaveLength(0)
+    }
+    expect(await database.first<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM schema_migrations',
+    )).toEqual({ count: 5 })
+    await database.close()
+
+    database = betterDatabase(path, failOn('INSERT INTO training_plan_days', 4))
+    repositories = createLocalRepositories(database)
+    const before = (await repositories.plans.list()).length
+    await expect(repositories.plans.createWithDays({
+      plan: {
+        name: 'Falha transacional',
+        description: '',
+        category: 'Mista',
+        difficulty: 'Adaptável',
+      },
+      days: TRAINING_PLAN_TEMPLATES[0]!.days,
+    })).rejects.toThrow('injetada')
+    expect(await repositories.plans.list()).toHaveLength(before)
+    await database.close()
+  })
+
+  it('duplica completa, estrutura e sem cargas com IDs novos e nomes sem colisão', async () => {
+    const path = newDatabase()
+    const database = betterDatabase(path)
+    await runMigrations(database)
+    await initializeFirstInstallation(database, seedData())
+    const repositories = createLocalRepositories(database)
+    const original = (await repositories.plans.list())[0]!
+    const originalDay = original.days[0]!
+    const originalExercise = originalDay.exercises[0]!
+    await repositories.plans.updateExercise(
+      original.id,
+      originalDay.id,
+      originalExercise.id,
+      {
+        sets: 3,
+        minReps: 8,
+        maxReps: 12,
+        plannedLoad: 42,
+        plannedDurationSeconds: 90,
+        plannedDistance: 250,
+        restSeconds: 75,
+        plannedRpe: 8,
+        setType: 'DROP_SET',
+        notes: 'Progressão pessoal',
+        alternativeExerciseId: originalExercise.exercise.id,
+      },
+    )
+    await repositories.plans.addRestActivity(original.id, originalDay.id, {
+      name: 'Caminhada',
+      description: 'Leve',
+      estimatedDurationMinutes: 15,
+      category: 'Recuperação',
+      optional: true,
+    })
+    const session = await repositories.sessions.start(original.id, originalDay.id)
+    await repositories.sessions.complete(session.id, null, '')
+
+    const complete = await repositories.plans.duplicate(original.id, 'COMPLETE')
+    const structure = await repositories.plans.duplicate(original.id, 'STRUCTURE_ONLY')
+    const withoutLoads = await repositories.plans.duplicate(original.id, 'WITHOUT_LOADS')
+    expect([complete.name, structure.name, withoutLoads.name]).toEqual([
+      'Ficha local — Cópia',
+      'Ficha local — Cópia 2',
+      'Ficha local — Cópia 3',
+    ])
+    for (const copy of [complete, structure, withoutLoads]) {
+      expect(copy).toMatchObject({
+        active: false,
+        archived: false,
+        deletedAt: null,
+        purgeAt: null,
+      })
+      expect(copy.id).not.toBe(original.id)
+      expect(copy.days[0]!.id).not.toBe(originalDay.id)
+      expect(copy.days[0]!.exercises[0]!.id).not.toBe(originalExercise.id)
+      expect(copy.days[0]!.restActivities).toHaveLength(1)
+    }
+    expect(complete.days[0]!.exercises[0]).toMatchObject({
+      plannedLoad: 42,
+      plannedRpe: 8,
+      plannedDurationSeconds: 90,
+      plannedDistance: 250,
+      notes: 'Progressão pessoal',
+      alternativeExerciseId: originalExercise.exercise.id,
+    })
+    expect(structure.days[0]!.exercises[0]).toMatchObject({
+      sets: 3,
+      minReps: 8,
+      maxReps: 12,
+      plannedLoad: null,
+      plannedRpe: null,
+      restSeconds: 75,
+      setType: 'DROP_SET',
+      notes: '',
+      alternativeExerciseId: null,
+    })
+    expect(withoutLoads.days[0]!.exercises[0]).toMatchObject({
+      plannedLoad: null,
+      plannedRpe: 8,
+      plannedDurationSeconds: 90,
+      plannedDistance: 250,
+      notes: 'Progressão pessoal',
+      alternativeExerciseId: originalExercise.exercise.id,
+    })
+    expect((await repositories.plans.getById(original.id)).days[0]!.exercises[0])
+      .toMatchObject({ plannedLoad: 42, notes: 'Progressão pessoal' })
+    expect(await repositories.sessions.getHistory()).toHaveLength(1)
+    await database.close()
+  })
+
+  it('reverte integralmente uma duplicação quando qualquer cópia falha', async () => {
+    const path = newDatabase()
+    let database = betterDatabase(path)
+    await runMigrations(database)
+    await initializeFirstInstallation(database, seedData())
+    let repositories = createLocalRepositories(database)
+    const original = (await repositories.plans.list())[0]!
+    await repositories.plans.addRestActivity(original.id, original.days[0]!.id, {
+      name: 'Mobilidade',
+      description: '',
+      estimatedDurationMinutes: 10,
+      category: 'Mobilidade',
+      optional: false,
+    })
+    await database.close()
+
+    database = betterDatabase(path, failOn('INSERT INTO rest_activities'))
+    repositories = createLocalRepositories(database)
+    await expect(repositories.plans.duplicate(original.id, 'COMPLETE')).rejects.toThrow('injetada')
+    expect(await repositories.plans.list()).toHaveLength(1)
+    expect(await database.first<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM training_plan_days',
+    )).toEqual({ count: 7 })
     await database.close()
   })
 })

@@ -9,6 +9,7 @@ import type {
   ExternalExerciseCandidate,
   ExternalExerciseImportRepository,
   TrainingPlan,
+  TrainingPlanRepository,
   TrainingPlanTrashRepository,
   WorkoutSession,
   WorkoutSessionRepository,
@@ -18,11 +19,13 @@ import type { AppMetadataRepository } from '@training/training-local-db'
 import { useTrainingController } from './useTrainingController'
 import { useWorkoutSessionController } from './useWorkoutSessionController'
 import { useBackupController } from './useBackupController'
+import { runRefreshParts } from './refreshAll'
 import { useWgerIntegrationController } from '../features/wger/useWgerIntegrationController'
 import {
   isEmptyTrashConfirmation,
   useTrainingPlanTrashController,
 } from '../features/training-plan/controller/useTrainingPlanTrashController'
+import { useTrainingPlanController } from '../features/training-plan/controller/useTrainingPlanController'
 
 const mocks = vi.hoisted(() => ({
   storage: {
@@ -154,7 +157,7 @@ describe('controllers locais', () => {
       reset: vi.fn(async () => {}),
       restore: vi.fn(async () => {}),
     } as unknown as BackupRepository
-    const changed = vi.fn(async () => {})
+    const changed = vi.fn(async () => ({ success: true, failedParts: [] }))
     const hook = await renderController(() => useBackupController(
       repository,
       {} as AppMetadataRepository,
@@ -169,6 +172,91 @@ describe('controllers locais', () => {
     expect(automatic.create).toHaveBeenCalledWith('BEFORE_IMPORT')
     expect(automatic.restore).toHaveBeenCalledWith('file:///backup.json')
     expect(changed).toHaveBeenCalledTimes(2)
+    hook.unmount()
+  })
+
+  it('separa backup confirmado de refresh incompleto e permite repetir só o refresh', async () => {
+    automatic.restore.mockClear()
+    const repository = {
+      reset: vi.fn(async () => {}),
+      restore: vi.fn(async () => {}),
+    } as unknown as BackupRepository
+    const changed = vi.fn()
+      .mockResolvedValueOnce({ success: false, failedParts: ['fichas'] })
+      .mockResolvedValueOnce({ success: true, failedParts: [] })
+    const hook = await renderController(() => useBackupController(
+      repository,
+      {} as AppMetadataRepository,
+      '0.4.0',
+      vi.fn(async () => {}),
+      changed,
+    ))
+    await act(async () => {
+      expect(await hook.current.restoreAutomatic('file:///backup.json')).toBe(true)
+    })
+    expect(automatic.restore).toHaveBeenCalledTimes(1)
+    expect(hook.current.messageKind).toBe('warning')
+    expect(hook.current.message).toBe(
+      'Backup automático restaurado, mas algumas telas não puderam ser atualizadas.',
+    )
+    await act(async () => {
+      expect(await hook.current.retryRefresh()).toBe(true)
+    })
+    expect(automatic.restore).toHaveBeenCalledTimes(1)
+    expect(changed).toHaveBeenCalledTimes(2)
+    hook.unmount()
+  })
+
+  it('refresh global trata false e rejeição como falhas e coleta todas as partes', async () => {
+    await expect(runRefreshParts([
+      { name: 'sessão', refresh: vi.fn(async () => true) },
+      { name: 'lixeira e badge', refresh: vi.fn(async () => false) },
+      { name: 'dashboard', refresh: vi.fn(async () => { throw new Error('offline') }) },
+    ])).resolves.toEqual({
+      success: false,
+      failedParts: ['lixeira e badge', 'dashboard'],
+    })
+  })
+
+  it('preserva sucesso de criação e duplicação quando refresh posterior retorna false', async () => {
+    const created = trashPlan(20, 'PPL')
+    const duplicated = trashPlan(21, 'PPL — Cópia')
+    const repository = {
+      list: vi.fn(async () => []),
+      createWithDays: vi.fn(async () => created),
+      duplicate: vi.fn(async () => duplicated),
+    } as unknown as TrainingPlanRepository
+    const refresh = vi.fn(async () => false)
+    const hook = await renderController(() => useTrainingPlanController(repository, refresh))
+    let createResult!: Awaited<ReturnType<typeof hook.current.createWithDays>>
+    await act(async () => {
+      createResult = await hook.current.createWithDays({
+        plan: {
+          name: 'PPL',
+          description: '',
+          category: 'Hipertrofia',
+          difficulty: 'Intermediário',
+        },
+        days: [],
+      })
+    })
+    expect(createResult).toEqual({
+      status: 'success',
+      refreshWarning: true,
+      plan: created,
+    })
+    let duplicateResult!: Awaited<ReturnType<typeof hook.current.duplicate>>
+    await act(async () => {
+      duplicateResult = await hook.current.duplicate(20, 'STRUCTURE_ONLY')
+    })
+    expect(repository.duplicate).toHaveBeenCalledWith(20, 'STRUCTURE_ONLY')
+    expect(duplicateResult).toEqual({
+      status: 'success',
+      refreshWarning: true,
+      plan: duplicated,
+    })
+    expect(hook.current.selectedTrainingPlanId).toBe(21)
+    expect(hook.current.messageKind).toBe('warning')
     hook.unmount()
   })
 
@@ -227,6 +315,7 @@ describe('controllers locais', () => {
     })
     expect(repository.restore).toHaveBeenCalledTimes(1)
     expect(hook.current.pendingUndo?.status).toBe('running')
+    expect(hook.current.message).toBe('Ficha movida para a lixeira.')
     await act(async () => {
       restore.resolve(trashPlan())
       await Promise.all([first, second])
@@ -234,6 +323,7 @@ describe('controllers locais', () => {
     expect(await first).toBe(true)
     expect(await second).toBe(false)
     expect(hook.current.pendingUndo).toBeNull()
+    expect(hook.current.message).toBe('Ficha restaurada.')
 
     await act(async () => { await hook.current.moveToTrash(7) })
     const retryToken = hook.current.pendingUndo!.token

@@ -81,12 +81,15 @@ export function useTrainingPlanTrashController(
     if (mountedRef.current) setMessage('')
   }, [clearPendingUndo])
 
-  const acquireOperation = useCallback((key: string) => {
+  const acquireOperation = useCallback((
+    key: string,
+    { clearMessage = true }: { clearMessage?: boolean } = {},
+  ) => {
     if (activeOperationRef.current !== null) return false
     activeOperationRef.current = key
     if (mountedRef.current) {
       setBusyKey(key)
-      setMessage('')
+      if (clearMessage) setMessage('')
     }
     return true
   }, [])
@@ -128,8 +131,9 @@ export function useTrainingPlanTrashController(
     operationKey: string,
     mutation: () => Promise<T>,
     refreshAfterCommit: () => Promise<void>,
+    options?: { clearMessage?: boolean },
   ): Promise<CommittedMutationResult<T>> => {
-    if (!acquireOperation(operationKey)) {
+    if (!acquireOperation(operationKey, options)) {
       return { status: 'failed', error: new Error('Outra operação da lixeira está em andamento.') }
     }
     try {
@@ -238,6 +242,7 @@ export function useTrainingPlanTrashController(
         return repository.restore(current.planId)
       },
       refreshTrashDependents,
+      { clearMessage: false },
     )
     if (result.status === 'failed') {
       const current = pendingUndoRef.current

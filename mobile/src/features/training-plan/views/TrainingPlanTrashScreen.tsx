@@ -116,10 +116,18 @@ export function TrainingPlanTrashScreen({
         visible={confirmingEmpty}
         transparent
         animationType="fade"
-        onRequestClose={() => setConfirmingEmpty(false)}
+        onRequestClose={() => {
+          if (!busy) setConfirmingEmpty(false)
+        }}
       >
         <View style={styles.modalBackdrop}>
-          <View accessibilityViewIsModal style={styles.modal}>
+          <View
+            accessibilityLabel={busy ? 'Esvaziando lixeira…' : 'Confirmação para esvaziar a lixeira'}
+            accessibilityLiveRegion="polite"
+            accessibilityState={{ busy }}
+            accessibilityViewIsModal
+            style={styles.modal}
+          >
             <Text style={styles.modalTitle}>Esvaziar lixeira?</Text>
             <Text style={styles.meta}>
               {emptyTrashCountLabel(plans.length)}
@@ -137,7 +145,13 @@ export function TrainingPlanTrashScreen({
               style={styles.input}
             />
             <View style={styles.modalActions}>
-              <Pressable style={styles.secondaryAction} onPress={() => setConfirmingEmpty(false)}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ disabled: busy }}
+                disabled={busy}
+                style={[styles.secondaryAction, busy && styles.disabled]}
+                onPress={() => setConfirmingEmpty(false)}
+              >
                 <Text style={styles.secondaryText}>Cancelar</Text>
               </Pressable>
               <Pressable
@@ -151,7 +165,12 @@ export function TrainingPlanTrashScreen({
                 })()}
               >
                 {busy
-                  ? <ActivityIndicator color={colors.onPrimary} />
+                  ? (
+                    <View style={styles.busyLabel}>
+                      <ActivityIndicator color={colors.onPrimary} />
+                      <Text style={styles.dangerActionText}>Esvaziando lixeira…</Text>
+                    </View>
+                  )
                   : <Text style={styles.dangerActionText}>Esvaziar</Text>}
               </Pressable>
             </View>
@@ -251,5 +270,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   secondaryText: { color: colors.textPrimary, fontWeight: '800' },
   dangerAction: { alignItems: 'center', backgroundColor: colors.danger, borderRadius: 12, flex: 1, justifyContent: 'center', minHeight: 48 },
   dangerActionText: { color: colors.onPrimary, fontWeight: '800' },
+  busyLabel: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   disabled: { opacity: 0.5 },
 })

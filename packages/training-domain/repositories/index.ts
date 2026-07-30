@@ -20,6 +20,10 @@ import type {
   TrainingPlanInput,
   WorkoutSession,
 } from '../model'
+import type {
+  TrainingPlanCreationInput,
+  TrainingPlanDuplicateMode,
+} from '../training-plans'
 
 export interface ExerciseLibraryRepository {
   list(query?: ExerciseLibraryQuery): Promise<ExerciseDefinition[]>
@@ -36,8 +40,9 @@ export interface TrainingPlanRepository {
   findById(id: number): Promise<TrainingPlan | null>
   getById(id: number): Promise<TrainingPlan>
   create(input: TrainingPlanInput): Promise<TrainingPlan>
+  createWithDays(input: TrainingPlanCreationInput): Promise<TrainingPlan>
   update(id: number, input: TrainingPlanInput): Promise<TrainingPlan>
-  duplicate(id: number): Promise<TrainingPlan>
+  duplicate(id: number, mode: TrainingPlanDuplicateMode): Promise<TrainingPlan>
   activate(id: number): Promise<TrainingPlan>
   archive(id: number, archived?: boolean): Promise<TrainingPlan>
   updateDay(planId: number, dayId: number, input: TrainingPlanDayInput): Promise<TrainingPlan>

@@ -39,6 +39,7 @@ import { AppErrorBoundary } from './src/features/bootstrap/AppErrorBoundary'
 import { exportDiagnostic } from './src/integrations/backupFiles'
 import { getAppVersion } from './src/config/version'
 import { Toast } from './src/components/Toast'
+import { runRefreshParts, type RefreshAllResult } from './src/controllers/refreshAll'
 
 const Stack = createNativeStackNavigator<RootStackParamList>()
 const Tabs = createBottomTabNavigator<MainTabParamList>()
@@ -92,17 +93,12 @@ function LocalApp({
   const trainingPlan = useTrainingPlanController(repositories.plans, controller.refresh)
   const workoutSession = useWorkoutSessionController(repositories.sessions, controller.refresh)
   const trashRefresh = useRef<() => Promise<boolean>>(async () => true)
-  const refreshCore = useCallback(async () => {
-    const results = await Promise.all([
-      workoutSession.refresh(),
-      trainingPlan.refresh(),
-      controller.refresh(),
-    ])
-    if (results.some((result) => !result)) throw new Error('Não foi possível recarregar todos os dados locais.')
-  }, [controller.refresh, trainingPlan.refresh, workoutSession.refresh])
-  const refreshAll = useCallback(async () => {
-    await Promise.all([refreshCore(), trashRefresh.current()])
-  }, [refreshCore])
+  const refreshAll = useCallback((): Promise<RefreshAllResult> => runRefreshParts([
+    { name: 'sessão', refresh: workoutSession.refresh },
+    { name: 'fichas', refresh: trainingPlan.refresh },
+    { name: 'dashboard e biblioteca', refresh: controller.refresh },
+    { name: 'lixeira e badge', refresh: () => trashRefresh.current() },
+  ]), [controller.refresh, trainingPlan.refresh, workoutSession.refresh])
   const backup = useBackupController(
     repositories.backup,
     repositories.metadata,
@@ -134,7 +130,7 @@ function LocalApp({
     : workoutSession.message
       ? { message: workoutSession.message, kind: 'error' as const, source: 'other' as const }
       : trainingPlan.message
-      ? { message: trainingPlan.message, kind: 'error' as const, source: 'other' as const }
+      ? { message: trainingPlan.message, kind: trainingPlan.messageKind, source: 'other' as const }
       : controller.message
         ? { message: controller.message, kind: 'error' as const, source: 'other' as const }
         : { message: backup.message, kind: backup.messageKind, source: 'other' as const }
@@ -213,7 +209,7 @@ function LocalApp({
                     plans={trainingPlan.trainingPlans}
                     busyKeys={trainingPlan.busyKeys}
                     errors={trainingPlan.errors}
-                    onCreate={trainingPlan.create}
+                    onCreate={trainingPlan.createWithDays}
                     onUpdate={trainingPlan.update}
                     onActivate={trainingPlan.activate}
                     onDuplicate={trainingPlan.duplicate}

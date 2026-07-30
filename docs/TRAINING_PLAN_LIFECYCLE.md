@@ -35,3 +35,19 @@ usam `training-auto-backup-<timestamp>.json`.
 
 Todas as operações usam o SQLite local e funcionam sem conta, servidor ou
 conexão. A integração opcional Wger não recebe dados das fichas.
+
+## Criação e duplicação
+
+Uma ficha pode ser criada vazia ou a partir de um template local. A ficha e os
+sete dias são inseridos na mesma transação; falha em qualquer dia reverte tudo.
+Templates definem somente nomes, descanso e foco semanal, sem criar exercícios.
+
+Duplicações também são transacionais e sempre nascem inativas, não arquivadas
+e fora da lixeira. Elas não copiam sessões, histórico ou snapshots:
+
+- **Completa:** preserva toda a programação, cargas, RPE, notas e alternativas;
+- **Apenas estrutura:** preserva exercícios, séries, repetições, descanso,
+  duração, distância, tipo de série e atividades; limpa carga, RPE, notas de
+  exercício e alternativa;
+- **Sem cargas:** preserva toda a programação, exceto `plannedLoad`, que fica
+  nulo.

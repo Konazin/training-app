@@ -49,6 +49,18 @@ export function validateTrainingPlanInput(input: TrainingPlanInput): TrainingPla
   if (!name) throw new DomainError('INVALID_TRAINING_PLAN', 'Informe o nome da ficha.')
   if (!category) throw new DomainError('INVALID_TRAINING_PLAN', 'Informe a categoria da ficha.')
   if (!difficulty) throw new DomainError('INVALID_TRAINING_PLAN', 'Informe a dificuldade da ficha.')
+  if (name.length > 80) {
+    throw new DomainError('INVALID_TRAINING_PLAN', 'O nome deve ter no máximo 80 caracteres.')
+  }
+  if (input.description.trim().length > 500) {
+    throw new DomainError('INVALID_TRAINING_PLAN', 'A descrição deve ter no máximo 500 caracteres.')
+  }
+  if (category.length > 50 || difficulty.length > 50) {
+    throw new DomainError(
+      'INVALID_TRAINING_PLAN',
+      'Categoria e dificuldade devem ter no máximo 50 caracteres.',
+    )
+  }
   if ((input.startDate && !isDateKey(input.startDate)) || (input.endDate && !isDateKey(input.endDate))) {
     throw new DomainError('INVALID_TRAINING_PLAN', 'Informe datas válidas no formato AAAA-MM-DD.')
   }

@@ -4,10 +4,16 @@ import type {
   DayExerciseInput,
   RestActivityInput,
   TrainingPlan,
+  TrainingPlanCreationInput,
   TrainingPlanDayInput,
+  TrainingPlanDuplicateMode,
   TrainingPlanInput,
 } from '../model/trainingPlan'
 import type { TrainingPlanRepository } from '../repository/TrainingPlanRepository'
+
+export type TrainingPlanUiResult =
+  | { status: 'success'; refreshWarning: boolean; plan: TrainingPlan }
+  | { status: 'failed' }
 
 export function useTrainingPlanController(
   repository: TrainingPlanRepository,
@@ -18,6 +24,10 @@ export function useTrainingPlanController(
   const [loading, setLoading] = useState(false)
   const [busyKeys, setBusyKeys] = useState<Set<string>>(new Set())
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [notice, setNotice] = useState<{
+    text: string
+    kind: 'success' | 'warning' | 'error'
+  } | null>(null)
   const busyRef = useRef(new Set<string>())
   const selectedTrainingPlan = useMemo(
     () => trainingPlans.find((plan) => plan.id === selectedTrainingPlanId),
@@ -80,10 +90,58 @@ export function useTrainingPlanController(
     }
   }, [onChanged])
 
+  const mutateCommitted = useCallback(async (
+    key: string,
+    operation: () => Promise<TrainingPlan>,
+    successMessage: string,
+  ): Promise<TrainingPlanUiResult> => {
+    if (busyRef.current.has(key)) return { status: 'failed' }
+    busyRef.current.add(key)
+    setBusyKeys(new Set(busyRef.current))
+    setErrors((current) => ({ ...current, [key]: '' }))
+    setNotice(null)
+    let plan: TrainingPlan
+    try {
+      plan = await operation()
+    } catch (cause) {
+      const text = messageFrom(cause)
+      setErrors((current) => ({ ...current, [key]: text }))
+      setNotice({ text, kind: 'error' })
+      return { status: 'failed' }
+    } finally {
+      busyRef.current.delete(key)
+      setBusyKeys(new Set(busyRef.current))
+    }
+    setTrainingPlans((current) => [plan, ...current.filter((item) => item.id !== plan.id)])
+    setSelectedTrainingPlanId(plan.id)
+    let refreshWarning = false
+    try {
+      refreshWarning = await onChanged?.() === false
+    } catch {
+      refreshWarning = true
+    }
+    setNotice({
+      text: refreshWarning
+        ? `${successMessage} Algumas telas não puderam ser atualizadas.`
+        : successMessage,
+      kind: refreshWarning ? 'warning' : 'success',
+    })
+    return { status: 'success', refreshWarning, plan }
+  }, [onChanged])
+
   const create = useCallback(
     (input: TrainingPlanInput) =>
       mutate('plan:create', () => repository.create(input), { select: true }),
     [mutate, repository],
+  )
+  const createWithDays = useCallback(
+    (input: TrainingPlanCreationInput) =>
+      mutateCommitted(
+        'plan:create',
+        () => repository.createWithDays(input),
+        'Ficha criada.',
+      ),
+    [mutateCommitted, repository],
   )
   const update = useCallback(
     (id: number, input: TrainingPlanInput) =>
@@ -96,9 +154,13 @@ export function useTrainingPlanController(
     [mutate, repository],
   )
   const duplicate = useCallback(
-    (id: number) =>
-      mutate(`plan:duplicate:${id}`, () => repository.duplicate(id), { select: true }),
-    [mutate, repository],
+    (id: number, mode: TrainingPlanDuplicateMode) =>
+      mutateCommitted(
+        `plan:duplicate:${id}`,
+        () => repository.duplicate(id, mode),
+        'Ficha duplicada.',
+      ),
+    [mutateCommitted, repository],
   )
   const archive = useCallback(
     (id: number, archived = true) =>
@@ -163,9 +225,11 @@ export function useTrainingPlanController(
     loading,
     busyKeys,
     errors,
-    message: errors.general ?? '',
+    message: notice?.text || errors.general || '',
+    messageKind: notice?.kind ?? 'error',
     refresh,
     create,
+    createWithDays,
     update,
     activate,
     duplicate,

@@ -6,8 +6,10 @@ export type {
   SetType,
   TrainingDayExercise as DayExercise,
   TrainingPlan,
+  TrainingPlanCreationInput,
   TrainingPlanDay,
   TrainingPlanDayInput,
+  TrainingPlanDuplicateMode,
   TrainingPlanInput,
   Weekday,
 } from '@training/training-domain'

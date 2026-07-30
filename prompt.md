@@ -1,37 +1,27 @@
 Continue o desenvolvimento do repositório `training-app` a partir do commit:
 
-1e9f4469a44f9a8e5dad3ca7f993d0ca1fc20d08
+85e951baa963068e2816e3bee79aa963f596bbbd
 
-Este é um PATCH DE ESTABILIZAÇÃO do Marco 1:
+Este é o MARCO 2 do roadmap:
 
-CICLO DE VIDA DAS FICHAS E LIXEIRA LOCAL
+EDITOR DE FICHA, TEMPLATES E DUPLICAÇÃO CONFIGURÁVEL
 
-O Marco 1 já foi implementado, mas não deve ser considerado encerrado enquanto
-existirem problemas de concorrência, feedback incorreto após mutations
-confirmadas, divergências de UX e lacunas de teste.
+O Marco 1 está estabilizado no núcleo. Antes de implementar qualquer função
+nova deste marco, concluir a Etapa 2.0 com três ajustes operacionais pendentes.
 
-Commit sugerido:
+O aplicativo deve permanecer:
 
-fix(mobile): stabilize training plan trash lifecycle
+- local-only;
+- offline-first;
+- sem backend obrigatório;
+- sem VPS;
+- sem login;
+- com SQLite como fonte de verdade;
+- compatível com backup schemaVersion 2;
+- compatível com fichas arquivadas e lixeira;
+- compatível com o catálogo Wger opcional.
 
-Não implementar funcionalidades do Marco 2.
-
-Não adicionar:
-
-- templates;
-- dropdowns de categoria;
-- dropdowns de dificuldade;
-- nova Home;
-- temas;
-- animações;
-- novas APIs;
-- catálogo inicial;
-- thumbnails;
-- IA;
-- nuvem;
-- novas migrations, salvo se uma necessidade real e comprovada for encontrada.
-
-Trabalhar apenas em:
+Trabalhar principalmente em:
 
 packages/training-domain/
 packages/training-local-db/
@@ -46,781 +36,1362 @@ web/
 umamusume-mobile/
 packages/training-wger/
 
-==================================================
-1. OBJETIVO PRINCIPAL
-==================================================
+Não implementar neste marco:
 
-Substituir a lógica genérica e ambígua do método `run` do controller da lixeira
-por um fluxo explícito que diferencie:
-
-1. mutation não iniciada;
-2. mutation falhou antes do commit;
-3. mutation foi confirmada no SQLite;
-4. refresh após mutation teve sucesso;
-5. refresh após mutation falhou;
-6. operação de desfazer disponível;
-7. operação de desfazer em andamento;
-8. operação de desfazer consumida ou expirada.
-
-A UI nunca deve afirmar que a mutation falhou quando o SQLite já confirmou a
-alteração.
-
-O botão Desfazer nunca deve desaparecer sem restaurar a ficha apenas porque um
-refresh ainda estava em andamento.
+- nova Home semanal;
+- skins ou temas novos;
+- animações gerais do aplicativo;
+- catálogo inicial expandido;
+- thumbnails;
+- favoritos;
+- múltiplos providers;
+- progressão automática;
+- IA;
+- Health Connect;
+- nuvem;
+- alterações de mídia;
+- APK final.
 
 ==================================================
-2. PROBLEMA ATUAL DO `run`
+1. EXECUÇÃO EM ETAPAS
 ==================================================
 
-A implementação atual trata mutation e refresh como uma única operação:
+Executar obrigatoriamente nesta ordem:
 
-- executa a mutation;
-- publica mensagem e callback de Desfazer;
-- ainda mantém o lock global;
-- executa refresh;
-- retorna sucesso ou falha de forma genérica.
+ETAPA 2.0
+Fechamento operacional da lixeira.
 
-Isso permite a seguinte corrida:
+ETAPA 2.1
+Seletores de categoria e dificuldade.
 
-1. `moveToTrash` confirma a alteração no SQLite;
-2. Snackbar é exibido;
-3. refresh ainda está em andamento;
-4. usuário toca em Desfazer;
-5. o callback limpa o ID pendente;
-6. o lock global rejeita a restauração;
-7. o Snackbar fecha;
-8. a ficha permanece na lixeira.
+ETAPA 2.2
+Templates locais de ficha.
 
-Também existe outro problema:
+ETAPA 2.3
+Prévia semanal.
 
-1. mutation confirma no SQLite;
-2. refresh falha;
-3. controller retorna false;
-4. tela informa falha ou não navega;
-5. banco já foi alterado.
+ETAPA 2.4
+Duplicação configurável.
 
-Corrigir os dois problemas na raiz.
+ETAPA 2.5
+Testes, documentação e validação geral.
 
-Não apenas adicionar `setTimeout`, aumentar a duração do Snackbar ou inserir
-outro booleano em torno do código existente.
+Não iniciar a Etapa 2.1 enquanto os testes da Etapa 2.0 não estiverem passando.
+
+Não marcar o Marco 2 como concluído se alguma etapa estiver parcial.
 
 ==================================================
-3. REMOVER OU REESTRUTURAR O `run`
+2. ETAPA 2.0 — SNACKBAR DURANTE DESFAZER
 ==================================================
 
-Remover o helper genérico atual ou substituí-lo por uma abstração com semântica
-explícita.
+O controller da lixeira atualmente limpa a mensagem ao adquirir qualquer lock.
 
-Criar tipos semelhantes a:
+Isso faz o Snackbar desaparecer assim que o usuário toca em Desfazer, mesmo
+existindo suporte visual para “Desfazendo…”.
 
-type CommittedMutationResult<T> =
-  | {
-      status: 'committed'
-      value: T
-      refreshStatus: 'success'
-    }
-  | {
-      status: 'committed'
-      value: T
-      refreshStatus: 'failed'
-      refreshError: unknown
-    }
-  | {
-      status: 'failed'
-      error: unknown
-    }
+Corrigir sem remover as proteções de concorrência já implementadas.
 
-O nome exato pode variar, mas deve ser impossível confundir:
+Fluxo esperado:
 
-- mutation falhou;
-- mutation confirmou e refresh falhou.
+1. Snackbar mostra:
+   “Ficha movida para a lixeira.”
+   ação “Desfazer”.
 
-Criar uma função interna como:
+2. usuário toca em Desfazer;
 
-executeCommittedMutation<T>(
-  operationKey: string,
-  mutation: () => Promise<T>,
-  refresh: () => Promise<void>
-): Promise<CommittedMutationResult<T>>
+3. Snackbar permanece visível;
 
-Regras:
+4. ação muda para:
+   “Desfazendo…”;
 
-1. adquirir lock;
-2. executar mutation;
-3. registrar localmente que a mutation foi confirmada;
-4. tentar refresh;
-5. capturar falha do refresh separadamente;
-6. liberar lock em `finally`;
-7. retornar resultado estruturado;
-8. nunca publicar Snackbar dentro desse helper;
-9. nunca navegar dentro desse helper;
-10. nunca limpar estado de Desfazer dentro desse helper.
+5. botão da ação e botão fechar ficam desativados;
 
-Nenhum callback de UI deve ser disponibilizado enquanto o lock da mutation
-original ainda estiver ativo.
+6. repository.restore confirma;
 
-==================================================
-4. LOCK E OPERAÇÕES CONCORRENTES
-==================================================
+7. refresh é tentado;
 
-Substituir o booleano global pouco expressivo por estado explícito.
+8. Snackbar anterior fecha;
 
-Pode usar:
+9. nova mensagem mostra:
+   “Ficha restaurada.”
 
-- `activeOperationRef: string | null`;
-- ou `busyKeysRef: Set<string>`.
+Em refresh falho:
 
-Operações destrutivas da lixeira podem continuar serializadas.
+“Ficha restaurada, mas a tela não pôde ser atualizada.”
 
-Chaves sugeridas:
+Em restore falho:
 
-- trash:move:<planId>
-- trash:restore:<planId>
-- trash:delete:<planId>
-- trash:empty
-- trash:purge
-- trash:undo:<planId>
+- manter Snackbar visível;
+- retornar a ação para “Desfazer”;
+- permitir nova tentativa enquanto o token estiver válido;
+- não limpar pending undo;
+- mostrar mensagem de erro sem perder a possibilidade de tentar novamente.
 
-Regras:
+Alterar `acquireOperation` para aceitar comportamento explícito, por exemplo:
 
-- a mesma operação não pode iniciar duas vezes;
-- duplo toque deve resultar em uma única mutation;
-- o lock deve ser liberado em `finally`;
-- falha de refresh não pode manter lock;
-- falha de mensagem ou callback não pode manter lock;
-- nenhuma operação deve depender de estado React assíncrono para garantir
-  exclusão mútua;
-- usar refs para a garantia imediata de concorrência.
+acquireOperation(key, {
+  clearMessage: boolean
+})
 
-Não criar mutex externo ou biblioteca nova.
+Para operações `trash:undo:*`:
+
+clearMessage = false
+
+Não depender de verificar prefixo de string em vários lugares.
+
+Centralizar essa decisão.
 
 ==================================================
-5. PUBLICAÇÃO DO SNACKBAR DESFAZER
+3. ETAPA 2.0 — REFRESH GLOBAL
 ==================================================
 
-O Snackbar com Desfazer só pode ser publicado depois de:
+O `refreshAll` atual considera uma Promise resolvida com `false` como sucesso.
 
-1. `moveToTrash` ter sido confirmado;
-2. tentativa de refresh ter terminado;
-3. lock da operação ter sido liberado.
+Corrigir para que cada atualização seja validada.
 
-Fluxo correto:
+Criar contrato estruturado semelhante a:
 
-mutation
-→ tentativa de refresh
-→ liberação do lock
-→ navegação
-→ publicação do Snackbar com Desfazer
-
-Caso a mutation confirme e o refresh falhe:
-
-- considerar a exclusão concluída;
-- navegar normalmente;
-- disponibilizar Desfazer;
-- informar:
-  “Ficha movida para a lixeira, mas a tela não pôde ser atualizada.”
-- oferecer ação para tentar atualizar novamente quando adequado.
-
-Não mostrar:
-
-“Não foi possível mover a ficha”
-
-quando a ficha já foi movida.
-
-==================================================
-6. ESTADO TOKENIZADO DE DESFAZER
-==================================================
-
-Substituir o estado baseado apenas em `undoPlanId` por um objeto tokenizado.
-
-Criar tipo semelhante a:
-
-interface PendingTrashUndo {
-  token: string
-  planId: number
-  planName: string
-  createdAt: number
-  expiresAt: number
-  status: 'available' | 'running'
+interface RefreshPartResult {
+  name: string
+  success: boolean
+  error?: unknown
 }
 
-Guardar em ref e expor o necessário para a UI.
-
-Cada nova ação de mover para a lixeira deve criar um token único.
-
-Pode usar:
-
-- contador incremental local;
-- combinação segura de timestamp e contador;
-- `crypto.randomUUID()` apenas se disponível no ambiente sem polyfill adicional.
-
-Não depender exclusivamente de `Date.now()` se duas operações puderem ocorrer no
-mesmo milissegundo.
-
-==================================================
-7. CALLBACK DE DESFAZER
-==================================================
-
-Criar:
-
-undoMoveToTrash(token: string): Promise<boolean>
-
-Fluxo:
-
-1. verificar se existe pending undo;
-2. verificar se o token recebido ainda é o token atual;
-3. verificar se não expirou;
-4. verificar se não está em execução;
-5. adquirir lock de undo;
-6. marcar status como running;
-7. executar `repository.restore(planId)`;
-8. considerar a restauração confirmada assim que o SQLite concluir;
-9. tentar atualizar os controllers;
-10. liberar lock;
-11. limpar pending undo somente depois de a restauração ter sido confirmada;
-12. retornar true quando a ficha foi restaurada;
-13. retornar false quando nada foi restaurado.
-
-Se o refresh falhar depois de restaurar:
-
-- considerar Desfazer concluído;
-- limpar o pending undo;
-- informar:
-  “Ficha restaurada, mas a tela não pôde ser atualizada.”
-- não tentar restaurar outra vez.
-
-Se a mutation de restore falhar:
-
-- manter o pending undo disponível enquanto ainda estiver no prazo;
-- retornar false;
-- não fechar automaticamente o Snackbar;
-- mostrar erro amigável.
-
-Não limpar token antes de obter sucesso na mutation.
-
-==================================================
-8. CALLBACKS OBSOLETOS
-==================================================
-
-O `onDismiss` de um Snackbar antigo não pode limpar um undo novo.
-
-Criar:
-
-clearPendingUndo(token: string): void
-
-A função só limpa quando:
-
-pendingUndo.token === token
-
-Exemplo de caso a proteger:
-
-1. ficha A gera Snackbar token A;
-2. ficha B gera Snackbar token B;
-3. callback atrasado de A executa;
-4. token B deve permanecer intacto.
-
-Adicionar teste específico.
-
-==================================================
-9. COMPONENTE TOAST/SNACKBAR
-==================================================
-
-Atualizar o componente atual para aceitar ação assíncrona de forma segura.
-
-Contrato sugerido:
-
-interface ToastAction {
-  label: string
-  onPress: () => boolean | void | Promise<boolean | void>
+interface RefreshAllResult {
+  success: boolean
+  failedParts: string[]
 }
 
-Ou props equivalentes:
+Ou implementação equivalente.
 
-- actionLabel;
-- onAction;
-- actionBusy opcional;
-- onDismiss.
+O refresh global deve considerar:
 
-Regras:
-
-- impedir duplo toque enquanto a ação estiver em execução;
-- área de toque mínima de 48 dp;
-- mostrar estado visual de execução quando necessário;
-- chamar `onAction`;
-- aguardar Promise;
-- se o resultado for false, manter Snackbar visível;
-- se o resultado for true ou void, fechar;
-- chamar `onDismiss` somente quando realmente fechar;
-- fechamento automático deve respeitar token atual;
-- timer deve ser cancelado durante ação assíncrona;
-- timer não pode fechar Snackbar enquanto Desfazer está rodando;
-- erro do callback não deve causar unhandled rejection;
-- ação antiga não pode executar após troca de mensagem.
-
-Não armazenar callback no SQLite ou no domínio.
-
-==================================================
-10. EXPIRAÇÃO DO DESFAZER
-==================================================
-
-A duração visual continua sendo aproximadamente seis segundos.
-
-Quando expirar:
-
-- limpar apenas o token correspondente;
-- não alterar a ficha;
-- não executar restore;
-- não produzir erro.
-
-Caso o usuário toque exatamente durante a expiração:
-
-- no máximo uma decisão deve vencer;
-- ou a restauração inicia e o timer é cancelado;
-- ou o token expira e a restauração não inicia;
-- nunca restaurar duas vezes;
-- nunca deixar o Snackbar sem estado consistente.
-
-Adicionar teste com timers falsos.
-
-==================================================
-11. RESULTADOS PÚBLICOS DO CONTROLLER
-==================================================
-
-Evitar retornar apenas boolean quando a UI precisa distinguir estados.
-
-Para `moveToTrash`, retornar resultado como:
-
-type TrashUiResult =
-  | { status: 'success'; refreshWarning: false }
-  | { status: 'success'; refreshWarning: true }
-  | { status: 'failed' }
-
-O nome pode variar.
-
-O editor deve navegar para trás quando:
-
-status === 'success'
-
-mesmo que:
-
-refreshWarning === true
-
-Somente permanecer na tela quando a mutation falhou.
-
-Aplicar a mesma distinção, quando necessário, a:
-
-- restore;
-- deletePermanently;
-- emptyTrash;
-- purgeExpired.
-
-Não transformar todas as operações do aplicativo inteiro neste patch.
-
-Limitar a mudança ao controller da lixeira e integrações diretas.
-
-==================================================
-12. REFRESH CONSISTENTE
-==================================================
-
-Criar função separada:
-
-refreshTrashDependents(): Promise<void>
-
-Ela deve atualizar de forma explícita:
-
-- lista normal de fichas;
-- ficha selecionada;
-- dashboard;
+- sessão;
+- fichas;
+- dashboard/biblioteca;
 - lixeira;
-- contador/badge.
+- badge.
 
-Usar `Promise.allSettled`, ou tratamento equivalente, quando múltiplos refreshes
-independentes forem executados.
+Usar `Promise.allSettled` quando as atualizações forem independentes.
 
-Não interromper a coleta das falhas na primeira Promise rejeitada.
+Não interromper a coleta no primeiro erro.
 
-Retornar ou lançar um erro agregado sanitizado contendo quais partes falharam.
+Não repetir mutation para corrigir refresh.
 
-Não executar a mutation novamente para corrigir falha de refresh.
+Quando qualquer refresh retornar false ou rejeitar:
 
-Adicionar ação ou método:
-
-retryRefresh(): Promise<boolean>
-
-Essa ação apenas recarrega dados.
+- considerar o refresh incompleto;
+- informar quais partes falharam;
+- não afirmar que toda a interface foi atualizada.
 
 ==================================================
-13. CORRIGIR EXCLUSÃO PERMANENTE
+4. ETAPA 2.0 — BACKUP E MUTATION CONFIRMADA
 ==================================================
 
-Na confirmação individual, mostrar:
+O `useBackupController` também não deve tratar mutation confirmada mais refresh
+falho como se a mutation inteira tivesse falhado.
 
-Título:
+Aplicar separação explícita ao menos às operações:
 
-Excluir “<nome da ficha>” permanentemente?
+- importar backup;
+- restaurar backup automático;
+- apagar todos os dados;
+- recriar dados iniciais.
 
-Descrição:
+Distinguir:
 
-“A programação desta ficha não poderá ser recuperada. Seu histórico de sessões
-será preservado.”
+1. backup ou mutation falhou antes do commit;
+2. banco foi alterado e refresh passou;
+3. banco foi alterado e refresh falhou.
 
-Botões:
+Exemplos:
 
-- Cancelar;
-- Excluir permanentemente.
+Restauração confirmada e refresh completo:
 
-O botão destrutivo deve usar exatamente:
+“Backup restaurado com sucesso.”
 
-“Excluir permanentemente”
+Restauração confirmada e refresh incompleto:
 
-Não usar apenas “Excluir”.
+“Backup restaurado, mas algumas telas não puderam ser atualizadas.”
 
-Adicionar teste de interface verificando:
+Reset confirmado e refresh incompleto:
 
-- nome da ficha;
-- texto sobre histórico;
-- texto do botão.
+“Os dados foram recriados, mas algumas telas não puderam ser atualizadas.”
 
-==================================================
-14. CORRIGIR CARD DA LIXEIRA
-==================================================
+Nunca repetir restore/reset automaticamente por falha de refresh.
 
-Cada card deve mostrar:
+Nunca afirmar que a restauração falhou quando o SQLite já confirmou a operação.
 
-- nome;
-- categoria;
-- dificuldade;
-- data em que foi movida;
-- label de expiração;
-- restaurar;
-- excluir permanentemente.
+Manter o backup de segurança criado.
 
-Não omitir dificuldade.
-
-Acessibilidade deve descrever:
-
-“<nome>, categoria <categoria>, dificuldade <dificuldade>, será apagada em X
-dias.”
+Adicionar um método de retry apenas para refresh quando necessário.
 
 ==================================================
-15. NÍVEIS VISUAIS DE EXPIRAÇÃO
+5. ETAPA 2.0 — MODAL DE ESVAZIAMENTO
 ==================================================
 
-Aplicar exatamente:
+Enquanto `busy === true`:
 
-- mais de 2 dias: `textSecondary`;
-- 2 dias ou menos, mas ainda não vencida: `warning`;
-- vencida: `danger`.
+- botão Cancelar desativado;
+- `onRequestClose` não fecha o modal;
+- voltar do Android não fecha o modal;
+- input continua desativado;
+- botão destrutivo continua desativado;
+- modal permanece visível;
+- indicador de carregamento permanece;
+- não permitir segunda submissão.
 
-Não depender apenas da cor.
+Se backup falhar:
 
-Manter texto explícito:
+- modal permanece aberto;
+- dados permanecem;
+- confirmação digitada pode permanecer;
+- mostrar erro.
 
-- “Será apagada em X dias”;
-- “Será apagada amanhã”;
-- “Será apagada hoje”;
-- “Pronta para exclusão”.
+Se emptyTrash confirmar e refresh falhar:
 
-Adicionar função pura ou contrato visual testável para determinar a intenção:
+- fechar modal;
+- mostrar warning;
+- não comunicar cancelamento;
+- não repetir emptyTrash.
 
-type TrashUrgency =
-  | 'normal'
-  | 'warning'
-  | 'expired'
+Adicionar acessibilidade:
 
-==================================================
-16. TEXTO SOBRE EXPURGO
-==================================================
-
-Substituir textos que afirmem exclusão automática em background.
-
-Usar:
-
-“As fichas ficam na lixeira por sete dias. Depois do prazo, são removidas na
-próxima abertura do app ou atualização desta tela.”
-
-No estado vazio:
-
-“Não há fichas na lixeira.”
-
-Descrição:
-
-“As fichas excluídas podem ser restauradas durante sete dias.”
-
-Atualizar README e documentação com a mesma semântica.
+- modal anunciado como operação em andamento;
+- botão Cancelar com estado disabled;
+- texto “Esvaziando lixeira…” durante busy.
 
 ==================================================
-17. MODAL ESVAZIAR
-==================================================
-
-Substituir o `TextInput` cru por `ThemedTextInput`.
-
-Mostrar quantidade exata:
-
-- “1 ficha será excluída permanentemente.”
-- “3 fichas serão excluídas permanentemente.”
-
-Informar:
-
-- backup será criado primeiro;
-- histórico de sessões será preservado;
-- programação não poderá ser recuperada.
-
-Manter confirmação digitada:
-
-ESVAZIAR
-
-Normalização:
-
-value.trim().toUpperCase() === 'ESVAZIAR'
-
-Botão destrutivo deve permanecer desabilitado até a confirmação válida.
-
-Durante a operação:
-
-- impedir duplo envio;
-- não fechar modal antes do resultado;
-- mostrar loading;
-- se backup falhar, manter modal e dados;
-- se emptyTrash confirmar mas refresh falhar, fechar modal e mostrar warning,
-  pois a lixeira já foi esvaziada.
-
-==================================================
-18. BACKUP E MENSAGENS
-==================================================
-
-Manter:
-
-BEFORE_EMPTY_TRASH
-
-Garantir:
-
-- backup termina antes da mutation;
-- falha de backup impede mutation;
-- backup criado não é apagado caso refresh falhe;
-- mensagem de sucesso diferencia:
-  - backup e esvaziamento concluídos;
-  - esvaziamento concluído, refresh falhou.
-
-Não alterar o schema do backup neste patch.
-
-==================================================
-19. DOCUMENTAÇÃO DO BACKUP
-==================================================
-
-Corrigir referências ao nome físico do arquivo.
-
-Não afirmar que o arquivo se chama literalmente:
-
-training-backup-v2.json
-
-Documentar:
-
-- formato interno: schemaVersion 2;
-- nome do arquivo manual:
-  `training-backup-<timestamp>.json`;
-- nome do backup automático:
-  `training-auto-backup-<timestamp>.json`.
-
-Atualizar:
-
-README.md
-docs/BACKUP_AND_RESTORE.md
-docs/TRAINING_PLAN_LIFECYCLE.md
-docs/PRODUCT_ROADMAP.md
-
-Não marcar o Marco 2 como iniciado.
-
-==================================================
-20. CASOS SQLITE FALTANTES
-==================================================
-
-Adicionar testes reais para:
-
-1. sessão PAUSED bloqueia moveToTrash;
-2. ficha arquivada pode ser movida para lixeira e deixa de ser arquivada;
-3. ficha na lixeira não pode ser ativada;
-4. ficha na lixeira não pode iniciar sessão;
-5. ficha na lixeira não pode ser editada;
-6. purgeExpired não remove ficha associada a sessão ativa;
-7. purgeExpired não remove ficha associada a sessão pausada;
-8. emptyTrash faz rollback integral quando uma exclusão falha;
-9. backup v2 restaura ficha não vencida e ela permanece na lixeira;
-10. backup v2 restaura ficha vencida e purgeExpired a remove;
-11. exclusão permanente preserva histórico;
-12. contador permanece correto após rollback.
-
-Não usar mocks para atomicidade SQLite.
-
-==================================================
-21. TESTES DE CONCORRÊNCIA DO CONTROLLER
-==================================================
-
-Adicionar testes determinísticos usando Promises controladas/deferred.
-
-Caso 1: Desfazer não aparece antes de liberar lock
-
-1. mutation resolve;
-2. refresh permanece pendente;
-3. confirmar que pending undo ainda não foi publicado;
-4. resolver refresh;
-5. confirmar que lock foi liberado;
-6. confirmar que Snackbar/undo foi publicado.
-
-Caso 2: refresh falha depois do commit
-
-1. mutation confirma;
-2. refresh rejeita;
-3. resultado público é success com warning;
-4. navegação pode ocorrer;
-5. pending undo continua disponível;
-6. mensagem não afirma que mutation falhou.
-
-Caso 3: toque rápido em Desfazer
-
-1. publicar pending undo;
-2. tocar Desfazer;
-3. repository.restore é chamado exatamente uma vez;
-4. segundo toque não inicia outra chamada;
-5. token só é limpo após commit da restauração.
-
-Caso 4: restauração falha
-
-1. repository.restore rejeita;
-2. callback retorna false;
-3. Snackbar permanece;
-4. token permanece enquanto válido;
-5. usuário pode tentar novamente.
-
-Caso 5: callback antigo
-
-1. criar token A;
-2. criar token B;
-3. executar dismiss de A;
-4. token B permanece.
-
-Caso 6: expiração concorrente
-
-1. iniciar ação antes do timer vencer;
-2. avançar timers;
-3. restore executa uma vez;
-4. Snackbar fecha de forma consistente.
-
-Caso 7: unmount
-
-1. iniciar refresh;
-2. desmontar controller;
-3. resolver promises;
-4. não atualizar estado desmontado;
-5. não deixar unhandled rejection.
-
-==================================================
-22. TESTES DO TOAST/SNACKBAR
-==================================================
-
-Cobrir:
-
-- ação síncrona com sucesso fecha;
-- ação assíncrona com sucesso fecha;
-- ação retorna false e permanece;
-- ação rejeita e permanece ou fecha com erro tratado, conforme contrato
-  documentado;
-- duplo toque chama onAction uma vez;
-- timer pausa durante ação;
-- onDismiss chamado uma vez;
-- mensagem nova invalida callback antigo;
-- touch target mínimo;
-- acessibilidade;
-- Snackbar não cobre tab bar;
-- ThemedTextInput no modal ESVAZIAR.
-
-==================================================
-23. TESTES VISUAIS E DE TELA
+6. TESTES OBRIGATÓRIOS DA ETAPA 2.0
 ==================================================
 
 Adicionar testes para:
 
-- nome na confirmação permanente;
-- botão “Excluir permanentemente”;
-- dificuldade no card;
-- quantidade no modal;
-- singular e plural;
-- urgência normal;
-- urgência warning;
-- urgência expired;
-- texto correto sobre remoção após abertura;
-- badge escondido quando zero;
-- badge atualizado após mutation;
-- erro de refresh não desfaz sucesso visual da mutation.
+1. Snackbar permanece durante restore pendente;
+2. actionBusyLabel mostra “Desfazendo…”;
+3. botão fechar fica desativado durante restore;
+4. restore falho mantém ação disponível;
+5. restore bem-sucedido fecha Snackbar anterior;
+6. refresh falho após restore mostra warning;
+7. `trashRefresh` retornando false torna refreshAll incompleto;
+8. refreshAll coleta múltiplas falhas;
+9. restore de backup confirmado não é tratado como falha por refresh;
+10. modal não fecha por Cancelar durante busy;
+11. modal não fecha por onRequestClose durante busy;
+12. modal fecha após emptyTrash confirmado;
+13. modal permanece após falha do backup;
+14. duplo toque continua bloqueado.
+
+Somente após estes testes passarem, iniciar a Etapa 2.1.
 
 ==================================================
-24. CI
+7. ETAPA 2.1 — CATEGORIAS PADRÃO
 ==================================================
 
-No job `local-mobile`, adicionar:
+Criar presets no domínio:
 
-- run: npm run typecheck --workspace=@training/training-wger
-- run: npm run test --workspace=@training/training-wger
+TRAINING_PLAN_CATEGORY_PRESETS
 
-A ordem recomendada:
+Valores de exibição e persistência:
 
-1. training-domain;
-2. training-local-db;
-3. training-wger;
-4. training-mobile;
-5. umamusume-mobile;
-6. Expo install check;
-7. Expo export;
-8. git diff --check.
+- Força
+- Hipertrofia
+- Resistência muscular
+- Condicionamento
+- Mobilidade
+- Recuperação
+- Técnica
+- Mista
 
-O job local-mobile não pode usar `continue-on-error`.
+Adicionar opção visual:
 
-Não chamar Wger real no CI.
+- Outra
+
+“Outra” é apenas uma opção de interface.
+
+Nunca persistir literalmente:
+
+Outra
+
+Quando Outra estiver selecionada:
+
+- exibir campo “Categoria personalizada”;
+- exigir valor não vazio;
+- normalizar espaços;
+- limitar a 50 caracteres;
+- persistir o texto personalizado.
+
+Ao editar ficha antiga:
+
+- se a categoria pertence aos presets, selecionar o preset;
+- caso contrário, selecionar Outra;
+- preencher o campo personalizado com o valor existente;
+- não perder categorias antigas.
+
+Criar funções puras:
+
+resolveTrainingPlanCategorySelection(value)
+
+normalizeTrainingPlanCategory(value)
+
+isTrainingPlanCategoryPreset(value)
+
+Não criar enum SQLite.
+
+Continuar persistindo categoria como TEXT.
 
 ==================================================
-25. ROADMAP
+8. ETAPA 2.1 — DIFICULDADES PADRÃO
 ==================================================
 
-Atualizar:
+Criar presets no domínio:
 
-docs/PRODUCT_ROADMAP.md
+TRAINING_PLAN_DIFFICULTY_PRESETS
 
-O Marco 1 só pode ser marcado como:
+Valores:
 
-ESTABILIZADO
+- Iniciante
+- Intermediário
+- Avançado
+- Adaptável
 
-depois de:
+Adicionar opção visual:
 
-- corrida do Desfazer coberta;
-- mutation e refresh separados;
-- UX corrigida;
-- testes adicionados;
-- CI atualizado;
-- validações passando.
+- Outra
 
-Não marcar:
+Não incluir Deload como dificuldade.
 
-Marco 2 em andamento
+Deload é fase de programação e pertence a uma futura evolução do modelo.
 
-neste commit.
+Quando Outra estiver selecionada:
+
+- exibir campo “Dificuldade personalizada”;
+- exigir valor não vazio;
+- normalizar espaços;
+- limitar a 50 caracteres;
+- persistir somente o valor personalizado.
+
+Ao editar valor antigo não reconhecido:
+
+- selecionar Outra;
+- preservar o texto anterior.
+
+Criar funções puras equivalentes às de categoria.
 
 ==================================================
-26. VERSÃO
+9. COMPONENTE DE SELEÇÃO
 ==================================================
+
+Criar componente reutilizável:
+
+OptionPickerField
+
+Responsabilidades:
+
+- label;
+- valor atual;
+- placeholder;
+- erro;
+- disabled;
+- acessibilidade;
+- abrir seletor;
+- mostrar seleção;
+- indicar que é interativo.
+
+Criar seletor mobile:
+
+OptionPickerModal
+
+Ou bottom sheet sem biblioteca externa.
+
+Requisitos:
+
+- SafeAreaView ou insets;
+- KeyboardAvoidingView quando houver campo customizado;
+- conteúdo rolável;
+- touch targets mínimos;
+- opção selecionada claramente;
+- suporte a tema claro e escuro;
+- botão Cancelar;
+- botão Confirmar;
+- fechar pelo Android apenas quando não estiver processando;
+- não depender somente da cor;
+- suporte a fonte ampliada.
+
+Não instalar biblioteca de dropdown.
+
+Não usar Picker nativo com comportamento inconsistente entre plataformas.
+
+==================================================
+10. EDITOR DE FICHA
+==================================================
+
+Substituir no TrainingPlanEditorScreen:
+
+- FormField livre de Categoria;
+- FormField livre de Dificuldade.
+
+Usar os novos seletores.
 
 Manter:
 
-- mobile version: 0.4.0;
-- android.versionCode: 6.
+- Nome;
+- Descrição;
+- Salvar;
+- Ativar;
+- Duplicar;
+- Arquivar;
+- Zona de perigo;
+- Mover para lixeira.
 
-Não incrementar versão neste patch.
+Organizar visualmente em seções:
 
-Não gerar APK.
+DADOS DA FICHA
 
-O versionCode será incrementado apenas quando for gerado outro APK instalável.
+- nome;
+- descrição;
+- categoria;
+- dificuldade.
+
+ESTRUTURA SEMANAL
+
+- prévia da semana;
+- template selecionado quando aplicável.
+
+GESTÃO
+
+- ativar;
+- duplicar;
+- arquivar.
+
+ZONA DE PERIGO
+
+- mover para lixeira.
+
+Não transformar o editor em um formulário excessivamente longo sem separadores.
 
 ==================================================
-27. VALIDAÇÃO
+11. VALIDAÇÃO DO FORMULÁRIO
+==================================================
+
+Validar:
+
+Nome:
+- obrigatório;
+- trim;
+- máximo 80 caracteres.
+
+Descrição:
+- opcional;
+- máximo 500 caracteres.
+
+Categoria:
+- preset válido ou personalizada;
+- máximo 50 caracteres.
+
+Dificuldade:
+- preset válido ou personalizada;
+- máximo 50 caracteres.
+
+Mostrar erro no campo correspondente.
+
+Não mostrar apenas erro geral no topo.
+
+O botão Salvar deve:
+
+- permanecer disponível visualmente;
+- rejeitar submissão inválida;
+- mover foco ou rolar até o primeiro erro quando viável.
+
+Não remover useUnsavedChangesGuard.
+
+A troca de template, categoria ou dificuldade deve marcar o formulário como sujo.
+
+==================================================
+12. SEM MIGRATION NESTE MARCO
+==================================================
+
+Não criar migration 6.
+
+Categoria e dificuldade continuam TEXT.
+
+Templates são definições de código e não registros permanentes próprios.
+
+Modos de duplicação são parâmetros de operação e não campos do banco.
+
+Backup continua:
+
+schemaVersion: 2
+
+Não alterar formato do backup.
+
+Não editar migrations 1 a 5.
+
+==================================================
+13. ETAPA 2.2 — MODELO DE TEMPLATE
+==================================================
+
+Criar no domínio:
+
+TrainingPlanTemplateId
+
+Valores:
+
+- PPL_3X
+- FULL_BODY_3X
+- UPPER_LOWER_4X
+- RUNNING_BEGINNER
+- MOBILITY_3X
+- BLANK
+
+Criar:
+
+TrainingPlanTemplate
+
+Campos sugeridos:
+
+- id;
+- name;
+- description;
+- category;
+- difficulty;
+- summary;
+- days.
+
+Cada dia deve conter:
+
+- weekday;
+- name;
+- description;
+- isRestDay;
+- focus opcional.
+
+Não incluir IDs SQLite.
+
+Não incluir IDs de exercícios.
+
+Não realizar chamadas Wger.
+
+Não criar exercícios automaticamente.
+
+Os templates deste marco definem a estrutura semanal, não uma prescrição
+completa de exercícios.
+
+O catálogo inicial completo pertence ao Marco 5.
+
+==================================================
+14. TEMPLATES INICIAIS
+==================================================
+
+Implementar:
+
+1. PPL 3x
+
+- segunda: Push;
+- quarta: Pull;
+- sexta: Legs;
+- demais dias: descanso.
+
+Categoria:
+Hipertrofia
+
+Dificuldade:
+Intermediário
+
+2. Full Body 3x
+
+- segunda: Full Body A;
+- quarta: Full Body B;
+- sexta: Full Body C;
+- demais dias: descanso.
+
+Categoria:
+Mista
+
+Dificuldade:
+Iniciante
+
+3. Upper/Lower 4x
+
+- segunda: Upper A;
+- terça: Lower A;
+- quinta: Upper B;
+- sexta: Lower B;
+- demais dias: descanso.
+
+Categoria:
+Hipertrofia
+
+Dificuldade:
+Intermediário
+
+4. Corrida iniciante
+
+- terça: Corrida leve;
+- quinta: Estímulo técnico;
+- sábado: Corrida longa;
+- demais dias: descanso ou recuperação.
+
+Categoria:
+Condicionamento
+
+Dificuldade:
+Iniciante
+
+Não prescrever velocidades ou distâncias médicas neste template.
+
+5. Mobilidade 3x
+
+- segunda: Mobilidade A;
+- quarta: Mobilidade B;
+- sexta: Mobilidade C;
+- demais dias: descanso.
+
+Categoria:
+Mobilidade
+
+Dificuldade:
+Adaptável
+
+6. Ficha vazia
+
+- sete dias criados;
+- nenhum dia de treino pré-configurado;
+- nenhum exercício;
+- categoria e dificuldade escolhidas pelo usuário.
+
+==================================================
+15. SELEÇÃO DE TEMPLATE
+==================================================
+
+Na criação de nova ficha, mostrar:
+
+COMEÇAR COM UM TEMPLATE
+
+Cards para os seis templates.
+
+Cada card deve mostrar:
+
+- nome;
+- resumo;
+- frequência;
+- categoria sugerida;
+- dificuldade sugerida.
+
+Adicionar ação:
+
+“Começar do zero”
+
+Ao tocar em um template:
+
+- abrir prévia;
+- não criar ainda;
+- permitir Cancelar;
+- permitir “Usar este template”.
+
+Ao confirmar:
+
+- preencher o draft do editor;
+- preencher categoria e dificuldade;
+- preencher a estrutura semanal;
+- preencher nome apenas se o campo estiver vazio;
+- não salvar automaticamente;
+- marcar formulário como alterado.
+
+O usuário deve poder editar nome, descrição, categoria e dificuldade antes de
+salvar.
+
+Trocar de template com alterações existentes deve pedir confirmação quando
+substituir estrutura semanal.
+
+==================================================
+16. CRIAÇÃO TRANSACIONAL COM ESTRUTURA SEMANAL
+==================================================
+
+Adicionar contrato explícito:
+
+TrainingPlanCreationInput
+
+Estrutura sugerida:
+
+{
+  plan: TrainingPlanInput
+  days: TrainingPlanDayCreationInput[]
+  templateId?: TrainingPlanTemplateId
+}
+
+`templateId` pode ser usado durante a operação ou para telemetria local futura,
+mas não deve ser persistido sem necessidade.
+
+Criar método repository:
+
+createWithDays(input: TrainingPlanCreationInput):
+  Promise<TrainingPlan>
+
+O método deve executar em uma transação:
+
+1. validar ficha;
+2. validar exatamente sete weekdays sem duplicatas;
+3. inserir training_plan;
+4. criar sete dias;
+5. aplicar nomes, descrições e descanso;
+6. retornar ficha completa.
+
+Falha em qualquer dia:
+
+- rollback integral;
+- nenhuma ficha parcial;
+- nenhum dia órfão.
+
+O método create atual pode delegar para createWithDays usando a estrutura padrão.
+
+Não ativar automaticamente.
+
+Não arquivar.
+
+Não marcar como excluída.
+
+==================================================
+17. VALIDAÇÃO DOS TEMPLATES
+==================================================
+
+Criar validação pura:
+
+validateTrainingPlanTemplate(template)
+
+Rejeitar:
+
+- ID vazio;
+- nome vazio;
+- menos ou mais de sete dias;
+- weekday duplicado;
+- weekday ausente;
+- dia sem nome;
+- categoria vazia;
+- dificuldade vazia.
+
+Validar todos os templates em teste.
+
+Os templates devem ser imutáveis.
+
+Usar readonly ou Object.freeze quando adequado.
+
+Não permitir que alterações no draft modifiquem o objeto global do template.
+
+==================================================
+18. ETAPA 2.3 — PRÉVIA SEMANAL
+==================================================
+
+Criar componente:
+
+TrainingPlanWeekPreview
+
+Exibir os sete dias na ordem local:
+
+- SEG
+- TER
+- QUA
+- QUI
+- SEX
+- SÁB
+- DOM
+
+Cada item deve mostrar:
+
+- abreviação;
+- nome do dia;
+- treino ou descanso;
+- quantidade de exercícios quando existir;
+- quantidade de atividades quando existir.
+
+Estados visuais:
+
+- treino configurado;
+- descanso;
+- dia vazio;
+- dia com aviso.
+
+A prévia deve funcionar para:
+
+- template ainda não salvo;
+- ficha existente;
+- ficha recém-criada;
+- ficha sem exercícios.
+
+==================================================
+19. AVISOS DA PRÉVIA
+==================================================
+
+Criar análise pura:
+
+analyzeTrainingPlanWeekPreview(days)
+
+Retornar avisos como:
+
+- nenhum dia de treino configurado;
+- dia de treino sem exercícios;
+- weekday duplicado;
+- weekday ausente;
+- nome vazio;
+- sete dias consecutivos de treino;
+- nenhum dia de descanso.
+
+Neste marco:
+
+- avisos não bloqueiam salvar, salvo estrutura inválida;
+- weekday duplicado ou ausente bloqueia criação;
+- treino sem exercícios é apenas aviso;
+- nenhum dia de descanso é warning;
+- não emitir recomendação médica.
+
+Mostrar mensagens claras:
+
+“Este dia ainda não possui exercícios.”
+
+“Esta ficha não possui dias de descanso.”
+
+Não usar linguagem acusatória.
+
+==================================================
+20. PRÉVIA ANTES DE USAR TEMPLATE
+==================================================
+
+O modal de template deve mostrar:
+
+- nome;
+- descrição;
+- categoria;
+- dificuldade;
+- divisão dos sete dias;
+- quantidade de dias de treino;
+- quantidade de dias de descanso;
+- aviso de que exercícios serão adicionados depois.
+
+Texto obrigatório:
+
+“Este template cria a divisão semanal. Os exercícios podem ser adicionados
+depois na ficha.”
+
+Ações:
+
+- Cancelar;
+- Usar este template.
+
+==================================================
+21. PRÉVIA NO EDITOR
+==================================================
+
+Depois de escolher um template:
+
+- exibir a prévia dentro do editor;
+- permitir trocar template;
+- permitir voltar para ficha vazia;
+- não permitir editar dias diretamente nesta tela se isso exigir duplicar o
+  editor de dias existente;
+- após salvar, usar as telas de dia já existentes para editar detalhes.
+
+Para ficha existente:
+
+- mostrar a estrutura atual;
+- mudanças feitas nas telas de dia devem aparecer após refresh.
+
+==================================================
+22. ETAPA 2.4 — MODOS DE DUPLICAÇÃO
+==================================================
+
+Criar:
+
+TrainingPlanDuplicateMode
+
+Valores:
+
+- COMPLETE
+- STRUCTURE_ONLY
+- WITHOUT_LOADS
+
+Alterar repository:
+
+duplicate(
+  planId: number,
+  mode: TrainingPlanDuplicateMode
+): Promise<TrainingPlan>
+
+Não manter uma segunda implementação antiga sem modo.
+
+==================================================
+23. DUPLICAR COMPLETA
+==================================================
+
+COMPLETE:
+
+Copiar:
+
+- nome com sufixo de cópia;
+- descrição;
+- categoria;
+- dificuldade;
+- datas atualmente copiadas pela implementação existente;
+- dias;
+- nomes e descrições dos dias;
+- dias de descanso;
+- exercícios;
+- ordem;
+- séries;
+- repetições;
+- cargas planejadas;
+- duração;
+- distância;
+- RPE;
+- descansos;
+- tipos de série;
+- notas de programação;
+- alternativas;
+- atividades de descanso.
+
+Não copiar:
+
+- ID da ficha;
+- IDs de dias;
+- IDs das configurações;
+- estado ativo;
+- estado arquivado;
+- deletedAt;
+- purgeAt;
+- sessões;
+- histórico;
+- snapshots.
+
+Nova ficha:
+
+- active = false;
+- archived = false;
+- deletedAt = null;
+- purgeAt = null.
+
+==================================================
+24. DUPLICAR APENAS ESTRUTURA
+==================================================
+
+STRUCTURE_ONLY:
+
+Copiar:
+
+- dados gerais da ficha;
+- dias;
+- nomes;
+- descrições;
+- descanso;
+- exercícios escolhidos;
+- ordem dos exercícios;
+- quantidade de séries;
+- faixa de repetições;
+- tempo de descanso;
+- tipo de série;
+- atividades de descanso.
+
+Limpar:
+
+- carga planejada;
+- RPE planejado;
+- notas específicas dos exercícios;
+- alternativa específica quando representar escolha temporária.
+
+Preservar:
+
+- referência ao exercício;
+- sets;
+- minReps;
+- maxReps;
+- restSeconds;
+- setType.
+
+Documentar exatamente os campos preservados e limpos.
+
+==================================================
+25. DUPLICAR SEM CARGAS
+==================================================
+
+WITHOUT_LOADS:
+
+Copiar tudo o que COMPLETE copia, exceto:
+
+- plannedLoad deve ser null.
+
+Preservar:
+
+- séries;
+- repetições;
+- descanso;
+- RPE;
+- duração;
+- distância;
+- notas;
+- alternativas;
+- atividades.
+
+Não interpretar duração ou distância como carga.
+
+==================================================
+26. NOMES DAS CÓPIAS
+==================================================
+
+Gerar nome legível e não conflitante:
+
+Original:
+“PPL”
+
+Primeira cópia:
+“PPL — Cópia”
+
+Segunda:
+“PPL — Cópia 2”
+
+Terceira:
+“PPL — Cópia 3”
+
+Consultar fichas normais e arquivadas.
+
+Ignorar fichas permanentemente apagadas.
+
+Evitar conflito case-insensitive e com espaços normalizados.
+
+O nome continua editável depois.
+
+==================================================
+27. UI DE DUPLICAÇÃO
+==================================================
+
+Ao tocar em “Duplicar ficha”, abrir modal com:
+
+- Duplicar completa;
+- Apenas estrutura;
+- Sem cargas planejadas.
+
+Cada opção deve mostrar descrição curta.
+
+Completa:
+
+“Copia toda a programação, incluindo cargas e notas.”
+
+Apenas estrutura:
+
+“Copia a divisão, exercícios, séries e repetições, mas limpa dados pessoais de
+progressão.”
+
+Sem cargas:
+
+“Copia toda a programação e remove apenas as cargas planejadas.”
+
+Ações:
+
+- Cancelar;
+- Duplicar.
+
+Não duplicar imediatamente ao tocar no botão principal.
+
+Durante duplicação:
+
+- modal não fecha;
+- opções ficam desativadas;
+- indicador de carregamento;
+- duplo toque bloqueado.
+
+Após sucesso:
+
+- fechar modal;
+- selecionar a nova ficha;
+- voltar ou navegar de acordo com o fluxo atual;
+- mostrar feedback.
+
+==================================================
+28. DUPLICAÇÃO TRANSACIONAL
+==================================================
+
+Todo o processo deve ocorrer em uma transação.
+
+Falha em qualquer cópia:
+
+- rollback integral;
+- nenhuma ficha parcial;
+- nenhum dia órfão;
+- nenhum exercício órfão;
+- nenhuma atividade órfã.
+
+Adicionar falha injetada em teste SQLite.
+
+Não copiar sessões.
+
+Não alterar a ficha original.
+
+Não ativar a cópia automaticamente.
+
+==================================================
+29. CONTROLLER DE FICHAS
+==================================================
+
+Atualizar useTrainingPlanController.
+
+Adicionar:
+
+- createWithDays;
+- duplicate com mode;
+- resultados claros para operações novas.
+
+Não repetir o problema anterior de mutation + refresh em um booleano ambíguo.
+
+Para novas operações, distinguir:
+
+- mutation falhou;
+- mutation confirmou e atualização passou;
+- mutation confirmou e atualização falhou.
+
+Pode criar:
+
+type TrainingPlanUiResult =
+  | { status: 'success'; refreshWarning: boolean; plan: TrainingPlan }
+  | { status: 'failed' }
+
+A UI deve considerar sucesso quando a mutation foi confirmada, mesmo com
+refreshWarning.
+
+Não é obrigatório refatorar todas as operações antigas neste marco, mas:
+
+- createWithDays;
+- duplicate;
+- template creation
+
+devem usar o contrato correto.
+
+==================================================
+30. ESTADO NÃO SALVO
+==================================================
+
+O guard deve considerar:
+
+- nome;
+- descrição;
+- categoria resolvida;
+- dificuldade resolvida;
+- categoria customizada;
+- dificuldade customizada;
+- template;
+- draft dos dias.
+
+Ao trocar de template com alterações:
+
+- pedir confirmação;
+- não descartar silenciosamente.
+
+Ao sair:
+
+- manter alerta de alterações não salvas.
+
+Após salvar:
+
+- atualizar baseline corretamente.
+
+==================================================
+31. ACESSIBILIDADE
+==================================================
+
+Garantir:
+
+- seletores anunciados como botão;
+- valor atual lido pelo leitor;
+- modal com foco adequado;
+- opção selecionada anunciada;
+- cards de template com descrição;
+- prévia semanal legível;
+- textos não dependem somente de cor;
+- touch targets mínimos de 48 dp;
+- fonte ampliada sem corte;
+- botões destrutivos identificados;
+- loading anunciado.
+
+==================================================
+32. TESTES DE DOMÍNIO
+==================================================
+
+Adicionar testes para:
+
+- presets de categoria;
+- presets de dificuldade;
+- valor customizado;
+- normalização;
+- limite de tamanho;
+- valor antigo não preset;
+- templates imutáveis;
+- sete weekdays;
+- duplicidade de weekday;
+- template incompleto;
+- análise semanal;
+- dia de treino sem exercício;
+- ausência de descanso;
+- modos de duplicação;
+- nome de cópia;
+- segunda e terceira cópia.
+
+==================================================
+33. TESTES SQLITE
+==================================================
+
+Adicionar testes reais para:
+
+1. createWithDays cria ficha e sete dias;
+2. rollback quando criação de um dia falha;
+3. template PPL;
+4. template Full Body;
+5. template Upper/Lower;
+6. template corrida;
+7. template mobilidade;
+8. template vazio;
+9. criação nunca ativa automaticamente;
+10. criação nunca arquiva;
+11. criação nunca entra na lixeira;
+12. duplicação COMPLETE;
+13. duplicação STRUCTURE_ONLY;
+14. duplicação WITHOUT_LOADS;
+15. IDs novos;
+16. ficha original inalterada;
+17. cópia inativa;
+18. cópia fora da lixeira;
+19. sessões não copiadas;
+20. atividades copiadas corretamente;
+21. notas limpas apenas no modo correto;
+22. carga limpa apenas nos modos corretos;
+23. rollback de duplicação;
+24. nomes sem colisão;
+25. backup schemaVersion 2 continua funcionando;
+26. migrations continuam em versão 5.
+
+==================================================
+34. TESTES MOBILE
+==================================================
+
+Adicionar testes para:
+
+- categoria preset;
+- categoria Outra;
+- dificuldade preset;
+- dificuldade Outra;
+- edição de valor antigo;
+- erro de custom vazio;
+- seletor acessível;
+- template preview;
+- cancelar template;
+- usar template;
+- trocar template com confirmação;
+- prévia dos sete dias;
+- aviso sem exercícios;
+- opção ficha vazia;
+- modal de duplicação;
+- COMPLETE;
+- STRUCTURE_ONLY;
+- WITHOUT_LOADS;
+- loading;
+- duplo toque;
+- formulário sujo;
+- sucesso com refreshWarning;
+- Etapa 2.0 integralmente coberta.
+
+==================================================
+35. TESTE MANUAL ANDROID
+==================================================
+
+Executar no aparelho ou emulador disponível:
+
+1. abrir editor;
+2. selecionar categoria;
+3. selecionar dificuldade;
+4. usar categoria Outra;
+5. usar dificuldade Outra;
+6. fechar e reabrir ficha;
+7. confirmar persistência;
+8. escolher PPL;
+9. revisar prévia;
+10. salvar;
+11. editar dias;
+12. duplicar completa;
+13. duplicar apenas estrutura;
+14. duplicar sem cargas;
+15. comparar as três;
+16. mover uma cópia para lixeira;
+17. tocar Desfazer;
+18. confirmar Snackbar “Desfazendo…”;
+19. esvaziar lixeira;
+20. tentar fechar modal durante loading;
+21. verificar backup e badge.
+
+Registrar em:
+
+docs/MARCO_2_ANDROID_SMOKE.md
+
+Caso não exista aparelho:
+
+- registrar claramente como pendente;
+- não inventar evidência.
+
+==================================================
+36. DOCUMENTAÇÃO
+==================================================
+
+Criar:
+
+docs/TRAINING_PLAN_EDITOR.md
+docs/TRAINING_PLAN_TEMPLATES.md
+
+Documentar:
+
+- categorias;
+- dificuldades;
+- valores personalizados;
+- templates;
+- limitações dos templates;
+- prévia semanal;
+- modos de duplicação;
+- diferenças entre os modos;
+- ausência de dependência da internet;
+- ausência de criação automática de exercícios.
+
+Atualizar:
+
+README.md
+docs/PRODUCT_ROADMAP.md
+docs/TRAINING_PLAN_LIFECYCLE.md
+
+No roadmap:
+
+- Marco 1 permanece ESTABILIZADO;
+- Marco 2 fica EM VALIDAÇÃO durante implementação;
+- marcar CONCLUÍDO apenas após todas as validações.
+
+==================================================
+37. VERSÃO
+==================================================
+
+Ao concluir todas as etapas:
+
+mobile/app.json:
+- version: 0.5.0
+- android.versionCode: 7
+
+mobile/package.json:
+- version: 0.5.0
+
+Não alterar:
+
+- package;
+- slug;
+- scheme;
+- projectId;
+- versão Umamusume.
+
+Não gerar APK neste marco.
+
+O APK será produzido após revisão rigorosa do commit.
+
+==================================================
+38. VALIDAÇÃO
 ==================================================
 
 Executar na raiz:
@@ -849,53 +1420,63 @@ EXPO_NO_TELEMETRY=1 npm exec --workspace=training-mobile -- expo export \
 
 git diff --check
 
-Não declarar sucesso se qualquer comando falhar.
+Não declarar conclusão se qualquer comando falhar.
 
 ==================================================
-28. CRITÉRIOS DE CONCLUSÃO
+39. CRITÉRIOS DE CONCLUSÃO
 ==================================================
 
-O patch estará aprovado somente quando:
+O Marco 2 estará aprovado somente quando:
 
-- Desfazer não puder falhar por causa do lock da mutation original;
-- pending undo só aparecer depois da liberação do lock;
-- token não for apagado antes do restore confirmado;
-- duplo toque não duplicar restore;
-- callback antigo não apagar token novo;
-- refresh falho não transformar mutation confirmada em falha;
-- editor navegar depois de mutation confirmada;
-- UI comunicar warning de refresh separadamente;
-- confirmação permanente mostrar nome;
-- dificuldade aparecer no card;
-- urgência visual seguir o contrato;
-- modal ESVAZIAR usar ThemedTextInput;
-- quantidade aparecer no modal;
-- documentação do backup estar correta;
-- testes faltantes existirem;
-- training-wger estiver no CI;
-- todas as validações passarem.
+- Snackbar permanecer durante Desfazer;
+- refreshAll tratar false como falha;
+- backup distinguir commit de refresh;
+- modal não fechar durante emptyTrash;
+- categoria e dificuldade usarem seletores;
+- valores antigos forem preservados;
+- Outra funcionar;
+- seis templates estiverem disponíveis;
+- templates criarem estrutura transacional;
+- nenhum template depender de exercícios externos;
+- prévia semanal mostrar sete dias;
+- avisos forem claros;
+- duplicação possuir três modos;
+- duplicação for transacional;
+- cópias nunca forem ativas ou excluídas;
+- histórico não for copiado;
+- backup v2 continuar compatível;
+- nenhuma migration nova for criada;
+- testes passarem;
+- export Android passar.
 
 ==================================================
-29. ENTREGA
+40. ENTREGA
 ==================================================
 
 Informar:
 
 1. commit final;
-2. causa da corrida original;
-3. estrutura removida ou alterada no antigo `run`;
-4. novo modelo de resultado de mutation;
-5. novo modelo de pending undo;
-6. política de locks;
-7. comportamento em refresh falho;
-8. comportamento do Snackbar assíncrono;
-9. testes de concorrência adicionados;
-10. testes SQLite adicionados;
-11. correções de UX;
-12. correções de documentação;
-13. alteração do CI;
-14. resultado de todos os comandos;
-15. limitações restantes;
-16. confirmação de que o Marco 1 pode ou não ser marcado como estabilizado.
+2. resultado da Etapa 2.0;
+3. correção do Snackbar;
+4. contrato de refreshAll;
+5. comportamento de backup com refresh falho;
+6. bloqueio do modal;
+7. presets criados;
+8. tratamento de valores customizados;
+9. templates implementados;
+10. estratégia transacional de criação;
+11. prévia semanal;
+12. avisos semanais;
+13. modos de duplicação;
+14. campos preservados por modo;
+15. testes de domínio;
+16. testes SQLite;
+17. testes mobile;
+18. smoke Android;
+19. documentação;
+20. versão e versionCode;
+21. resultado de todos os comandos;
+22. limitações restantes;
+23. confirmação de que o Marco 2 está CONCLUÍDO ou EM VALIDAÇÃO.
 
-Não iniciar o Marco 2.
+Não iniciar o Marco 3.

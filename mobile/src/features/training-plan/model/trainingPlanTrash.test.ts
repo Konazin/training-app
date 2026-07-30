@@ -54,6 +54,9 @@ describe('contratos visuais da lixeira', () => {
     )
     expect(source).toContain('<ThemedTextInput')
     expect(source).not.toContain('<TextInput')
+    expect(source).toContain('if (!busy) setConfirmingEmpty(false)')
+    expect(source).toContain('disabled={busy}')
+    expect(source).toContain('Esvaziando lixeira…')
   })
 })
 

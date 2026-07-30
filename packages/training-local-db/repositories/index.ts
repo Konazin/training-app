@@ -1,14 +1,15 @@
 import {
   DomainError,
+  WEEKDAYS,
   activeSessionExists,
   activeSessionUsesTrainingPlan,
   calculateDashboard,
   computeTrainingPlanPurgeAt,
   createSessionSnapshot,
   createTrainingPlan,
-  duplicateTrainingPlan,
   invalidTransition,
   localDateKey,
+  nextTrainingPlanCopyName,
   finishWorkoutSession,
   normalizeName,
   notFound,
@@ -22,6 +23,7 @@ import {
   validateRestActivityInput,
   validateSetLogInput,
   validateTrainingPlanDayInput,
+  validateTrainingPlanCreationDays,
   validateTrainingPlanInput,
   type BackupRepository,
   type DashboardRepository,
@@ -35,7 +37,9 @@ import {
   type SetLogInput,
   type SettingsRepository,
   type TrainingPlan,
+  type TrainingPlanCreationInput,
   type TrainingPlanDay,
+  type TrainingPlanDuplicateMode,
   type TrainingPlanRepository,
   type TrainingPlanTrashRepository,
   type WorkoutSession,
@@ -439,6 +443,40 @@ async function loadExercise(database: SqlDatabase, id: number) {
 
 function planRepository(database: SqlDatabase): LocalRepositories['plans'] {
   const get = (id: number) => requireNormalPlan(database, id)
+  const createWithDays = (input: TrainingPlanCreationInput) =>
+    database.transaction(async (transaction) => {
+      const validPlan = validateTrainingPlanInput(input.plan)
+      const validDays = validateTrainingPlanCreationDays(input.days)
+        .map((day) => ({
+          ...day,
+          ...validateTrainingPlanDayInput({
+            title: day.title,
+            description: day.description,
+            restDay: day.restDay,
+            estimatedDurationMinutes: day.estimatedDurationMinutes,
+            notes: day.notes,
+          }),
+        }))
+        .sort((first, second) => WEEKDAYS.indexOf(first.weekday) - WEEKDAYS.indexOf(second.weekday))
+      const timestamp = new Date().toISOString()
+      const result = await transaction.run(`
+        INSERT INTO training_plans(
+          name, description, category, difficulty, start_date, end_date,
+          active, archived, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?, ?)
+      `, validPlan.name, validPlan.description, validPlan.category, validPlan.difficulty,
+      validPlan.startDate ?? null, validPlan.endDate ?? null, timestamp, timestamp)
+      for (const [sortOrder, day] of validDays.entries()) {
+        await transaction.run(`
+          INSERT INTO training_plan_days(
+            training_plan_id, weekday, title, description, sort_order, rest_day,
+            estimated_duration_minutes, notes
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `, result.lastInsertRowId, day.weekday, day.title, day.description, sortOrder,
+        Number(day.restDay), day.estimatedDurationMinutes, day.notes)
+      }
+      return (await loadPlan(transaction, result.lastInsertRowId))!
+    })
   return {
     list: () => loadPlans(database),
     findById: (id) => loadPlan(database, id),
@@ -464,6 +502,7 @@ function planRepository(database: SqlDatabase): LocalRepositories['plans'] {
       }
       return (await loadPlan(transaction, result.lastInsertRowId))!
     }),
+    createWithDays,
     update: async (id, input) => {
       await assertNormalPlan(database, id)
       const valid = validateTrainingPlanInput(input)
@@ -475,16 +514,20 @@ function planRepository(database: SqlDatabase): LocalRepositories['plans'] {
       if (!result.changes) throw notFound('Ficha')
       return get(id)
     },
-    duplicate: (id) => database.transaction(async (transaction) => {
+    duplicate: (id, mode) => database.transaction(async (transaction) => {
       const source = await requireNormalPlan(transaction, id)
-      const draft = duplicateTrainingPlan(source, 0, () => 0, () => 0, () => 0)
+      const rows = await transaction.all<{ name: string }>(
+        'SELECT name FROM training_plans WHERE deleted_at IS NULL',
+      )
+      const name = nextTrainingPlanCopyName(source.name, rows.map((row) => row.name))
+      const timestamp = new Date().toISOString()
       const inserted = await transaction.run(`
         INSERT INTO training_plans(
           name, description, category, difficulty, start_date, end_date,
           active, archived, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?, ?)
-      `, draft.name, draft.description, draft.category, draft.difficulty,
-      draft.startDate, draft.endDate, draft.createdAt, draft.updatedAt)
+      `, name, source.description, source.category, source.difficulty,
+      source.startDate, source.endDate, timestamp, timestamp)
       for (const sourceDay of source.days) {
         const day = await transaction.run(`
           INSERT INTO training_plan_days(
@@ -494,7 +537,12 @@ function planRepository(database: SqlDatabase): LocalRepositories['plans'] {
         `, inserted.lastInsertRowId, sourceDay.weekday, sourceDay.title, sourceDay.description,
         sourceDay.sortOrder, Number(sourceDay.restDay), sourceDay.estimatedDurationMinutes, sourceDay.notes)
         for (const exercise of sourceDay.exercises) {
-          await insertDayExercise(transaction, day.lastInsertRowId, exercise.exercise.id, exercise)
+          await insertDayExercise(
+            transaction,
+            day.lastInsertRowId,
+            exercise.exercise.id,
+            duplicateExerciseConfig(exercise, mode),
+          )
         }
         for (const activity of sourceDay.restActivities) {
           await transaction.run(`
@@ -781,6 +829,22 @@ async function insertDayExercise(
   `, dayId, exerciseDefinitionId, valid.sortOrder, valid.sets, valid.minReps, valid.maxReps,
   valid.plannedLoad, valid.plannedDurationSeconds, valid.plannedDistance, valid.restSeconds,
   valid.plannedRpe, valid.setType, valid.notes, valid.alternativeExerciseId)
+}
+
+function duplicateExerciseConfig(
+  exercise: DayExerciseConfigInput & { sortOrder: number },
+  mode: TrainingPlanDuplicateMode,
+) {
+  if (mode === 'STRUCTURE_ONLY') {
+    return {
+      ...exercise,
+      plannedLoad: null,
+      plannedRpe: null,
+      notes: '',
+      alternativeExerciseId: null,
+    }
+  }
+  return mode === 'WITHOUT_LOADS' ? { ...exercise, plannedLoad: null } : exercise
 }
 
 async function assertDay(database: SqlDatabase, planId: number, dayId: number) {

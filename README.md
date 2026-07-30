@@ -7,7 +7,10 @@ com repositories `expo-sqlite`, sem exigir servidor, VPS, IP, conta ou internet.
 ## O que funciona offline
 
 - criar, editar e arquivar exercícios;
-- criar, editar, duplicar, ativar, arquivar e restaurar fichas;
+- criar fichas do zero ou com seis templates semanais;
+- editar categoria e dificuldade com presets ou valores personalizados;
+- duplicar fichas por completo, somente a estrutura ou sem cargas planejadas;
+- ativar, arquivar e restaurar fichas;
 - configurar segunda a domingo, incluindo descanso;
 - iniciar, pausar, retomar, concluir ou abandonar sessões;
 - editar séries e usar cronômetro de descanso;
@@ -82,6 +85,21 @@ metadados técnicos e impede que o seed reapareça ao reabrir.
 
 Arquivos de backup não contêm tokens, chaves, mídia, cache ou estado do player.
 Veja [backup e restauração](docs/BACKUP_AND_RESTORE.md).
+
+## Editor, templates e duplicação
+
+O editor organiza dados gerais, estrutura semanal, gestão e zona de perigo. As
+categorias e dificuldades oferecem presets, mas valores antigos e personalizados
+continuam sendo texto local no SQLite.
+
+Os templates PPL 3x, Full Body 3x, Upper/Lower 4x, Corrida iniciante,
+Mobilidade 3x e Ficha vazia criam somente a divisão dos sete dias. Eles não
+baixam nem criam exercícios. A prévia semanal mostra treino, descanso,
+exercícios, atividades e avisos não médicos antes do salvamento.
+
+Criação com template e duplicação são transacionais. Consulte
+[editor de ficha](docs/TRAINING_PLAN_EDITOR.md) e
+[templates e duplicação](docs/TRAINING_PLAN_TEMPLATES.md).
 
 ## Ciclo de vida das fichas
 

@@ -7,17 +7,19 @@ import type {
 import type { AppMetadataRepository } from '@training/training-local-db'
 import { pickBackup, shareBackup } from '../integrations/backupFiles'
 import { createAutomaticBackupService } from '../integrations/automaticBackupService'
+import type { RefreshAllResult } from './refreshAll'
 
 export function useBackupController(
   repository: BackupRepository,
   metadata: AppMetadataRepository,
   appVersion: string,
   recreateSeed: () => Promise<void>,
-  onChanged: () => Promise<void>,
+  onChanged: () => Promise<RefreshAllResult>,
 ) {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
-  const [messageKind, setMessageKind] = useState<'success' | 'error'>('success')
+  const [messageKind, setMessageKind] = useState<'success' | 'warning' | 'error'>('success')
+  const [refreshPending, setRefreshPending] = useState(false)
   const [automaticBackups, setAutomaticBackups] = useState<AutomaticBackupInfo[]>([])
   const automatic = useMemo(
     () => createAutomaticBackupService(repository, metadata, appVersion),
@@ -51,10 +53,46 @@ export function useBackupController(
     }
   }, [busy, refreshBackups])
 
+  const refreshChanged = useCallback(async (
+    successMessage: string,
+    warningMessage: string,
+  ) => {
+    const result = await onChanged()
+    setRefreshPending(!result.success)
+    setMessageKind(result.success ? 'success' : 'warning')
+    setMessage(result.success ? successMessage : warningMessage)
+    return result.success
+  }, [onChanged])
+
+  const runCommitted = useCallback(async (
+    mutation: () => Promise<boolean | void>,
+    successMessage: string,
+    warningMessage: string,
+  ) => {
+    if (busy) return false
+    setBusy(true)
+    setMessage('')
+    let committed = true
+    try {
+      committed = await mutation() !== false
+    } catch (cause) {
+      setMessageKind('error')
+      setMessage(cause instanceof Error ? cause.message : 'Falha na operação local.')
+      return false
+    } finally {
+      setBusy(false)
+    }
+    if (!committed) return false
+    await refreshBackups()
+    await refreshChanged(successMessage, warningMessage)
+    return true
+  }, [busy, refreshBackups, refreshChanged])
+
   return {
     busy,
     message,
     messageKind,
+    refreshPending,
     automaticBackups,
     createAutomaticBackup: async (reason: AutomaticBackupReason) => {
       const result = await automatic.create(reason)
@@ -65,32 +103,34 @@ export function useBackupController(
       await shareBackup(repository, appVersion)
       return 'Backup exportado.'
     }),
-    importBackup: () => run(async () => {
+    retryRefresh: () => refreshChanged(
+      'Telas atualizadas.',
+      'Algumas telas ainda não puderam ser atualizadas.',
+    ),
+    importBackup: () => runCommitted(async () => {
       const selected = await pickBackup()
-      if (!selected) return
+      if (!selected) return false
       await automatic.create('BEFORE_IMPORT')
       await repository.restore(selected)
-      await onChanged()
-      return 'Backup restaurado com sucesso.'
-    }),
-    eraseAll: () => run(async () => {
+    }, 'Backup restaurado com sucesso.',
+    'Backup restaurado, mas algumas telas não puderam ser atualizadas.'),
+    eraseAll: () => runCommitted(async () => {
       const backup = await automatic.create('BEFORE_ERASE')
       await repository.reset()
-      await onChanged()
-      return `Todos os dados foram apagados. Backup de segurança criado em ${formatDate(backup.createdAt)}.`
-    }),
-    resetSeed: () => run(async () => {
+      setMessage(`Backup de segurança criado em ${formatDate(backup.createdAt)}.`)
+    }, 'Todos os dados foram apagados.',
+    'Os dados foram apagados, mas algumas telas não puderam ser atualizadas.'),
+    resetSeed: () => runCommitted(async () => {
       const backup = await automatic.create('BEFORE_RESET_SEED')
       await recreateSeed()
-      await onChanged()
-      return `Dados iniciais recriados. Backup de segurança criado em ${formatDate(backup.createdAt)}.`
-    }),
-    restoreAutomatic: (uri: string) => run(async () => {
+      setMessage(`Backup de segurança criado em ${formatDate(backup.createdAt)}.`)
+    }, 'Dados iniciais recriados.',
+    'Os dados foram recriados, mas algumas telas não puderam ser atualizadas.'),
+    restoreAutomatic: (uri: string) => runCommitted(async () => {
       await automatic.create('BEFORE_IMPORT')
       await automatic.restore(uri)
-      await onChanged()
-      return 'Backup automático restaurado com sucesso.'
-    }),
+    }, 'Backup automático restaurado com sucesso.',
+    'Backup automático restaurado, mas algumas telas não puderam ser atualizadas.'),
     shareAutomatic: (uri: string) => run(() => automatic.share(uri)),
     deleteAutomatic: (uri: string) => run(() => automatic.delete(uri)),
     deleteAllAutomatic: () => run(() => automatic.deleteAll()),
