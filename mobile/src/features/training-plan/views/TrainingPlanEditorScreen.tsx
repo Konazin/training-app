@@ -82,7 +82,12 @@ export function TrainingPlanEditorScreen({
   const [duplicateOpen, setDuplicateOpen] = useState(false)
   const [duplicateMode, setDuplicateMode] = useState<TrainingPlanDuplicateMode>('COMPLETE')
   const [fieldErrors, setFieldErrors] = useState<TrainingPlanEditorErrors>({})
-  const guardValue = {
+  const guardValue = plan ? {
+    name,
+    description,
+    category,
+    difficulty,
+  } : {
     name,
     description,
     category,
@@ -136,6 +141,7 @@ export function TrainingPlanEditorScreen({
   }
 
   const applyTemplate = (template: TrainingPlanTemplate) => {
+    if (plan) return
     const apply = () => {
       const values = applyTemplateToEditor({ name, description, category, difficulty }, template)
       setName(values.name)
@@ -154,7 +160,7 @@ export function TrainingPlanEditorScreen({
     }
     Alert.alert(
       'Substituir estrutura semanal?',
-      'A estrutura atual será substituída pelo template selecionado.',
+      'O template substituirá a categoria, a dificuldade e a estrutura semanal atuais.',
       [
         { text: 'Cancelar', style: 'cancel' },
         { text: 'Substituir', style: 'destructive', onPress: apply },
@@ -204,20 +210,28 @@ export function TrainingPlanEditorScreen({
         </Section>
 
         <Section title="ESTRUTURA SEMANAL" styles={styles}>
-          {!!templateId && (
+          {!plan && !!templateId && (
             <Text style={styles.templateName}>
               Template: {TRAINING_PLAN_TEMPLATES.find((item) => item.id === templateId)?.name}
             </Text>
           )}
           <TrainingPlanWeekPreview days={days} />
-          <PrimaryButton
-            label={templateId ? 'Trocar template' : 'Escolher template'}
-            onPress={() => setTemplateOpen(true)}
-            secondary
-          />
-          <Text style={styles.hint}>
-            Depois de salvar, use as telas de cada dia para editar exercícios e atividades.
-          </Text>
+          {plan ? (
+            <Text style={styles.hint}>
+              Edite os dias, exercícios e atividades pelas telas da ficha.
+            </Text>
+          ) : (
+            <>
+              <PrimaryButton
+                label={templateId ? 'Trocar template' : 'Escolher template'}
+                onPress={() => setTemplateOpen(true)}
+                secondary
+              />
+              <Text style={styles.hint}>
+                Depois de salvar, use as telas de cada dia para editar exercícios e atividades.
+              </Text>
+            </>
+          )}
         </Section>
 
         {!!errors[key] && <Text style={styles.error}>{errors[key]}</Text>}
@@ -316,16 +330,19 @@ export function TrainingPlanEditorScreen({
         value={difficulty}
         visible={picker === 'difficulty'}
       />
-      <TrainingPlanTemplateModal
-        onCancel={() => {
-          setTemplateOpen(false)
-          setTemplatePreviewId(null)
-        }}
-        onPreview={setTemplatePreviewId}
-        onUse={applyTemplate}
-        previewId={templatePreviewId}
-        visible={templateOpen}
-      />
+      {!plan && (
+        <TrainingPlanTemplateModal
+          onBack={() => setTemplatePreviewId(null)}
+          onCancel={() => {
+            setTemplateOpen(false)
+            setTemplatePreviewId(null)
+          }}
+          onPreview={setTemplatePreviewId}
+          onUse={applyTemplate}
+          previewId={templatePreviewId}
+          visible={templateOpen}
+        />
+      )}
       {!!plan && (
         <TrainingPlanDuplicateModal
           busy={duplicateBusy}
@@ -333,13 +350,11 @@ export function TrainingPlanEditorScreen({
             if (!duplicateBusy) setDuplicateOpen(false)
           }}
           onChange={setDuplicateMode}
-          onConfirm={() => void (async () => {
-            const result = await onDuplicate(plan.id, duplicateMode)
-            if (result.status === 'success') {
-              setDuplicateOpen(false)
-              commit(guardValue, navigation.goBack)
-            }
-          })()}
+          onConfirm={() => onDuplicate(plan.id, duplicateMode)}
+          onSuccess={() => {
+            setDuplicateOpen(false)
+            commit(guardValue, navigation.goBack)
+          }}
           value={duplicateMode}
           visible={duplicateOpen}
         />

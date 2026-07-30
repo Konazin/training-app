@@ -740,6 +740,37 @@ describe('SQLite local schema', () => {
     await database.close()
   })
 
+  it('update geral preserva integralmente os sete dias persistidos', async () => {
+    const path = newDatabase()
+    const database = betterDatabase(path)
+    await runMigrations(database)
+    const repositories = createLocalRepositories(database)
+    const created = await repositories.plans.createWithDays({
+      plan: {
+        name: 'PPL',
+        description: '',
+        category: 'Hipertrofia',
+        difficulty: 'Intermediário',
+      },
+      days: TRAINING_PLAN_TEMPLATES[0]!.days,
+    })
+    const before = created.days
+    const updated = await repositories.plans.update(created.id, {
+      name: 'PPL atualizado',
+      description: 'Somente dados gerais',
+      category: 'Força',
+      difficulty: 'Avançado',
+    })
+    expect(updated.days).toEqual(before)
+    expect(updated).toMatchObject({
+      name: 'PPL atualizado',
+      description: 'Somente dados gerais',
+      category: 'Força',
+      difficulty: 'Avançado',
+    })
+    await database.close()
+  })
+
   it('duplica completa, estrutura e sem cargas com IDs novos e nomes sem colisão', async () => {
     const path = newDatabase()
     const database = betterDatabase(path)
@@ -827,6 +858,8 @@ describe('SQLite local schema', () => {
     expect((await repositories.plans.getById(original.id)).days[0]!.exercises[0])
       .toMatchObject({ plannedLoad: 42, notes: 'Progressão pessoal' })
     expect(await repositories.sessions.getHistory()).toHaveLength(1)
+    const copyOfCopy = await repositories.plans.duplicate(complete.id, 'COMPLETE')
+    expect(copyOfCopy.name).toBe('Ficha local — Cópia 4')
     await database.close()
   })
 

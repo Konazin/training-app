@@ -1,6 +1,6 @@
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
-import { beforeAll, describe, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   AutomaticBackupInfo,
   BackupRepository,
@@ -58,6 +58,21 @@ vi.mock('../integrations/backupFiles', () => ({
 
 beforeAll(() => {
   ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+})
+
+beforeEach(() => {
+  automatic.list.mockReset().mockResolvedValue([])
+  automatic.create.mockReset().mockImplementation(async (reason: string) => ({
+    uri: 'file:///backup.json',
+    fileName: 'backup.json',
+    createdAt: '2026-07-29T12:00:00.000Z',
+    sizeBytes: 10,
+    reason,
+  }))
+  automatic.restore.mockReset().mockResolvedValue(undefined)
+  automatic.share.mockReset().mockResolvedValue(undefined)
+  automatic.delete.mockReset().mockResolvedValue(undefined)
+  automatic.deleteAll.mockReset().mockResolvedValue(undefined)
 })
 
 describe('controllers locais', () => {
@@ -168,6 +183,7 @@ describe('controllers locais', () => {
     await act(async () => { await hook.current.eraseAll() })
     expect(automatic.create).toHaveBeenCalledWith('BEFORE_ERASE')
     expect(repository.reset).toHaveBeenCalled()
+    expect(hook.current.message).toContain('Backup de segurança criado em')
     await act(async () => { await hook.current.restoreAutomatic('file:///backup.json') })
     expect(automatic.create).toHaveBeenCalledWith('BEFORE_IMPORT')
     expect(automatic.restore).toHaveBeenCalledWith('file:///backup.json')
@@ -197,13 +213,135 @@ describe('controllers locais', () => {
     expect(automatic.restore).toHaveBeenCalledTimes(1)
     expect(hook.current.messageKind).toBe('warning')
     expect(hook.current.message).toBe(
-      'Backup automático restaurado, mas algumas telas não puderam ser atualizadas.',
+      'Backup automático restaurado, mas algumas informações não puderam ser atualizadas. Não atualizadas: fichas.',
     )
     await act(async () => {
       expect(await hook.current.retryRefresh()).toBe(true)
     })
     expect(automatic.restore).toHaveBeenCalledTimes(1)
     expect(changed).toHaveBeenCalledTimes(2)
+    hook.unmount()
+  })
+
+  it('mantém o lock de backup durante mutation, lista e telas e bloqueia duplo toque', async () => {
+    const mutation = deferredValue<void>()
+    const backupRefresh = deferredValue<AutomaticBackupInfo[]>()
+    const changedRefresh = deferredValue<Awaited<ReturnType<typeof runRefreshParts>>>()
+    automatic.list
+      .mockResolvedValueOnce([])
+      .mockImplementationOnce(() => backupRefresh.promise as never)
+    automatic.restore.mockReturnValueOnce(mutation.promise)
+    const changed = vi.fn(() => changedRefresh.promise)
+    const repository = {
+      reset: vi.fn(async () => {}),
+      restore: vi.fn(async () => {}),
+    } as unknown as BackupRepository
+    const hook = await renderController(() => useBackupController(
+      repository,
+      {} as AppMetadataRepository,
+      '0.5.0',
+      vi.fn(async () => {}),
+      changed,
+    ))
+
+    let first!: Promise<boolean>
+    let second!: Promise<boolean>
+    act(() => {
+      first = hook.current.restoreAutomatic('file:///backup.json')
+      second = hook.current.restoreAutomatic('file:///backup.json')
+    })
+    await act(async () => { await Promise.resolve() })
+    expect(automatic.restore).toHaveBeenCalledTimes(1)
+    await expect(second).resolves.toBe(false)
+    expect(hook.current.busy).toBe(true)
+
+    await act(async () => {
+      mutation.resolve()
+      await Promise.resolve()
+    })
+    expect(hook.current.busy).toBe(true)
+    expect(changed).not.toHaveBeenCalled()
+    expect(await hook.current.restoreAutomatic('file:///backup.json')).toBe(false)
+
+    await act(async () => {
+      backupRefresh.resolve([])
+      await Promise.resolve()
+    })
+    expect(changed).toHaveBeenCalledTimes(1)
+    expect(hook.current.busy).toBe(true)
+    expect(await hook.current.restoreAutomatic('file:///backup.json')).toBe(false)
+
+    await act(async () => {
+      changedRefresh.resolve({ success: true, failedParts: [] })
+      await first
+    })
+    expect(hook.current.busy).toBe(false)
+    hook.unmount()
+  })
+
+  it('transforma falhas dos dois refreshes pós-commit em warning e retry não repete restore', async () => {
+    automatic.list
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error('lista indisponível'))
+      .mockResolvedValueOnce([])
+    const changed = vi.fn()
+      .mockResolvedValueOnce({ success: false, failedParts: ['fichas', 'sessão'] })
+      .mockResolvedValueOnce({ success: true, failedParts: [] })
+    const repository = {
+      reset: vi.fn(async () => {}),
+      restore: vi.fn(async () => {}),
+    } as unknown as BackupRepository
+    const hook = await renderController(() => useBackupController(
+      repository,
+      {} as AppMetadataRepository,
+      '0.5.0',
+      vi.fn(async () => {}),
+      changed,
+    ))
+
+    await act(async () => {
+      expect(await hook.current.restoreAutomatic('file:///backup.json')).toBe(true)
+    })
+    expect(hook.current.messageKind).toBe('warning')
+    expect(hook.current.refreshPending).toBe(true)
+    expect(hook.current.message).toContain('lista de backups, fichas, sessão')
+    expect(automatic.restore).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      expect(await hook.current.retryRefresh()).toBe(true)
+    })
+    expect(automatic.list).toHaveBeenCalledTimes(3)
+    expect(changed).toHaveBeenCalledTimes(2)
+    expect(automatic.restore).toHaveBeenCalledTimes(1)
+    expect(hook.current.refreshPending).toBe(false)
+    hook.unmount()
+  })
+
+  it('libera o lock do backup após erro anterior ao commit', async () => {
+    automatic.restore
+      .mockRejectedValueOnce(new Error('Restore falhou'))
+      .mockResolvedValueOnce(undefined)
+    const repository = {
+      reset: vi.fn(async () => {}),
+      restore: vi.fn(async () => {}),
+    } as unknown as BackupRepository
+    const changed = vi.fn(async () => ({ success: true, failedParts: [] }))
+    const hook = await renderController(() => useBackupController(
+      repository,
+      {} as AppMetadataRepository,
+      '0.5.0',
+      vi.fn(async () => {}),
+      changed,
+    ))
+    await act(async () => {
+      expect(await hook.current.restoreAutomatic('file:///backup.json')).toBe(false)
+    })
+    expect(changed).not.toHaveBeenCalled()
+    await act(async () => {
+      expect(await hook.current.restoreAutomatic('file:///backup.json')).toBe(true)
+    })
+    expect(automatic.restore).toHaveBeenCalledTimes(2)
+    expect(hook.current.busy).toBe(false)
     hook.unmount()
   })
 
@@ -258,6 +396,90 @@ describe('controllers locais', () => {
     expect(hook.current.selectedTrainingPlanId).toBe(21)
     expect(hook.current.messageKind).toBe('warning')
     hook.unmount()
+  })
+
+  it('mantém create e os três modos de duplicate bloqueados até o refresh terminar', async () => {
+    const cases = [
+      { key: 'create', mode: null },
+      { key: 'complete', mode: 'COMPLETE' as const },
+      { key: 'structure', mode: 'STRUCTURE_ONLY' as const },
+      { key: 'without-loads', mode: 'WITHOUT_LOADS' as const },
+    ]
+    for (const testCase of cases) {
+      const refresh = deferredValue<boolean>()
+      const created = trashPlan(30, `Ficha ${testCase.key}`)
+      const repository = {
+        list: vi.fn(async () => []),
+        createWithDays: vi.fn(async () => created),
+        duplicate: vi.fn(async () => created),
+      } as unknown as TrainingPlanRepository
+      const onChanged = vi.fn(() => refresh.promise)
+      const hook = await renderController(() => useTrainingPlanController(repository, onChanged))
+      const execute = () => testCase.mode
+        ? hook.current.duplicate(20, testCase.mode)
+        : hook.current.createWithDays({
+            plan: {
+              name: 'Ficha',
+              description: '',
+              category: 'Força',
+              difficulty: 'Iniciante',
+            },
+            days: [],
+          })
+
+      let first!: ReturnType<typeof execute>
+      act(() => { first = execute() })
+      await act(async () => { await Promise.resolve() })
+      expect(onChanged).toHaveBeenCalledTimes(1)
+      await act(async () => {
+        expect(await execute()).toEqual({ status: 'failed' })
+      })
+      const mutation = testCase.mode ? repository.duplicate : repository.createWithDays
+      expect(mutation).toHaveBeenCalledTimes(1)
+
+      await act(async () => {
+        refresh.resolve(true)
+        await first
+      })
+      await act(async () => { await execute() })
+      expect(mutation).toHaveBeenCalledTimes(2)
+      hook.unmount()
+    }
+  })
+
+  it('libera o lock de ficha após falha da mutation e após unmount com refresh pendente', async () => {
+    const created = trashPlan(40, 'Ficha')
+    const pendingRefresh = deferredValue<boolean>()
+    const repository = {
+      list: vi.fn(async () => []),
+      createWithDays: vi.fn()
+        .mockRejectedValueOnce(new Error('Falha de criação'))
+        .mockResolvedValue(created),
+    } as unknown as TrainingPlanRepository
+    const onChanged = vi.fn(() => pendingRefresh.promise)
+    const hook = await renderController(() => useTrainingPlanController(repository, onChanged))
+    const input = {
+      plan: {
+        name: 'Ficha',
+        description: '',
+        category: 'Força',
+        difficulty: 'Iniciante',
+      },
+      days: [],
+    }
+    await act(async () => {
+      expect(await hook.current.createWithDays(input)).toEqual({ status: 'failed' })
+    })
+    let committed!: ReturnType<typeof hook.current.createWithDays>
+    act(() => { committed = hook.current.createWithDays(input) })
+    await act(async () => { await Promise.resolve() })
+    hook.unmount()
+    pendingRefresh.resolve(false)
+    await expect(committed).resolves.toMatchObject({
+      status: 'success',
+      refreshWarning: true,
+    })
+    expect(repository.createWithDays).toHaveBeenCalledTimes(2)
   })
 
   it('publica Desfazer somente depois de liberar mutation e refresh', async () => {

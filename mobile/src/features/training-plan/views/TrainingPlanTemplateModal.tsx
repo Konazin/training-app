@@ -1,4 +1,14 @@
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useEffect, useRef } from 'react'
+import {
+  AccessibilityInfo,
+  findNodeHandle,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import {
   TRAINING_PLAN_TEMPLATES,
@@ -13,12 +23,14 @@ export function TrainingPlanTemplateModal({
   visible,
   previewId,
   onPreview,
+  onBack,
   onCancel,
   onUse,
 }: {
   visible: boolean
   previewId: TrainingPlanTemplateId | null
   onPreview: (id: TrainingPlanTemplateId) => void
+  onBack: () => void
   onCancel: () => void
   onUse: (template: TrainingPlanTemplate) => void
 }) {
@@ -26,6 +38,23 @@ export function TrainingPlanTemplateModal({
   const styles = createStyles(colors)
   const preview = TRAINING_PLAN_TEMPLATES.find((template) => template.id === previewId)
   const trainingDays = preview?.days.filter((day) => !day.restDay).length ?? 0
+  const firstTemplateRef = useRef<View>(null)
+  const returningToList = useRef(false)
+  useEffect(() => {
+    if (!visible || preview || !returningToList.current) return
+    returningToList.current = false
+    const frame = requestAnimationFrame(() => {
+      const node = findNodeHandle(firstTemplateRef.current)
+      if (node) AccessibilityInfo.setAccessibilityFocus(node)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [preview, visible])
+
+  const back = () => {
+    returningToList.current = true
+    onBack()
+  }
+
   return (
     <Modal animationType="slide" onRequestClose={onCancel} visible={visible}>
       <SafeAreaView style={styles.safe}>
@@ -55,6 +84,7 @@ export function TrainingPlanTemplateModal({
                 accessibilityRole="button"
                 key={template.id}
                 onPress={() => onPreview(template.id)}
+                ref={template.id === TRAINING_PLAN_TEMPLATES[0]!.id ? firstTemplateRef : undefined}
                 style={styles.card}
               >
                 <Text style={styles.cardTitle}>{template.name}</Text>
@@ -68,6 +98,14 @@ export function TrainingPlanTemplateModal({
           )}
         </ScrollView>
         <View style={styles.actions}>
+          {preview && (
+            <PrimaryButton
+              accessibilityLabel="Voltar para a lista de templates"
+              label="Voltar"
+              onPress={back}
+              secondary
+            />
+          )}
           <PrimaryButton label="Cancelar" onPress={onCancel} secondary />
           {preview && <PrimaryButton label="Usar este template" onPress={() => onUse(preview)} />}
         </View>

@@ -133,7 +133,7 @@ function LocalApp({
       ? { message: trainingPlan.message, kind: trainingPlan.messageKind, source: 'other' as const }
       : controller.message
         ? { message: controller.message, kind: 'error' as const, source: 'other' as const }
-        : { message: backup.message, kind: backup.messageKind, source: 'other' as const }
+        : { message: backup.message, kind: backup.messageKind, source: 'backup' as const }
   const navigationTheme = useMemo<NavigationTheme>(() => ({
     ...DefaultTheme,
     dark: isDark,
@@ -313,11 +313,17 @@ function LocalApp({
         message={notification.message}
         kind={notification.kind}
         notificationId={notification.source === 'trash' ? trash.notificationId : undefined}
-        actionLabel={notification.source === 'trash' && trash.pendingUndo ? 'Desfazer' : undefined}
-        actionBusyLabel="Desfazendo…"
+        actionLabel={notification.source === 'trash' && trash.pendingUndo
+          ? 'Desfazer'
+          : notification.source === 'backup' && backup.refreshPending
+            ? 'Tentar atualizar'
+            : undefined}
+        actionBusyLabel={notification.source === 'backup' ? 'Atualizando…' : 'Desfazendo…'}
         onAction={notification.source === 'trash' && trash.pendingUndo
           ? () => trash.undoMoveToTrash(trash.pendingUndo!.token)
-          : undefined}
+          : notification.source === 'backup' && backup.refreshPending
+            ? backup.retryRefresh
+            : undefined}
         duration={notification.source === 'trash' && trash.pendingUndo ? 6000 : undefined}
         onDismiss={notification.source === 'trash'
           ? () => trash.dismissNotification(

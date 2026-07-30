@@ -91,5 +91,17 @@ describe('editor e templates de ficha', () => {
     expect(nextTrainingPlanCopyName('PPL', ['PPL'])).toBe('PPL — Cópia')
     expect(nextTrainingPlanCopyName(' PPL ', ['ppl — cópia', ' PPL  —  Cópia 2 ']))
       .toBe('PPL — Cópia 3')
+    expect(nextTrainingPlanCopyName('PPL — Cópia', ['PPL', 'PPL — Cópia']))
+      .toBe('PPL — Cópia 2')
+    expect(nextTrainingPlanCopyName('PPL — Cópia 2', [
+      'PPL', 'PPL — Cópia', 'PPL — Cópia 2',
+    ])).toBe('PPL — Cópia 3')
+    expect(nextTrainingPlanCopyName('  PPL   —   Cópia  2  ', [
+      'ppl — cópia', ' PPL  —  Cópia 2 ',
+    ])).toBe('PPL — Cópia 3')
+    expect(nextTrainingPlanCopyName('Método Cópia Segura', ['Método Cópia Segura']))
+      .toBe('Método Cópia Segura — Cópia')
+    expect(nextTrainingPlanCopyName('PPL — Cópia', ['ppl — CÓPIA', 'PPL — cópia 2']))
+      .toBe('PPL — Cópia 3')
   })
 })

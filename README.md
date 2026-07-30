@@ -97,7 +97,11 @@ Mobilidade 3x e Ficha vazia criam somente a divisão dos sete dias. Eles não
 baixam nem criam exercícios. A prévia semanal mostra treino, descanso,
 exercícios, atividades e avisos não médicos antes do salvamento.
 
-Criação com template e duplicação são transacionais. Consulte
+Templates são aplicados somente durante a criação. Em fichas existentes, a
+prévia usa a estrutura persistida e os dias continuam sendo editados nas telas
+próprias. Criação com template e duplicação são transacionais e ficam
+bloqueadas até o refresh posterior terminar; falha de refresh não reverte nem
+repete a operação confirmada. Consulte
 [editor de ficha](docs/TRAINING_PLAN_EDITOR.md) e
 [templates e duplicação](docs/TRAINING_PLAN_TEMPLATES.md).
 

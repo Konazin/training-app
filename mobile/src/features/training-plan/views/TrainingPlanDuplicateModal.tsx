@@ -1,7 +1,9 @@
+import { useRef } from 'react'
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 import { type TrainingPlanDuplicateMode } from '@training/training-domain'
 import { shared, type ThemeColors, useTheme } from '../../../theme'
 import { PrimaryButton } from '../../../components/PrimaryButton'
+import type { TrainingPlanUiResult } from '../controller/useTrainingPlanController'
 
 const options: Array<{
   mode: TrainingPlanDuplicateMode
@@ -32,21 +34,35 @@ export function TrainingPlanDuplicateModal({
   onChange,
   onCancel,
   onConfirm,
+  onSuccess,
 }: {
   visible: boolean
   value: TrainingPlanDuplicateMode
   busy: boolean
   onChange: (mode: TrainingPlanDuplicateMode) => void
   onCancel: () => void
-  onConfirm: () => void
+  onConfirm: () => Promise<TrainingPlanUiResult>
+  onSuccess: () => void
 }) {
   const { colors } = useTheme()
   const styles = createStyles(colors)
+  const confirmingRef = useRef(false)
+
+  const confirm = async () => {
+    if (busy || confirmingRef.current) return
+    confirmingRef.current = true
+    try {
+      if ((await onConfirm()).status === 'success') onSuccess()
+    } finally {
+      confirmingRef.current = false
+    }
+  }
+
   return (
     <Modal
       animationType="fade"
       onRequestClose={() => {
-        if (!busy) onCancel()
+        if (!busy && !confirmingRef.current) onCancel()
       }}
       transparent
       visible={visible}
@@ -82,8 +98,15 @@ export function TrainingPlanDuplicateModal({
             </View>
           )}
           <View style={styles.actions}>
-            <PrimaryButton disabled={busy} label="Cancelar" onPress={onCancel} secondary />
-            <PrimaryButton disabled={busy} loading={busy} label="Duplicar" onPress={onConfirm} />
+            <PrimaryButton
+              disabled={busy}
+              label="Cancelar"
+              onPress={() => {
+                if (!confirmingRef.current) onCancel()
+              }}
+              secondary
+            />
+            <PrimaryButton disabled={busy} loading={busy} label="Duplicar" onPress={() => void confirm()} />
           </View>
         </View>
       </View>

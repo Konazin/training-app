@@ -12,7 +12,8 @@ import type {
 import type { TrainingPlanRepository } from '../repository/TrainingPlanRepository'
 
 export type TrainingPlanUiResult =
-  | { status: 'success'; refreshWarning: boolean; plan: TrainingPlan }
+  | { status: 'success'; refreshWarning: false; plan: TrainingPlan }
+  | { status: 'success'; refreshWarning: true; plan: TrainingPlan }
   | { status: 'failed' }
 
 export function useTrainingPlanController(
@@ -100,33 +101,37 @@ export function useTrainingPlanController(
     setBusyKeys(new Set(busyRef.current))
     setErrors((current) => ({ ...current, [key]: '' }))
     setNotice(null)
-    let plan: TrainingPlan
     try {
-      plan = await operation()
-    } catch (cause) {
-      const text = messageFrom(cause)
-      setErrors((current) => ({ ...current, [key]: text }))
-      setNotice({ text, kind: 'error' })
-      return { status: 'failed' }
+      let plan: TrainingPlan
+      try {
+        plan = await operation()
+      } catch (cause) {
+        const text = messageFrom(cause)
+        setErrors((current) => ({ ...current, [key]: text }))
+        setNotice({ text, kind: 'error' })
+        return { status: 'failed' }
+      }
+      setTrainingPlans((current) => [plan, ...current.filter((item) => item.id !== plan.id)])
+      setSelectedTrainingPlanId(plan.id)
+      let refreshWarning = false
+      try {
+        refreshWarning = await onChanged?.() === false
+      } catch {
+        refreshWarning = true
+      }
+      setNotice({
+        text: refreshWarning
+          ? `${successMessage} Algumas telas não puderam ser atualizadas.`
+          : successMessage,
+        kind: refreshWarning ? 'warning' : 'success',
+      })
+      return refreshWarning
+        ? { status: 'success', refreshWarning: true, plan }
+        : { status: 'success', refreshWarning: false, plan }
     } finally {
       busyRef.current.delete(key)
       setBusyKeys(new Set(busyRef.current))
     }
-    setTrainingPlans((current) => [plan, ...current.filter((item) => item.id !== plan.id)])
-    setSelectedTrainingPlanId(plan.id)
-    let refreshWarning = false
-    try {
-      refreshWarning = await onChanged?.() === false
-    } catch {
-      refreshWarning = true
-    }
-    setNotice({
-      text: refreshWarning
-        ? `${successMessage} Algumas telas não puderam ser atualizadas.`
-        : successMessage,
-      kind: refreshWarning ? 'warning' : 'success',
-    })
-    return { status: 'success', refreshWarning, plan }
   }, [onChanged])
 
   const create = useCallback(

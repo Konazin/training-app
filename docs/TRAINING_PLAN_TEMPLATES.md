@@ -11,9 +11,11 @@ Os seis templates são definições TypeScript imutáveis:
 - Mobilidade 3x;
 - Ficha vazia.
 
-Eles criam exatamente sete dias em uma transação SQLite. A falha de qualquer
-inserção reverte ficha e dias. O template preenche nome quando vazio, categoria,
-dificuldade e divisão semanal, mas não salva automaticamente.
+Eles podem ser aplicados somente durante a criação e criam exatamente sete dias
+em uma transação SQLite. A falha de qualquer inserção reverte ficha e dias. O
+template preserva nome e descrição já digitados, substitui categoria,
+dificuldade e divisão semanal, mas não salva automaticamente. Fichas existentes
+não aceitam template no editor geral.
 
 Templates não contêm IDs SQLite ou IDs de exercícios, não consultam Wger e não
 criam exercícios. O usuário adiciona exercícios depois nas telas da ficha.
@@ -29,9 +31,12 @@ criam exercícios. O usuário adiciona exercícios depois nas telas da ficha.
   nulo. Duração e distância não são tratadas como carga.
 
 Cada cópia recebe IDs novos e nome `— Cópia`, `— Cópia 2` e seguintes sem
-colisão por maiúsculas ou espaços. A operação não altera a ficha original e
-não copia sessões, histórico ou snapshots. A cópia nasce inativa, não
-arquivada e fora da lixeira.
+colisão por maiúsculas ou espaços. Ao duplicar uma cópia, o sufixo final
+anterior é removido antes da próxima numeração; “Cópia” no meio de um nome é
+preservado. A operação não altera a ficha original e não copia sessões,
+histórico ou snapshots. A cópia nasce inativa, não arquivada e fora da
+lixeira.
 
-Todo o processo é offline e transacional. O backup permanece no
-`schemaVersion: 2`.
+Todo o processo é offline e transacional. O botão continua bloqueado durante o
+refresh posterior ao commit. Uma falha de refresh gera aviso sem reverter nem
+repetir a duplicação. O backup permanece no `schemaVersion: 2`.

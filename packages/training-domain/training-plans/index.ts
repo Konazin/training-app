@@ -284,9 +284,10 @@ export const TRAINING_PLAN_DUPLICATE_MODES: readonly TrainingPlanDuplicateMode[]
   Object.freeze(['COMPLETE', 'STRUCTURE_ONLY', 'WITHOUT_LOADS'])
 
 const normalizedCopyName = (value: string) => value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('pt-BR')
+const copySuffix = /\s+—\s+cópia(?:\s+\d+)?$/iu
 
 export function nextTrainingPlanCopyName(sourceName: string, existingNames: readonly string[]) {
-  const base = sourceName.trim().replace(/\s+/g, ' ')
+  const base = sourceName.trim().replace(/\s+/g, ' ').replace(copySuffix, '').trim()
   const existing = new Set(existingNames.map(normalizedCopyName))
   let index = 1
   while (true) {

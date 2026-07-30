@@ -16,7 +16,7 @@ nunca é persistida: somente o texto informado é salvo. Valores antigos fora
 dos presets são reabertos como personalizados e não são descartados.
 
 Categoria e dificuldade continuam colunas `TEXT`; não existe migration nova.
-Trocas de seletor, template ou estrutura participam do alerta de alterações
+Na criação, trocas de seletor ou template participam do alerta de alterações
 não salvas.
 
 ## Estrutura semanal
@@ -26,5 +26,13 @@ quantidade de exercícios, atividades e avisos. Treino sem exercícios e ausênc
 de descanso são avisos, não recomendações médicas. Weekday duplicado ou ausente
 é rejeitado na criação.
 
-Após salvar, os detalhes continuam sendo editados nas telas de cada dia. Todo o
-fluxo é local-only e não depende de internet, login ou backend.
+Templates estão disponíveis somente ao criar uma ficha. Uma ficha existente
+mostra a prévia dos dias, exercícios, atividades e descansos persistidos, mas o
+editor geral salva somente nome, descrição, categoria, dificuldade e datas.
+Seus dias são editados nas telas próprias; não existe substituição automática
+da estrutura por template.
+
+Criação e duplicação permanecem bloqueadas até a atualização das telas
+terminar. Falha nessa atualização gera aviso, mas não desfaz uma mutation já
+confirmada. Todo o fluxo é local-only e não depende de internet, login ou
+backend.

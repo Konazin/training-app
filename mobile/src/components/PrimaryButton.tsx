@@ -4,18 +4,20 @@ import { typography } from '../theme/typography'
 
 interface Props {
   label: string
+  accessibilityLabel?: string
   onPress: () => void
   loading?: boolean
   secondary?: boolean
   disabled?: boolean
 }
 
-export function PrimaryButton({ label, onPress, loading, secondary, disabled = false }: Props) {
+export function PrimaryButton({ label, accessibilityLabel, onPress, loading, secondary, disabled = false }: Props) {
   const { colors } = useTheme()
   const styles = createStyles(colors)
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ busy: loading, disabled: disabled || loading }}
       disabled={disabled || loading}
       onPress={onPress}

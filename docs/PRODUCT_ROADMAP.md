@@ -30,13 +30,17 @@ O backup usa `schemaVersion: 2`. Arquivos manuais são nomeados
 - criação transacional com exatamente sete weekdays;
 - prévia semanal com estados e avisos;
 - duplicação transacional completa, somente estrutura ou sem cargas;
+- templates restritos à criação; edição geral não substitui dias persistidos;
+- locks de criação, duplicação e backup mantidos até o fim dos refreshes;
+- refresh falho após commit gera warning e retry não repete a mutation;
+- cópia de cópia recebe sufixo numérico normalizado;
 - Snackbar, refresh global, backup e modal da lixeira estabilizados;
 - backup `schemaVersion: 2` e migrations 1 a 5 preservados;
 - versão mobile 0.5.0, `versionCode` 7.
 
-As verificações automatizadas e o export Android passaram. O smoke manual
-Android permanece pendente até existir aparelho ou emulador disponível; por
-isso o Marco 2 ainda não está marcado como concluído.
+As verificações automatizadas e o export Android deste patch passaram. O smoke
+manual Android permanece pendente até existir aparelho ou emulador disponível;
+por isso o Marco 2 ainda não está marcado como concluído.
 
 ## Adiado
 
