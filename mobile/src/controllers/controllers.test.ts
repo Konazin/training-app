@@ -8,6 +8,7 @@ import type {
   ExerciseLibraryRepository,
   ExternalExerciseCandidate,
   ExternalExerciseImportRepository,
+  TrainingPlan,
   TrainingPlanTrashRepository,
   WorkoutSession,
   WorkoutSessionRepository,
@@ -171,46 +172,166 @@ describe('controllers locais', () => {
     hook.unmount()
   })
 
-  it('move, desfaz uma vez e exige backup antes de esvaziar a lixeira', async () => {
+  it('publica Desfazer somente depois de liberar mutation e refresh', async () => {
     expect(isEmptyTrashConfirmation('esvaziar')).toBe(true)
     expect(isEmptyTrashConfirmation(' esvaziar ')).toBe(true)
     expect(isEmptyTrashConfirmation('esvaziar agora')).toBe(false)
-    const trashed = { id: 7, name: 'Ficha', deletedAt: '2026-07-29T12:00:00.000Z' }
-    const repository = {
-      purgeExpired: vi.fn(async () => 0),
-      list: vi.fn(async () => [trashed]),
-      count: vi.fn(async () => 1),
-      moveToTrash: vi.fn(async () => trashed),
-      restore: vi.fn(async () => trashed),
-      deletePermanently: vi.fn(async () => {}),
-      emptyTrash: vi.fn(async () => 1),
-    } as unknown as TrainingPlanTrashRepository
-    const backup = vi.fn(async () => ({
-      uri: 'file:///backup.json',
-      fileName: 'backup.json',
-      createdAt: '2026-07-29T12:00:00.000Z',
-      sizeBytes: 10,
-      reason: 'BEFORE_EMPTY_TRASH' as const,
-    }))
-    const changed = vi.fn(async () => {})
-    const hook = await renderController(() =>
-      useTrainingPlanTrashController(repository, backup, changed))
-
-    await act(async () => { await hook.current.moveToTrash(7) })
-    expect(hook.current.hasUndo).toBe(true)
+    const mutation = deferredValue<ReturnType<typeof trashPlan>>()
+    const refresh = deferredValue<ReturnType<typeof trashPlan>[]>()
+    const repository = trashRepository({
+      moveToTrash: vi.fn(() => mutation.promise),
+      list: vi.fn(() => refresh.promise),
+    })
+    const hook = await renderTrashController(repository)
+    let operation!: ReturnType<typeof hook.current.moveToTrash>
+    act(() => { operation = hook.current.moveToTrash(7) })
+    await act(async () => { mutation.resolve(trashPlan()) })
+    expect(hook.current.busyKey).toBe('trash:move:7')
+    expect(hook.current.pendingUndo).toBeNull()
     await act(async () => {
-      await hook.current.undo()
-      await hook.current.undo()
+      refresh.resolve([trashPlan()])
+      await operation
+    })
+    expect(hook.current.busyKey).toBeNull()
+    expect(hook.current.pendingUndo?.planId).toBe(7)
+    expect(hook.current.count).toBe(1)
+    hook.unmount()
+  })
+
+  it('preserva sucesso e undo quando refresh falha depois do commit', async () => {
+    const repository = trashRepository({
+      list: vi.fn(async () => { throw new Error('lista indisponível') }),
+    })
+    const hook = await renderTrashController(repository)
+    let result!: Awaited<ReturnType<typeof hook.current.moveToTrash>>
+    await act(async () => { result = await hook.current.moveToTrash(7) })
+    expect(result).toEqual({ status: 'success', refreshWarning: true })
+    expect(hook.current.pendingUndo?.status).toBe('available')
+    expect(hook.current.message).toBe(
+      'Ficha movida para a lixeira, mas a tela não pôde ser atualizada.',
+    )
+    hook.unmount()
+  })
+
+  it('serializa toque rápido, limpa token só após restore e permite nova tentativa', async () => {
+    const restore = deferredValue<ReturnType<typeof trashPlan>>()
+    const repository = trashRepository({ restore: vi.fn(() => restore.promise) })
+    const hook = await renderTrashController(repository)
+    await act(async () => { await hook.current.moveToTrash(7) })
+    const token = hook.current.pendingUndo!.token
+    let first!: Promise<boolean>
+    let second!: Promise<boolean>
+    act(() => {
+      first = hook.current.undoMoveToTrash(token)
+      second = hook.current.undoMoveToTrash(token)
     })
     expect(repository.restore).toHaveBeenCalledTimes(1)
+    expect(hook.current.pendingUndo?.status).toBe('running')
+    await act(async () => {
+      restore.resolve(trashPlan())
+      await Promise.all([first, second])
+    })
+    expect(await first).toBe(true)
+    expect(await second).toBe(false)
+    expect(hook.current.pendingUndo).toBeNull()
 
-    backup.mockRejectedValueOnce(new Error('Backup falhou'))
-    await act(async () => { await hook.current.emptyTrash() })
+    await act(async () => { await hook.current.moveToTrash(7) })
+    const retryToken = hook.current.pendingUndo!.token
+    repository.restore = vi.fn()
+      .mockRejectedValueOnce(new Error('Restore falhou'))
+      .mockResolvedValueOnce(trashPlan())
+    let failed = true
+    await act(async () => { failed = await hook.current.undoMoveToTrash(retryToken) })
+    expect(failed).toBe(false)
+    expect(hook.current.pendingUndo?.status).toBe('available')
+    await act(async () => { await hook.current.undoMoveToTrash(retryToken) })
+    expect(repository.restore).toHaveBeenCalledTimes(2)
+    hook.unmount()
+  })
+
+  it('callback antigo não limpa token novo e expiração decide uma única vez', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-30T12:00:00.000Z'))
+    const restore = deferredValue<ReturnType<typeof trashPlan>>()
+    const repository = trashRepository({ restore: vi.fn(() => restore.promise) })
+    const hook = await renderTrashController(repository)
+    await act(async () => { await hook.current.moveToTrash(7) })
+    const tokenA = hook.current.pendingUndo!.token
+    const notificationA = hook.current.notificationId
+    await act(async () => { await hook.current.moveToTrash(8) })
+    const tokenB = hook.current.pendingUndo!.token
+    act(() => hook.current.dismissNotification(notificationA, tokenA))
+    expect(hook.current.pendingUndo?.token).toBe(tokenB)
+    expect(hook.current.message).toBe('Ficha movida para a lixeira.')
+
+    let undo!: Promise<boolean>
+    act(() => { undo = hook.current.undoMoveToTrash(tokenB) })
+    vi.advanceTimersByTime(7000)
+    expect(repository.restore).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      restore.resolve(trashPlan(8, 'Ficha B'))
+      await undo
+    })
+    expect(hook.current.pendingUndo).toBeNull()
+
+    await act(async () => { await hook.current.moveToTrash(9) })
+    const expiredToken = hook.current.pendingUndo!.token
+    vi.advanceTimersByTime(7000)
+    await act(async () => {
+      expect(await hook.current.undoMoveToTrash(expiredToken)).toBe(false)
+    })
+    expect(repository.restore).toHaveBeenCalledTimes(1)
+    hook.unmount()
+    vi.useRealTimers()
+  })
+
+  it('backup falho impede empty e commit com refresh falho continua sucesso', async () => {
+    const repository = trashRepository()
+    const backup = safetyBackup()
+    const hook = await renderTrashController(repository, backup)
+    await act(async () => {
+      backup.mockRejectedValueOnce(new Error('Backup falhou'))
+      expect(await hook.current.emptyTrash()).toEqual({ status: 'failed' })
+    })
     expect(repository.emptyTrash).not.toHaveBeenCalled()
     expect(hook.current.message).toBe('Backup falhou')
-    await act(async () => { await hook.current.emptyTrash() })
+    repository.list = vi.fn(async () => { throw new Error('refresh falhou') })
+    let result!: Awaited<ReturnType<typeof hook.current.emptyTrash>>
+    await act(async () => { result = await hook.current.emptyTrash() })
     expect(backup).toHaveBeenCalledTimes(2)
     expect(repository.emptyTrash).toHaveBeenCalledTimes(1)
+    expect(result).toEqual({ status: 'success', refreshWarning: true })
+    expect(hook.current.message).toBe('Lixeira esvaziada, mas a tela não pôde ser atualizada.')
+    hook.unmount()
+  })
+
+  it('não atualiza estado desmontado após refresh pendente', async () => {
+    const refresh = deferredValue<ReturnType<typeof trashPlan>[]>()
+    const repository = trashRepository({ list: vi.fn(() => refresh.promise) })
+    const hook = await renderTrashController(repository)
+    const operation = hook.current.moveToTrash(7)
+    hook.unmount()
+    refresh.resolve([trashPlan()])
+    await expect(operation).resolves.toEqual({ status: 'success', refreshWarning: false })
+  })
+
+  it('retryRefresh coleta todas as falhas sem repetir mutation', async () => {
+    const repository = trashRepository({
+      list: vi.fn(async () => { throw new Error('lista') }),
+    })
+    const refreshPlans = vi.fn(async () => { throw new Error('fichas') })
+    const refreshDashboard = vi.fn(async () => false)
+    const hook = await renderTrashController(
+      repository,
+      safetyBackup(),
+      refreshPlans,
+      refreshDashboard,
+    )
+    await act(async () => {
+      expect(await hook.current.retryRefresh()).toBe(false)
+    })
+    expect(hook.current.message).toContain('lixeira e badge, fichas, dashboard')
+    expect(repository.moveToTrash).not.toHaveBeenCalled()
     hook.unmount()
   })
 
@@ -280,6 +401,74 @@ async function renderController<T>(useController: () => T) {
     get current() { return current },
     unmount: () => act(() => renderer.unmount()),
   }
+}
+
+function renderTrashController(
+  repository: TrainingPlanTrashRepository,
+  backup = safetyBackup(),
+  refreshPlans = vi.fn(async () => true),
+  refreshDashboard = vi.fn(async () => true),
+) {
+  return renderController(() => useTrainingPlanTrashController(
+    repository,
+    backup,
+    refreshPlans,
+    refreshDashboard,
+  ))
+}
+
+function trashRepository(
+  overrides: Partial<TrainingPlanTrashRepository> = {},
+): TrainingPlanTrashRepository {
+  return {
+    list: vi.fn(async () => [trashPlan()]),
+    count: vi.fn(async () => 1),
+    moveToTrash: vi.fn(async (id) => trashPlan(id)),
+    restore: vi.fn(async (id) => trashPlan(id)),
+    deletePermanently: vi.fn(async () => {}),
+    emptyTrash: vi.fn(async () => 1),
+    purgeExpired: vi.fn(async () => 0),
+    ...overrides,
+  }
+}
+
+function trashPlan(id = 7, name = 'Ficha'): TrainingPlan {
+  return {
+    id,
+    name,
+    description: '',
+    category: 'Calistenia',
+    difficulty: 'Iniciante',
+    startDate: null,
+    endDate: null,
+    active: false,
+    archived: false,
+    deletedAt: '2026-07-30T12:00:00.000Z',
+    purgeAt: '2026-08-06T12:00:00.000Z',
+    days: [],
+    createdAt: '2026-07-01T12:00:00.000Z',
+    updatedAt: '2026-07-30T12:00:00.000Z',
+  }
+}
+
+function safetyBackup() {
+  return vi.fn(async (): Promise<AutomaticBackupInfo> => ({
+    uri: 'file:///backup.json',
+    fileName: 'backup.json',
+    createdAt: '2026-07-30T12:00:00.000Z',
+    sizeBytes: 10,
+    reason: 'BEFORE_EMPTY_TRASH',
+  }))
+}
+
+function deferredValue<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((done, fail) => {
+    resolve = done
+    reject = fail
+  })
+  return { promise, resolve, reject }
 }
 
 function session(status: WorkoutSession['status']): WorkoutSession {

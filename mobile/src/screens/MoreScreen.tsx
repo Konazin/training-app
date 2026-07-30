@@ -5,6 +5,10 @@ import { SelectableChip } from '../components/SelectableChip'
 import { shared, type ThemeColors, type ThemePreference, useTheme } from '../theme'
 import { typography } from '../theme/typography'
 import type { AutomaticBackupInfo } from '@training/training-domain'
+import {
+  trashBadgeAccessibilityLabel,
+  trashBadgeText,
+} from '../features/training-plan/model/trainingPlan'
 
 export function MoreScreen({
   busy,
@@ -80,7 +84,7 @@ export function MoreScreen({
         onPress={onTrash}
         disabled={busy}
         badge={trashCount}
-        accessibilityLabel={`Lixeira de fichas, ${trashCount} ${trashCount === 1 ? 'item' : 'itens'}`}
+        accessibilityLabel={trashBadgeAccessibilityLabel(trashCount)}
       />
       <Text style={styles.section}>INTEGRAÇÕES</Text>
       <MenuItem
@@ -90,7 +94,7 @@ export function MoreScreen({
         disabled={busy}
       />
       <Text style={styles.section}>BACKUP</Text>
-      <MenuItem label="Exportar backup" detail="training-backup-v2.json" onPress={onExport} disabled={busy} />
+      <MenuItem label="Exportar backup" detail="Schema 2 · arquivo identificado por data" onPress={onExport} disabled={busy} />
       <MenuItem label="Importar backup" detail="Validar e restaurar" onPress={onImport} disabled={busy} />
       <Text style={styles.section}>BACKUPS AUTOMÁTICOS</Text>
       {!automaticBackups.length && <Text style={styles.note}>Nenhum backup automático criado.</Text>}
@@ -203,9 +207,9 @@ function MenuItem({
         <Text style={styles.detail}>{detail}</Text>
       </View>
       <View style={styles.trailing}>
-        {!!badge && (
+        {!!trashBadgeText(badge ?? 0) && (
           <View style={styles.badge}>
-            <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
+            <Text style={styles.badgeText}>{trashBadgeText(badge ?? 0)}</Text>
           </View>
         )}
         <Text style={styles.arrow}>→</Text>

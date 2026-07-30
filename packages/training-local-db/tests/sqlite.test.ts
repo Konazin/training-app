@@ -464,6 +464,122 @@ describe('SQLite local schema', () => {
     await database.close()
   })
 
+  it('protege todas as entradas da lixeira e sessões ativas ou pausadas', async () => {
+    const path = newDatabase()
+    const database = betterDatabase(path)
+    await runMigrations(database)
+    await initializeFirstInstallation(database, seedData())
+    const repositories = createLocalRepositories(database)
+    const plan = (await repositories.plans.list())[0]!
+    const archived = await repositories.plans.archive(plan.id)
+    expect(archived.archived).toBe(true)
+    const fromArchive = await repositories.planTrash.moveToTrash(plan.id)
+    expect(fromArchive).toMatchObject({ archived: false, active: false })
+    await repositories.planTrash.restore(plan.id)
+
+    const paused = await repositories.sessions.start(plan.id, plan.days[0]!.id)
+    await repositories.sessions.pause(paused.id)
+    await expect(repositories.planTrash.moveToTrash(plan.id)).rejects.toMatchObject({
+      code: 'ACTIVE_SESSION_USES_TRAINING_PLAN',
+    })
+    await repositories.sessions.abandon(paused.id)
+    await repositories.planTrash.moveToTrash(plan.id, '2026-07-01T00:00:00.000Z')
+    await expect(repositories.plans.activate(plan.id)).rejects.toMatchObject({
+      code: 'TRAINING_PLAN_IN_TRASH',
+    })
+    await expect(repositories.sessions.start(plan.id, plan.days[0]!.id)).rejects.toMatchObject({
+      code: 'TRAINING_PLAN_IN_TRASH',
+    })
+    await expect(repositories.plans.update(plan.id, {
+      name: 'Não editar',
+      description: plan.description,
+      category: plan.category,
+      difficulty: plan.difficulty,
+    })).rejects.toMatchObject({ code: 'TRAINING_PLAN_IN_TRASH' })
+
+    const active = await database.run(`
+      INSERT INTO workout_sessions(
+        training_plan_id, plan_day_id, workout_name, day_name, scheduled_date,
+        started_at, status, active_slot
+      ) VALUES (?, ?, 'Snapshot', 'Segunda', '2026-07-01', ?, 'IN_PROGRESS', 1)
+    `, plan.id, plan.days[0]!.id, '2026-07-01T00:00:00.000Z')
+    expect(await repositories.planTrash.purgeExpired('2026-07-08T00:00:00.000Z')).toBe(0)
+    expect(await repositories.planTrash.count()).toBe(1)
+    await database.run(
+      `UPDATE workout_sessions SET status = 'PAUSED' WHERE id = ?`,
+      active.lastInsertRowId,
+    )
+    expect(await repositories.planTrash.purgeExpired('2026-07-08T00:00:00.000Z')).toBe(0)
+    expect(await repositories.planTrash.count()).toBe(1)
+    await database.run(
+      `UPDATE workout_sessions SET status = 'ABANDONED', active_slot = NULL WHERE id = ?`,
+      active.lastInsertRowId,
+    )
+    expect(await repositories.planTrash.purgeExpired('2026-07-08T00:00:00.000Z')).toBe(1)
+    expect(await repositories.planTrash.count()).toBe(0)
+    await database.close()
+  })
+
+  it('faz rollback integral de emptyTrash e mantém contador correto', async () => {
+    const path = newDatabase()
+    const database = betterDatabase(path)
+    await runMigrations(database)
+    await initializeFirstInstallation(database, seedData())
+    const repositories = createLocalRepositories(database)
+    const first = (await repositories.plans.list())[0]!
+    const blocked = await repositories.plans.create({
+      name: 'Bloqueada', description: '', category: 'Força', difficulty: 'Inicial',
+    })
+    await repositories.planTrash.moveToTrash(first.id)
+    await repositories.planTrash.moveToTrash(blocked.id)
+    await database.exec(`
+      CREATE TRIGGER fail_empty_trash
+      BEFORE DELETE ON training_plans
+      WHEN OLD.name = 'Bloqueada' AND OLD.deleted_at IS NOT NULL
+      BEGIN
+        SELECT RAISE(ABORT, 'falha injetada no emptyTrash');
+      END;
+    `)
+    await expect(repositories.planTrash.emptyTrash()).rejects.toThrow('falha injetada')
+    expect(await repositories.planTrash.count()).toBe(2)
+    expect(await repositories.planTrash.list()).toHaveLength(2)
+    await database.exec('DROP TRIGGER fail_empty_trash')
+    expect(await repositories.planTrash.emptyTrash()).toBe(2)
+    expect(await repositories.planTrash.count()).toBe(0)
+    await database.close()
+  })
+
+  it('restaura backup v2 não vencido e expurga o vencido', async () => {
+    const path = newDatabase()
+    const database = betterDatabase(path)
+    await runMigrations(database)
+    await initializeFirstInstallation(database, seedData())
+    const repositories = createLocalRepositories(database)
+    const plan = (await repositories.plans.list())[0]!
+    const deletedAt = new Date().toISOString()
+    await repositories.planTrash.moveToTrash(plan.id, deletedAt)
+    const backup = await repositories.backup.export('0.4.0')
+    await repositories.backup.reset()
+    await repositories.backup.restore(backup)
+    expect(await repositories.planTrash.count()).toBe(1)
+    expect((await repositories.planTrash.list())[0]).toMatchObject({
+      id: plan.id,
+      deletedAt,
+    })
+
+    const expired: TrainingBackup = {
+      ...backup,
+      trainingPlans: backup.trainingPlans.map((row) => ({
+        ...row as object,
+        deleted_at: '2026-07-01T00:00:00.000Z',
+        purge_at: '2026-07-08T00:00:00.000Z',
+      })),
+    }
+    await repositories.backup.restore(expired)
+    expect(await repositories.planTrash.count()).toBe(0)
+    await database.close()
+  })
+
   it('migra 3 para 5 e faz upsert Wger transacional preservando IDs e dados locais', async () => {
     const path = newDatabase()
     let database = betterDatabase(path)

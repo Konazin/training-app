@@ -14,7 +14,7 @@ com repositories `expo-sqlite`, sem exigir servidor, VPS, IP, conta ou internet.
 - recuperar uma sessão após fechar o aplicativo;
 - consultar histórico, duração, volume e aderência;
 - mover fichas para uma lixeira local com retenção de sete dias;
-- exportar, validar e restaurar `training-backup-v2.json`.
+- exportar, validar e restaurar backups com `schemaVersion: 2`.
 
 O SQLite `training.db` é a fonte de verdade. AsyncStorage guarda somente o
 cronômetro transitório. Desinstalar o aplicativo apaga o banco local; exporte
@@ -69,7 +69,7 @@ demonstrativa pode ser editada ou arquivada.
 
 Em **Mais**:
 
-- **Exportar backup** cria e compartilha `training-backup-v2.json`;
+- **Exportar backup** cria e compartilha `training-backup-<timestamp>.json`;
 - **Importar backup** valida versão e referências antes de trocar dados;
 - operações destrutivas criam primeiro um backup automático no diretório de
   documentos do app;
@@ -87,11 +87,12 @@ Veja [backup e restauração](docs/BACKUP_AND_RESTORE.md).
 
 O fluxo principal é:
 
-**Ficha → Editar → Mover para lixeira → Restaurar em até sete dias → Exclusão automática**
+**Ficha → Editar → Mover para lixeira → Restaurar em até sete dias → Remoção na próxima abertura ou atualização**
 
 Arquivar apenas tira uma ficha do uso normal; a lixeira inicia a retenção para
-exclusão. A ficha vencida é removida na próxima inicialização ou abertura da
-lixeira, sem serviço em background. Sessões ativas ou pausadas impedem a
+exclusão. As fichas ficam na lixeira por sete dias. Depois do prazo, são
+removidas na próxima abertura do app ou atualização da tela, sem serviço em background.
+Sessões ativas ou pausadas impedem a
 remoção, e o histórico concluído permanece salvo em snapshots. Veja
 [ciclo de vida das fichas](docs/TRAINING_PLAN_LIFECYCLE.md).
 

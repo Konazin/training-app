@@ -11,8 +11,9 @@ Uma ficha na lixeira fica inativa, deixa de ser editável e recebe
 prazo, a ficha pode ser restaurada e retorna como inativa, não arquivada e sem
 datas de exclusão. O aviso da tela informa quantos dias restam.
 
-A ficha é removida após vencer o prazo na próxima inicialização ou abertura da
-lixeira. Não há serviço de exclusão em background.
+As fichas ficam na lixeira por sete dias. Depois do prazo, são removidas na
+próxima abertura do app ou atualização da tela. Não há serviço de exclusão em
+background.
 
 ## Exclusão
 
@@ -26,9 +27,11 @@ backup falhar, nada é excluído.
 
 ## Backup e funcionamento offline
 
-O backup v2 inclui fichas normais, arquivadas e na lixeira, com os dois
-timestamps. A importação valida as invariantes do ciclo de vida. Backups v1
-continuam compatíveis e são interpretados com timestamps nulos.
+O formato `schemaVersion: 2` inclui fichas normais, arquivadas e na lixeira,
+com os dois timestamps. A importação valida as invariantes do ciclo de vida.
+Backups v1 continuam compatíveis e são interpretados com timestamps nulos.
+Arquivos manuais usam `training-backup-<timestamp>.json`; arquivos automáticos
+usam `training-auto-backup-<timestamp>.json`.
 
 Todas as operações usam o SQLite local e funcionam sem conta, servidor ou
 conexão. A integração opcional Wger não recebe dados das fichas.

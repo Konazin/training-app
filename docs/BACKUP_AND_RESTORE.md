@@ -1,7 +1,12 @@
 # Backup e restauração
 
-O formato atual é `training-backup-v2.json`. Backups v1 continuam aceitos e
+O formato interno atual usa `schemaVersion: 2`. Backups v1 continuam aceitos e
 recebem `deleted_at` e `purge_at` nulos durante a restauração.
+
+O nome físico inclui a data de criação:
+
+- exportação manual: `training-backup-<timestamp>.json`;
+- backup automático: `training-auto-backup-<timestamp>.json`.
 
 Ele contém versão, versão do app, data de exportação, exercícios, metadados de
 mídia, fichas, dias, configurações, atividades, sessões, snapshots, séries e
@@ -57,4 +62,6 @@ próximas aberturas. **Recriar dados iniciais** apaga os dados do usuário,
 reinstala catálogo/ficha demonstrativa e reativa explicitamente o seed.
 
 Esvaziar a lixeira só prossegue após o backup automático ter sido criado. Uma
-falha no backup cancela a exclusão.
+falha no backup cancela a exclusão. Se apenas a atualização da tela falhar
+depois do esvaziamento confirmado, o backup é mantido e a operação continua
+tratada como concluída.

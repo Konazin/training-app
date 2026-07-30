@@ -1,25 +1,34 @@
 import { useCallback, useState } from 'react'
 import {
   Alert,
+  ActivityIndicator,
   FlatList,
   Modal,
   Pressable,
   RefreshControl,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native'
-import {
-  trainingPlanTrashDaysRemaining,
-  trainingPlanTrashStatusLabel,
-  type TrainingPlan,
-} from '@training/training-domain'
+import { trainingPlanTrashStatusLabel, type TrainingPlan } from '@training/training-domain'
 import { useFocusEffect } from '@react-navigation/native'
 import { Screen } from '../../../components/Screen'
 import { ScreenHeader } from '../../../components/ScreenHeader'
+import { ThemedTextInput } from '../../../components/ThemedTextInput'
 import { shared, type ThemeColors, useTheme } from '../../../theme'
-import { isEmptyTrashConfirmation } from '../controller/useTrainingPlanTrashController'
+import {
+  isEmptyTrashConfirmation,
+  type TrashUiResult,
+} from '../controller/useTrainingPlanTrashController'
+import {
+  EMPTY_TRASH_DESCRIPTION,
+  EMPTY_TRASH_TITLE,
+  TRASH_RETENTION_DESCRIPTION,
+  emptyTrashCountLabel,
+  permanentDeleteCopy,
+  trainingPlanTrashAccessibilityLabel,
+  trainingPlanTrashUrgency,
+} from '../model/trainingPlan'
 
 export function TrainingPlanTrashScreen({
   plans,
@@ -34,9 +43,9 @@ export function TrainingPlanTrashScreen({
   loading: boolean
   busy: boolean
   onRefresh: () => Promise<boolean>
-  onRestore: (id: number) => Promise<boolean>
-  onDelete: (id: number) => Promise<boolean>
-  onEmpty: () => Promise<boolean>
+  onRestore: (id: number) => Promise<TrashUiResult>
+  onDelete: (id: number) => Promise<TrashUiResult>
+  onEmpty: () => Promise<TrashUiResult>
 }) {
   const { colors } = useTheme()
   const styles = createStyles(colors)
@@ -59,7 +68,7 @@ export function TrainingPlanTrashScreen({
             <ScreenHeader
               eyebrow="Gestão de fichas"
               title="Lixeira de fichas"
-              description="As fichas são apagadas automaticamente após 7 dias."
+              description={TRASH_RETENTION_DESCRIPTION}
             />
             {!!plans.length && (
               <Pressable
@@ -79,8 +88,8 @@ export function TrainingPlanTrashScreen({
         )}
         ListEmptyComponent={(
           <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>A lixeira está vazia</Text>
-            <Text style={styles.meta}>Fichas removidas aparecerão aqui por 7 dias.</Text>
+            <Text style={styles.emptyTitle}>{EMPTY_TRASH_TITLE}</Text>
+            <Text style={styles.meta}>{EMPTY_TRASH_DESCRIPTION}</Text>
           </View>
         )}
         renderItem={({ item }) => (
@@ -89,18 +98,17 @@ export function TrainingPlanTrashScreen({
             busy={busy}
             colors={colors}
             onRestore={() => void onRestore(item.id)}
-            onDelete={() => Alert.alert(
-              'Excluir permanentemente?',
-              'Esta ficha não poderá ser restaurada. O histórico de treinos será preservado.',
-              [
+            onDelete={() => {
+              const copy = permanentDeleteCopy(item.name)
+              Alert.alert(copy.title, copy.description, [
                 { text: 'Cancelar', style: 'cancel' },
                 {
-                  text: 'Excluir',
+                  text: copy.action,
                   style: 'destructive',
                   onPress: () => void onDelete(item.id),
                 },
-              ],
-            )}
+              ])
+            }}
           />
         )}
       />
@@ -114,16 +122,18 @@ export function TrainingPlanTrashScreen({
           <View accessibilityViewIsModal style={styles.modal}>
             <Text style={styles.modalTitle}>Esvaziar lixeira?</Text>
             <Text style={styles.meta}>
-              Um backup será criado antes. Digite ESVAZIAR para excluir todas as fichas definitivamente.
+              {emptyTrashCountLabel(plans.length)}
+              {'\n'}Um backup será criado primeiro. O histórico de sessões será preservado,
+              mas a programação não poderá ser recuperada.
+              {'\n'}Digite ESVAZIAR para continuar.
             </Text>
-            <TextInput
+            <ThemedTextInput
               accessibilityLabel="Confirmação para esvaziar a lixeira"
               autoCapitalize="characters"
-              editable={!busy}
+              disabled={busy}
               value={confirmation}
               onChangeText={setConfirmation}
               placeholder="ESVAZIAR"
-              placeholderTextColor={colors.textSecondary}
               style={styles.input}
             />
             <View style={styles.modalActions}>
@@ -136,10 +146,13 @@ export function TrainingPlanTrashScreen({
                 disabled={busy || !canEmpty}
                 style={[styles.dangerAction, (busy || !canEmpty) && styles.disabled]}
                 onPress={() => void (async () => {
-                  if (await onEmpty()) setConfirmingEmpty(false)
+                  const result = await onEmpty()
+                  if (result.status === 'success') setConfirmingEmpty(false)
                 })()}
               >
-                <Text style={styles.dangerActionText}>{busy ? 'Esvaziando…' : 'Esvaziar'}</Text>
+                {busy
+                  ? <ActivityIndicator color={colors.onPrimary} />
+                  : <Text style={styles.dangerActionText}>Esvaziar</Text>}
               </Pressable>
             </View>
           </View>
@@ -164,17 +177,27 @@ function TrashCard({
 }) {
   const styles = createStyles(colors)
   const now = new Date()
-  const remaining = trainingPlanTrashDaysRemaining(plan.purgeAt!, now)
+  const urgency = trainingPlanTrashUrgency(plan.purgeAt!, now)
   return (
     <View style={styles.card}>
-      <Text style={styles.name}>{plan.name}</Text>
+      <Text
+        accessible
+        accessibilityLabel={trainingPlanTrashAccessibilityLabel(plan, now)}
+        style={styles.name}
+      >
+        {plan.name}
+      </Text>
       <Text style={styles.meta}>
-        {plan.category} · {plan.days.reduce((total, day) => total + day.exercises.length, 0)} exercícios
+        {plan.category} · {plan.difficulty}
       </Text>
       <Text style={styles.meta}>
         Removida em {new Date(plan.deletedAt!).toLocaleDateString('pt-BR')}
       </Text>
-      <Text style={[styles.status, remaining <= 1 && styles.expiring]}>
+      <Text style={[
+        styles.status,
+        urgency === 'warning' && styles.warning,
+        urgency === 'expired' && styles.expired,
+      ]}>
         {trainingPlanTrashStatusLabel(plan.purgeAt!, now)}
       </Text>
       <View style={styles.actions}>
@@ -194,7 +217,7 @@ function TrashCard({
           style={styles.delete}
           onPress={onDelete}
         >
-          <Text style={styles.deleteText}>Excluir</Text>
+          <Text style={styles.deleteText}>Excluir permanentemente</Text>
         </Pressable>
       </View>
     </View>
@@ -207,8 +230,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   card: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 17, borderWidth: 1, marginBottom: 10, padding: 16 },
   name: { color: colors.textPrimary, fontSize: 17, fontWeight: '800', lineHeight: 23 },
   meta: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, marginTop: 4 },
-  status: { color: colors.textPrimary, fontSize: 14, fontWeight: '800', marginTop: 10 },
-  expiring: { color: colors.danger },
+  status: { color: colors.textSecondary, fontSize: 14, fontWeight: '800', marginTop: 10 },
+  warning: { color: colors.warning },
+  expired: { color: colors.danger },
   actions: { flexDirection: 'row', gap: 8, marginTop: 14 },
   restore: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 12, flex: 1, justifyContent: 'center', minHeight: 48 },
   restoreText: { color: colors.onPrimary, fontWeight: '800' },
@@ -221,7 +245,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   modalBackdrop: { alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.58)', flex: 1, justifyContent: 'center', padding: 24 },
   modal: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 20, borderWidth: 1, maxWidth: 420, padding: 20, width: '100%' },
   modalTitle: { color: colors.textPrimary, fontSize: 20, fontWeight: '800', marginBottom: 6 },
-  input: { backgroundColor: colors.background, borderColor: colors.border, borderRadius: 12, borderWidth: 1, color: colors.textPrimary, fontSize: 16, marginTop: 16, minHeight: 48, paddingHorizontal: 14 },
+  input: { marginTop: 16 },
   modalActions: { flexDirection: 'row', gap: 8, marginTop: 16 },
   secondaryAction: { alignItems: 'center', borderColor: colors.border, borderRadius: 12, borderWidth: 1, flex: 1, justifyContent: 'center', minHeight: 48 },
   secondaryText: { color: colors.textPrimary, fontWeight: '800' },

@@ -113,7 +113,8 @@ function LocalApp({
   const trash = useTrainingPlanTrashController(
     repositories.planTrash,
     () => backup.createAutomaticBackup('BEFORE_EMPTY_TRASH'),
-    refreshCore,
+    trainingPlan.refresh,
+    controller.refresh,
   )
   trashRefresh.current = trash.refresh
   useEffect(() => {
@@ -128,15 +129,15 @@ function LocalApp({
     controller.refresh,
     trash.refresh,
   ])
-  const notification = workoutSession.message
-    ? { message: workoutSession.message, kind: 'error' as const, source: 'other' as const }
-    : trainingPlan.message
+  const notification = trash.message
+    ? { message: trash.message, kind: trash.messageKind, source: 'trash' as const }
+    : workoutSession.message
+      ? { message: workoutSession.message, kind: 'error' as const, source: 'other' as const }
+      : trainingPlan.message
       ? { message: trainingPlan.message, kind: 'error' as const, source: 'other' as const }
       : controller.message
         ? { message: controller.message, kind: 'error' as const, source: 'other' as const }
-        : trash.message
-          ? { message: trash.message, kind: trash.messageKind, source: 'trash' as const }
-          : { message: backup.message, kind: backup.messageKind, source: 'other' as const }
+        : { message: backup.message, kind: backup.messageKind, source: 'other' as const }
   const navigationTheme = useMemo<NavigationTheme>(() => ({
     ...DefaultTheme,
     dark: isDark,
@@ -316,10 +317,18 @@ function LocalApp({
         message={notification.message}
         kind={notification.kind}
         notificationId={notification.source === 'trash' ? trash.notificationId : undefined}
-        actionLabel={notification.source === 'trash' && trash.hasUndo ? 'Desfazer' : undefined}
-        onAction={notification.source === 'trash' && trash.hasUndo ? () => void trash.undo() : undefined}
-        duration={notification.source === 'trash' && trash.hasUndo ? 6000 : undefined}
-        onDismiss={notification.source === 'trash' ? trash.dismissMessage : undefined}
+        actionLabel={notification.source === 'trash' && trash.pendingUndo ? 'Desfazer' : undefined}
+        actionBusyLabel="Desfazendo…"
+        onAction={notification.source === 'trash' && trash.pendingUndo
+          ? () => trash.undoMoveToTrash(trash.pendingUndo!.token)
+          : undefined}
+        duration={notification.source === 'trash' && trash.pendingUndo ? 6000 : undefined}
+        onDismiss={notification.source === 'trash'
+          ? () => trash.dismissNotification(
+            trash.notificationId,
+            trash.pendingUndo?.token,
+          )
+          : undefined}
       />
     </>
   )

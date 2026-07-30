@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Keyboard, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { shared, useTheme } from '../theme'
@@ -6,11 +6,23 @@ import { typography } from '../theme/typography'
 import { feedbackColors } from '../theme/uiContracts'
 
 export type ToastKind = 'info' | 'success' | 'warning' | 'error'
+export type ToastActionResult = boolean | void
+
+export async function executeToastAction(
+  action: () => ToastActionResult | Promise<ToastActionResult>,
+) {
+  try {
+    return await action() !== false
+  } catch {
+    return false
+  }
+}
 
 export function Toast({
   message,
   kind = 'info',
   actionLabel,
+  actionBusyLabel,
   onAction,
   duration = 4500,
   notificationId,
@@ -19,7 +31,8 @@ export function Toast({
   message: string
   kind?: ToastKind
   actionLabel?: string
-  onAction?: () => void
+  actionBusyLabel?: string
+  onAction?: () => ToastActionResult | Promise<ToastActionResult>
   duration?: number
   notificationId?: number
   onDismiss?: () => void
@@ -27,21 +40,50 @@ export function Toast({
   const { colors } = useTheme()
   const insets = useSafeAreaInsets()
   const [visible, setVisible] = useState(false)
+  const [actionBusy, setActionBusy] = useState(false)
   const [keyboardHeight, setKeyboardHeight] = useState(0)
-  const actionUsed = useRef(false)
-  const dismiss = useRef(onDismiss)
-  dismiss.current = onDismiss
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const actionRunningRef = useRef(false)
+  const currentKeyRef = useRef('')
+  const dismissedKeyRef = useRef<string | null>(null)
+  const visibleRef = useRef(false)
+  const dismissRef = useRef(onDismiss)
+  dismissRef.current = onDismiss
+  const toastKey = `${notificationId ?? 'message'}:${message}`
+  currentKeyRef.current = toastKey
+
+  const clearTimer = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = null
+  }, [])
+
+  const close = useCallback((key: string) => {
+    if (currentKeyRef.current !== key || dismissedKeyRef.current === key) return
+    clearTimer()
+    dismissedKeyRef.current = key
+    visibleRef.current = false
+    setVisible(false)
+    dismissRef.current?.()
+  }, [clearTimer])
+
+  const scheduleClose = useCallback((key: string) => {
+    clearTimer()
+    timerRef.current = setTimeout(() => {
+      if (!actionRunningRef.current) close(key)
+    }, duration)
+  }, [clearTimer, close, duration])
 
   useEffect(() => {
-    actionUsed.current = false
+    clearTimer()
+    actionRunningRef.current = false
+    dismissedKeyRef.current = null
+    visibleRef.current = Boolean(message)
+    setActionBusy(false)
     setVisible(Boolean(message))
-    if (!message) return
-    const timer = setTimeout(() => {
-      setVisible(false)
-      dismiss.current?.()
-    }, duration)
-    return () => clearTimeout(timer)
-  }, [duration, message, notificationId])
+    if (message) scheduleClose(toastKey)
+    return clearTimer
+  }, [clearTimer, message, notificationId, scheduleClose, toastKey])
+
   useEffect(() => {
     const show = Keyboard.addListener('keyboardDidShow', (event) => {
       setKeyboardHeight(Platform.OS === 'ios' ? event.endCoordinates.height : 0)
@@ -55,32 +97,58 @@ export function Toast({
 
   if (!message || !visible) return null
   const palette = toastColors(colors, kind)
+  const runAction = async (
+    key: string,
+    action: () => ToastActionResult | Promise<ToastActionResult>,
+  ) => {
+    if (
+      currentKeyRef.current !== key
+      || !visibleRef.current
+      || actionRunningRef.current
+    ) return
+    clearTimer()
+    actionRunningRef.current = true
+    setActionBusy(true)
+    const shouldClose = await executeToastAction(action)
+    if (currentKeyRef.current !== key) return
+    actionRunningRef.current = false
+    setActionBusy(false)
+    if (shouldClose) close(key)
+    else scheduleClose(key)
+  }
   return (
-    <View accessibilityLiveRegion={kind === 'error' ? 'assertive' : 'polite'} style={[styles.toast, {
-      backgroundColor: palette.background,
-      borderColor: palette.border,
-      bottom: keyboardHeight + insets.bottom + 76,
-    }]}>
+    <View
+      accessibilityLiveRegion={kind === 'error' ? 'assertive' : 'polite'}
+      style={[styles.toast, {
+        backgroundColor: palette.background,
+        borderColor: palette.border,
+        bottom: keyboardHeight + insets.bottom + 76,
+      }]}
+    >
       <Text style={[styles.message, { color: palette.text }]}>{message}</Text>
       {!!actionLabel && !!onAction && (
         <Pressable
+          accessibilityLabel={actionBusy ? actionBusyLabel ?? actionLabel : actionLabel}
           accessibilityRole="button"
-          onPress={() => {
-            if (actionUsed.current) return
-            actionUsed.current = true
-            setVisible(false)
-            onAction()
-            onDismiss?.()
-          }}
+          accessibilityState={{ busy: actionBusy, disabled: actionBusy }}
+          disabled={actionBusy}
+          onPress={() => void runAction(toastKey, onAction)}
           style={styles.action}
         >
-          <Text style={[styles.actionText, { color: palette.text }]}>{actionLabel}</Text>
+          <Text style={[styles.actionText, { color: palette.text }]}>
+            {actionBusy ? actionBusyLabel ?? actionLabel : actionLabel}
+          </Text>
         </Pressable>
       )}
-      <Pressable accessibilityLabel="Fechar mensagem" accessibilityRole="button" hitSlop={8} onPress={() => {
-        setVisible(false)
-        onDismiss?.()
-      }} style={styles.close}>
+      <Pressable
+        accessibilityLabel="Fechar mensagem"
+        accessibilityRole="button"
+        accessibilityState={{ disabled: actionBusy }}
+        disabled={actionBusy}
+        hitSlop={8}
+        onPress={() => close(toastKey)}
+        style={[styles.close, actionBusy && styles.disabled]}
+      >
         <Text style={[styles.closeText, { color: palette.text }]}>×</Text>
       </Pressable>
     </View>
@@ -109,4 +177,5 @@ const styles = StyleSheet.create({
   actionText: { ...typography.label, fontWeight: '900', textDecorationLine: 'underline' },
   close: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 },
   closeText: { fontSize: 24, lineHeight: 28 },
+  disabled: { opacity: 0.55 },
 })

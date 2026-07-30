@@ -1,28 +1,43 @@
 Continue o desenvolvimento do repositório `training-app` a partir do commit:
 
-f0eb7601bbdd1d4dd723fcafa56366d7a074d26f
+1e9f4469a44f9a8e5dad3ca7f993d0ca1fc20d08
 
-Este é o MARCO 1 do novo roadmap do aplicativo:
+Este é um PATCH DE ESTABILIZAÇÃO do Marco 1:
 
 CICLO DE VIDA DAS FICHAS E LIXEIRA LOCAL
 
-O aplicativo deve continuar:
+O Marco 1 já foi implementado, mas não deve ser considerado encerrado enquanto
+existirem problemas de concorrência, feedback incorreto após mutations
+confirmadas, divergências de UX e lacunas de teste.
 
-- local-only;
-- offline-first;
-- sem backend obrigatório;
-- sem VPS;
-- sem login;
-- com SQLite como fonte de verdade;
-- com histórico baseado em snapshots;
-- compatível com a integração Wger já implementada.
+Commit sugerido:
 
-Trabalhe principalmente em:
+fix(mobile): stabilize training plan trash lifecycle
+
+Não implementar funcionalidades do Marco 2.
+
+Não adicionar:
+
+- templates;
+- dropdowns de categoria;
+- dropdowns de dificuldade;
+- nova Home;
+- temas;
+- animações;
+- novas APIs;
+- catálogo inicial;
+- thumbnails;
+- IA;
+- nuvem;
+- novas migrations, salvo se uma necessidade real e comprovada for encontrada.
+
+Trabalhar apenas em:
 
 packages/training-domain/
 packages/training-local-db/
 mobile/
 docs/
+.github/workflows/
 
 Não alterar funcionalmente:
 
@@ -31,975 +46,781 @@ web/
 umamusume-mobile/
 packages/training-wger/
 
-Não implementar nesta etapa:
-
-- nova Home;
-- templates de ficha;
-- novos temas;
-- animações;
-- catálogo inicial expandido;
-- thumbnails;
-- múltiplos providers;
-- IA;
-- Health Connect;
-- nuvem;
-- novas funcionalidades de treino.
-
 ==================================================
-1. OBJETIVO DO MARCO
+1. OBJETIVO PRINCIPAL
 ==================================================
 
-Implementar uma lixeira local segura para fichas de treino.
+Substituir a lógica genérica e ambígua do método `run` do controller da lixeira
+por um fluxo explícito que diferencie:
 
-O ciclo de vida deve distinguir claramente:
+1. mutation não iniciada;
+2. mutation falhou antes do commit;
+3. mutation foi confirmada no SQLite;
+4. refresh após mutation teve sucesso;
+5. refresh após mutation falhou;
+6. operação de desfazer disponível;
+7. operação de desfazer em andamento;
+8. operação de desfazer consumida ou expirada.
 
-1. ficha ativa;
-2. ficha inativa;
-3. ficha arquivada;
-4. ficha na lixeira;
-5. ficha apagada permanentemente.
+A UI nunca deve afirmar que a mutation falhou quando o SQLite já confirmou a
+alteração.
 
-Arquivar e excluir não são a mesma ação.
-
-Arquivar:
-
-- mantém a ficha salva;
-- mantém a ficha fora da seleção principal;
-- permite restauração normal;
-- não inicia contagem para exclusão.
-
-Mover para a lixeira:
-
-- desativa a ficha;
-- remove a ficha das listas normais;
-- inicia retenção de sete dias;
-- permite desfazer e restaurar;
-- resulta em exclusão permanente após a retenção.
+O botão Desfazer nunca deve desaparecer sem restaurar a ficha apenas porque um
+refresh ainda estava em andamento.
 
 ==================================================
-2. ROADMAP DO PRODUTO
+2. PROBLEMA ATUAL DO `run`
+==================================================
+
+A implementação atual trata mutation e refresh como uma única operação:
+
+- executa a mutation;
+- publica mensagem e callback de Desfazer;
+- ainda mantém o lock global;
+- executa refresh;
+- retorna sucesso ou falha de forma genérica.
+
+Isso permite a seguinte corrida:
+
+1. `moveToTrash` confirma a alteração no SQLite;
+2. Snackbar é exibido;
+3. refresh ainda está em andamento;
+4. usuário toca em Desfazer;
+5. o callback limpa o ID pendente;
+6. o lock global rejeita a restauração;
+7. o Snackbar fecha;
+8. a ficha permanece na lixeira.
+
+Também existe outro problema:
+
+1. mutation confirma no SQLite;
+2. refresh falha;
+3. controller retorna false;
+4. tela informa falha ou não navega;
+5. banco já foi alterado.
+
+Corrigir os dois problemas na raiz.
+
+Não apenas adicionar `setTimeout`, aumentar a duração do Snackbar ou inserir
+outro booleano em torno do código existente.
+
+==================================================
+3. REMOVER OU REESTRUTURAR O `run`
+==================================================
+
+Remover o helper genérico atual ou substituí-lo por uma abstração com semântica
+explícita.
+
+Criar tipos semelhantes a:
+
+type CommittedMutationResult<T> =
+  | {
+      status: 'committed'
+      value: T
+      refreshStatus: 'success'
+    }
+  | {
+      status: 'committed'
+      value: T
+      refreshStatus: 'failed'
+      refreshError: unknown
+    }
+  | {
+      status: 'failed'
+      error: unknown
+    }
+
+O nome exato pode variar, mas deve ser impossível confundir:
+
+- mutation falhou;
+- mutation confirmou e refresh falhou.
+
+Criar uma função interna como:
+
+executeCommittedMutation<T>(
+  operationKey: string,
+  mutation: () => Promise<T>,
+  refresh: () => Promise<void>
+): Promise<CommittedMutationResult<T>>
+
+Regras:
+
+1. adquirir lock;
+2. executar mutation;
+3. registrar localmente que a mutation foi confirmada;
+4. tentar refresh;
+5. capturar falha do refresh separadamente;
+6. liberar lock em `finally`;
+7. retornar resultado estruturado;
+8. nunca publicar Snackbar dentro desse helper;
+9. nunca navegar dentro desse helper;
+10. nunca limpar estado de Desfazer dentro desse helper.
+
+Nenhum callback de UI deve ser disponibilizado enquanto o lock da mutation
+original ainda estiver ativo.
+
+==================================================
+4. LOCK E OPERAÇÕES CONCORRENTES
+==================================================
+
+Substituir o booleano global pouco expressivo por estado explícito.
+
+Pode usar:
+
+- `activeOperationRef: string | null`;
+- ou `busyKeysRef: Set<string>`.
+
+Operações destrutivas da lixeira podem continuar serializadas.
+
+Chaves sugeridas:
+
+- trash:move:<planId>
+- trash:restore:<planId>
+- trash:delete:<planId>
+- trash:empty
+- trash:purge
+- trash:undo:<planId>
+
+Regras:
+
+- a mesma operação não pode iniciar duas vezes;
+- duplo toque deve resultar em uma única mutation;
+- o lock deve ser liberado em `finally`;
+- falha de refresh não pode manter lock;
+- falha de mensagem ou callback não pode manter lock;
+- nenhuma operação deve depender de estado React assíncrono para garantir
+  exclusão mútua;
+- usar refs para a garantia imediata de concorrência.
+
+Não criar mutex externo ou biblioteca nova.
+
+==================================================
+5. PUBLICAÇÃO DO SNACKBAR DESFAZER
+==================================================
+
+O Snackbar com Desfazer só pode ser publicado depois de:
+
+1. `moveToTrash` ter sido confirmado;
+2. tentativa de refresh ter terminado;
+3. lock da operação ter sido liberado.
+
+Fluxo correto:
+
+mutation
+→ tentativa de refresh
+→ liberação do lock
+→ navegação
+→ publicação do Snackbar com Desfazer
+
+Caso a mutation confirme e o refresh falhe:
+
+- considerar a exclusão concluída;
+- navegar normalmente;
+- disponibilizar Desfazer;
+- informar:
+  “Ficha movida para a lixeira, mas a tela não pôde ser atualizada.”
+- oferecer ação para tentar atualizar novamente quando adequado.
+
+Não mostrar:
+
+“Não foi possível mover a ficha”
+
+quando a ficha já foi movida.
+
+==================================================
+6. ESTADO TOKENIZADO DE DESFAZER
+==================================================
+
+Substituir o estado baseado apenas em `undoPlanId` por um objeto tokenizado.
+
+Criar tipo semelhante a:
+
+interface PendingTrashUndo {
+  token: string
+  planId: number
+  planName: string
+  createdAt: number
+  expiresAt: number
+  status: 'available' | 'running'
+}
+
+Guardar em ref e expor o necessário para a UI.
+
+Cada nova ação de mover para a lixeira deve criar um token único.
+
+Pode usar:
+
+- contador incremental local;
+- combinação segura de timestamp e contador;
+- `crypto.randomUUID()` apenas se disponível no ambiente sem polyfill adicional.
+
+Não depender exclusivamente de `Date.now()` se duas operações puderem ocorrer no
+mesmo milissegundo.
+
+==================================================
+7. CALLBACK DE DESFAZER
 ==================================================
 
 Criar:
 
-docs/PRODUCT_ROADMAP.md
-
-Registrar os seis marcos planejados:
-
-1. ciclo de vida das fichas e lixeira;
-2. editor de ficha e templates;
-3. Home semanal limpa;
-4. skins, animações e acessibilidade;
-5. biblioteca inicial e mídia;
-6. providers, inteligência local e release candidate.
-
-No Marco 1, registrar como aprovados:
-
-- lixeira com sete dias;
-- badge com quantidade;
-- aviso de expiração;
-- backup antes de esvaziar;
-- lixeira incluída no backup;
-- confirmação reforçada para exclusão permanente.
-
-Registrar que estão adiados:
-
-- ordenação avançada da lixeira;
-- auditoria detalhada da origem da exclusão.
-
-Não implementar itens dos marcos seguintes.
-
-==================================================
-3. MODELO DE DOMÍNIO
-==================================================
-
-Adicionar ao modelo TrainingPlan:
-
-- deletedAt: string | null;
-- purgeAt: string | null.
-
-Não substituir `active` e `archived` por um enum nesta etapa.
-
-Regras válidas:
-
-Ficha normal:
-- deletedAt = null;
-- purgeAt = null.
-
-Ficha na lixeira:
-- deletedAt contém timestamp ISO UTC;
-- purgeAt contém timestamp ISO UTC;
-- purgeAt é exatamente sete dias após deletedAt;
-- active = false;
-- archived = false.
-
-Ficha arquivada:
-- archived = true;
-- active = false;
-- deletedAt = null;
-- purgeAt = null.
-
-Ficha ativa:
-- active = true;
-- archived = false;
-- deletedAt = null;
-- purgeAt = null.
-
-Nunca permitir:
-
-- ficha ativa e arquivada;
-- ficha ativa e na lixeira;
-- ficha arquivada e na lixeira;
-- deletedAt sem purgeAt;
-- purgeAt sem deletedAt;
-- purgeAt menor ou igual a deletedAt.
-
-==================================================
-4. FUNÇÕES PURAS DE DOMÍNIO
-==================================================
-
-Criar funções puras e testáveis:
-
-computeTrainingPlanPurgeAt(
-  deletedAt: Date,
-  retentionDays?: number
-): string
-
-trainingPlanTrashDaysRemaining(
-  purgeAt: string,
-  now?: Date
-): number
-
-trainingPlanTrashStatusLabel(
-  purgeAt: string,
-  now?: Date
-): string
-
-validateTrainingPlanLifecycle(plan): void
-
-A retenção padrão deve ser:
-
-7 dias exatos, equivalentes a 7 * 24 horas.
-
-Labels esperadas:
-
-- mais de um dia:
-  “Será apagada em 5 dias”
-
-- um dia:
-  “Será apagada amanhã”
-
-- menos de 24 horas:
-  “Será apagada hoje”
-
-- vencida:
-  “Pronta para exclusão”
-
-O cálculo deve ser determinístico e não depender do timezone para comparar
-timestamps UTC.
-
-==================================================
-5. MIGRATION SQLITE
-==================================================
-
-Não editar migrations 1, 2, 3 ou 4.
-
-Criar migration 5:
-
-training_plan_trash
-
-Adicionar em training_plans:
-
-- deleted_at TEXT;
-- purge_at TEXT.
-
-Adicionar índice:
-
-training_plan_trash_lookup
-
-sobre:
-
-- deleted_at;
-- purge_at.
-
-Adicionar índice ou ajuste de consulta para listagem das fichas normais sem
-prejudicar a listagem da lixeira.
-
-Quando viável sem reconstrução insegura da tabela, criar triggers que impeçam:
-
-- active = 1 com archived = 1;
-- active = 1 com deleted_at preenchido;
-- archived = 1 com deleted_at preenchido;
-- apenas um dos timestamps deleted_at/purge_at preenchido.
-
-Caso triggers tornem a migration excessivamente complexa, manter as garantias
-no domínio e repositories, mas documentar a decisão.
-
-Não usar `IF NOT EXISTS` para esconder inconsistências do histórico de
-migrations.
-
-Testar:
-
-- upgrade migration 4 para 5;
-- banco novo migrations 1 a 5;
-- segunda inicialização;
-- checksums imutáveis;
-- dados antigos preservados;
-- fichas existentes recebem deleted_at e purge_at nulos.
-
-==================================================
-6. REPOSITORY DE LIXEIRA
-==================================================
-
-Criar interface separada:
-
-TrainingPlanTrashRepository
-
-Métodos:
-
-list(): Promise<TrainingPlan[]>
-
-count(): Promise<number>
-
-moveToTrash(
-  planId: number,
-  deletedAt?: Date
-): Promise<TrainingPlan>
-
-restore(
-  planId: number
-): Promise<TrainingPlan>
-
-deletePermanently(
-  planId: number
-): Promise<void>
-
-emptyTrash(): Promise<number>
-
-purgeExpired(
-  now?: Date
-): Promise<number>
-
-Adicionar ao composition root:
-
-repositories.planTrash
-
-Não misturar operações de lixeira com `BackupRepository.reset()`.
-
-==================================================
-7. MOVER PARA A LIXEIRA
-==================================================
-
-`moveToTrash` deve executar em transação.
+undoMoveToTrash(token: string): Promise<boolean>
 
 Fluxo:
 
-1. buscar ficha;
-2. rejeitar ficha inexistente;
-3. rejeitar ficha já na lixeira;
-4. verificar sessão ativa ou pausada;
-5. caso exista sessão ativa ligada à ficha, bloquear;
-6. calcular deletedAt;
-7. calcular purgeAt em sete dias;
-8. definir active = false;
-9. definir archived = false;
-10. persistir deleted_at e purge_at;
-11. atualizar updated_at;
-12. retornar a ficha alterada.
+1. verificar se existe pending undo;
+2. verificar se o token recebido ainda é o token atual;
+3. verificar se não expirou;
+4. verificar se não está em execução;
+5. adquirir lock de undo;
+6. marcar status como running;
+7. executar `repository.restore(planId)`;
+8. considerar a restauração confirmada assim que o SQLite concluir;
+9. tentar atualizar os controllers;
+10. liberar lock;
+11. limpar pending undo somente depois de a restauração ter sido confirmada;
+12. retornar true quando a ficha foi restaurada;
+13. retornar false quando nada foi restaurado.
 
-Erro de domínio sugerido:
+Se o refresh falhar depois de restaurar:
 
-ACTIVE_SESSION_USES_TRAINING_PLAN
+- considerar Desfazer concluído;
+- limpar o pending undo;
+- informar:
+  “Ficha restaurada, mas a tela não pôde ser atualizada.”
+- não tentar restaurar outra vez.
 
-Mensagem:
+Se a mutation de restore falhar:
 
-“Conclua ou abandone a sessão ativa antes de excluir esta ficha.”
+- manter o pending undo disponível enquanto ainda estiver no prazo;
+- retornar false;
+- não fechar automaticamente o Snackbar;
+- mostrar erro amigável.
 
-Não abandonar ou concluir sessão automaticamente.
+Não limpar token antes de obter sucesso na mutation.
 
 ==================================================
-8. LISTAGENS E CONSULTAS
+8. CALLBACKS OBSOLETOS
 ==================================================
 
-Por padrão, fichas na lixeira não podem aparecer em:
+O `onDismiss` de um Snackbar antigo não pode limpar um undo novo.
+
+Criar:
+
+clearPendingUndo(token: string): void
+
+A função só limpa quando:
+
+pendingUndo.token === token
+
+Exemplo de caso a proteger:
+
+1. ficha A gera Snackbar token A;
+2. ficha B gera Snackbar token B;
+3. callback atrasado de A executa;
+4. token B deve permanecer intacto.
+
+Adicionar teste específico.
+
+==================================================
+9. COMPONENTE TOAST/SNACKBAR
+==================================================
+
+Atualizar o componente atual para aceitar ação assíncrona de forma segura.
+
+Contrato sugerido:
+
+interface ToastAction {
+  label: string
+  onPress: () => boolean | void | Promise<boolean | void>
+}
+
+Ou props equivalentes:
+
+- actionLabel;
+- onAction;
+- actionBusy opcional;
+- onDismiss.
+
+Regras:
+
+- impedir duplo toque enquanto a ação estiver em execução;
+- área de toque mínima de 48 dp;
+- mostrar estado visual de execução quando necessário;
+- chamar `onAction`;
+- aguardar Promise;
+- se o resultado for false, manter Snackbar visível;
+- se o resultado for true ou void, fechar;
+- chamar `onDismiss` somente quando realmente fechar;
+- fechamento automático deve respeitar token atual;
+- timer deve ser cancelado durante ação assíncrona;
+- timer não pode fechar Snackbar enquanto Desfazer está rodando;
+- erro do callback não deve causar unhandled rejection;
+- ação antiga não pode executar após troca de mensagem.
+
+Não armazenar callback no SQLite ou no domínio.
+
+==================================================
+10. EXPIRAÇÃO DO DESFAZER
+==================================================
+
+A duração visual continua sendo aproximadamente seis segundos.
+
+Quando expirar:
+
+- limpar apenas o token correspondente;
+- não alterar a ficha;
+- não executar restore;
+- não produzir erro.
+
+Caso o usuário toque exatamente durante a expiração:
+
+- no máximo uma decisão deve vencer;
+- ou a restauração inicia e o timer é cancelado;
+- ou o token expira e a restauração não inicia;
+- nunca restaurar duas vezes;
+- nunca deixar o Snackbar sem estado consistente.
+
+Adicionar teste com timers falsos.
+
+==================================================
+11. RESULTADOS PÚBLICOS DO CONTROLLER
+==================================================
+
+Evitar retornar apenas boolean quando a UI precisa distinguir estados.
+
+Para `moveToTrash`, retornar resultado como:
+
+type TrashUiResult =
+  | { status: 'success'; refreshWarning: false }
+  | { status: 'success'; refreshWarning: true }
+  | { status: 'failed' }
+
+O nome pode variar.
+
+O editor deve navegar para trás quando:
+
+status === 'success'
+
+mesmo que:
+
+refreshWarning === true
+
+Somente permanecer na tela quando a mutation falhou.
+
+Aplicar a mesma distinção, quando necessário, a:
+
+- restore;
+- deletePermanently;
+- emptyTrash;
+- purgeExpired.
+
+Não transformar todas as operações do aplicativo inteiro neste patch.
+
+Limitar a mudança ao controller da lixeira e integrações diretas.
+
+==================================================
+12. REFRESH CONSISTENTE
+==================================================
+
+Criar função separada:
+
+refreshTrashDependents(): Promise<void>
+
+Ela deve atualizar de forma explícita:
 
 - lista normal de fichas;
-- seletor de ficha;
-- ficha ativa;
+- ficha selecionada;
 - dashboard;
-- tela de arquivadas;
-- criação de sessão;
-- duplicação;
-- ativação;
-- edição;
-- reordenação;
-- busca normal por ID.
+- lixeira;
+- contador/badge.
 
-A tela de lixeira deve usar uma consulta explícita que retorna apenas:
+Usar `Promise.allSettled`, ou tratamento equivalente, quando múltiplos refreshes
+independentes forem executados.
 
-deleted_at IS NOT NULL
+Não interromper a coleta das falhas na primeira Promise rejeitada.
 
-A tela de arquivadas deve retornar apenas:
+Retornar ou lançar um erro agregado sanitizado contendo quais partes falharam.
 
-archived = 1
-AND deleted_at IS NULL
+Não executar a mutation novamente para corrigir falha de refresh.
 
-A listagem normal deve retornar apenas:
+Adicionar ação ou método:
 
-archived = 0
-AND deleted_at IS NULL
+retryRefresh(): Promise<boolean>
 
-A ativação deve exigir:
-
-archived = 0
-AND deleted_at IS NULL
-
-O início de sessão deve rejeitar uma ficha na lixeira mesmo que um ID antigo seja
-fornecido diretamente.
+Essa ação apenas recarrega dados.
 
 ==================================================
-9. RESTAURAÇÃO
+13. CORRIGIR EXCLUSÃO PERMANENTE
 ==================================================
 
-Ao restaurar uma ficha:
+Na confirmação individual, mostrar:
 
-- deletedAt = null;
-- purgeAt = null;
-- active = false;
-- archived = false;
-- updatedAt atualizado.
+Título:
 
-A ficha volta como inativa.
+Excluir “<nome da ficha>” permanentemente?
 
-Não reativar automaticamente, mesmo que fosse ativa antes da exclusão.
+Descrição:
 
-Não registrar estado anterior nesta etapa.
+“A programação desta ficha não poderá ser recuperada. Seu histórico de sessões
+será preservado.”
 
-Não restaurar fichas já apagadas permanentemente.
+Botões:
 
-==================================================
-10. EXCLUSÃO PERMANENTE
-==================================================
+- Cancelar;
+- Excluir permanentemente.
 
-`deletePermanently` deve aceitar apenas fichas que já estejam na lixeira.
+O botão destrutivo deve usar exatamente:
 
-Não permitir apagar permanentemente:
+“Excluir permanentemente”
 
-- ficha normal;
-- ficha arquivada;
-- ficha ativa;
-- ficha usada por sessão ativa ou pausada.
+Não usar apenas “Excluir”.
 
-A exclusão deve:
+Adicionar teste de interface verificando:
 
-- apagar training_plan_days por cascade;
-- apagar training_day_exercises por cascade;
-- apagar rest_activities por cascade;
-- preservar workout_sessions;
-- preservar workout_session_exercises;
-- preservar workout_set_logs;
-- preservar nomes e snapshots do histórico.
-
-O histórico não pode depender da existência posterior da ficha.
-
-Adicionar teste explícito:
-
-1. criar ficha;
-2. iniciar e concluir sessão;
-3. mover ficha para lixeira;
-4. excluir permanentemente;
-5. confirmar que o histórico e snapshots continuam legíveis.
+- nome da ficha;
+- texto sobre histórico;
+- texto do botão.
 
 ==================================================
-11. EXPURGO AUTOMÁTICO
+14. CORRIGIR CARD DA LIXEIRA
 ==================================================
-
-Executar purgeExpired:
-
-- durante o bootstrap local, após migrations e inicialização;
-- ao abrir a tela da lixeira;
-- após restaurar um backup.
-
-O expurgo deve remover apenas fichas onde:
-
-deleted_at IS NOT NULL
-AND purge_at <= now
-
-Não apagar:
-
-- ficha normal;
-- ficha arquivada;
-- ficha ainda dentro dos sete dias;
-- ficha ligada a sessão ativa ou pausada.
-
-O expurgo deve ser transacional.
-
-Não executar serviço em background.
-
-Não adicionar WorkManager, cron job, servidor ou processo externo.
-
-==================================================
-12. BADGE DA LIXEIRA
-==================================================
-
-Na tela Mais, adicionar entrada:
-
-Lixeira de fichas
-
-Exibir badge com a quantidade atual.
-
-Exemplos:
-
-- sem itens: sem badge ou badge oculto;
-- um item: 1;
-- nove itens: 9;
-- mais de 99: 99+.
-
-O badge deve atualizar após:
-
-- mover ficha;
-- desfazer;
-- restaurar;
-- excluir permanentemente;
-- esvaziar;
-- expurgo;
-- restaurar backup.
-
-Acessibilidade:
-
-“Lixeira de fichas, 3 itens”
-
-Não alterar a Home neste marco.
-
-==================================================
-13. TELA DA LIXEIRA
-==================================================
-
-Criar rota:
-
-TrainingPlanTrash
-
-Criar tela:
-
-TrainingPlanTrashScreen
 
 Cada card deve mostrar:
 
-- nome da ficha;
+- nome;
 - categoria;
 - dificuldade;
-- data da exclusão;
-- aviso de tempo restante;
-- Restaurar;
-- Excluir permanentemente.
+- data em que foi movida;
+- label de expiração;
+- restaurar;
+- excluir permanentemente.
 
-Estados:
+Não omitir dificuldade.
 
-- carregando;
-- vazia;
-- com itens;
-- erro;
-- expurgando;
-- restaurando;
-- excluindo;
-- esvaziando.
+Acessibilidade deve descrever:
 
-Estado vazio:
+“<nome>, categoria <categoria>, dificuldade <dificuldade>, será apagada em X
+dias.”
+
+==================================================
+15. NÍVEIS VISUAIS DE EXPIRAÇÃO
+==================================================
+
+Aplicar exatamente:
+
+- mais de 2 dias: `textSecondary`;
+- 2 dias ou menos, mas ainda não vencida: `warning`;
+- vencida: `danger`.
+
+Não depender apenas da cor.
+
+Manter texto explícito:
+
+- “Será apagada em X dias”;
+- “Será apagada amanhã”;
+- “Será apagada hoje”;
+- “Pronta para exclusão”.
+
+Adicionar função pura ou contrato visual testável para determinar a intenção:
+
+type TrashUrgency =
+  | 'normal'
+  | 'warning'
+  | 'expired'
+
+==================================================
+16. TEXTO SOBRE EXPURGO
+==================================================
+
+Substituir textos que afirmem exclusão automática em background.
+
+Usar:
+
+“As fichas ficam na lixeira por sete dias. Depois do prazo, são removidas na
+próxima abertura do app ou atualização desta tela.”
+
+No estado vazio:
 
 “Não há fichas na lixeira.”
 
 Descrição:
 
-“As fichas excluídas ficam aqui por sete dias antes da remoção permanente.”
+“As fichas excluídas podem ser restauradas durante sete dias.”
 
-Adicionar ação:
-
-Esvaziar lixeira
-
-Mostrar apenas quando houver pelo menos uma ficha.
-
-Não implementar ordenação avançada neste marco.
-
-Ordenar inicialmente por:
-
-purge_at ASC
-
-ou seja, fichas próximas de expirar primeiro.
-
-Essa ordenação básica é necessária para segurança e não constitui o sistema
-avançado adiado.
+Atualizar README e documentação com a mesma semântica.
 
 ==================================================
-14. AVISO DE EXPIRAÇÃO
+17. MODAL ESVAZIAR
 ==================================================
 
-Exibir labels usando a função pura do domínio.
+Substituir o `TextInput` cru por `ThemedTextInput`.
 
-Estilos:
+Mostrar quantidade exata:
 
-- mais de 2 dias: texto secundário;
-- 2 dias ou menos: warning;
-- pronta para exclusão: danger.
+- “1 ficha será excluída permanentemente.”
+- “3 fichas serão excluídas permanentemente.”
 
-Não depender apenas da cor.
+Informar:
 
-Usar também texto explícito.
+- backup será criado primeiro;
+- histórico de sessões será preservado;
+- programação não poderá ser recuperada.
 
-Exemplo:
+Manter confirmação digitada:
 
-“Será apagada amanhã”
+ESVAZIAR
 
-Não atualizar a tela a cada segundo.
+Normalização:
 
-Atualizar ao:
+value.trim().toUpperCase() === 'ESVAZIAR'
 
-- abrir tela;
-- voltar do background;
-- restaurar;
-- excluir;
-- realizar pull-to-refresh.
+Botão destrutivo deve permanecer desabilitado até a confirmação válida.
 
-==================================================
-15. DESFAZER EXCLUSÃO
-==================================================
+Durante a operação:
 
-Depois de mover uma ficha para a lixeira:
-
-- voltar para a tela anterior;
-- mostrar Snackbar global;
-- mensagem:
-  “Ficha movida para a lixeira.”
-- ação:
-  “Desfazer”
-
-A ação Desfazer deve restaurar a ficha.
-
-Como a restauração sempre volta inativa, desfazer também retorna a ficha como
-inativa.
-
-Estender o componente Toast/Snackbar atual para aceitar opcionalmente:
-
-- actionLabel;
-- onAction;
-- duração configurável.
-
-Requisitos:
-
-- ação acessível;
-- ação com touch target mínimo;
-- não cobrir tab bar;
-- não cobrir teclado;
-- não armazenar callback no domínio ou SQLite;
-- limpar a ação ao expirar;
-- evitar executar duas vezes.
-
-Duração recomendada para Snackbar com ação:
-
-6 segundos.
-
-Se o desfazer falhar, mostrar erro normal e manter a ficha na lixeira.
+- impedir duplo envio;
+- não fechar modal antes do resultado;
+- mostrar loading;
+- se backup falhar, manter modal e dados;
+- se emptyTrash confirmar mas refresh falhar, fechar modal e mostrar warning,
+  pois a lixeira já foi esvaziada.
 
 ==================================================
-16. EDITOR DA FICHA
+18. BACKUP E MENSAGENS
 ==================================================
 
-No TrainingPlanEditorScreen, manter:
-
-- Salvar;
-- Ativar;
-- Duplicar;
-- Arquivar.
-
-Adicionar seção visual separada:
-
-ZONA DE PERIGO
-
-Conteúdo:
-
-“Mover ficha para a lixeira”
-
-Descrição:
-
-“Ela poderá ser restaurada durante sete dias.”
-
-A ação deve:
-
-- exigir que não existam alterações não salvas;
-- pedir confirmação;
-- chamar moveToTrash;
-- navegar para trás quando concluída;
-- mostrar Snackbar com Desfazer.
-
-Não adicionar ainda:
-
-- dropdown de categoria;
-- dropdown de dificuldade;
-- templates;
-- nova organização completa do editor.
-
-Esses itens pertencem ao Marco 2.
-
-==================================================
-17. CONFIRMAÇÃO REFORÇADA
-==================================================
-
-Mover para a lixeira:
-
-- confirmação simples;
-- informar retenção de sete dias;
-- não usar linguagem de exclusão permanente.
-
-Excluir uma ficha permanentemente:
-
-- abrir confirmação específica;
-- mostrar o nome da ficha;
-- explicar que histórico será preservado;
-- explicar que a programação da ficha não poderá ser recuperada;
-- usar ação destructive com texto:
-  “Excluir permanentemente”
-
-Esvaziar lixeira:
-
-- usar modal de confirmação reforçada;
-- mostrar quantidade de fichas;
-- informar que um backup será criado;
-- exigir digitação da palavra:
-  ESVAZIAR
-
-A comparação deve:
-
-- ignorar espaços externos;
-- aceitar maiúsculas/minúsculas;
-- não aceitar texto parcial.
-
-Não usar o nome da ficha como confirmação em exclusão individual, porque isso
-torna a operação excessivamente incômoda no celular.
-
-==================================================
-18. BACKUP ANTES DE ESVAZIAR
-==================================================
-
-Adicionar motivo:
+Manter:
 
 BEFORE_EMPTY_TRASH
 
-ao tipo AutomaticBackupReason.
+Garantir:
 
-Antes de esvaziar a lixeira:
+- backup termina antes da mutation;
+- falha de backup impede mutation;
+- backup criado não é apagado caso refresh falhe;
+- mensagem de sucesso diferencia:
+  - backup e esvaziamento concluídos;
+  - esvaziamento concluído, refresh falhou.
 
-1. exportar backup automático;
-2. persistir metadados do backup;
-3. confirmar que o arquivo foi criado;
-4. somente então executar emptyTrash.
-
-Caso o backup falhe:
-
-- não esvaziar;
-- mostrar erro;
-- manter todos os dados;
-- não executar exclusão parcial.
-
-Após sucesso:
-
-“Backup de segurança criado e lixeira esvaziada.”
-
-Não criar backup automático antes do expurgo normal de fichas já vencidas.
-
-A retenção de sete dias já é a proteção para esse fluxo.
+Não alterar o schema do backup neste patch.
 
 ==================================================
-19. BACKUP COM LIXEIRA
+19. DOCUMENTAÇÃO DO BACKUP
 ==================================================
 
-Atualizar o formato para:
+Corrigir referências ao nome físico do arquivo.
+
+Não afirmar que o arquivo se chama literalmente:
 
 training-backup-v2.json
 
-Definir:
-
-schemaVersion: 2
-
-Adicionar aos registros de trainingPlans:
-
-- deleted_at;
-- purge_at.
-
-O backup deve incluir:
-
-- fichas normais;
-- fichas arquivadas;
-- fichas na lixeira;
-- dias e exercícios de todas elas;
-- deletedAt original;
-- purgeAt original.
-
-Não incluir:
-
-- callbacks de Snackbar;
-- estado transitório de desfazer;
-- contador derivado;
-- labels de expiração calculadas.
-
-Manter compatibilidade de leitura com schemaVersion 1.
-
-Ao importar backup v1:
-
-- deleted_at = null;
-- purge_at = null;
-- preservar todo o restante.
-
-Ao importar backup v2, validar:
-
-- os timestamps são ISO UTC;
-- ambos são nulos ou ambos preenchidos;
-- purge_at > deleted_at;
-- ficha na lixeira tem active = 0;
-- ficha na lixeira tem archived = 0;
-- apenas uma ficha normal pode estar ativa;
-- ficha ativa não pode estar na lixeira;
-- ficha arquivada não pode estar na lixeira.
-
-Não exportar app_metadata.
-
-==================================================
-20. RESTAURAÇÃO DE BACKUP
-==================================================
-
-A restauração deve continuar transacional.
-
-Fluxo:
-
-1. validar backup completo;
-2. converter backup v1 para representação v2;
-3. criar backup de segurança do banco atual;
-4. restaurar em transação;
-5. executar purgeExpired;
-6. atualizar controllers;
-7. atualizar badge da lixeira.
-
-Se a restauração falhar:
-
-- rollback integral;
-- manter banco anterior;
-- manter lixeira anterior;
-- não apagar backup de segurança.
-
-Adicionar testes para:
-
-- importar v1;
-- importar v2;
-- importar v2 com ficha na lixeira;
-- importar v2 com timestamps inconsistentes;
-- rollback;
-- backup contendo ficha expirada;
-- histórico preservado.
-
-==================================================
-21. CONTROLLER
-==================================================
-
-Criar hook separado:
-
-useTrainingPlanTrashController
-
-Responsabilidades:
-
-- carregar itens;
-- carregar contador;
-- mover para lixeira;
-- restaurar;
-- excluir permanentemente;
-- esvaziar;
-- expurgar;
-- controlar loading e busy keys;
-- mensagens;
-- Snackbar com Desfazer;
-- sincronizar demais controllers.
-
-Não esconder repository em singleton global.
-
-Injetar explicitamente:
-
-- TrainingPlanTrashRepository;
-- função para criar backup automático;
-- callback de refresh das fichas;
-- callback de refresh do dashboard;
-- callback de refresh da lixeira.
-
-Uma operação em andamento deve impedir duplo clique equivalente.
-
-==================================================
-22. PROTEÇÃO DAS OPERAÇÕES EXISTENTES
-==================================================
-
-Atualizar operações existentes para rejeitar fichas na lixeira:
-
-- update;
-- duplicate;
-- activate;
-- archive;
-- updateDay;
-- addExercise;
-- updateExercise;
-- removeExercise;
-- reorderExercise;
-- addRestActivity;
-- updateRestActivity;
-- removeRestActivity;
-- reorderRestActivities;
-- start session.
-
-Usar erro de domínio consistente:
-
-TRAINING_PLAN_IN_TRASH
-
-Mensagem:
-
-“Esta ficha está na lixeira e precisa ser restaurada antes de ser alterada.”
-
-Não reutilizar `notFound` para esconder todos os casos nos repositories internos.
-
-Na UI pública, pode ser mostrada mensagem amigável sem expor detalhes do banco.
-
-==================================================
-23. TESTES DE DOMÍNIO
-==================================================
-
-Adicionar testes para:
-
-- purgeAt sete dias depois;
-- dias restantes;
-- amanhã;
-- hoje;
-- vencida;
-- ciclo normal;
-- ativa não pode estar na lixeira;
-- arquivada não pode estar na lixeira;
-- timestamps incompletos;
-- purgeAt anterior a deletedAt;
-- restauração sempre inativa;
-- timezone não altera retenção.
-
-==================================================
-24. TESTES SQLITE
-==================================================
-
-Adicionar testes com transação real para:
-
-1. migration 4 para 5;
-2. banco novo até migration 5;
-3. segunda inicialização;
-4. ficha normal não aparece na lixeira;
-5. ficha arquivada não aparece na lixeira;
-6. mover ficha ativa desativa;
-7. mover ficha arquivada remove archived;
-8. sessão ativa bloqueia exclusão;
-9. sessão pausada bloqueia exclusão;
-10. sessão concluída não bloqueia;
-11. restaurar retorna inativa;
-12. ativação de ficha na lixeira falha;
-13. edição de ficha na lixeira falha;
-14. início de sessão com ficha na lixeira falha;
-15. exclusão permanente preserva histórico;
-16. expurgo remove apenas vencidas;
-17. expurgo não remove fichas dentro do prazo;
-18. emptyTrash remove todas as fichas na lixeira;
-19. rollback em falha de emptyTrash;
-20. count atualizado;
-21. backup v1 compatível;
-22. backup v2 preserva lixeira;
-23. backup inválido rejeitado;
-24. restauração faz rollback integral.
-
-==================================================
-25. TESTES MOBILE
-==================================================
-
-Adicionar testes para:
-
-- badge oculto quando vazio;
-- badge atualizado após exclusão;
-- tela vazia;
-- lista com dias restantes;
-- alerta “amanhã”;
-- mover ficha;
-- Snackbar com Desfazer;
-- Desfazer restaura;
-- Desfazer não executa duas vezes;
-- botão bloqueado com formulário sujo;
-- erro de sessão ativa;
-- restauração;
-- confirmação permanente;
-- palavra ESVAZIAR incorreta;
-- palavra ESVAZIAR correta;
-- backup criado antes de esvaziar;
-- falha do backup impede esvaziar;
-- navegação para lixeira;
-- acessibilidade do badge e das ações.
-
-==================================================
-26. DOCUMENTAÇÃO
-==================================================
-
-Criar:
-
-docs/TRAINING_PLAN_LIFECYCLE.md
-
 Documentar:
 
-- diferença entre inativa, arquivada e lixeira;
-- retenção de sete dias;
-- restauração;
-- expurgo;
-- exclusão permanente;
-- proteção de sessão ativa;
-- preservação do histórico;
-- backup v1 e v2;
-- comportamento offline.
+- formato interno: schemaVersion 2;
+- nome do arquivo manual:
+  `training-backup-<timestamp>.json`;
+- nome do backup automático:
+  `training-auto-backup-<timestamp>.json`.
 
 Atualizar:
 
-docs/BACKUP_AND_RESTORE.md
 README.md
+docs/BACKUP_AND_RESTORE.md
+docs/TRAINING_PLAN_LIFECYCLE.md
+docs/PRODUCT_ROADMAP.md
 
-No README, incluir fluxo:
-
-Ficha
-→ Editar
-→ Mover para lixeira
-→ Restaurar em até sete dias
-→ Exclusão automática
-
-Não afirmar que o sistema apaga exatamente após sete dias em background.
-
-Explicar corretamente:
-
-“A ficha é removida após vencer o prazo na próxima inicialização ou abertura da
-lixeira.”
+Não marcar o Marco 2 como iniciado.
 
 ==================================================
-27. VERSÃO
+20. CASOS SQLITE FALTANTES
 ==================================================
 
-Atualizar somente o app padrão:
+Adicionar testes reais para:
 
-mobile/app.json:
-- version: 0.4.0
-- android.versionCode: 6
+1. sessão PAUSED bloqueia moveToTrash;
+2. ficha arquivada pode ser movida para lixeira e deixa de ser arquivada;
+3. ficha na lixeira não pode ser ativada;
+4. ficha na lixeira não pode iniciar sessão;
+5. ficha na lixeira não pode ser editada;
+6. purgeExpired não remove ficha associada a sessão ativa;
+7. purgeExpired não remove ficha associada a sessão pausada;
+8. emptyTrash faz rollback integral quando uma exclusão falha;
+9. backup v2 restaura ficha não vencida e ela permanece na lixeira;
+10. backup v2 restaura ficha vencida e purgeExpired a remove;
+11. exclusão permanente preserva histórico;
+12. contador permanece correto após rollback.
 
-mobile/package.json:
-- version: 0.4.0
-
-Não alterar:
-
-- package;
-- slug;
-- scheme;
-- projectId;
-- versão do Umamusume.
+Não usar mocks para atomicidade SQLite.
 
 ==================================================
-28. VALIDAÇÃO
+21. TESTES DE CONCORRÊNCIA DO CONTROLLER
+==================================================
+
+Adicionar testes determinísticos usando Promises controladas/deferred.
+
+Caso 1: Desfazer não aparece antes de liberar lock
+
+1. mutation resolve;
+2. refresh permanece pendente;
+3. confirmar que pending undo ainda não foi publicado;
+4. resolver refresh;
+5. confirmar que lock foi liberado;
+6. confirmar que Snackbar/undo foi publicado.
+
+Caso 2: refresh falha depois do commit
+
+1. mutation confirma;
+2. refresh rejeita;
+3. resultado público é success com warning;
+4. navegação pode ocorrer;
+5. pending undo continua disponível;
+6. mensagem não afirma que mutation falhou.
+
+Caso 3: toque rápido em Desfazer
+
+1. publicar pending undo;
+2. tocar Desfazer;
+3. repository.restore é chamado exatamente uma vez;
+4. segundo toque não inicia outra chamada;
+5. token só é limpo após commit da restauração.
+
+Caso 4: restauração falha
+
+1. repository.restore rejeita;
+2. callback retorna false;
+3. Snackbar permanece;
+4. token permanece enquanto válido;
+5. usuário pode tentar novamente.
+
+Caso 5: callback antigo
+
+1. criar token A;
+2. criar token B;
+3. executar dismiss de A;
+4. token B permanece.
+
+Caso 6: expiração concorrente
+
+1. iniciar ação antes do timer vencer;
+2. avançar timers;
+3. restore executa uma vez;
+4. Snackbar fecha de forma consistente.
+
+Caso 7: unmount
+
+1. iniciar refresh;
+2. desmontar controller;
+3. resolver promises;
+4. não atualizar estado desmontado;
+5. não deixar unhandled rejection.
+
+==================================================
+22. TESTES DO TOAST/SNACKBAR
+==================================================
+
+Cobrir:
+
+- ação síncrona com sucesso fecha;
+- ação assíncrona com sucesso fecha;
+- ação retorna false e permanece;
+- ação rejeita e permanece ou fecha com erro tratado, conforme contrato
+  documentado;
+- duplo toque chama onAction uma vez;
+- timer pausa durante ação;
+- onDismiss chamado uma vez;
+- mensagem nova invalida callback antigo;
+- touch target mínimo;
+- acessibilidade;
+- Snackbar não cobre tab bar;
+- ThemedTextInput no modal ESVAZIAR.
+
+==================================================
+23. TESTES VISUAIS E DE TELA
+==================================================
+
+Adicionar testes para:
+
+- nome na confirmação permanente;
+- botão “Excluir permanentemente”;
+- dificuldade no card;
+- quantidade no modal;
+- singular e plural;
+- urgência normal;
+- urgência warning;
+- urgência expired;
+- texto correto sobre remoção após abertura;
+- badge escondido quando zero;
+- badge atualizado após mutation;
+- erro de refresh não desfaz sucesso visual da mutation.
+
+==================================================
+24. CI
+==================================================
+
+No job `local-mobile`, adicionar:
+
+- run: npm run typecheck --workspace=@training/training-wger
+- run: npm run test --workspace=@training/training-wger
+
+A ordem recomendada:
+
+1. training-domain;
+2. training-local-db;
+3. training-wger;
+4. training-mobile;
+5. umamusume-mobile;
+6. Expo install check;
+7. Expo export;
+8. git diff --check.
+
+O job local-mobile não pode usar `continue-on-error`.
+
+Não chamar Wger real no CI.
+
+==================================================
+25. ROADMAP
+==================================================
+
+Atualizar:
+
+docs/PRODUCT_ROADMAP.md
+
+O Marco 1 só pode ser marcado como:
+
+ESTABILIZADO
+
+depois de:
+
+- corrida do Desfazer coberta;
+- mutation e refresh separados;
+- UX corrigida;
+- testes adicionados;
+- CI atualizado;
+- validações passando.
+
+Não marcar:
+
+Marco 2 em andamento
+
+neste commit.
+
+==================================================
+26. VERSÃO
+==================================================
+
+Manter:
+
+- mobile version: 0.4.0;
+- android.versionCode: 6.
+
+Não incrementar versão neste patch.
+
+Não gerar APK.
+
+O versionCode será incrementado apenas quando for gerado outro APK instalável.
+
+==================================================
+27. VALIDAÇÃO
 ==================================================
 
 Executar na raiz:
@@ -1028,51 +849,53 @@ EXPO_NO_TELEMETRY=1 npm exec --workspace=training-mobile -- expo export \
 
 git diff --check
 
-Não gerar APK neste marco.
-
-Não declarar conclusão caso qualquer validação falhe.
+Não declarar sucesso se qualquer comando falhar.
 
 ==================================================
-29. CRITÉRIOS DE CONCLUSÃO
+28. CRITÉRIOS DE CONCLUSÃO
 ==================================================
 
-O Marco 1 estará aprovado somente quando:
+O patch estará aprovado somente quando:
 
-- lixeira funcionar integralmente offline;
-- retenção de sete dias estiver correta;
-- arquivar e excluir forem distintos;
-- sessão ativa bloquear exclusão;
-- restauração retornar a ficha como inativa;
-- histórico sobreviver à exclusão permanente;
-- badge atualizar;
-- labels de expiração funcionarem;
-- Desfazer funcionar;
-- backup for criado antes de esvaziar;
-- backup v2 incluir a lixeira;
-- backup v1 continuar importável;
-- migrations antigas permanecerem imutáveis;
-- testes e export Android passarem.
+- Desfazer não puder falhar por causa do lock da mutation original;
+- pending undo só aparecer depois da liberação do lock;
+- token não for apagado antes do restore confirmado;
+- duplo toque não duplicar restore;
+- callback antigo não apagar token novo;
+- refresh falho não transformar mutation confirmada em falha;
+- editor navegar depois de mutation confirmada;
+- UI comunicar warning de refresh separadamente;
+- confirmação permanente mostrar nome;
+- dificuldade aparecer no card;
+- urgência visual seguir o contrato;
+- modal ESVAZIAR usar ThemedTextInput;
+- quantidade aparecer no modal;
+- documentação do backup estar correta;
+- testes faltantes existirem;
+- training-wger estiver no CI;
+- todas as validações passarem.
 
 ==================================================
-30. ENTREGA
+29. ENTREGA
 ==================================================
 
 Informar:
 
 1. commit final;
-2. migration adicionada;
-3. modelo de ciclo de vida;
-4. repository criado;
-5. política de retenção;
-6. proteção de sessão ativa;
-7. funcionamento do expurgo;
-8. funcionamento do badge;
-9. funcionamento do Desfazer;
-10. backup automático antes de esvaziar;
-11. compatibilidade v1/v2;
-12. testes adicionados;
-13. resultado de todas as validações;
-14. versão e versionCode;
-15. limitações restantes.
+2. causa da corrida original;
+3. estrutura removida ou alterada no antigo `run`;
+4. novo modelo de resultado de mutation;
+5. novo modelo de pending undo;
+6. política de locks;
+7. comportamento em refresh falho;
+8. comportamento do Snackbar assíncrono;
+9. testes de concorrência adicionados;
+10. testes SQLite adicionados;
+11. correções de UX;
+12. correções de documentação;
+13. alteração do CI;
+14. resultado de todos os comandos;
+15. limitações restantes;
+16. confirmação de que o Marco 1 pode ou não ser marcado como estabilizado.
 
 Não iniciar o Marco 2.

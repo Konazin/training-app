@@ -40,6 +40,8 @@ jobs:
       - run: npm run test --workspace=@training/training-domain
       - run: npm run typecheck --workspace=@training/training-local-db
       - run: npm run test --workspace=@training/training-local-db
+      - run: npm run typecheck --workspace=@training/training-wger
+      - run: npm run test --workspace=@training/training-wger
       - run: npm run typecheck --workspace=training-mobile
       - run: npm run test --workspace=training-mobile
       - run: npm run typecheck --workspace=umamusume-mobile

@@ -10,6 +10,7 @@ import type { RootStackParamList } from '../../../navigation/types'
 import { useUnsavedChangesGuard } from '../../../navigation/useUnsavedChangesGuard'
 import type { TrainingPlan, TrainingPlanInput } from '../model/trainingPlan'
 import { shared, type ThemeColors, useTheme } from '../../../theme'
+import type { TrashUiResult } from '../controller/useTrainingPlanTrashController'
 
 export function TrainingPlanEditorScreen({
   plans,
@@ -30,7 +31,7 @@ export function TrainingPlanEditorScreen({
   onActivate: (id: number) => Promise<boolean>
   onDuplicate: (id: number) => Promise<boolean>
   onArchive: (id: number, archived?: boolean) => Promise<boolean>
-  onMoveToTrash: (id: number) => Promise<boolean>
+  onMoveToTrash: (id: number) => Promise<TrashUiResult>
 }) {
   const route = useRoute<RouteProp<RootStackParamList, 'TrainingPlanEditor'>>()
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>()
@@ -147,7 +148,8 @@ export function TrainingPlanEditorScreen({
                   text: 'Mover',
                   style: 'destructive',
                   onPress: () => void (async () => {
-                    if (await onMoveToTrash(plan.id)) commit(form, navigation.goBack)
+                    const result = await onMoveToTrash(plan.id)
+                    if (result.status === 'success') commit(form, navigation.goBack)
                   })(),
                 },
               ],
