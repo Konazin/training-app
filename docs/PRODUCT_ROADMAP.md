@@ -2,10 +2,10 @@
 
 1. **Ciclo de vida das fichas e lixeira — Marco 1 ESTABILIZADO**
 2. **Editor de ficha, templates e duplicação — Marco 2 IMPLEMENTADO, smoke Android pendente**
-3. **Home semanal e progresso — Marco 3 EM VALIDAÇÃO**
-4. Skins, animações e acessibilidade
-5. Biblioteca inicial e mídia
-6. Providers, inteligência local e release candidate
+3. **Home semanal e progresso — Marco 3 IMPLEMENTADO, smoke Android pendente**
+4. **Temas, movimento e acessibilidade — Marco 4 EM VALIDAÇÃO**
+5. **Biblioteca inicial e mídia — PLANEJADO**
+6. **Providers, inteligência local e release candidate — PLANEJADO**
 
 ## Marco 1 estabilizado
 
@@ -29,7 +29,7 @@ As verificações automatizadas e o export Android passaram. O smoke manual
 continua pendente por falta de aparelho ou emulador; consulte
 [`MARCO_2_ANDROID_SMOKE.md`](MARCO_2_ANDROID_SMOKE.md).
 
-## Marco 3 em validação
+## Marco 3 implementado
 
 - Home orientada ao treino de hoje;
 - semana local de segunda-feira a domingo com nove estados textuais;
@@ -51,6 +51,18 @@ continua pendente por falta de aparelho ou emulador; consulte
 
 O smoke Android do Marco 3 permanece pendente até existir dispositivo. A
 migração de `react-test-renderer` para Testing Library é dívida técnica.
+
+## Marco 4 em validação
+
+- quatro presets com variantes clara e escura;
+- preferência de aparência e movimento seguindo ou ignorando o sistema;
+- prévia não persistida e confirmação atômica no AsyncStorage;
+- alto contraste dedicado à sessão;
+- feedback tátil isolado e desativável;
+- auditoria dos estados, rótulos, progresso e modais acessíveis.
+
+O Marco 4 permanece em validação até a execução do roteiro em um aparelho ou
+emulador Android com TalkBack, fonte ampliada e redução de movimento.
 
 ## Adiado
 

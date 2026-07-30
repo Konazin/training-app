@@ -33,6 +33,7 @@ import { LibraryScreen } from './src/screens/LibraryScreen'
 import { HomeScreen } from './src/screens/HomeScreen'
 import { HistoryScreen } from './src/screens/HistoryScreen'
 import { MoreScreen } from './src/screens/MoreScreen'
+import { AppearanceSettingsScreen } from './src/screens/AppearanceSettingsScreen'
 import { IntegrationsScreen } from './src/screens/IntegrationsScreen'
 import { WgerIntegrationScreen } from './src/features/wger/WgerIntegrationScreen'
 import { ThemeProvider, useTheme } from './src/theme'
@@ -43,12 +44,14 @@ import { AppErrorBoundary } from './src/features/bootstrap/AppErrorBoundary'
 import { exportDiagnostic } from './src/integrations/backupFiles'
 import { getAppVersion } from './src/config/version'
 import { Toast } from './src/components/Toast'
+import { triggerHaptic } from './src/theme/haptics'
 import { runRefreshParts, type RefreshAllResult } from './src/controllers/refreshAll'
 import {
   useLocalCalendarClock,
   useRefreshOnFocus,
   useRefreshUi,
 } from './src/controllers/useRefreshUi'
+import { systemBarStyle } from './src/theme/uiContracts'
 
 const Stack = createNativeStackNavigator<RootStackParamList>()
 const Tabs = createBottomTabNavigator<MainTabParamList>()
@@ -70,8 +73,8 @@ function SystemBars() {
   const { isDark } = useTheme()
   return (
     <>
-      <StatusBar style={isDark ? 'light' : 'dark'} />
-      <NavigationBar style={isDark ? 'light' : 'dark'} />
+      <StatusBar style={systemBarStyle(isDark)} />
+      <NavigationBar style={systemBarStyle(isDark)} />
     </>
   )
 }
@@ -97,7 +100,7 @@ function LocalApp({
 }: {
   repositories: LocalRepositories
 }) {
-  const { colors, isDark } = useTheme()
+  const { colors, isDark, motion, preferences } = useTheme()
   const controller = useTrainingController(repositories.exercises, repositories.dashboard)
   const trainingPlan = useTrainingPlanController(repositories.plans, controller.refresh)
   const workoutSession = useWorkoutSessionController(repositories.sessions, controller.refresh)
@@ -166,7 +169,7 @@ function LocalApp({
     <>
       <NavigationContainer theme={navigationTheme}>
             <Stack.Navigator screenOptions={{
-              animation: 'slide_from_right',
+              animation: motion.navigationAnimation,
               contentStyle: { backgroundColor: colors.background },
               headerShown: false,
             }}>
@@ -207,6 +210,7 @@ function LocalApp({
                   />
                 )}
               </Stack.Screen>
+              <Stack.Screen name="AppearanceSettings" component={AppearanceSettingsScreen} />
               <Stack.Screen name="TrainingPlanEditor">
                 {() => (
                   <TrainingPlanEditorScreen
@@ -235,7 +239,10 @@ function LocalApp({
                     onReorderActivities={trainingPlan.reorderRestActivities}
                     onStart={async (planId, dayId) => {
                       const success = await workoutSession.start(planId, dayId)
-                      if (success) navigation.navigate('Session')
+                      if (success) {
+                        void triggerHaptic('SESSION_START', preferences.hapticsEnabled)
+                        navigation.navigate('Session')
+                      }
                       return success
                     }}
                   />
@@ -357,7 +364,7 @@ function MainTabs({
   trash: ReturnType<typeof useTrainingPlanTrashController>
   refreshAll: () => Promise<RefreshAllResult>
 }) {
-  const { colors } = useTheme()
+  const { colors, preferences } = useTheme()
   const insets = useSafeAreaInsets()
   const icons: Record<keyof MainTabParamList, keyof typeof Ionicons.glyphMap> = {
     Today: 'home-outline',
@@ -389,9 +396,12 @@ function MainTabs({
     const day = plan?.days.find((item) => item.id === planDayId)
     if (workoutSession.activeSession || !day || day.restDay || !day.exercises.length) return false
     const success = await workoutSession.start(planId, planDayId)
-    if (success) navigation.navigate('Session')
+    if (success) {
+      void triggerHaptic('SESSION_START', preferences.hapticsEnabled)
+      navigation.navigate('Session')
+    }
     return success
-  }, [navigation, trainingPlan.trainingPlans, workoutSession])
+  }, [navigation, preferences.hapticsEnabled, trainingPlan.trainingPlans, workoutSession])
   return (
     <Tabs.Navigator screenOptions={({ route }) => ({
       headerShown: false,
@@ -452,7 +462,10 @@ function MainTabs({
             onSelect={trainingPlan.setSelectedTrainingPlanId}
             onStart={async (planId, dayId) => {
               const success = await workoutSession.start(planId, dayId)
-              if (success) navigation.navigate('Session')
+              if (success) {
+                void triggerHaptic('SESSION_START', preferences.hapticsEnabled)
+                navigation.navigate('Session')
+              }
               return success
             }}
           />
@@ -472,6 +485,7 @@ function MainTabs({
         {() => (
           <MoreScreen
             busy={backup.busy}
+            onAppearance={() => navigation.navigate('AppearanceSettings')}
             onLibrary={() => navigation.navigate('Library')}
             onTrash={() => navigation.navigate('TrainingPlanTrash')}
             trashCount={trash.count}

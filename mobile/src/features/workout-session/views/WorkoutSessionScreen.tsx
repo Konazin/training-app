@@ -26,6 +26,7 @@ import { type ThemeColors, useTheme } from '../../../theme'
 import { ExerciseVideo } from '../../exercise-library/ExerciseVideo'
 import { attributionLabel, resolveMediaAttribution } from '../../exercise-library/libraryState'
 import { ThemedTextInput } from '../../../components/ThemedTextInput'
+import { triggerHaptic } from '../../../theme/haptics'
 
 interface Props {
   session: WorkoutSession | null
@@ -63,8 +64,8 @@ export function WorkoutSessionScreen(props: Props) {
     onAdjustRest,
     onSkipRest,
   } = props
-  const { colors } = useTheme()
-  const styles = createStyles(colors)
+  const { colors, preferences } = useTheme()
+  const styles = createStyles(colors, preferences.workoutHighContrast)
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>()
   const [now, setNow] = useState(Date.now())
   const [rpe, setRpe] = useState('')
@@ -108,10 +109,10 @@ export function WorkoutSessionScreen(props: Props) {
   useEffect(() => {
     if (restTimer && !restTimer.paused && remaining === 0 && notifiedTimer.current !== timerKey) {
       notifiedTimer.current = timerKey
-      Vibration.vibrate([0, 180, 80, 180])
+      if (preferences.hapticsEnabled) Vibration.vibrate([0, 180, 80, 180])
       onSkipRest()
     }
-  }, [onSkipRest, remaining, restTimer, timerKey])
+  }, [onSkipRest, preferences.hapticsEnabled, remaining, restTimer, timerKey])
 
   usePreventRemove(Boolean(session) && !canLeave, ({ data }) => {
     Alert.alert('Sair da sessão?', 'Escolha como deseja deixar o treino.', [
@@ -122,6 +123,7 @@ export function WorkoutSessionScreen(props: Props) {
           void (async () => {
             const success = session?.status === 'PAUSED' || await onPause()
             if (!success) return
+            if (session?.status !== 'PAUSED') void triggerHaptic('SESSION_PAUSE', preferences.hapticsEnabled)
             setCanLeave(true)
             setTimeout(() => navigation.dispatch(data.action), 0)
           })()
@@ -132,6 +134,7 @@ export function WorkoutSessionScreen(props: Props) {
         style: 'destructive',
         onPress: () => {
           void (async () => {
+            void triggerHaptic('DESTRUCTIVE_CONFIRM', preferences.hapticsEnabled)
             if (!await onAbandon()) return
             setCanLeave(true)
             setTimeout(() => navigation.dispatch(data.action), 0)
@@ -159,6 +162,7 @@ export function WorkoutSessionScreen(props: Props) {
 
   async function completeSession() {
     if (await onComplete(rpe ? toNumber(rpe) : null, notes)) {
+      void triggerHaptic('SESSION_COMPLETE', preferences.hapticsEnabled)
       setCanLeave(true)
       setTimeout(() => navigation.navigate('MainTabs', { screen: 'History' }), 0)
     }
@@ -166,9 +170,13 @@ export function WorkoutSessionScreen(props: Props) {
 
   return (<>
     <ScreenScrollView
+      contentContainerStyle={preferences.workoutHighContrast && { backgroundColor: colors.workout.background }}
       showsVerticalScrollIndicator={false}
     >
-      <View style={[styles.sessionHeader, session.status === 'PAUSED' && styles.pausedHeader]}>
+      <View
+        accessibilityLabel={session.status === 'PAUSED' ? 'Sessão pausada' : 'Sessão em andamento'}
+        style={[styles.sessionHeader, session.status === 'PAUSED' && styles.pausedHeader]}
+      >
         <View style={{ flex: 1 }}>
           <Text style={styles.eyebrow}>
             {session.status === 'PAUSED' ? 'SESSÃO PAUSADA' : 'SESSÃO EM ANDAMENTO'}
@@ -179,7 +187,13 @@ export function WorkoutSessionScreen(props: Props) {
           accessibilityRole="button"
           accessibilityState={{ disabled: busyKeys.has('session') }}
           disabled={busyKeys.has('session')}
-          onPress={() => void (session.status === 'PAUSED' ? onResume() : onPause())}
+          onPress={() => void (async () => {
+            const resuming = session.status === 'PAUSED'
+            const success = await (resuming ? onResume() : onPause())
+            if (success) {
+              void triggerHaptic(resuming ? 'SESSION_RESUME' : 'SESSION_PAUSE', preferences.hapticsEnabled)
+            }
+          })()}
           style={styles.secondary}
         >
           <Text style={styles.secondaryText}>
@@ -189,7 +203,17 @@ export function WorkoutSessionScreen(props: Props) {
       </View>
 
       <View style={styles.metrics}>
-        <View style={styles.metric}>
+        <View
+          accessible
+          accessibilityLabel="Progresso da sessão"
+          accessibilityValue={{
+            min: 0,
+            max: session.totalPlannedSets,
+            now: session.completedSets,
+            text: `${session.completedSets} de ${session.totalPlannedSets} séries`,
+          }}
+          style={styles.metric}
+        >
           <Text style={styles.metricLabel}>PROGRESSO</Text>
           <Text style={styles.metricValue}>
             {session.totalPlannedSets
@@ -197,14 +221,14 @@ export function WorkoutSessionScreen(props: Props) {
               : 0}%
           </Text>
         </View>
-        <View style={styles.metric}>
+        <View accessible accessibilityLabel={`Volume registrado: ${session.totalVolume} quilogramas`} style={styles.metric}>
           <Text style={styles.metricLabel}>VOLUME</Text>
           <Text style={styles.metricValue}>{session.totalVolume}kg</Text>
         </View>
       </View>
 
       {remaining > 0 && (
-        <View style={styles.timer}>
+        <View accessible accessibilityLabel={`Descanso: ${formatTime(remaining)} restantes`} accessibilityRole="timer" style={styles.timer}>
           <View>
             <Text style={styles.timerLabel}>DESCANSO</Text>
             <Text style={styles.timerValue}>{formatTime(remaining)}</Text>
@@ -217,8 +241,18 @@ export function WorkoutSessionScreen(props: Props) {
         </View>
       )}
 
-      {session.exercises.map((exercise, index) => (
-        <View key={exercise.id} style={styles.card}>
+      {session.exercises.map((exercise, index) => {
+        const statusLabel = exercise.status === 'SKIPPED'
+          ? 'Pulado'
+          : exercise.sets.length > 0 && exercise.sets.every((set) => set.completed)
+            ? 'Concluído'
+            : 'Pendente'
+        return (
+          <View
+            key={exercise.id}
+            accessibilityLabel={`${exercise.name}. Estado: ${statusLabel}.`}
+            style={styles.card}
+          >
           <View style={styles.exerciseHeader}>
             <Text style={styles.index}>{index + 1}</Text>
             <View style={{ flex: 1 }}>
@@ -229,6 +263,7 @@ export function WorkoutSessionScreen(props: Props) {
                   : `${exercise.plannedMinReps}–${exercise.plannedMaxReps} reps`}
                 {' · '}{exercise.restSeconds}s descanso
               </Text>
+              <Text style={styles.exerciseStatus}>Estado: {statusLabel}</Text>
               {!!exercise.primaryVideoUrl && (
                 <TouchableOpacity accessibilityLabel={`Ver execução de ${exercise.name}`} accessibilityRole="button" onPress={() => openVideo(exercise)} style={styles.textAction}>
                   <Text style={styles.videoLink}>▶ Ver execução</Text>
@@ -239,6 +274,7 @@ export function WorkoutSessionScreen(props: Props) {
               accessibilityRole="button"
               accessibilityState={{ disabled: busyKeys.has(`exercise:${exercise.id}`), selected: exercise.status === 'SKIPPED' }}
               disabled={busyKeys.has(`exercise:${exercise.id}`)}
+              style={styles.textAction}
               onPress={() => void onSetExerciseStatus(
                 exercise.id,
                 exercise.status === 'SKIPPED' ? 'PENDING' : 'SKIPPED',
@@ -264,18 +300,20 @@ export function WorkoutSessionScreen(props: Props) {
           ))}
 
           {!!errors[`exercise:${exercise.id}`] && (
-            <Text style={styles.error}>{errors[`exercise:${exercise.id}`]}</Text>
+            <Text accessibilityLiveRegion="polite" style={styles.error}>{errors[`exercise:${exercise.id}`]}</Text>
           )}
           <TouchableOpacity
             accessibilityRole="button"
+            accessibilityState={{ disabled: busyKeys.has(`exercise:${exercise.id}`) }}
             disabled={busyKeys.has(`exercise:${exercise.id}`)}
             style={styles.addSet}
             onPress={() => void onAddSet(exercise.id)}
           >
             <Text style={styles.addSetText}>＋ Adicionar série</Text>
           </TouchableOpacity>
-        </View>
-      ))}
+          </View>
+        )
+      })}
 
       <View style={styles.finish}>
         <ThemedTextInput
@@ -293,9 +331,10 @@ export function WorkoutSessionScreen(props: Props) {
           placeholder="Observações da sessão"
           style={styles.input}
         />
-        {!!errors.session && <Text style={styles.error}>{errors.session}</Text>}
+        {!!errors.session && <Text accessibilityLiveRegion="polite" style={styles.error}>{errors.session}</Text>}
         <TouchableOpacity
           accessibilityRole="button"
+          accessibilityState={{ disabled: busyKeys.has('session') }}
           disabled={busyKeys.has('session')}
           style={styles.primary}
           onPress={() => void completeSession()}
@@ -306,6 +345,7 @@ export function WorkoutSessionScreen(props: Props) {
           accessibilityRole="button"
           accessibilityState={{ disabled: busyKeys.has('session') }}
           disabled={busyKeys.has('session')}
+          style={styles.textAction}
           onPress={() => Alert.alert(
             'Abandonar sessão?',
             'Os registros feitos serão preservados.',
@@ -315,6 +355,7 @@ export function WorkoutSessionScreen(props: Props) {
                 text: 'Abandonar',
                 style: 'destructive',
                 onPress: () => void (async () => {
+                  void triggerHaptic('DESTRUCTIVE_CONFIRM', preferences.hapticsEnabled)
                   if (await onAbandon()) {
                     setCanLeave(true)
                     setTimeout(() => navigation.navigate('MainTabs', { screen: 'History' }), 0)
@@ -330,7 +371,7 @@ export function WorkoutSessionScreen(props: Props) {
     </ScreenScrollView>
     {videoExercise && <Modal visible transparent animationType="fade" onRequestClose={closeVideo}>
       <Screen style={styles.videoBackdrop}>
-        <View style={styles.videoSheet}>
+        <View accessibilityViewIsModal style={styles.videoSheet}>
           <Text style={styles.videoTitle}>{videoExercise.name}</Text>
           {!!videoExercise.primaryVideoUrl && <ExerciseVideo key={videoRetryKey} url={videoExercise.primaryVideoUrl} posterUrl={videoExercise.primaryImageUrl} onRetry={() => setVideoRetryKey((value) => value + 1)} />}
           <Text style={styles.videoAttribution}>{videoAttribution}</Text>
@@ -360,8 +401,8 @@ function SetEditor({
   onRemove: () => Promise<boolean>
   onStartRest: () => void
 }) {
-  const { colors } = useTheme()
-  const styles = createStyles(colors)
+  const { colors, preferences } = useTheme()
+  const styles = createStyles(colors, preferences.workoutHighContrast)
   const [reps, setReps] = useState(String(set.reps))
   const [load, setLoad] = useState(String(set.load))
   const [duration, setDuration] = useState(String(set.durationSeconds))
@@ -385,11 +426,14 @@ function SetEditor({
 
   async function toggle() {
     const completing = !set.completed
-    if (await onSave(input(completing)) && completing) onStartRest()
+    if (await onSave(input(completing)) && completing) {
+      void triggerHaptic('SET_COMPLETE', preferences.hapticsEnabled)
+      onStartRest()
+    }
   }
 
   return (
-    <View style={styles.setEditor}>
+    <View accessibilityLabel={`Série ${set.setNumber}. ${set.completed ? 'Concluída' : 'Pendente'}.`} style={styles.setEditor}>
       <View style={styles.setTitle}>
         <Text style={styles.setNumber}>SÉRIE {set.setNumber}</Text>
         {set.manuallyAdded && (
@@ -416,7 +460,7 @@ function SetEditor({
         placeholder="Observação opcional"
         style={styles.setNotes}
       />
-      {!!error && <Text style={styles.error}>{error}</Text>}
+      {!!error && <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text>}
       <View style={styles.setActions}>
         <TouchableOpacity
           accessibilityRole="button"
@@ -454,8 +498,8 @@ function SetField({
   onChange: (value: string) => void
   decimal?: boolean
 }) {
-  const { colors } = useTheme()
-  const styles = createStyles(colors)
+  const { colors, preferences } = useTheme()
+  const styles = createStyles(colors, preferences.workoutHighContrast)
   return (
     <View style={styles.field}>
       <Text style={styles.setLabel}>{label}</Text>
@@ -472,11 +516,11 @@ function SetField({
 }
 
 function TimerAction({ label, onPress }: { label: string; onPress: () => void }) {
-  const { colors } = useTheme()
-  const styles = createStyles(colors)
+  const { colors, preferences } = useTheme()
+  const styles = createStyles(colors, preferences.workoutHighContrast)
   return (
     <TouchableOpacity accessibilityRole="button" onPress={onPress} style={styles.timerAction}>
-      <Text style={[timerActionStyle, { color: colors.background }]}>{label}</Text>
+      <Text style={[timerActionStyle, styles.timerActionText]}>{label}</Text>
     </TouchableOpacity>
   )
 }
@@ -495,54 +539,67 @@ const timerActionStyle = {
   fontWeight: '700' as const,
 }
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  sessionHeader: { alignItems: 'center', borderRadius: 18, flexDirection: 'row', gap: 12, marginBottom: 12, padding: 12 },
-  pausedHeader: { backgroundColor: colors.surfaceSecondary, borderColor: colors.warning, borderWidth: 1 },
-  eyebrow: { color: colors.textSecondary, fontSize: 12, fontWeight: '800', letterSpacing: 1.5, marginTop: 10 },
-  title: { color: colors.textPrimary, fontSize: 30, fontWeight: '700', letterSpacing: -1, lineHeight: 37, marginTop: 7 },
+const createStyles = (colors: ThemeColors, highContrast = false) => {
+  const workout = highContrast ? colors.workout : null
+  const background = workout?.background ?? colors.background
+  const surface = workout?.surface ?? colors.surface
+  const border = workout?.border ?? colors.border
+  const text = workout?.text ?? colors.textPrimary
+  const secondaryText = workout?.textSecondary ?? colors.textSecondary
+  const completed = workout?.completed ?? colors.success
+  const onCompleted = workout?.onCompleted ?? colors.background
+  const danger = workout?.danger ?? colors.danger
+  const borderWidth = highContrast ? 2 : 1
+  return StyleSheet.create({
+  sessionHeader: { alignItems: 'center', backgroundColor: highContrast ? surface : undefined, borderColor: highContrast ? border : undefined, borderRadius: 18, borderWidth: highContrast ? 2 : 0, flexDirection: 'row', gap: 12, marginBottom: 12, padding: 12 },
+  pausedHeader: { backgroundColor: surface, borderColor: colors.warning, borderWidth: 2 },
+  eyebrow: { color: secondaryText, fontSize: 12, fontWeight: '800', letterSpacing: 1.5, marginTop: 10 },
+  title: { color: text, fontSize: 30, fontWeight: '700', letterSpacing: -1, lineHeight: 37, marginTop: 7 },
   metrics: { flexDirection: 'row', gap: 12, marginBottom: 12 },
-  metric: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 18, borderWidth: 1, flex: 1, padding: 16 },
-  metricLabel: { color: colors.gray400, fontSize: 12 },
-  metricValue: { color: colors.textPrimary, fontSize: 24, fontWeight: '800', lineHeight: 30, marginTop: 6 },
-  timer: { alignItems: 'center', backgroundColor: colors.textPrimary, borderRadius: 22, flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', marginBottom: 12, padding: 18 },
-  timerLabel: { color: colors.background, fontSize: 14, fontWeight: '800' },
-  timerValue: { color: colors.background, fontSize: 36, fontWeight: '700', lineHeight: 43, marginTop: 3 },
+  metric: { backgroundColor: surface, borderColor: border, borderRadius: 18, borderWidth, flex: 1, padding: 16 },
+  metricLabel: { color: secondaryText, fontSize: 12 },
+  metricValue: { color: text, fontSize: 24, fontWeight: '800', lineHeight: 30, marginTop: 6 },
+  timer: { alignItems: 'center', backgroundColor: workout?.timer ?? colors.textPrimary, borderColor: highContrast ? border : undefined, borderRadius: 22, borderWidth: highContrast ? 2 : 0, flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', marginBottom: 12, padding: 18 },
+  timerLabel: { color: workout?.timerText ?? colors.background, fontSize: 14, fontWeight: '800' },
+  timerValue: { color: workout?.timerText ?? colors.background, fontSize: 36, fontWeight: '700', lineHeight: 43, marginTop: 3 },
   timerActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   timerAction: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 },
-  card: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 21, borderWidth: 1, marginBottom: 12, overflow: 'hidden' },
+  timerActionText: { color: workout?.timerText ?? colors.background },
+  card: { backgroundColor: surface, borderColor: border, borderRadius: 21, borderWidth, marginBottom: 12, overflow: 'hidden' },
   exerciseHeader: { alignItems: 'center', flexDirection: 'row', gap: 12, padding: 16 },
   index: { backgroundColor: colors.primary, borderRadius: 13, color: colors.onPrimary, fontSize: 16, fontWeight: '800', minWidth: 48, overflow: 'hidden', padding: 14, textAlign: 'center' },
-  exerciseName: { color: colors.textPrimary, fontSize: 20, fontWeight: '700', lineHeight: 26 },
-  muted: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, marginTop: 4 },
+  exerciseName: { color: text, fontSize: 20, fontWeight: '700', lineHeight: 26 },
+  exerciseStatus: { color: text, fontSize: 13, fontWeight: '900', marginTop: 5 },
+  muted: { color: secondaryText, fontSize: 14, lineHeight: 20, marginTop: 4 },
   videoLink: { color: colors.primary, fontSize: 14, fontWeight: '800', marginTop: 7 },
   textAction: { justifyContent: 'center', minHeight: 48 },
-  skip: { color: colors.textSecondary, fontSize: 14, fontWeight: '700', padding: 8 },
-  setEditor: { borderTopColor: colors.border, borderTopWidth: 1, gap: 12, padding: 16 },
+  skip: { color: secondaryText, fontSize: 14, fontWeight: '700', padding: 8 },
+  setEditor: { backgroundColor: highContrast ? background : undefined, borderTopColor: border, borderTopWidth: borderWidth, gap: 12, padding: 16 },
   setTitle: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  setNumber: { color: colors.textSecondary, fontSize: 14, fontWeight: '800' },
-  removeSet: { color: colors.danger, fontSize: 14, fontWeight: '700' },
+  setNumber: { color: secondaryText, fontSize: 14, fontWeight: '800' },
+  removeSet: { color: danger, fontSize: 14, fontWeight: '700' },
   fields: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   field: { flexGrow: 1, minWidth: 108 },
-  setLabel: { color: colors.textSecondary, fontSize: 12, marginBottom: 4 },
-  setInput: { backgroundColor: colors.surfaceSecondary, borderColor: colors.border, borderRadius: 11, borderWidth: 1, color: colors.textPrimary, fontSize: 18, fontWeight: '700', minHeight: 56, paddingHorizontal: 12 },
-  setNotes: { backgroundColor: colors.surfaceSecondary, borderColor: colors.border, borderRadius: 11, borderWidth: 1, color: colors.textPrimary, fontSize: 16, minHeight: 56, paddingHorizontal: 12 },
+  setLabel: { color: secondaryText, fontSize: 12, marginBottom: 4 },
+  setInput: { backgroundColor: highContrast ? surface : colors.surfaceSecondary, borderColor: border, borderRadius: 11, borderWidth, color: text, fontSize: 18, fontWeight: '700', minHeight: 56, paddingHorizontal: 12 },
+  setNotes: { backgroundColor: highContrast ? surface : colors.surfaceSecondary, borderColor: border, borderRadius: 11, borderWidth, color: text, fontSize: 16, minHeight: 56, paddingHorizontal: 12 },
   setActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  saveSet: { alignItems: 'center', borderColor: colors.border, borderRadius: 12, borderWidth: 1, flex: 1, justifyContent: 'center', minHeight: 52, minWidth: 100 },
-  saveSetText: { color: colors.textPrimary, fontSize: 14, fontWeight: '800' },
-  check: { alignItems: 'center', backgroundColor: colors.surfaceSecondary, borderColor: colors.border, borderRadius: 12, borderWidth: 1, flex: 1.4, justifyContent: 'center', minHeight: 52, minWidth: 130 },
-  checked: { backgroundColor: colors.success, borderColor: colors.success },
-  checkText: { color: colors.textPrimary, fontSize: 14, fontWeight: '800' },
-  checkedText: { color: colors.background },
-  addSet: { alignItems: 'center', borderTopColor: colors.border, borderTopWidth: 1, justifyContent: 'center', minHeight: 56 },
+  saveSet: { alignItems: 'center', borderColor: border, borderRadius: 12, borderWidth, flex: 1, justifyContent: 'center', minHeight: 52, minWidth: 100 },
+  saveSetText: { color: text, fontSize: 14, fontWeight: '800' },
+  check: { alignItems: 'center', backgroundColor: workout?.pending ?? colors.surfaceSecondary, borderColor: border, borderRadius: 12, borderWidth, flex: 1.4, justifyContent: 'center', minHeight: 52, minWidth: 130 },
+  checked: { backgroundColor: completed, borderColor: highContrast ? border : completed },
+  checkText: { color: text, fontSize: 14, fontWeight: '800' },
+  checkedText: { color: onCompleted },
+  addSet: { alignItems: 'center', borderTopColor: border, borderTopWidth: borderWidth, justifyContent: 'center', minHeight: 56 },
   addSetText: { color: colors.primary, fontSize: 14, fontWeight: '800' },
-  finish: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 22, borderWidth: 1, gap: 12, marginTop: 5, padding: 16 },
-  input: { backgroundColor: colors.surfaceSecondary, borderColor: colors.border, borderRadius: 14, borderWidth: 1, color: colors.textPrimary, fontSize: 16, minHeight: 56, paddingHorizontal: 14 },
+  finish: { backgroundColor: surface, borderColor: border, borderRadius: 22, borderWidth, gap: 12, marginTop: 5, padding: 16 },
+  input: { backgroundColor: highContrast ? background : colors.surfaceSecondary, borderColor: border, borderRadius: 14, borderWidth, color: text, fontSize: 16, minHeight: 56, paddingHorizontal: 14 },
   primary: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 16, justifyContent: 'center', minHeight: 56, paddingHorizontal: 20 },
   primaryText: { color: colors.onPrimary, fontSize: 16, fontWeight: '800' },
-  secondary: { alignItems: 'center', borderColor: colors.border, borderRadius: 14, borderWidth: 1, justifyContent: 'center', minHeight: 48, paddingHorizontal: 14 },
-  secondaryText: { color: colors.textPrimary, fontSize: 14, fontWeight: '800' },
-  abandon: { color: colors.danger, fontSize: 14, fontWeight: '700', minHeight: 48, padding: 12, textAlign: 'center' },
-  error: { color: colors.danger, fontSize: 14, lineHeight: 20, paddingHorizontal: 2 },
+  secondary: { alignItems: 'center', backgroundColor: highContrast ? background : undefined, borderColor: border, borderRadius: 14, borderWidth, justifyContent: 'center', minHeight: 56, paddingHorizontal: 14 },
+  secondaryText: { color: text, fontSize: 14, fontWeight: '800' },
+  abandon: { color: danger, fontSize: 14, fontWeight: '800', minHeight: 56, padding: 12, textAlign: 'center' },
+  error: { color: danger, fontSize: 14, lineHeight: 20, paddingHorizontal: 2 },
   empty: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: 30 },
   emptyTitle: { color: colors.ink, fontSize: 21, fontWeight: '700', marginBottom: 6 },
   videoBackdrop: { backgroundColor: colors.scrim, justifyContent: 'center', paddingHorizontal: 18 },
@@ -550,4 +607,5 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   videoTitle: { color: colors.ink, fontSize: 18, fontWeight: '800', marginBottom: 14 },
   videoAttribution: { color: colors.gray500, fontSize: 12, lineHeight: 16, marginTop: 4 },
   videoClose: { color: colors.primary, fontSize: 12, fontWeight: '800', padding: 14, textAlign: 'center' },
-})
+  })
+}

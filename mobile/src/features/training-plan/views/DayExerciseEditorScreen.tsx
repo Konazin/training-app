@@ -184,7 +184,7 @@ export function DayExerciseEditorScreen({
         visible={showAlternativePicker}
         onRequestClose={() => setShowAlternativePicker(false)}
       >
-        <View style={[styles.modal, { backgroundColor: colors.background }]}>
+        <View accessibilityViewIsModal style={[styles.modal, { backgroundColor: colors.background }]}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Exercício alternativo</Text>
             <TouchableOpacity accessibilityRole="button" onPress={() => setShowAlternativePicker(false)} style={styles.clearButton}>

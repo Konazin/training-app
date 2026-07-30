@@ -57,7 +57,7 @@ export function TrainingPlanTemplateModal({
 
   return (
     <Modal animationType="slide" onRequestClose={onCancel} visible={visible}>
-      <SafeAreaView style={styles.safe}>
+      <SafeAreaView accessibilityViewIsModal style={styles.safe}>
         <ScrollView contentContainerStyle={styles.content}>
           <Text accessibilityRole="header" style={styles.title}>
             {preview ? preview.name : 'Começar com um template'}

@@ -53,7 +53,7 @@ export function OptionPickerField({
         <Text style={[styles.value, !value && styles.placeholder]}>{value || placeholder}</Text>
         <Text accessibilityElementsHidden style={styles.chevron}>⌄</Text>
       </Pressable>
-      {!!error && <Text style={styles.error}>{error}</Text>}
+      {!!error && <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text>}
     </View>
   )
 }

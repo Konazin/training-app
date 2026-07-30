@@ -17,6 +17,8 @@ com repositories `expo-sqlite`, sem exigir servidor, VPS, IP, conta ou internet.
 - recuperar uma sessão após fechar o aplicativo;
 - consultar a programação de hoje, progresso semanal e referências de carga anteriores;
 - consultar histórico, duração, volume e taxa de conclusão;
+- escolher entre quatro temas, aparência do sistema e níveis de movimento;
+- usar alto contraste no treino e controlar feedback tátil;
 - mover fichas para uma lixeira local com retenção de sete dias;
 - exportar, validar e restaurar backups com `schemaVersion: 2`.
 
@@ -47,6 +49,10 @@ root de `mobile/App.tsx` abre o banco, aplica migrations, executa o seed inicial
 e injeta repositories nos controllers React.
 
 Detalhes: [arquitetura de dados](docs/LOCAL_DATA_ARCHITECTURE.md).
+
+As preferências visuais, o comportamento de movimento e os contratos de
+acessibilidade estão descritos em
+[temas e acessibilidade](docs/THEMES_ACCESSIBILITY.md).
 
 ## Requisitos e instalação
 

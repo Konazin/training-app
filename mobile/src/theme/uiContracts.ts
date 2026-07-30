@@ -58,6 +58,30 @@ export function tabColors(colors: ThemeColors) {
   return { active: colors.primary, inactive: colors.textSecondary, background: colors.tabBar }
 }
 
-export function resolvedDarkTheme(preference: ThemePreference, systemScheme: 'light' | 'dark' | 'unspecified' | null | undefined) {
-  return preference === 'system' ? systemScheme === 'dark' : preference === 'dark'
+export function resolvedDarkTheme(
+  preference: ThemePreference | 'SYSTEM' | 'LIGHT' | 'DARK',
+  systemScheme: 'light' | 'dark' | 'unspecified' | null | undefined,
+) {
+  const normalized = preference.toLowerCase()
+  return normalized === 'system' ? systemScheme === 'dark' : normalized === 'dark'
+}
+
+export function systemBarStyle(dark: boolean) {
+  return dark ? 'light' as const : 'dark' as const
+}
+
+export function workoutPalette(colors: ThemeColors, highContrast: boolean) {
+  return highContrast ? colors.workout : {
+    background: colors.background,
+    surface: colors.surface,
+    border: colors.border,
+    text: colors.textPrimary,
+    textSecondary: colors.textSecondary,
+    completed: colors.success,
+    onCompleted: colors.background,
+    pending: colors.surfaceSecondary,
+    timer: colors.textPrimary,
+    timerText: colors.background,
+    danger: colors.danger,
+  }
 }

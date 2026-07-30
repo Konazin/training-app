@@ -1,8 +1,8 @@
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
 import { ScreenScrollView } from '../components/Screen'
 import { ScreenHeader } from '../components/ScreenHeader'
-import { SelectableChip } from '../components/SelectableChip'
-import { shared, type ThemeColors, type ThemePreference, useTheme } from '../theme'
+import { shared, type ThemeColors, useTheme } from '../theme'
+import { triggerHaptic } from '../theme/haptics'
 import { typography } from '../theme/typography'
 import type { AutomaticBackupInfo } from '@training/training-domain'
 import {
@@ -13,6 +13,7 @@ import {
 export function MoreScreen({
   busy,
   onIntegrations,
+  onAppearance,
   onLibrary,
   onTrash,
   trashCount,
@@ -28,6 +29,7 @@ export function MoreScreen({
 }: {
   busy: boolean
   onIntegrations: () => void
+  onAppearance: () => void
   onLibrary: () => void
   onTrash: () => void
   trashCount: number
@@ -41,14 +43,21 @@ export function MoreScreen({
   onDeleteAutomatic: (uri: string) => void
   onDeleteAllAutomatic: () => void
 }) {
-  const { colors, preference, setPreference } = useTheme()
+  const { colors, preferences } = useTheme()
   const styles = createStyles(colors)
   const confirmErase = () => Alert.alert(
     'Apagar todos os dados?',
     'Um backup automático será criado antes. Esta ação remove fichas, exercícios e histórico deste aparelho.',
     [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Apagar tudo', style: 'destructive', onPress: onErase },
+      {
+        text: 'Apagar tudo',
+        style: 'destructive',
+        onPress: () => {
+          void triggerHaptic('DESTRUCTIVE_CONFIRM', preferences.hapticsEnabled)
+          onErase()
+        },
+      },
     ],
   )
   const confirmSeed = () => Alert.alert(
@@ -56,7 +65,14 @@ export function MoreScreen({
     'Os dados atuais serão substituídos pelo catálogo e pela ficha demonstrativa.',
     [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Recriar', style: 'destructive', onPress: onResetSeed },
+      {
+        text: 'Recriar',
+        style: 'destructive',
+        onPress: () => {
+          void triggerHaptic('DESTRUCTIVE_CONFIRM', preferences.hapticsEnabled)
+          onResetSeed()
+        },
+      },
     ],
   )
   return (
@@ -67,15 +83,12 @@ export function MoreScreen({
         description="Backup e dados do aparelho. Nenhuma destas ações usa servidor."
       />
       <Text style={styles.section}>APARÊNCIA</Text>
-      <View style={styles.themeOptions}>
-        {([
-          ['system', 'Sistema'],
-          ['light', 'Claro'],
-          ['dark', 'Escuro'],
-        ] as [ThemePreference, string][]).map(([value, label]) => (
-          <SelectableChip key={value} label={label} selected={preference === value} onPress={() => setPreference(value)} />
-        ))}
-      </View>
+      <MenuItem
+        label="Aparência e acessibilidade"
+        detail="Tema, movimento, contraste e feedback tátil"
+        onPress={onAppearance}
+        disabled={busy}
+      />
       <Text style={styles.section}>CONTEÚDO</Text>
       <MenuItem label="Biblioteca de exercícios" detail="Criar e editar" onPress={onLibrary} disabled={busy} />
       <MenuItem
@@ -220,7 +233,6 @@ function MenuItem({
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   section: { ...typography.caption, color: colors.textSecondary, fontWeight: '800', letterSpacing: 1.5, marginBottom: 8, marginTop: 20 },
-  themeOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
   item: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 17, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8, minHeight: 68, paddingHorizontal: 16, paddingVertical: 10 },
   itemCopy: { flex: 1, minWidth: 0 },
   disabled: { opacity: 0.55 },
