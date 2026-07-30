@@ -11,6 +11,7 @@ import type {
 import { WEEKDAYS } from '../model'
 import { invalidTransition, notFound, trainingPlanInTrash } from '../errors'
 import {
+  calculateHistoryProgress,
   historyStats,
   localDateKey,
   selectPrimaryMedia,
@@ -163,13 +164,14 @@ export function createSessionSnapshot(
 
 export function calculateDashboard(sessions: WorkoutSession[], activePlan: TrainingPlan | null, now = new Date()): Dashboard {
   const stats = historyStats(sessions, now)
+  const progress = calculateHistoryProgress(sessions, now)
   const next = activePlan?.days.find((day) => day.weekday === weekdayFrom(now)) ?? null
   return {
     ...stats,
     activePlanName: activePlan?.name ?? null,
     nextWorkoutName: next?.title ?? null,
     nextPlanDayId: next?.id ?? null,
-    adherence: sessions.length ? Math.round(stats.completedSessions / sessions.length * 100) : 0,
+    adherence: progress.completionRate,
     recentSessions: sessions.slice(0, 5),
   }
 }

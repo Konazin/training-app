@@ -15,7 +15,8 @@ com repositories `expo-sqlite`, sem exigir servidor, VPS, IP, conta ou internet.
 - iniciar, pausar, retomar, concluir ou abandonar sessões;
 - editar séries e usar cronômetro de descanso;
 - recuperar uma sessão após fechar o aplicativo;
-- consultar histórico, duração, volume e aderência;
+- consultar a programação de hoje, progresso semanal e referências de carga anteriores;
+- consultar histórico, duração, volume e taxa de conclusão;
 - mover fichas para uma lixeira local com retenção de sete dias;
 - exportar, validar e restaurar backups com `schemaVersion: 2`.
 
@@ -105,6 +106,23 @@ repete a operação confirmada. Consulte
 [editor de ficha](docs/TRAINING_PLAN_EDITOR.md) e
 [templates e duplicação](docs/TRAINING_PLAN_TEMPLATES.md).
 
+## Hoje, semana e progresso
+
+A Home mostra a sessão atual, o treino de hoje, o progresso e os sete dias da
+semana local de segunda-feira a domingo. Descanso planejado continua sendo
+descanso mesmo no passado. Um treino vazio abre a configuração, e uma sessão
+ativa ou pausada sempre tem prioridade sobre iniciar outra.
+
+As cargas anteriores são exibidas somente como **Referência anterior**, usando
+séries concluídas do mesmo exercício e dia. Elas não são recomendação de carga
+nem orientação de progressão.
+
+As seis métricas ficam em **Progresso** (`History`): sessões, conclusões da
+semana, taxa de conclusão, exercícios, minutos e volume. A taxa considera
+somente sessões concluídas e não concluídas; sessões ativas ou pausadas ficam
+fora do denominador. Veja [Home semanal](docs/HOME_WEEKLY.md) e
+[Histórico e progresso](docs/HISTORY_PROGRESS.md).
+
 ## Ciclo de vida das fichas
 
 O fluxo principal é:
@@ -159,7 +177,10 @@ npm run typecheck --workspace=umamusume-mobile
 EXPO_NO_TELEMETRY=1 npm exec --workspace=training-mobile -- expo install --check
 EXPO_NO_TELEMETRY=1 npm exec --workspace=training-mobile -- expo export --platform android --output-dir dist
 git diff --check
+npm run test --workspace=training-mobile
 ```
 
 O export Expo valida o bundle; esta etapa não gera APK. Para o teste físico em
 modo avião, use [o roteiro local-only](docs/LOCAL_ONLY_SMOKE_TEST.md).
+O roteiro específico desta entrega está em
+[smoke Android do Marco 3](docs/MARCO_3_ANDROID_SMOKE.md).

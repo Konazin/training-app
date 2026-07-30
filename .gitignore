@@ -65,6 +65,9 @@ coverage/
 *.tsbuildinfo
 
 # React Native / Expo
+**/.eas-inspect/
+**/.expo/
+**/dist/
 mobile/.expo/
 mobile/.expo-shared/
 mobile/.cache/

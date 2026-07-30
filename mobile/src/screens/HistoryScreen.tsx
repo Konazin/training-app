@@ -1,59 +1,111 @@
-import { StyleSheet, Text, View } from 'react-native'
-import type { WorkoutSession } from '@training/training-domain'
+import { RefreshControl, StyleSheet, Text, View } from 'react-native'
+import type { HistoryProgress, WorkoutSession } from '@training/training-domain'
 import { ScreenHeader } from '../components/ScreenHeader'
 import { ScreenScrollView } from '../components/Screen'
 import { type ThemeColors, useTheme } from '../theme'
 import { typography } from '../theme/typography'
 
-export function HistoryScreen({ sessions }: { sessions: WorkoutSession[] }) {
+const statusLabels = {
+  COMPLETED: 'Concluída',
+  ABANDONED: 'Não concluída',
+  IN_PROGRESS: 'Em andamento',
+  PAUSED: 'Pausada',
+} as const
+
+export function HistoryScreen({
+  sessions,
+  progress,
+  loading,
+  warning,
+  onRefresh,
+}: {
+  sessions: WorkoutSession[]
+  progress: HistoryProgress
+  loading: boolean
+  warning?: string
+  onRefresh: () => void
+}) {
   const { colors } = useTheme()
   const styles = createStyles(colors)
-  const completed = sessions.filter((item) => item.status === 'COMPLETED')
-  const volume = completed.reduce((sum, item) => sum + item.totalVolume, 0)
   return (
-    <ScreenScrollView includeBottomInset={false}>
-      <ScreenHeader eyebrow="Evolução real" title={'Histórico e\nprogresso'} description="Métricas calculadas sobre séries persistidas." />
+    <ScreenScrollView
+      includeBottomInset={false}
+      refreshControl={<RefreshControl refreshing={loading && !!sessions.length} onRefresh={onRefresh} tintColor={colors.ink} />}
+    >
+      <ScreenHeader
+        eyebrow="Progresso local"
+        title="Histórico e progresso"
+        description="Resultados calculados a partir das sessões salvas neste aparelho."
+      />
+      {!!warning && <Text accessibilityRole="alert" style={styles.warning}>{warning}</Text>}
       <View style={styles.metrics}>
-        <Metric label="SESSÕES" value={completed.length} styles={styles} />
-        <Metric label="VOLUME" value={`${volume}kg`} styles={styles} />
+        <Metric label="SESSÕES" value={progress.completedSessions} />
+        <Metric label="ESTA SEMANA" value={progress.completedThisWeek} />
+        <Metric label="CONCLUSÃO" value={`${progress.completionRate}%`} />
+        <Metric label="EXERCÍCIOS" value={progress.completedExercises} />
+        <Metric label="MINUTOS" value={Math.round(progress.totalDurationSeconds / 60)} />
+        <Metric label="VOLUME" value={`${Math.round(progress.totalVolume)} kg`} />
       </View>
       {!sessions.length ? (
         <View style={styles.empty}>
           <Text style={styles.title}>Nenhuma sessão registrada</Text>
-          <Text style={styles.meta}>Inicie um treino pela ficha ativa.</Text>
+          <Text style={styles.meta}>Seus treinos concluídos e não concluídos aparecerão aqui.</Text>
         </View>
-      ) : sessions.map((item) => (
-        <View key={item.id} style={styles.card}>
-          <View style={[styles.status, item.status === 'COMPLETED' && styles.complete]}>
-            <Text style={styles.statusText}>{item.status === 'COMPLETED' ? '✓' : '×'}</Text>
-          </View>
-          <View style={styles.copy}>
-            <Text style={styles.title}>{item.workoutName}</Text>
-            <Text style={styles.meta}>{item.scheduledDate.split('-').reverse().join('/')} · {item.completedSets} séries</Text>
-          </View>
-          <Text style={styles.volume}>{item.totalVolume}kg</Text>
+      ) : sessions.map((session) => (
+        <View
+          accessibilityLabel={`${session.workoutName}, ${session.dayName}, ${statusLabels[session.status]}`}
+          key={session.id}
+          style={styles.card}
+        >
+          <Text style={[styles.status, session.status === 'COMPLETED' && styles.completed]}>
+            {statusLabels[session.status]}
+          </Text>
+          <Text style={styles.title}>{session.workoutName}</Text>
+          <Text style={styles.day}>{session.dayName}</Text>
+          <Text style={styles.meta}>
+            {formatDateKey(session.scheduledDate)} · {session.completedSets} séries
+            {' · '}{formatDuration(session.totalDurationSeconds)}
+            {session.totalVolume > 0 ? ` · ${Math.round(session.totalVolume)} kg` : ''}
+          </Text>
         </View>
       ))}
     </ScreenScrollView>
   )
 }
 
-function Metric({ label, value, styles }: { label: string; value: string | number; styles: ReturnType<typeof createStyles> }) {
-  return <View style={styles.metric}><Text style={styles.label}>{label}</Text><Text style={styles.value}>{value}</Text></View>
+function Metric({ label, value }: { label: string; value: string | number }) {
+  const { colors } = useTheme()
+  const styles = createStyles(colors)
+  return (
+    <View style={styles.metric}>
+      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.value}>{value}</Text>
+    </View>
+  )
+}
+
+function formatDateKey(value: string) {
+  return value.split('-').reverse().join('/')
+}
+
+export function formatDuration(seconds: number) {
+  if (seconds < 60) return `${seconds} s`
+  const minutes = Math.floor(seconds / 60)
+  const remaining = seconds % 60
+  return remaining ? `${minutes} min ${remaining} s` : `${minutes} min`
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  metrics: { flexDirection: 'row', gap: 12, marginBottom: 16 },
-  metric: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 18, borderWidth: 1, flex: 1, padding: 16 },
+  warning: { ...typography.bodySmall, backgroundColor: colors.surfaceSecondary, borderRadius: 12, color: colors.warning, marginBottom: 12, padding: 12 },
+  metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 20 },
+  metric: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 17, borderWidth: 1, minWidth: '46%', padding: 15 },
   label: { ...typography.caption, color: colors.textSecondary, fontWeight: '800' },
-  value: { color: colors.textPrimary, fontSize: 22, fontWeight: '800', lineHeight: 28, marginTop: 6 },
-  card: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 19, borderWidth: 1, flexDirection: 'row', gap: 12, marginBottom: 8, minHeight: 72, padding: 12 },
-  status: { alignItems: 'center', backgroundColor: colors.surfaceSecondary, borderRadius: 14, height: 48, justifyContent: 'center', width: 48 },
-  complete: { backgroundColor: colors.successSurface },
-  statusText: { color: colors.success, fontSize: 18, fontWeight: '800' },
-  copy: { flex: 1, minWidth: 0 },
-  title: { ...typography.body, color: colors.textPrimary, flexShrink: 1, fontWeight: '700' },
-  meta: { ...typography.caption, color: colors.textSecondary, marginTop: 4 },
-  volume: { ...typography.label, color: colors.textPrimary, fontWeight: '800' },
-  empty: { alignItems: 'center', minHeight: 260, justifyContent: 'center' },
+  value: { color: colors.textPrimary, fontSize: 22, fontWeight: '900', lineHeight: 28, marginTop: 6 },
+  card: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 18, borderWidth: 1, marginBottom: 9, padding: 16 },
+  status: { ...typography.caption, color: colors.warning, fontWeight: '900', marginBottom: 8, textTransform: 'uppercase' },
+  completed: { color: colors.success },
+  title: { ...typography.body, color: colors.textPrimary, fontWeight: '800' },
+  day: { ...typography.bodySmall, color: colors.textSecondary, marginTop: 2 },
+  meta: { ...typography.caption, color: colors.textSecondary, lineHeight: 18, marginTop: 7 },
+  empty: { alignItems: 'center', justifyContent: 'center', minHeight: 240 },
 })

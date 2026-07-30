@@ -1,29 +1,69 @@
 import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native'
-import type { Dashboard, WorkoutSession } from '@training/training-domain'
+import {
+  buildWeeklyTrainingOverview,
+  findLatestExerciseLoadReferences,
+  type TrainingPlan,
+  type WorkoutSession,
+} from '@training/training-domain'
 import { ScreenHeader } from '../components/ScreenHeader'
 import { ScreenScrollView } from '../components/Screen'
-import { shared, type ThemeColors, useTheme } from '../theme'
+import { type ThemeColors, useTheme } from '../theme'
 import { typography } from '../theme/typography'
+import { TodayWorkoutCard } from './TodayWorkoutCard'
+import { TrainingWeekSummary } from './TrainingWeekSummary'
 
 export function HomeScreen({
-  dashboard,
+  plans,
+  sessions,
   loading,
   activeSession,
+  trashCount,
+  warning,
+  now = new Date(),
   onRefresh,
-  onOpenPlan,
+  onCreatePlan,
+  onOpenPlans,
+  onOpenPlanDay,
+  onStartToday,
+  onContinueSession,
+  onOpenArchived,
+  onOpenTrash,
   onOpenLibrary,
-  onResumeSession,
+  onOpenIntegrations,
 }: {
-  dashboard: Dashboard | null
+  plans: TrainingPlan[]
+  sessions: WorkoutSession[]
   loading: boolean
   activeSession: WorkoutSession | null
+  trashCount: number
+  warning?: string
+  now?: Date
   onRefresh: () => void
-  onOpenPlan: () => void
+  onCreatePlan: () => void
+  onOpenPlans: () => void
+  onOpenPlanDay: (planId: number, dayId: number) => void
+  onStartToday: (planId: number, planDayId: number) => void
+  onContinueSession: () => void
+  onOpenArchived: () => void
+  onOpenTrash: () => void
   onOpenLibrary: () => void
-  onResumeSession: () => void
+  onOpenIntegrations: () => void
 }) {
   const { colors } = useTheme()
   const styles = createStyles(colors)
+  const normalPlans = plans.filter((plan) => !plan.archived && plan.deletedAt === null)
+  const activePlan = normalPlans.find((plan) => plan.active) ?? null
+  const overview = activePlan
+    ? buildWeeklyTrainingOverview(activePlan, sessions, activeSession, now)
+    : null
+  const todayDay = activePlan?.days.find((day) => day.id === overview?.today.planDayId)
+  const references = todayDay
+    ? findLatestExerciseLoadReferences(todayDay, sessions)
+    : []
+  const todaySession = overview?.today.sessionId
+    ? [activeSession, ...sessions].find((session) => session?.id === overview.today.sessionId) ?? null
+    : null
+
   return (
     <ScreenScrollView
       includeBottomInset={false}
@@ -31,115 +71,150 @@ export function HomeScreen({
       showsVerticalScrollIndicator={false}
     >
       <ScreenHeader
-        eyebrow="Dados no aparelho"
-        title={`${greeting()},\natleta.`}
-        description="Sua rotina continua disponível mesmo em modo avião."
+        eyebrow={greeting(now)}
+        title="Hoje"
+        description={formatReadableDate(now)}
       />
-
-      {!!activeSession && (
-        <Pressable accessibilityRole="button" style={({ pressed }) => [styles.active, pressed && styles.pressed]} onPress={onResumeSession}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.eyebrow}>{activeSession.status === 'PAUSED' ? 'SESSÃO PAUSADA' : 'SESSÃO ATIVA'}</Text>
-            <Text style={styles.activeTitle}>{activeSession.workoutName} · {activeSession.dayName}</Text>
+      {!!warning && <Text accessibilityRole="alert" style={styles.warning}>{warning}</Text>}
+      {!normalPlans.length ? (
+        <EmptyPlan
+          title="Nenhuma ficha ativa"
+          description="Crie uma ficha para organizar sua semana de treino."
+          action="Criar primeira ficha"
+          onPress={onCreatePlan}
+        />
+      ) : !activePlan ? (
+        <EmptyPlan
+          title="Escolha sua ficha ativa"
+          description="Você possui fichas salvas, mas nenhuma está ativa para esta semana."
+          action="Abrir fichas"
+          onPress={onOpenPlans}
+        />
+      ) : overview ? (
+        <>
+          {!!activeSession && (
+            <Pressable
+              accessibilityLabel={`${activeSession.status === 'PAUSED' ? 'Sessão pausada' : 'Sessão em andamento'}: ${activeSession.workoutName}, ${activeSession.dayName}`}
+              accessibilityRole="button"
+              onPress={onContinueSession}
+              style={({ pressed }) => [styles.activeSession, pressed && styles.pressed]}
+            >
+              <Text style={styles.activeEyebrow}>
+                {activeSession.status === 'PAUSED' ? 'SESSÃO PAUSADA' : 'SESSÃO EM ANDAMENTO'}
+              </Text>
+              <Text style={styles.activeTitle}>{activeSession.workoutName} · {activeSession.dayName}</Text>
+              <Text style={styles.activeAction}>
+                {activeSession.status === 'PAUSED' ? 'Retomar treino' : 'Continuar treino'} →
+              </Text>
+            </Pressable>
+          )}
+          <TodayWorkoutCard
+            plan={activePlan}
+            day={overview.today}
+            session={todaySession}
+            references={references}
+            blockedByCurrentSession={activeSession !== null}
+            onStart={() => overview.today.planDayId
+              && onStartToday(activePlan.id, overview.today.planDayId)}
+            onConfigure={() => overview.today.planDayId
+              && onOpenPlanDay(activePlan.id, overview.today.planDayId)}
+            onContinue={onContinueSession}
+            onOpenPlan={onOpenPlans}
+          />
+          <TrainingWeekSummary overview={overview} />
+          <Text style={styles.sectionTitle}>Atalhos</Text>
+          <View style={styles.shortcuts}>
+            <Shortcut label="Ficha ativa" onPress={onOpenPlans} />
+            <Shortcut label="Fichas arquivadas" onPress={onOpenArchived} />
+            <Shortcut label="Lixeira" badge={trashCount} onPress={onOpenTrash} />
+            <Shortcut label="Biblioteca" onPress={onOpenLibrary} />
+            <Shortcut label="Integrações" onPress={onOpenIntegrations} />
           </View>
-          <Text style={styles.activeAction}>Retomar →</Text>
-        </Pressable>
-      )}
-
-      <View style={styles.hero}>
-        <Text style={styles.heroEyebrow}>FICHA ATIVA</Text>
-        <Text style={styles.heroTitle}>{dashboard?.activePlanName ?? 'Monte sua primeira ficha'}</Text>
-        <Text style={styles.heroText}>
-          {dashboard?.nextWorkoutName
-            ? `Próximo dia: ${dashboard.nextWorkoutName}`
-            : 'Configure os sete dias da semana no próprio aparelho.'}
-        </Text>
-        <Pressable accessibilityRole="button" style={({ pressed }) => [styles.heroButton, pressed && styles.pressed]} onPress={onOpenPlan}>
-          <Text style={styles.heroButtonText}>{dashboard?.activePlanName ? 'Abrir ficha' : 'Criar ficha'}</Text>
-          <Text style={styles.heroButtonText}>→</Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.metrics}>
-        <Metric label="SESSÕES" value={dashboard?.completedSessions ?? 0} />
-        <Metric label="ESTA SEMANA" value={dashboard?.weeklySessions ?? 0} />
-        <Metric label="ADERÊNCIA" value={`${dashboard?.adherence ?? 0}%`} />
-        <Metric label="EXERCÍCIOS" value={dashboard?.totalExercises ?? 0} />
-        <Metric label="MINUTOS" value={Math.round((dashboard?.totalDurationSeconds ?? 0) / 60)} />
-        <Metric label="VOLUME" value={`${Math.round(dashboard?.totalVolume ?? 0)}kg`} />
-      </View>
-
-      <View style={styles.sectionHeader}>
-        <View>
-          <Text style={styles.eyebrow}>HISTÓRICO LOCAL</Text>
-          <Text style={styles.sectionTitle}>Sessões recentes</Text>
-        </View>
-        <Pressable accessibilityRole="button" hitSlop={8} onPress={onOpenLibrary} style={styles.linkButton}><Text style={styles.link}>Biblioteca</Text></Pressable>
-      </View>
-      {!dashboard?.recentSessions.length ? (
-        <View style={styles.empty}>
-          <Text style={styles.emptyTitle}>Tudo pronto para começar</Text>
-          <Text style={styles.emptyText}>Abra a ficha ativa e inicie um dia configurado.</Text>
-        </View>
-      ) : dashboard.recentSessions.map((session) => (
-        <View key={session.id} style={styles.session}>
-          <View style={[styles.status, session.status === 'COMPLETED' && styles.completed]}>
-            <Text style={styles.statusText}>{session.status === 'COMPLETED' ? '✓' : '×'}</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.sessionTitle}>{session.workoutName}</Text>
-            <Text style={styles.sessionMeta}>{session.dayName} · {formatDate(session.startedAt)}</Text>
-          </View>
-          <Text style={styles.volume}>{Math.round(session.totalVolume)}kg</Text>
-        </View>
-      ))}
+        </>
+      ) : null}
     </ScreenScrollView>
   )
 }
 
-function Metric({ label, value }: { label: string; value: string | number }) {
+function EmptyPlan({
+  title,
+  description,
+  action,
+  onPress,
+}: {
+  title: string
+  description: string
+  action: string
+  onPress: () => void
+}) {
   const { colors } = useTheme()
   const styles = createStyles(colors)
-  return <View style={styles.metric}><Text style={styles.metricLabel}>{label}</Text><Text style={styles.metricValue}>{value}</Text></View>
+  return (
+    <View style={styles.empty}>
+      <Text style={styles.emptyTitle}>{title}</Text>
+      <Text style={styles.emptyDescription}>{description}</Text>
+      <Pressable accessibilityRole="button" onPress={onPress} style={styles.primary}>
+        <Text style={styles.primaryText}>{action}</Text>
+      </Pressable>
+    </View>
+  )
 }
 
-function greeting() {
-  const hour = new Date().getHours()
+function Shortcut({
+  label,
+  badge,
+  onPress,
+}: {
+  label: string
+  badge?: number
+  onPress: () => void
+}) {
+  const { colors } = useTheme()
+  const styles = createStyles(colors)
+  return (
+    <Pressable
+      accessibilityLabel={badge ? `${label}, ${badge} ${badge === 1 ? 'item' : 'itens'}` : label}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.shortcut, pressed && styles.pressed]}
+    >
+      <Text style={styles.shortcutText}>{label}</Text>
+      {!!badge && <Text accessibilityRole="text" style={styles.badge}>{badge > 99 ? '99+' : badge}</Text>}
+      <Text style={styles.arrow}>→</Text>
+    </Pressable>
+  )
+}
+
+function greeting(now: Date) {
+  const hour = now.getHours()
   return hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite'
 }
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(new Date(value)).replace('.', '')
+function formatReadableDate(now: Date) {
+  const text = new Intl.DateTimeFormat('pt-BR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }).format(now)
+  return text.charAt(0).toLowerCase() + text.slice(1)
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  active: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 18, borderWidth: 1, flexDirection: 'row', gap: 12, marginBottom: 12, minHeight: 64, padding: 16 },
-  eyebrow: { ...typography.caption, color: colors.textSecondary, fontWeight: '800', letterSpacing: 1 },
-  activeTitle: { ...typography.body, color: colors.textPrimary, flexShrink: 1, fontWeight: '800', marginTop: 5 },
-  activeAction: { ...typography.label, color: colors.primary, fontWeight: '800' },
-  hero: { backgroundColor: colors.textPrimary, borderRadius: 22, marginBottom: 12, minHeight: 250, padding: 22 },
-  heroEyebrow: { ...typography.caption, color: colors.background, fontWeight: '800', letterSpacing: 1.5 },
-  heroTitle: { color: colors.background, fontSize: 29, fontWeight: '900', lineHeight: 35, marginTop: 36 },
-  heroText: { ...typography.bodySmall, color: colors.background, marginTop: 10 },
-  heroButton: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: colors.primary, borderRadius: 14, flexDirection: 'row', gap: 25, marginTop: 24, minHeight: 48, paddingHorizontal: 16 },
-  heroButtonText: { ...typography.label, color: colors.onPrimary, fontWeight: '900' },
-  metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: shared.responsive.twoColumnGap, marginBottom: 8 },
-  metric: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 17, borderWidth: 1, minWidth: shared.responsive.metricMinWidth, padding: 16, width: '47%' },
-  metricLabel: { ...typography.caption, color: colors.textSecondary, fontWeight: '800' },
-  metricValue: { color: colors.textPrimary, fontSize: 22, fontWeight: '900', lineHeight: 28, marginTop: 6 },
-  sectionHeader: { alignItems: 'flex-end', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10, marginTop: 18 },
-  sectionTitle: { color: colors.ink, fontSize: 19, fontWeight: '800', marginTop: 5 },
-  linkButton: { justifyContent: 'center', minHeight: 48 },
-  link: { ...typography.label, color: colors.primary, fontWeight: '800' },
-  empty: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 20, borderWidth: 1, padding: 30 },
-  emptyTitle: { ...typography.label, color: colors.textPrimary, fontWeight: '800' },
-  emptyText: { ...typography.bodySmall, color: colors.textSecondary, marginTop: 7, textAlign: 'center' },
-  session: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 18, borderWidth: 1, flexDirection: 'row', gap: 12, marginBottom: 8, minHeight: 72, padding: 12 },
-  status: { alignItems: 'center', backgroundColor: colors.gray100, borderRadius: 13, height: 42, justifyContent: 'center', width: 42 },
-  completed: { backgroundColor: '#d1fae5' },
-  statusText: { color: '#047857', fontWeight: '900' },
-  sessionTitle: { ...typography.body, color: colors.textPrimary, fontWeight: '800' },
-  sessionMeta: { ...typography.caption, color: colors.textSecondary, marginTop: 4 },
-  volume: { ...typography.label, color: colors.textPrimary, fontWeight: '800' },
+  warning: { ...typography.bodySmall, backgroundColor: colors.surfaceSecondary, borderRadius: 12, color: colors.warning, marginBottom: 12, padding: 12 },
+  empty: { alignItems: 'flex-start', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 22, borderWidth: 1, padding: 22 },
+  emptyTitle: { color: colors.textPrimary, fontSize: 23, fontWeight: '900', lineHeight: 30 },
+  emptyDescription: { ...typography.body, color: colors.textSecondary, marginTop: 9 },
+  primary: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 14, justifyContent: 'center', marginTop: 20, minHeight: 48, paddingHorizontal: 18 },
+  primaryText: { ...typography.label, color: colors.onPrimary, fontWeight: '900' },
+  activeSession: { backgroundColor: colors.textPrimary, borderRadius: 20, marginBottom: 14, padding: 18 },
+  activeEyebrow: { ...typography.caption, color: colors.background, fontWeight: '900', letterSpacing: 1.4 },
+  activeTitle: { ...typography.body, color: colors.background, fontWeight: '800', marginTop: 8 },
+  activeAction: { ...typography.label, color: colors.primary, fontWeight: '900', marginTop: 14 },
+  sectionTitle: { color: colors.textPrimary, fontSize: 20, fontWeight: '900', marginBottom: 10 },
+  shortcuts: { gap: 8, marginBottom: 12 },
+  shortcut: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, flexDirection: 'row', gap: 10, minHeight: 56, paddingHorizontal: 16 },
+  shortcutText: { ...typography.body, color: colors.textPrimary, flex: 1, fontWeight: '700' },
+  badge: { ...typography.caption, backgroundColor: colors.danger, borderRadius: 12, color: colors.white, fontWeight: '900', minWidth: 24, overflow: 'hidden', paddingHorizontal: 7, paddingVertical: 3, textAlign: 'center' },
+  arrow: { ...typography.body, color: colors.textSecondary },
   pressed: { opacity: 0.72 },
 })

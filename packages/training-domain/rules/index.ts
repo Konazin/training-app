@@ -256,16 +256,55 @@ export function sessionDuration(session: WorkoutSession, now = new Date()) {
   return duration
 }
 
-export function historyStats(sessions: WorkoutSession[], now = new Date()) {
+export interface HistoryProgress {
+  completedSessions: number
+  completedThisWeek: number
+  completionRate: number
+  completedExercises: number
+  totalDurationSeconds: number
+  totalVolume: number
+}
+
+export function calculateHistoryProgress(
+  sessions: readonly WorkoutSession[],
+  now = new Date(),
+): HistoryProgress {
   const completed = sessions.filter((session) => session.status === 'COMPLETED')
-  const weekAgo = new Date(now)
-  weekAgo.setUTCDate(weekAgo.getUTCDate() - 7)
+  const abandoned = sessions.filter((session) => session.status === 'ABANDONED')
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7))
+  const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6)
+  const start = localDateKey(monday)
+  const end = localDateKey(sunday)
   return {
     completedSessions: completed.length,
-    weeklySessions: completed.filter((session) => new Date(session.startedAt) >= weekAgo).length,
-    totalExercises: completed.reduce((sum, session) => sum + session.exercises.filter((item) => item.status === 'COMPLETED').length, 0),
-    totalDurationSeconds: completed.reduce((sum, session) => sum + session.totalDurationSeconds, 0),
-    totalVolume: completed.reduce((sum, session) => sum + session.totalVolume, 0),
+    completedThisWeek: completed.filter(
+      (session) => session.scheduledDate >= start && session.scheduledDate <= end,
+    ).length,
+    completionRate: completed.length + abandoned.length
+      ? Math.round(completed.length / (completed.length + abandoned.length) * 100)
+      : 0,
+    completedExercises: completed.reduce(
+      (total, session) =>
+        total + session.exercises.filter((exercise) => exercise.status === 'COMPLETED').length,
+      0,
+    ),
+    totalDurationSeconds: completed.reduce(
+      (total, session) => total + session.totalDurationSeconds,
+      0,
+    ),
+    totalVolume: completed.reduce((total, session) => total + session.totalVolume, 0),
+  }
+}
+
+export function historyStats(sessions: WorkoutSession[], now = new Date()) {
+  const progress = calculateHistoryProgress(sessions, now)
+  return {
+    completedSessions: progress.completedSessions,
+    weeklySessions: progress.completedThisWeek,
+    totalExercises: progress.completedExercises,
+    totalDurationSeconds: progress.totalDurationSeconds,
+    totalVolume: progress.totalVolume,
   }
 }
 

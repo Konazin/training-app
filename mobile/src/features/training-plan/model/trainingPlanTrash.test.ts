@@ -1,4 +1,3 @@
-// @ts-expect-error Os testes rodam em Node; o bundle Expo não inclui tipos Node.
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { TrainingPlan } from '@training/training-domain'

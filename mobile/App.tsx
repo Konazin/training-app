@@ -1,6 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AppState } from 'react-native'
-import { DefaultTheme, NavigationContainer, type Theme as NavigationTheme } from '@react-navigation/native'
+import {
+  DefaultTheme,
+  NavigationContainer,
+  useFocusEffect,
+  type Theme as NavigationTheme,
+} from '@react-navigation/native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator, type NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -8,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { NavigationBar } from 'expo-navigation-bar'
 import { StatusBar } from 'expo-status-bar'
 import { type LocalRepositories, type SeedData } from '@training/training-local-db'
+import { calculateHistoryProgress } from '@training/training-domain'
 import seed from './assets/seeds/exercises.v1.json'
 import type { MainTabParamList, RootStackParamList } from './src/navigation/types'
 import { useTrainingController } from './src/controllers/useTrainingController'
@@ -113,12 +119,6 @@ function LocalApp({
     controller.refresh,
   )
   trashRefresh.current = trash.refresh
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void trash.refresh()
-    })
-    return () => subscription.remove()
-  }, [trash.refresh])
   const bootstrap = useAppBootstrap([
     workoutSession.refresh,
     trainingPlan.refresh,
@@ -176,6 +176,7 @@ function LocalApp({
                     workoutSession={workoutSession}
                     backup={backup}
                     trash={trash}
+                    refreshAll={refreshAll}
                   />
                 )}
               </Stack.Screen>
@@ -343,6 +344,7 @@ function MainTabs({
   workoutSession,
   backup,
   trash,
+  refreshAll,
 }: {
   navigation: NativeStackNavigationProp<RootStackParamList>
   controller: ReturnType<typeof useTrainingController>
@@ -350,6 +352,7 @@ function MainTabs({
   workoutSession: ReturnType<typeof useWorkoutSessionController>
   backup: ReturnType<typeof useBackupController>
   trash: ReturnType<typeof useTrainingPlanTrashController>
+  refreshAll: () => Promise<RefreshAllResult>
 }) {
   const { colors } = useTheme()
   const insets = useSafeAreaInsets()
@@ -359,7 +362,32 @@ function MainTabs({
     History: 'time-outline',
     More: 'ellipsis-horizontal-circle-outline',
   }
-  const labels: Record<keyof MainTabParamList, string> = { Today: 'Hoje', Plan: 'Ficha', History: 'Histórico', More: 'Mais' }
+  const labels: Record<keyof MainTabParamList, string> = { Today: 'Hoje', Plan: 'Ficha', History: 'Progresso', More: 'Mais' }
+  const historySessions = useMemo(
+    () => workoutSession.activeSession
+      ? [
+          workoutSession.activeSession,
+          ...workoutSession.sessions.filter((item) => item.id !== workoutSession.activeSession?.id),
+        ]
+      : workoutSession.sessions,
+    [workoutSession.activeSession, workoutSession.sessions],
+  )
+  const historyProgress = useMemo(
+    () => calculateHistoryProgress(historySessions),
+    [historySessions],
+  )
+  const onStartToday = useCallback(async (
+    planId: number,
+    planDayId: number,
+  ): Promise<boolean> => {
+    const plan = trainingPlan.trainingPlans.find((item) =>
+      item.id === planId && item.active && !item.archived && item.deletedAt === null)
+    const day = plan?.days.find((item) => item.id === planDayId)
+    if (workoutSession.activeSession || !day || day.restDay || !day.exercises.length) return false
+    const success = await workoutSession.start(planId, planDayId)
+    if (success) navigation.navigate('Session')
+    return success
+  }, [navigation, trainingPlan.trainingPlans, workoutSession])
   return (
     <Tabs.Navigator screenOptions={({ route }) => ({
       headerShown: false,
@@ -381,14 +409,31 @@ function MainTabs({
     })}>
       <Tabs.Screen name="Today">
         {({ navigation: tabNavigation }) => (
-          <HomeScreen
-            dashboard={controller.dashboard}
-            loading={controller.loading}
-            activeSession={workoutSession.activeSession}
-            onRefresh={controller.refresh}
-            onOpenPlan={() => tabNavigation.navigate('Plan')}
-            onOpenLibrary={() => navigation.navigate('Library')}
-            onResumeSession={() => navigation.navigate('Session')}
+          <TodayTab
+            refreshAll={refreshAll}
+            render={(refresh, warning) => (
+              <HomeScreen
+                plans={trainingPlan.trainingPlans}
+                sessions={workoutSession.sessions}
+                loading={controller.loading || trainingPlan.loading || workoutSession.loading}
+                activeSession={workoutSession.activeSession}
+                trashCount={trash.count}
+                warning={warning}
+                onRefresh={() => void refresh()}
+                onCreatePlan={() => navigation.navigate('TrainingPlanEditor')}
+                onOpenPlans={() => tabNavigation.navigate('Plan')}
+                onOpenPlanDay={(planId, dayId) => navigation.navigate('TrainingPlanDay', {
+                  planId,
+                  dayId,
+                })}
+                onStartToday={(planId, dayId) => void onStartToday(planId, dayId)}
+                onContinueSession={() => navigation.navigate('Session')}
+                onOpenArchived={() => navigation.navigate('ArchivedTrainingPlans')}
+                onOpenTrash={() => navigation.navigate('TrainingPlanTrash')}
+                onOpenLibrary={() => navigation.navigate('Library')}
+                onOpenIntegrations={() => navigation.navigate('Integrations')}
+              />
+            )}
           />
         )}
       </Tabs.Screen>
@@ -408,7 +453,14 @@ function MainTabs({
         )}
       </Tabs.Screen>
       <Tabs.Screen name="History">
-        {() => <HistoryScreen sessions={workoutSession.sessions} />}
+        {() => (
+          <RefreshableHistory
+            sessions={historySessions}
+            progress={historyProgress}
+            loading={workoutSession.loading}
+            onRefresh={refreshAll}
+          />
+        )}
       </Tabs.Screen>
       <Tabs.Screen name="More">
         {() => (
@@ -431,5 +483,74 @@ function MainTabs({
         )}
       </Tabs.Screen>
     </Tabs.Navigator>
+  )
+}
+
+function TodayTab({
+  refreshAll,
+  render,
+}: {
+  refreshAll: () => Promise<RefreshAllResult>
+  render: (refresh: () => Promise<void>, warning: string) => React.ReactNode
+}) {
+  const [warning, setWarning] = useState('')
+  const mountedRef = useRef(false)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
+  const refresh = useCallback(async () => {
+    const result = await refreshAll()
+    if (mountedRef.current) {
+      setWarning(result.success
+        ? ''
+        : `Algumas informações não puderam ser atualizadas: ${result.failedParts.join(', ')}.`)
+    }
+  }, [refreshAll])
+  useFocusEffect(useCallback(() => {
+    void refresh()
+  }, [refresh]))
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void refresh()
+    })
+    return () => subscription.remove()
+  }, [refresh])
+  return render(refresh, warning)
+}
+
+function RefreshableHistory({
+  sessions,
+  progress,
+  loading,
+  onRefresh,
+}: {
+  sessions: Parameters<typeof HistoryScreen>[0]['sessions']
+  progress: Parameters<typeof HistoryScreen>[0]['progress']
+  loading: boolean
+  onRefresh: () => Promise<RefreshAllResult>
+}) {
+  const [warning, setWarning] = useState('')
+  const mountedRef = useRef(false)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
+  const refresh = useCallback(async () => {
+    const result = await onRefresh()
+    if (mountedRef.current) {
+      setWarning(result.success
+        ? ''
+        : `Algumas informações não puderam ser atualizadas: ${result.failedParts.join(', ')}.`)
+    }
+  }, [onRefresh])
+  return (
+    <HistoryScreen
+      sessions={sessions}
+      progress={progress}
+      loading={loading}
+      warning={warning}
+      onRefresh={() => void refresh()}
+    />
   )
 }

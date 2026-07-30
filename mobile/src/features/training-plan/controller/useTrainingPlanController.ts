@@ -30,10 +30,16 @@ export function useTrainingPlanController(
     kind: 'success' | 'warning' | 'error'
   } | null>(null)
   const busyRef = useRef(new Set<string>())
+  const mountedRef = useRef(false)
   const selectedTrainingPlan = useMemo(
     () => trainingPlans.find((plan) => plan.id === selectedTrainingPlanId),
     [selectedTrainingPlanId, trainingPlans],
   )
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   useEffect(() => {
     if (selectedTrainingPlanId == null) return
@@ -44,18 +50,24 @@ export function useTrainingPlanController(
   }, [selectedTrainingPlanId, trainingPlans])
 
   const refresh = useCallback(async () => {
-    setLoading(true)
-    setErrors((current) => ({ ...current, general: '' }))
+    if (mountedRef.current) {
+      setLoading(true)
+      setErrors((current) => ({ ...current, general: '' }))
+    }
     try {
       const plans = await repository.list()
-      setTrainingPlans(plans)
-      setSelectedTrainingPlanId(chooseInitialPlan(plans)?.id ?? null)
+      if (mountedRef.current) {
+        setTrainingPlans(plans)
+        setSelectedTrainingPlanId(chooseInitialPlan(plans)?.id ?? null)
+      }
       return true
     } catch (cause) {
-      setErrors((current) => ({ ...current, general: messageFrom(cause) }))
+      if (mountedRef.current) {
+        setErrors((current) => ({ ...current, general: messageFrom(cause) }))
+      }
       return false
     } finally {
-      setLoading(false)
+      if (mountedRef.current) setLoading(false)
     }
   }, [repository])
 
@@ -66,28 +78,34 @@ export function useTrainingPlanController(
   ) => {
     if (busyRef.current.has(key)) return false
     busyRef.current.add(key)
-    setBusyKeys(new Set(busyRef.current))
-    setErrors((current) => ({ ...current, [key]: '' }))
+    if (mountedRef.current) {
+      setBusyKeys(new Set(busyRef.current))
+      setErrors((current) => ({ ...current, [key]: '' }))
+    }
     try {
       const updated = await operation()
-      setTrainingPlans((current) => {
-        let next = current.some((plan) => plan.id === updated.id)
-          ? current.map((plan) => plan.id === updated.id ? updated : plan)
-          : [updated, ...current]
-        if (options?.activate) {
-          next = next.map((plan) => ({ ...plan, active: plan.id === updated.id }))
-        }
-        return next
-      })
-      if (options?.select) setSelectedTrainingPlanId(updated.id)
+      if (mountedRef.current) {
+        setTrainingPlans((current) => {
+          let next = current.some((plan) => plan.id === updated.id)
+            ? current.map((plan) => plan.id === updated.id ? updated : plan)
+            : [updated, ...current]
+          if (options?.activate) {
+            next = next.map((plan) => ({ ...plan, active: plan.id === updated.id }))
+          }
+          return next
+        })
+        if (options?.select) setSelectedTrainingPlanId(updated.id)
+      }
       await onChanged?.()
       return true
     } catch (cause) {
-      setErrors((current) => ({ ...current, [key]: messageFrom(cause) }))
+      if (mountedRef.current) {
+        setErrors((current) => ({ ...current, [key]: messageFrom(cause) }))
+      }
       return false
     } finally {
       busyRef.current.delete(key)
-      setBusyKeys(new Set(busyRef.current))
+      if (mountedRef.current) setBusyKeys(new Set(busyRef.current))
     }
   }, [onChanged])
 
@@ -98,39 +116,47 @@ export function useTrainingPlanController(
   ): Promise<TrainingPlanUiResult> => {
     if (busyRef.current.has(key)) return { status: 'failed' }
     busyRef.current.add(key)
-    setBusyKeys(new Set(busyRef.current))
-    setErrors((current) => ({ ...current, [key]: '' }))
-    setNotice(null)
+    if (mountedRef.current) {
+      setBusyKeys(new Set(busyRef.current))
+      setErrors((current) => ({ ...current, [key]: '' }))
+      setNotice(null)
+    }
     try {
       let plan: TrainingPlan
       try {
         plan = await operation()
       } catch (cause) {
         const text = messageFrom(cause)
-        setErrors((current) => ({ ...current, [key]: text }))
-        setNotice({ text, kind: 'error' })
+        if (mountedRef.current) {
+          setErrors((current) => ({ ...current, [key]: text }))
+          setNotice({ text, kind: 'error' })
+        }
         return { status: 'failed' }
       }
-      setTrainingPlans((current) => [plan, ...current.filter((item) => item.id !== plan.id)])
-      setSelectedTrainingPlanId(plan.id)
+      if (mountedRef.current) {
+        setTrainingPlans((current) => [plan, ...current.filter((item) => item.id !== plan.id)])
+        setSelectedTrainingPlanId(plan.id)
+      }
       let refreshWarning = false
       try {
         refreshWarning = await onChanged?.() === false
       } catch {
         refreshWarning = true
       }
-      setNotice({
-        text: refreshWarning
-          ? `${successMessage} Algumas telas não puderam ser atualizadas.`
-          : successMessage,
-        kind: refreshWarning ? 'warning' : 'success',
-      })
+      if (mountedRef.current) {
+        setNotice({
+          text: refreshWarning
+            ? `${successMessage} Algumas telas não puderam ser atualizadas.`
+            : successMessage,
+          kind: refreshWarning ? 'warning' : 'success',
+        })
+      }
       return refreshWarning
         ? { status: 'success', refreshWarning: true, plan }
         : { status: 'success', refreshWarning: false, plan }
     } finally {
       busyRef.current.delete(key)
-      setBusyKeys(new Set(busyRef.current))
+      if (mountedRef.current) setBusyKeys(new Set(busyRef.current))
     }
   }, [onChanged])
 

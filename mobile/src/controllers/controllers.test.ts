@@ -474,10 +474,12 @@ describe('controllers locais', () => {
     act(() => { committed = hook.current.createWithDays(input) })
     await act(async () => { await Promise.resolve() })
     hook.unmount()
-    pendingRefresh.resolve(false)
-    await expect(committed).resolves.toMatchObject({
-      status: 'success',
-      refreshWarning: true,
+    await act(async () => {
+      pendingRefresh.resolve(false)
+      await expect(committed).resolves.toMatchObject({
+        status: 'success',
+        refreshWarning: true,
+      })
     })
     expect(repository.createWithDays).toHaveBeenCalledTimes(2)
   })
