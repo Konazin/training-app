@@ -7,12 +7,6 @@
     "version": "0.8.1",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#F5F6F8"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.konazin.trainingapp"
@@ -30,6 +24,14 @@
       "expo-sqlite",
       "expo-sharing",
       "expo-secure-store",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#F5F6F8"
+        }
+      ],
       [
         "expo-navigation-bar",
         {
