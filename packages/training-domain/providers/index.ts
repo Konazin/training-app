@@ -13,6 +13,9 @@ export interface ExerciseProviderDescriptor {
   capabilities: readonly ExerciseProviderCapability[]
   requiresNetwork: boolean
   automaticBootstrap: false
+  manualOnly: true
+  integrationRoute: 'WGER_CATALOG' | null
+  supportState: 'SUPPORTED' | 'UNSUPPORTED'
 }
 
 const PROVIDERS: readonly ExerciseProviderDescriptor[] = Object.freeze([
@@ -22,6 +25,9 @@ const PROVIDERS: readonly ExerciseProviderDescriptor[] = Object.freeze([
     capabilities: Object.freeze(['SEARCH', 'IMPORT', 'REFRESH', 'MEDIA', 'ATTRIBUTION'] as const),
     requiresNetwork: true,
     automaticBootstrap: false,
+    manualOnly: true,
+    integrationRoute: 'WGER_CATALOG',
+    supportState: 'SUPPORTED',
   }),
 ])
 

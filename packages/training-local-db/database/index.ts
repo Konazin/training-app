@@ -35,6 +35,7 @@ export async function openTrainingDatabase(
 export * from './seed'
 export * from './installation'
 export * from './catalog'
+export * from './legacyCatalog'
 
 function adapter(native: SQLiteDatabase): SqlDatabase {
   return {

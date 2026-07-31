@@ -1,5 +1,5 @@
 import { createElement } from 'react'
-import { Pressable, Text, View } from 'react-native'
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import {
   act,
   fireEvent,
@@ -24,11 +24,6 @@ jest.mock('../../theme', () => ({
 jest.mock('../../theme/typography', () => ({
   typography: { body: {}, caption: {}, label: {}, title: {} },
 }))
-jest.mock('../../components/Screen', () => {
-  const { ScrollView } = require('react-native')
-  return { ScreenScrollView: ScrollView }
-})
-
 import { Onboarding } from './Onboarding'
 import { useOnboarding } from './useOnboarding'
 
@@ -55,8 +50,10 @@ describe('onboarding local', () => {
       [APP_METADATA_KEYS.onboardingComplete, false],
     ])
     const metadata = repository(values)
-    await renderAsync(createElement(Harness, { metadata }))
+    const view = await renderAsync(createElement(Harness, { metadata }))
     await waitFor(() => expect(screen.getByText('Seus treinos ficam no aparelho')).toBeTruthy())
+    expect(StyleSheet.flatten(view.UNSAFE_getByType(ScrollView).props.style).flex).toBeUndefined()
+    expect(StyleSheet.flatten(view.UNSAFE_getByType(ScrollView).props.style).flexShrink).toBe(1)
     fireEvent.press(screen.getByText('Pular'))
     await waitFor(() => expect(screen.queryByText('Seus treinos ficam no aparelho')).toBeNull())
     expect(values.get(APP_METADATA_KEYS.onboardingComplete)).toBe(true)
@@ -74,10 +71,30 @@ describe('onboarding local', () => {
     expect(screen.getByText('Comece pela sua ficha')).toBeTruthy()
     fireEvent.press(screen.getByText('Próximo'))
     expect(screen.getByText('Biblioteca, backup e integrações')).toBeTruthy()
+    expect(screen.getByText('Importar pacote recomendado')).toBeTruthy()
     await act(async () => {
-      fireEvent.press(screen.getByText('Concluir'))
+      fireEvent.press(screen.getByText('Continuar sem exercícios'))
     })
     await waitFor(() => expect(screen.queryByText('Biblioteca, backup e integrações')).toBeNull())
+  })
+
+  it('fecha pelo botão voltar do Android e não atualiza depois do unmount', async () => {
+    let resolve!: () => void
+    const metadata = repository(new Map([
+      [APP_METADATA_KEYS.onboardingEligible, true],
+      [APP_METADATA_KEYS.onboardingComplete, false],
+    ]))
+    metadata.set = jest.fn(() => new Promise<void>((done) => { resolve = done }))
+    const view = await renderAsync(createElement(Harness, { metadata }))
+    await waitFor(() => expect(screen.getByText('Seus treinos ficam no aparelho')).toBeTruthy())
+    await act(async () => {
+      view.UNSAFE_getByType(Modal).props.onRequestClose()
+      await Promise.resolve()
+    })
+    await view.unmountAsync()
+    resolve()
+    await act(async () => { await Promise.resolve() })
+    expect(metadata.set).toHaveBeenCalledWith(APP_METADATA_KEYS.onboardingComplete, true)
   })
 })
 

@@ -20,7 +20,7 @@ com repositories `expo-sqlite`, sem exigir servidor, VPS, IP, conta ou internet.
 - recuperar uma sessão após fechar o aplicativo;
 - consultar a programação de hoje, progresso semanal e referências de carga anteriores;
 - consultar histórico, duração, volume e taxa de conclusão;
-- explorar uma biblioteca offline com 40 exercícios em português;
+- usar uma biblioteca local que começa vazia e recebe conteúdo só por ação;
 - buscar por nomes e aliases, filtrar, favoritar e consultar recentes;
 - escolher entre quatro temas, aparência do sistema e níveis de movimento;
 - usar alto contraste no treino e controlar feedback tátil;
@@ -38,7 +38,7 @@ Desinstalar o aplicativo apaga os dados locais; exporte backups regularmente.
 mobile/                         # app padrão local-only
 packages/
 ├── training-domain/            # modelos, regras, portas e serviços TypeScript puros
-├── training-local-db/          # expo-sqlite, migrations, mappers, seed e backup
+├── training-local-db/          # expo-sqlite, migrations, mappers e backup
 ├── training-wger/              # cliente público, parser e mapper Wger sem React
 ├── training-contracts/         # reexports temporários do domínio
 ├── mobile-api/                 # infraestrutura HTTP opcional/legada
@@ -51,8 +51,8 @@ compose.beta.yml                # infraestrutura opcional
 
 `training-domain` não importa React, React Native, Expo, SQLite ou cliente
 HTTP. `training-local-db` usa diretamente `expo-sqlite`, sem ORM. O composition
-root de `mobile/App.tsx` abre o banco, aplica migrations, executa o seed inicial
-e injeta repositories nos controllers React.
+root de `mobile/App.tsx` abre o banco, aplica migrations e injeta repositories
+nos controllers React.
 
 Detalhes: [arquitetura de dados](docs/LOCAL_DATA_ARCHITECTURE.md).
 
@@ -76,16 +76,18 @@ Não crie `.env` para o app padrão. `EXPO_PUBLIC_API_URL` e
 
 ## Primeiro uso
 
-No primeiro banco vazio, o app sincroniza exatamente 40 exercícios empacotados,
-com textos próprios e mídia ilustrativa neutra, e cria a ficha “Calistenia
-inicial”. A sincronização é offline, transacional e idempotente. Ela preserva
-IDs e dados do usuário em atualizações e nunca consulta o Wger.
+No primeiro banco, o app cria somente schema, metadados, configurações
+necessárias e elegibilidade do onboarding. Exercícios, fichas, sessões, dias
+demonstrativos e atividades começam vazios. Nenhum provider é consultado.
+
+O antigo catálogo gerado foi aposentado. Em upgrades, suas linhas são
+arquivadas sem apagar IDs, referências de fichas ou snapshots históricos.
 
 Consulte [biblioteca de exercícios](docs/EXERCISE_LIBRARY.md) e
 [mídia de exercícios](docs/EXERCISE_MEDIA.md).
 
 O primeiro uso também apresenta até três passos locais e dispensáveis. Bancos
-existentes atualizados para 0.9.0 não recebem onboarding forçado; a apresentação
+existentes atualizados para 0.9.1 não recebem onboarding forçado; a apresentação
 pode ser reaberta em **Mais → Conhecer o aplicativo**.
 
 ## Backup
@@ -97,11 +99,10 @@ Em **Mais**:
 - operações destrutivas criam primeiro um backup automático no diretório de
   documentos do app;
 - **Apagar todos os dados** exige confirmação;
-- **Recriar dados iniciais** restaura seed e ficha demonstrativa.
 
 Os cinco backups automáticos mais recentes ficam visíveis em **Mais**, com
 restauração, compartilhamento e exclusão. **Apagar todos os dados** preserva os
-metadados técnicos e impede que o seed reapareça ao reabrir.
+metadados técnicos e continua vazio ao reabrir.
 
 Backups v2 podem incluir preferências visuais, favoritos, recentes e aliases do
 usuário em campos opcionais; arquivos antigos continuam aceitos. Eles não
@@ -213,5 +214,6 @@ o teste físico em modo avião com
 [o roteiro local-only](docs/LOCAL_ONLY_SMOKE_TEST.md).
 O roteiro específico desta entrega está em
 [smoke Android dos Marcos 4 e 5](docs/MARCO_4_5_ANDROID_SMOKE.md).
-Para 0.9.0, use o [smoke do Marco 6](docs/MARCO_6_ANDROID_SMOKE.md) e consulte
-o [registro do release candidate](docs/RELEASE_CANDIDATE_0_9.md).
+O APK 0.9.0 foi substituído e não deve seguir para teste formal. A tentativa
+0.9.1 está bloqueada porque a curadoria Wger aprovou menos de 50 intenções;
+consulte [o relatório 0.9.1](docs/RELEASE_CANDIDATE_0_9_1.md).

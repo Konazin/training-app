@@ -25,6 +25,7 @@ import {
   rankExerciseSubstitutions,
   selectPreviousPerformance,
   suggestProgression,
+  effectiveExerciseDefinitionId,
 } from '@training/training-domain'
 import type { RestTimerState } from '../model/restTimer'
 import { Screen, ScreenScrollView } from '../../../components/Screen'
@@ -278,10 +279,11 @@ export function WorkoutSessionScreen(props: Props) {
       )}
 
       {session.exercises.map((exercise, index) => {
-        const definition = definitions.get(exercise.exerciseDefinitionId)
+        const effectiveId = effectiveExerciseDefinitionId(exercise)
+        const definition = definitions.get(effectiveId)
         const previous = selectPreviousPerformance(
           history,
-          exercise.exerciseDefinitionId,
+          effectiveId,
           session.trainingPlanId,
         )
         const suggestion = suggestProgression(
@@ -290,7 +292,11 @@ export function WorkoutSessionScreen(props: Props) {
           definition?.equipment.toLocaleLowerCase('pt-BR').includes('peso corporal') ?? false,
         )
         const substitutions = definition
-          ? rankExerciseSubstitutions(definition, library).slice(0, 4)
+          ? rankExerciseSubstitutions(definition, library)
+              .filter((candidate) => !session.exercises.some((item) =>
+                item.id !== exercise.id
+                && effectiveExerciseDefinitionId(item) === candidate.exercise.id))
+              .slice(0, 4)
           : []
         const statusLabel = exercise.status === 'SKIPPED'
           ? 'Pulado'
@@ -306,10 +312,12 @@ export function WorkoutSessionScreen(props: Props) {
           <View style={styles.exerciseHeader}>
             <Text style={styles.index}>{index + 1}</Text>
             <View style={{ flex: 1 }}>
-              <Text style={styles.exerciseName}>{exercise.name}</Text>
+              <Text style={styles.exerciseName}>
+                {exercise.substituteName ?? exercise.name}
+              </Text>
               {!!exercise.substituteName && (
                 <Text style={styles.substitution}>
-                  Substituído por {exercise.substituteName}
+                  Planejado: {exercise.name} · Realizado: {exercise.substituteName}
                 </Text>
               )}
               <Text style={styles.muted}>

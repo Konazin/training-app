@@ -1,6 +1,5 @@
 import { parseJson, serializeJson } from '@training/training-domain'
 import type { SqlDatabase } from '.'
-import { insertSeed, type SeedData } from './seed'
 
 export const APP_METADATA_KEYS = {
   initialized: 'installation.initialized',
@@ -34,19 +33,11 @@ export function createAppMetadataRepository(database: SqlDatabase): AppMetadataR
   }
 }
 
-export async function initializeFirstInstallation(database: SqlDatabase, seed: SeedData) {
+export async function initializeFirstInstallation(database: SqlDatabase, _retiredSeed?: unknown) {
   if (await metadataValue(database, APP_METADATA_KEYS.initialized) === true) return false
   await database.transaction(async (transaction) => {
     if (await metadataValue(transaction, APP_METADATA_KEYS.initialized) === true) return
-    const existing = await transaction.first<{ value: number }>(`
-      SELECT
-        (SELECT COUNT(*) FROM exercise_definitions)
-        + (SELECT COUNT(*) FROM training_plans)
-        + (SELECT COUNT(*) FROM workout_sessions) AS value
-    `)
-    if ((existing?.value ?? 0) === 0) await insertSeed(transaction, seed)
     await setMetadata(transaction, APP_METADATA_KEYS.initialized, true)
-    await setMetadata(transaction, APP_METADATA_KEYS.seedVersion, seed.version)
     await setMetadata(transaction, APP_METADATA_KEYS.seedSuppressed, false)
     await setMetadata(transaction, APP_METADATA_KEYS.onboardingEligible, true)
     await setMetadata(transaction, APP_METADATA_KEYS.onboardingComplete, false)
@@ -59,16 +50,6 @@ export async function clearUserData(database: SqlDatabase) {
     await deleteUserRows(transaction)
     await setMetadata(transaction, APP_METADATA_KEYS.initialized, true)
     await setMetadata(transaction, APP_METADATA_KEYS.seedSuppressed, true)
-  })
-}
-
-export async function resetToSeed(database: SqlDatabase, seed: SeedData) {
-  await database.transaction(async (transaction) => {
-    await deleteUserRows(transaction)
-    await insertSeed(transaction, seed)
-    await setMetadata(transaction, APP_METADATA_KEYS.initialized, true)
-    await setMetadata(transaction, APP_METADATA_KEYS.seedVersion, seed.version)
-    await setMetadata(transaction, APP_METADATA_KEYS.seedSuppressed, false)
   })
 }
 

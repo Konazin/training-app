@@ -19,6 +19,7 @@ export interface PreviousPerformance {
   reps: number[]
   durations: number[]
   completedSetCount: number
+  rpeCount: number
   averageRpe: number | null
   lastRpe: number | null
   annotation: string | null
@@ -37,6 +38,12 @@ export interface ExerciseSubstitution {
   reason: string
 }
 
+export function effectiveExerciseDefinitionId(
+  exercise: Pick<SessionExercise, 'exerciseDefinitionId' | 'substituteExerciseDefinitionId'>,
+) {
+  return exercise.substituteExerciseDefinitionId ?? exercise.exerciseDefinitionId
+}
+
 export function selectPreviousPerformance(
   sessions: readonly WorkoutSession[],
   exerciseDefinitionId: number,
@@ -45,7 +52,7 @@ export function selectPreviousPerformance(
   const completed = sessions
     .filter((session) => session.status === 'COMPLETED' && session.completedAt)
     .filter((session) => session.exercises.some((exercise) =>
-      exercise.exerciseDefinitionId === exerciseDefinitionId))
+      effectiveExerciseDefinitionId(exercise) === exerciseDefinitionId))
   const samePlan = trainingPlanId == null
     ? completed
     : completed.filter((session) => session.trainingPlanId === trainingPlanId)
@@ -53,7 +60,7 @@ export function selectPreviousPerformance(
     .sort((first, second) => second.completedAt!.localeCompare(first.completedAt!))[0]
   if (!selected) return null
   const exercise = selected.exercises.find((item) =>
-    item.exerciseDefinitionId === exerciseDefinitionId)!
+    effectiveExerciseDefinitionId(item) === exerciseDefinitionId)!
   const sets = exercise.sets.filter((set) => set.completed)
   const rpes = sets.flatMap((set) => set.rpe == null ? [] : [set.rpe])
   const loads = sets.map((set) => set.load).filter((load) => load > 0)
@@ -64,6 +71,7 @@ export function selectPreviousPerformance(
     reps: sets.map((set) => set.reps),
     durations: sets.map((set) => set.durationSeconds),
     completedSetCount: sets.length,
+    rpeCount: rpes.length,
     averageRpe: rpes.length ? rpes.reduce((sum, value) => sum + value, 0) / rpes.length : null,
     lastRpe: rpes.at(-1) ?? selected.overallRpe,
     annotation: exercise.userNotes.trim() || null,
@@ -91,6 +99,15 @@ export function suggestProgression(
       )
     }
     return suggestion('REPEAT_TARGET', 'Repita o alvo porque houve séries incompletas ou esforço alto.', null, null, null)
+  }
+  if (previous.averageRpe == null || previous.rpeCount < previous.completedSetCount) {
+    return suggestion(
+      'KEEP_LOAD',
+      'Mantenha o alvo: faltou registrar o RPE de uma ou mais séries.',
+      timed || bodyweight ? null : previous.load,
+      null,
+      null,
+    )
   }
   if (moderateEffort) {
     return suggestion('KEEP_LOAD', 'Todas as séries foram concluídas com esforço entre 8 e 9.', previous.load, null, null)

@@ -177,7 +177,6 @@ describe('controllers locais', () => {
       repository,
       {} as AppMetadataRepository,
       '0.2.0',
-      vi.fn(async () => {}),
       changed,
     ))
     await act(async () => { await hook.current.eraseAll() })
@@ -204,7 +203,6 @@ describe('controllers locais', () => {
       repository,
       {} as AppMetadataRepository,
       '0.4.0',
-      vi.fn(async () => {}),
       changed,
     ))
     await act(async () => {
@@ -240,7 +238,6 @@ describe('controllers locais', () => {
       repository,
       {} as AppMetadataRepository,
       '0.5.0',
-      vi.fn(async () => {}),
       changed,
     ))
 
@@ -295,7 +292,6 @@ describe('controllers locais', () => {
       repository,
       {} as AppMetadataRepository,
       '0.5.0',
-      vi.fn(async () => {}),
       changed,
     ))
 
@@ -330,7 +326,6 @@ describe('controllers locais', () => {
       repository,
       {} as AppMetadataRepository,
       '0.5.0',
-      vi.fn(async () => {}),
       changed,
     ))
     await act(async () => {

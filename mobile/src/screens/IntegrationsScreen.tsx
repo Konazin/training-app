@@ -23,7 +23,13 @@ export function IntegrationsScreen() {
         <Pressable
           key={provider.id}
           accessibilityRole="button"
-          onPress={() => navigation.navigate('WgerIntegration')}
+          accessibilityState={{ disabled: provider.supportState !== 'SUPPORTED' }}
+          disabled={provider.supportState !== 'SUPPORTED'}
+          onPress={() => {
+            if (provider.integrationRoute === 'WGER_CATALOG') {
+              navigation.navigate('WgerIntegration')
+            }
+          }}
           style={({ pressed }) => [styles.card, pressed && styles.pressed]}
         >
           <View style={styles.logo}><Text style={styles.logoText}>{provider.name[0]}</Text></View>

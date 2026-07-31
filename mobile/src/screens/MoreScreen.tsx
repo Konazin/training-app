@@ -21,7 +21,6 @@ export function MoreScreen({
   onExport,
   onImport,
   onErase,
-  onResetSeed,
   automaticBackups,
   onRestoreAutomatic,
   onShareAutomatic,
@@ -39,7 +38,6 @@ export function MoreScreen({
   onExport: () => void
   onImport: () => void
   onErase: () => void
-  onResetSeed: () => void
   automaticBackups: AutomaticBackupInfo[]
   onRestoreAutomatic: (uri: string) => void
   onShareAutomatic: (uri: string) => void
@@ -63,21 +61,6 @@ export function MoreScreen({
         onPress: () => {
           void triggerHaptic('DESTRUCTIVE_CONFIRM', preferences.hapticsEnabled)
           onErase()
-        },
-      },
-    ],
-  )
-  const confirmSeed = () => Alert.alert(
-    'Recriar dados iniciais?',
-    'Os dados atuais serão substituídos pelo catálogo e pela ficha demonstrativa.',
-    [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Recriar',
-        style: 'destructive',
-        onPress: () => {
-          void triggerHaptic('DESTRUCTIVE_CONFIRM', preferences.hapticsEnabled)
-          onResetSeed()
         },
       },
     ],
@@ -180,7 +163,6 @@ export function MoreScreen({
       )}
       <Text style={styles.section}>MANUTENÇÃO</Text>
       <MenuItem label="Apagar todos os dados" detail="Exige confirmação" onPress={confirmErase} disabled={busy} danger />
-      <MenuItem label="Recriar dados iniciais" detail="Catálogo e ficha demo" onPress={confirmSeed} disabled={busy} danger />
       <Text style={styles.note}>
         Os dados principais ficam no SQLite. Ao desinstalar o aplicativo, eles são apagados; exporte backups regularmente.
       </Text>

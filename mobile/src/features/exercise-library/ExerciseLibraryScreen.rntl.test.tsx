@@ -9,7 +9,7 @@ import type {
   ExerciseMedia,
 } from '@training/training-domain'
 
-const mockNavigation = { navigate: jest.fn() }
+const mockNavigation = { navigate: jest.fn(), goBack: jest.fn() }
 
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => mockNavigation,
@@ -78,6 +78,24 @@ describe('biblioteca renderizada', () => {
 
     fireEvent.press(screen.getByLabelText(/Flexão, Peito/))
     expect(mockNavigation.navigate).toHaveBeenCalledWith('ExerciseDetail', { exerciseId: 1 })
+  })
+
+  it('mostra biblioteca vazia sem iniciar provider e oferece escolhas explícitas', async () => {
+    await renderAsync(createElement(ExerciseLibraryScreen, {
+      exercises: [],
+      loading: false,
+      onCreate: jest.fn(),
+      onUpdate: jest.fn(),
+      onArchive: jest.fn(),
+      onFavorite: jest.fn(),
+    }))
+    expect(screen.getByText('Sua biblioteca está vazia')).toBeTruthy()
+    expect(screen.getByText('Importar pacote recomendado')).toBeTruthy()
+    expect(mockNavigation.navigate).not.toHaveBeenCalled()
+    fireEvent.press(screen.getByText('Pesquisar no Wger'))
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('WgerIntegration')
+    fireEvent.press(screen.getByText('Continuar sem exercícios'))
+    expect(mockNavigation.goBack).toHaveBeenCalledTimes(1)
   })
 })
 

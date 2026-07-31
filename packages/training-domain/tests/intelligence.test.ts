@@ -22,6 +22,9 @@ describe('inteligência local de treino', () => {
     expect(getExerciseProviderDescriptor('WGER')).toMatchObject({
       requiresNetwork: true,
       automaticBootstrap: false,
+      manualOnly: true,
+      integrationRoute: 'WGER_CATALOG',
+      supportState: 'SUPPORTED',
     })
     expect(providerSupports('WGER', 'IMPORT')).toBe(true)
     expect(Object.isFrozen(listExerciseProviders()[0])).toBe(true)
@@ -53,6 +56,24 @@ describe('inteligência local de treino', () => {
     expect(suggestProgression({ ...exercise, timed: true }, performance(0, 7)))
       .toMatchObject({ type: 'INCREASE_REPS', proposedDurationSeconds: 35 })
     expect(suggestProgression(exercise, performance(0, 7), true).type).toBe('INCREASE_REPS')
+    expect(suggestProgression(exercise, {
+      ...performance(20, 7),
+      averageRpe: null,
+      lastRpe: null,
+      rpeCount: 0,
+    })).toMatchObject({
+      type: 'KEEP_LOAD',
+      proposedLoad: 20,
+      reason: 'Mantenha o alvo: faltou registrar o RPE de uma ou mais séries.',
+    })
+  })
+
+  it('atribui histórico ao exercício efetivamente realizado após substituição', () => {
+    const completed = session(8, 'COMPLETED', 1, '2026-07-30T12:00:00.000Z', 30)
+    completed.exercises[0]!.substituteExerciseDefinitionId = 9
+    completed.exercises[0]!.substituteName = 'Crucifixo'
+    expect(selectPreviousPerformance([completed], 9, 1)?.load).toBe(30)
+    expect(selectPreviousPerformance([completed], 7, 1)).toBeNull()
   })
 
   it('ordena substituições locais, remove duplicatas e preserva os candidatos', () => {
@@ -90,6 +111,7 @@ function performance(load: number, averageRpe: number) {
     reps: [10, 10, 10],
     durations: [30, 30, 30],
     completedSetCount: 3,
+    rpeCount: 3,
     averageRpe,
     lastRpe: averageRpe,
     annotation: null,

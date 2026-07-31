@@ -23,7 +23,5 @@ reutilizados. Notas da ficha e do exercício canônico não são sobrescritas.
 ## Backup
 
 Os novos campos entram no backup `schemaVersion: 2`. Backups v1 e v2 anteriores,
-Os novos campos entram no backup `schemaVersion: 2`. Backups v1 e v2 anteriores,
-Os novos campos entram no backup `schemaVersion: 2`. Backups v1 e v2 anteriores,
 sem essas colunas, continuam válidos e restauram valores nulos ou vazios. A
 restauração permanece transacional.

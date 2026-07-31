@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
-import { ScreenScrollView } from '../../components/Screen'
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { type ThemeColors, useTheme } from '../../theme'
 import { typography } from '../../theme/typography'
 
@@ -23,10 +23,14 @@ export function Onboarding({
   visible,
   onSkip,
   onComplete,
+  onOpenWger,
+  onCreateCustom,
 }: {
   visible: boolean
   onSkip: () => Promise<void>
   onComplete: () => Promise<void>
+  onOpenWger?: () => void
+  onCreateCustom?: () => void
 }) {
   const [step, setStep] = useState(0)
   const { colors } = useTheme()
@@ -44,30 +48,67 @@ export function Onboarding({
       transparent
       visible={visible}
     >
-      <View accessibilityViewIsModal style={styles.backdrop}>
-        <View style={styles.sheet}>
-          <ScreenScrollView contentContainerStyle={styles.content}>
+      <View
+        accessibilityViewIsModal
+        onAccessibilityEscape={() => void onSkip()}
+        style={styles.backdrop}
+      >
+        <SafeAreaView edges={['top', 'bottom']} style={styles.sheet}>
+          <ScrollView
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+            style={styles.scroll}
+          >
             <Text style={styles.progress}>PASSO {step + 1} DE {STEPS.length}</Text>
             <Text accessibilityRole="header" style={styles.title}>{current.title}</Text>
             <Text style={styles.description}>{current.description}</Text>
-            <View style={styles.actions}>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => void onSkip()}
-                style={styles.secondary}
-              >
-                <Text style={styles.secondaryText}>Pular</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => last ? void onComplete() : setStep((value) => value + 1)}
-                style={styles.primary}
-              >
-                <Text style={styles.primaryText}>{last ? 'Concluir' : 'Próximo'}</Text>
-              </Pressable>
-            </View>
-          </ScreenScrollView>
-        </View>
+            {last && (
+              <View style={styles.choices}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: true }}
+                  disabled
+                  style={[styles.choice, styles.disabled]}
+                >
+                  <Text style={styles.choiceTitle}>Importar pacote recomendado</Text>
+                  <Text style={styles.choiceDetail}>Indisponível enquanto a curadoria Wger não estiver completa.</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => void onComplete().then(onOpenWger)}
+                  style={styles.choice}
+                >
+                  <Text style={styles.choiceTitle}>Pesquisar no Wger</Text>
+                  <Text style={styles.choiceDetail}>Requer internet e só consulta após sua ação.</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => void onComplete().then(onCreateCustom)}
+                  style={styles.choice}
+                >
+                  <Text style={styles.choiceTitle}>Criar exercício personalizado</Text>
+                  <Text style={styles.choiceDetail}>Conteúdo escrito e controlado por você.</Text>
+                </Pressable>
+              </View>
+            )}
+          </ScrollView>
+          <View style={styles.actions}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => void onSkip()}
+              style={styles.secondary}
+            >
+              <Text style={styles.secondaryText}>Pular</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => last ? void onComplete() : setStep((value) => value + 1)}
+              style={styles.primary}
+            >
+              <Text style={styles.primaryText}>{last ? 'Continuar sem exercícios' : 'Próximo'}</Text>
+            </Pressable>
+          </View>
+        </SafeAreaView>
       </View>
     </Modal>
   )
@@ -88,14 +129,34 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     borderWidth: 1,
     maxHeight: '88%',
     maxWidth: 520,
+    minHeight: 320,
     overflow: 'hidden',
     width: '100%',
   },
-  content: { padding: 24 },
+  scroll: { flexShrink: 1 },
+  content: { flexGrow: 1, padding: 24 },
   progress: { ...typography.caption, color: colors.textSecondary, fontWeight: '800', letterSpacing: 1.2 },
   title: { ...typography.title, color: colors.textPrimary, marginTop: 16 },
   description: { ...typography.body, color: colors.textSecondary, marginTop: 12 },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 28 },
+  choices: { gap: 10, marginTop: 20 },
+  choice: {
+    borderColor: colors.border,
+    borderRadius: 14,
+    borderWidth: 1,
+    minHeight: 56,
+    padding: 12,
+  },
+  disabled: { opacity: 0.55 },
+  choiceTitle: { ...typography.label, color: colors.textPrimary, fontWeight: '800' },
+  choiceDetail: { ...typography.caption, color: colors.textSecondary, marginTop: 4 },
+  actions: {
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    padding: 16,
+  },
   primary: {
     alignItems: 'center',
     backgroundColor: colors.primary,

@@ -4,8 +4,8 @@
 2. **Editor de ficha, templates e duplicação — Marco 2 IMPLEMENTADO, smoke consolidado pendente**
 3. **Home semanal e progresso — Marco 3 IMPLEMENTADO, smoke consolidado pendente**
 4. **Temas, movimento e acessibilidade — Marco 4 IMPLEMENTADO, smoke físico pendente**
-5. **Biblioteca inicial e mídia — Marco 5 IMPLEMENTADO, smoke físico pendente**
-6. **Providers, inteligência local e release candidate — Marco 6 EM VALIDAÇÃO**
+5. **Biblioteca e mídia — Marco 5 IMPLEMENTADO, direção de conteúdo revisada**
+6. **Providers, inteligência local e release candidate — Marco 6 BLOQUEADO PARA TESTES**
 
 ## Marco 1 estabilizado
 
@@ -66,10 +66,10 @@ migração de `react-test-renderer` para Testing Library é dívida técnica.
 O Marco 4 permanece em validação até a execução do roteiro em um aparelho ou
 emulador Android com TalkBack, fonte ampliada e redução de movimento.
 
-## Marco 5 em validação
+## Marco 5 — conteúdo gerado aposentado
 
-- catálogo offline com 40 exercícios originais em português;
-- sincronização transacional e idempotente por slug estável;
+- instalações novas com biblioteca vazia;
+- catálogo gerado legado arquivado sem excluir referências;
 - migration 6 para catálogo, aliases, favoritos e recentes;
 - busca local normalizada, visualização em lista ou por músculo, filtros e
   quatro packs;
@@ -77,14 +77,14 @@ emulador Android com TalkBack, fonte ampliada e redução de movimento.
 - mídia real diferenciada de placeholders e vídeo sob ação;
 - atribuição externa preservada e notas editáveis separadamente;
 - backup v2 ampliado apenas com campos opcionais;
-- restauração e sincronização do catálogo em uma única transação;
+- restauração transacional sem recriar catálogo gerado;
 - testes comportamentais renderizados dos fluxos críticos;
 - candidato mobile 0.8.1, `versionCode` 11.
 
 O Marco 5 permanece em validação até o smoke Android do catálogo, mídia,
 upgrade e backup. O Wger continua manual e não participa do bootstrap.
 
-## Marco 6 em validação
+## Marco 6 — estabilização 0.9.1
 
 - registry tipado de providers, mantendo Wger como integração manual;
 - último desempenho baseado em snapshots concluídos;
@@ -94,11 +94,13 @@ upgrade e backup. O Wger continua manual e não participa do bootstrap.
 - migration 7 aditiva, preservando byte a byte as migrations 1 a 6;
 - backups v2 antigos compatíveis;
 - avisos locais e onboarding dispensável somente em instalações novas;
-- versão mobile 0.9.0, `versionCode` 12.
+- migration 8 arquiva conteúdo `SYSTEM` legado sem apagar dados;
+- versão mobile de desenvolvimento 0.9.1, `versionCode` 13;
+- curadoria real do Wger incompleta.
 
-O release candidate 0.9.0 só passa a **PRONTO PARA TESTES** depois de todas as
-validações automatizadas e da geração e inspeção do APK. O smoke físico segue
-pendente e o produto não está marcado como pronto para produção.
+O candidato 0.9.0 foi substituído e não deve ser submetido a teste formal. O
+0.9.1 permanece **NO-GO PARA TESTES**: não há manifesto completo nem APK novo.
+O smoke físico segue pendente e o produto não está pronto para produção.
 
 ## Adiado
 

@@ -1,8 +1,8 @@
 # Arquitetura de providers de exercícios
 
 Integrações externas são descritas no domínio por identificador, capacidades,
-necessidade de rede e política de bootstrap. O registro atual contém somente
-`WGER`, com busca, importação, atualização, mídia e atribuição.
+necessidade de rede, política manual, estado de suporte e rota/adaptador. O
+registro atual contém somente `WGER`.
 
 ## Regras
 
@@ -15,5 +15,5 @@ necessidade de rede e política de bootstrap. O registro atual contém somente
 - mídia remota não é baixada automaticamente.
 
 Biblioteca, fichas e sessões dependem somente da cópia SQLite. Outro provider
-pode ser incluído no registro e receber sua tela/adaptador sem mudar os
-contratos locais da biblioteca.
+pode receber seu adaptador sem mudar esses contratos; um provider sem suporte
+jamais abre silenciosamente a rota Wger.

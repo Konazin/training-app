@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef } from 'react'
 import {
   DefaultTheme,
   NavigationContainer,
+  createNavigationContainerRef,
   type Theme as NavigationTheme,
 } from '@react-navigation/native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
@@ -10,13 +11,12 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { Ionicons } from '@expo/vector-icons'
 import { NavigationBar } from 'expo-navigation-bar'
 import { StatusBar } from 'expo-status-bar'
-import { type LocalRepositories, type SeedData } from '@training/training-local-db'
+import { type LocalRepositories } from '@training/training-local-db'
 import {
   buildLocalNotices,
   calculateHistoryProgress,
   type BackupRepository,
 } from '@training/training-domain'
-import seed from './assets/seeds/exercises.v1.json'
 import type { MainTabParamList, RootStackParamList } from './src/navigation/types'
 import { useTrainingController } from './src/controllers/useTrainingController'
 import { useWorkoutSessionController } from './src/controllers/useWorkoutSessionController'
@@ -56,13 +56,13 @@ import {
   useRefreshUi,
 } from './src/controllers/useRefreshUi'
 import { systemBarStyle } from './src/theme/uiContracts'
-import { bundledCatalog } from './src/features/exercise-library/bundledCatalog'
 import { isUiPreferences, type UiPreferences } from './src/theme/preferences'
 import { Onboarding } from './src/features/onboarding/Onboarding'
 import { useOnboarding } from './src/features/onboarding/useOnboarding'
 
 const Stack = createNativeStackNavigator<RootStackParamList>()
 const Tabs = createBottomTabNavigator<MainTabParamList>()
+const navigationRef = createNavigationContainerRef<RootStackParamList>()
 
 export default function App() {
   return (
@@ -144,19 +144,12 @@ function LocalApp({
         }
       }
     },
-    reset: async () => {
-      await repositories.backup.reset()
-      await repositories.catalog.sync(bundledCatalog)
-    },
+    reset: () => repositories.backup.reset(),
   }), [applyImportedPreferences, repositories, savedPreferences])
   const backup = useBackupController(
     backupRepository,
     repositories.metadata,
     getAppVersion(),
-    async () => {
-      await repositories.maintenance.resetToSeed(seed as SeedData)
-      await repositories.catalog.sync(bundledCatalog)
-    },
     refreshAll,
   )
   const trash = useTrainingPlanTrashController(
@@ -208,7 +201,7 @@ function LocalApp({
 
   return (
     <>
-      <NavigationContainer theme={navigationTheme}>
+      <NavigationContainer ref={navigationRef} theme={navigationTheme}>
             <Stack.Navigator screenOptions={{
               animation: motion.navigationAnimation,
               contentStyle: { backgroundColor: colors.background },
@@ -413,12 +406,20 @@ function LocalApp({
             trash.notificationId,
             trash.pendingUndo?.token,
           )
-          : undefined}
+          : notification.source === 'backup' && backup.refreshPending
+            ? backup.dismissRetry
+            : undefined}
       />
       <Onboarding
         visible={onboarding.visible}
         onSkip={onboarding.skip}
         onComplete={onboarding.complete}
+        onOpenWger={() => {
+          if (navigationRef.isReady()) navigationRef.navigate('WgerIntegration')
+        }}
+        onCreateCustom={() => {
+          if (navigationRef.isReady()) navigationRef.navigate('Library')
+        }}
       />
     </>
   )
@@ -574,7 +575,6 @@ function MainTabs({
             onExport={() => void backup.exportBackup()}
             onImport={() => void backup.importBackup()}
             onErase={() => void backup.eraseAll()}
-            onResetSeed={() => void backup.resetSeed()}
             automaticBackups={backup.automaticBackups}
             onRestoreAutomatic={(uri) => void backup.restoreAutomatic(uri)}
             onShareAutomatic={(uri) => void backup.shareAutomatic(uri)}

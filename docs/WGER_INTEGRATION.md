@@ -34,6 +34,17 @@ configurações ou identificadores do aparelho. Nenhum treino é sincronizado.
 A marcação não importa automaticamente. Uma nova importação do mesmo item
 atualiza a cópia existente sem trocar seu ID local ou duplicá-la.
 
+O texto técnico é preservado como fornecido pelo Wger. A prioridade é PT-BR,
+português e inglês, nesta ordem. Fallback em inglês permanece identificado; o
+app não reescreve, traduz ou gera instruções.
+
+## Pacote recomendado
+
+A lista de 50 intenções é uma especificação de desenvolvimento, não conteúdo
+do provider. A curadoria real não aprovou todas as intenções, portanto não há
+manifesto de produção e a ação permanece desabilitada. Consulte
+[`WGER_STARTER_PACK_CURATION.md`](WGER_STARTER_PACK_CURATION.md).
+
 ## Atualizar importados
 
 O botão **Atualizar exercícios importados** informa quantos itens serão
@@ -52,8 +63,7 @@ Imagens e vídeos não são baixados nesta versão. Portanto, mídia remota pode
 ficar indisponível sem internet. Vídeos nunca iniciam automaticamente e sua
 indisponibilidade não bloqueia o treino.
 
-O catálogo empacotado `BUNDLED` é separado do Wger. A sincronização offline do
-aplicativo não consulta, substitui ou mescla silenciosamente itens Wger.
+O catálogo gerado antigo foi aposentado e não reaparece em restaurações.
 
 ## Licenças e atribuição
 
@@ -76,6 +86,6 @@ licença global.
 
 ## Origens da biblioteca
 
-- **BUNDLED:** catálogo canônico empacotado do app;
+- **SYSTEM/BUNDLED legado:** arquivado e mantido por compatibilidade;
 - **CUSTOM:** criado e editado pelo usuário;
 - **WGER:** cópia importada do catálogo público, com origem e atribuição.

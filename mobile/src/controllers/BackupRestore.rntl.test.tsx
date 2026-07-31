@@ -47,7 +47,6 @@ function Harness({
     repository,
     {} as AppMetadataRepository,
     '0.8.1',
-    jest.fn(async () => undefined),
     onChanged,
   )
   return (
@@ -61,6 +60,9 @@ function Harness({
       </Pressable>
       <Pressable accessibilityRole="button" onPress={() => void backup.exportBackup()}>
         <Text>Exportar</Text>
+      </Pressable>
+      <Pressable accessibilityRole="button" onPress={backup.dismissRetry}>
+        <Text>Dispensar retry</Text>
       </Pressable>
     </View>
   )
@@ -98,7 +100,7 @@ describe('restauração pós-commit renderizada', () => {
     expect(onChanged).toHaveBeenCalledTimes(2)
   })
 
-  it('limpa retry antigo somente após uma ação diferente concluída', async () => {
+  it('preserva retry pendente após uma ação diferente concluída', async () => {
     const repository = {
       export: jest.fn(),
       reset: jest.fn(),
@@ -116,6 +118,27 @@ describe('restauração pós-commit renderizada', () => {
     await waitFor(() => expect(screen.getByText('Preferências pendentes.')).toBeTruthy())
     fireEvent.press(screen.getByText('Exportar'))
     await waitFor(() => expect(screen.getByText('Backup exportado.')).toBeTruthy())
+    fireEvent.press(screen.getByText('Tentar novamente'))
+    await waitFor(() => expect(screen.getByText('Preferências e informações atualizadas.')).toBeTruthy())
+    expect(mockRetryPreferences).toHaveBeenCalledTimes(1)
+  })
+
+  it('remove o retry somente após dispensa explícita', async () => {
+    const repository = {
+      export: jest.fn(),
+      reset: jest.fn(),
+      restore: jest.fn(async () => ({
+        postCommitWarning: 'Preferências pendentes.',
+        retryPostCommit: mockRetryPreferences,
+      })),
+    } as unknown as BackupRepository
+    await renderAsync(createElement(Harness, {
+      repository,
+      onChanged: jest.fn(async () => ({ success: true, failedParts: [] })),
+    }))
+    fireEvent.press(screen.getByText('Restaurar'))
+    await waitFor(() => expect(screen.getByText('Preferências pendentes.')).toBeTruthy())
+    fireEvent.press(screen.getByText('Dispensar retry'))
     fireEvent.press(screen.getByText('Tentar novamente'))
     await waitFor(() => expect(screen.getByText('Informações atualizadas.')).toBeTruthy())
     expect(mockRetryPreferences).not.toHaveBeenCalled()

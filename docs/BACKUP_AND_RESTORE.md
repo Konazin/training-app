@@ -1,86 +1,35 @@
 # Backup e restauração
 
-O formato interno atual usa `schemaVersion: 2`. Backups v1 continuam aceitos e
-recebem `deleted_at` e `purge_at` nulos durante a restauração.
+O formato permanece em `schemaVersion: 2`; backups v1 e v2 anteriores continuam
+aceitos. O JSON contém exercícios, metadados de mídia, fichas, dias, atividades,
+sessões, substituições, anotações, séries, configurações, favoritos, recentes e
+aliases opcionais. Bytes de imagens não são incorporados.
 
-O nome físico inclui a data de criação:
+## Restauração
 
-- exportação manual: `training-backup-<timestamp>.json`;
-- backup automático: `training-auto-backup-<timestamp>.json`.
+A validação rejeita coleções acima dos limites, referências quebradas, IDs ou
+datas inválidos, duplicações, múltiplas sessões/fichas ativas e chaves
+`secret.*` ou `app_metadata`.
 
-Ele contém versão, versão do app, data de exportação, exercícios do usuário ou
-importados, metadados de mídia, fichas, dias, configurações, atividades,
-sessões, snapshots, séries e preferências. A v2 inclui também fichas na lixeira
-e seus prazos.
+Em uma única transação SQLite, a restauração substitui os dados, remove fichas
+vencidas e arquiva definições geradas legadas. Ela nunca recria catálogo,
+consulta provider ou baixa mídia. Uma URI local ausente cai para a URL remota
+preservada ou para o estado sem mídia.
 
-Campos opcionais compatíveis com a v2 guardam preferências visuais, favoritos,
-uso recente e aliases criados pelo usuário. Backups v2 antigos sem esses campos
-usam padrões seguros. O catálogo canônico `BUNDLED` não precisa ser repetido no
-arquivo: ele é sincronizado na mesma transação da restauração.
+Falhas antes do commit preservam integralmente o banco anterior. Depois do
+commit, uma falha ao aplicar preferências visuais mantém um retry separado da
+mensagem visível. Exportar ou compartilhar não destrói essa pendência; ela só
+some quando:
 
-A partir da migration 7, snapshots de exercício incluem anotação da sessão e
-dados de substituição. Esses campos permanecem dentro do mesmo
-`schemaVersion: 2`; arquivos v2 anteriores, sem as colunas, restauram valores
-nulos ou vazios. Observações de série e anotação geral da sessão já usam as
-coleções existentes.
+- o retry funciona;
+- o usuário a dispensa explicitamente;
+- uma restauração mais nova a substitui.
 
-Não contém chaves, tokens, arquivos de vídeo, caches ou estado do player.
+O retry nunca repete a restauração SQLite.
 
-O arquivo é limitado a 25 MB. A validação rejeita IDs repetidos ou não
-positivos, referências quebradas, enums/datas/números inválidos, ordens
-duplicadas, fichas sem sete dias únicos, mais de uma ficha ou sessão ativa,
-`secret.*`, `app_metadata`, `NaN`, `Infinity` e coleções acima dos limites:
+## Operações destrutivas
 
-- 10.000 exercícios;
-- 20.000 mídias;
-- 1.000 fichas;
-- 20.000 sessões;
-- 500.000 séries.
-
-## Exportar
-
-Abra **Mais → Exportar backup** e escolha onde salvar/compartilhar o arquivo.
-Faça isso regularmente e antes de desinstalar o app.
-
-## Importar
-
-Abra **Mais → Importar backup** e selecione um JSON. O app:
-
-1. lê e parseia o arquivo;
-2. valida `schemaVersion`;
-3. valida coleções, IDs e referências;
-4. garante no máximo uma sessão ativa;
-5. valida o ciclo de vida das fichas na v2;
-6. cria um backup automático do estado atual;
-7. em uma única transação SQLite, apaga os dados atuais, insere o backup,
-   remove fichas vencidas e sincroniza o catálogo empacotado;
-8. depois do commit, aplica as preferências visuais opcionais e atualiza a
-   interface.
-
-JSON inválido e qualquer erro anterior ao commit mantêm o banco original por
-rollback, inclusive falha ao sincronizar o catálogo. Se apenas a aplicação das
-preferências no AsyncStorage falhar, o banco continua restaurado e o app mostra
-um aviso com **Tentar novamente**. Essa tentativa repete somente as preferências
-e a atualização da interface; nunca restaura nem altera o SQLite outra vez.
-Uma ação de backup diferente e concluída substitui explicitamente esse contexto
-e remove qualquer retry pós-commit antigo; falhas não limpam uma pendência real.
-
-## Backups automáticos
-
-Antes de importar, apagar, recriar o seed ou esvaziar a lixeira, o app grava um JSON em seu
-diretório de documentos. A seção **Mais → Backups automáticos** mostra data,
-motivo e tamanho e permite restaurar, compartilhar ou excluir. Somente os cinco
-mais recentes são mantidos. Restaurar um deles cria antes outro backup do
-estado atual.
-
-## Apagar ou recriar
-
-As duas ações exigem confirmação e geram backup automático. **Apagar** remove
-dados do usuário, preserva migrations/metadados e reinstala apenas o catálogo
-canônico offline. **Recriar dados iniciais** reinstala também a ficha
-demonstrativa e reativa explicitamente o seed.
-
-Esvaziar a lixeira só prossegue após o backup automático ter sido criado. Uma
-falha no backup cancela a exclusão. Se apenas a atualização da tela falhar
-depois do esvaziamento confirmado, o backup é mantido e a operação continua
-tratada como concluída.
+**Apagar todos os dados** cria antes um backup automático e retorna o aplicativo
+ao estado vazio. Não há ação para recriar seed, ficha demonstrativa ou catálogo
+gerado. Backups automáticos também são criados antes de restaurações e de
+esvaziar a lixeira.

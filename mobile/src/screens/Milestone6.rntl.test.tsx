@@ -49,7 +49,6 @@ describe('avisos e provider renderizados', () => {
       onExport: jest.fn(),
       onImport: jest.fn(),
       onErase: jest.fn(),
-      onResetSeed: jest.fn(),
       automaticBackups: [],
       onRestoreAutomatic: jest.fn(),
       onShareAutomatic: jest.fn(),

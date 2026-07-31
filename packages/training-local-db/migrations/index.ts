@@ -318,6 +318,12 @@ ALTER TABLE workout_session_exercises ADD COLUMN substitute_name TEXT;
 ALTER TABLE workout_session_exercises ADD COLUMN substitution_reason TEXT;
 `
 
+const retireGeneratedExerciseCatalog = `
+UPDATE exercise_definitions
+SET archived = 1
+WHERE source = 'SYSTEM' AND archived = 0;
+`
+
 export const MIGRATIONS: Migration[] = [
   migration(1, 'local_training_schema', schema),
   migration(2, 'local_query_indexes', indexes),
@@ -326,6 +332,7 @@ export const MIGRATIONS: Migration[] = [
   migration(5, 'training_plan_trash', trainingPlanTrash),
   migration(6, 'bundled_exercise_library', bundledExerciseLibrary),
   migration(7, 'local_workout_intelligence', localWorkoutIntelligence),
+  migration(8, 'retire_generated_exercise_catalog', retireGeneratedExerciseCatalog),
 ]
 
 export async function runMigrations(database: SqlDatabase, onProgress?: (progress: MigrationProgress) => void) {

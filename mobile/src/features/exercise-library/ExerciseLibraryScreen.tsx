@@ -119,7 +119,13 @@ export function ExerciseLibraryScreen({
   </>
   const empty = loading && !exercises.length
     ? <SkeletonList />
-    : <Text accessibilityLiveRegion="polite" style={styles.empty}>{emptyMessage}</Text>
+    : !exercises.length && !query && filter.kind === 'ALL'
+      ? <EmptyLibrary
+          onCreate={() => setEditing('new')}
+          onSearchWger={() => navigation.navigate('WgerIntegration')}
+          onContinue={() => navigation.goBack()}
+        />
+      : <Text accessibilityLiveRegion="polite" style={styles.empty}>{emptyMessage}</Text>
   const renderExercise = ({ item }: { item: ExerciseDefinition }) => <ExerciseCard
     exercise={item}
     onEdit={item.custom ? () => setEditing(item) : undefined}
@@ -183,6 +189,37 @@ export function ExerciseLibraryScreen({
           : undefined}
       />
     </Screen>
+  )
+}
+
+function EmptyLibrary({
+  onCreate,
+  onSearchWger,
+  onContinue,
+}: {
+  onCreate: () => void
+  onSearchWger: () => void
+  onContinue: () => void
+}) {
+  const { colors } = useTheme()
+  const styles = createStyles(colors)
+  return (
+    <View style={styles.emptyCard}>
+      <Text accessibilityRole="header" style={styles.emptyTitle}>Sua biblioteca está vazia</Text>
+      <Text style={styles.emptyCopy}>
+        Nenhum exercício é baixado automaticamente. Você pode importar exercícios de uma fonte externa ou criar os seus próprios.
+      </Text>
+      <Text style={styles.emptyCopy}>
+        Consultas ao provedor exigem internet, mas o conteúdo importado fica no aparelho. Nenhuma ficha é criada e nenhum dado é enviado automaticamente.
+      </Text>
+      <PrimaryButton disabled label="Importar pacote recomendado" onPress={() => undefined} />
+      <Text style={styles.emptyHint}>Pacote opcional indisponível até a curadoria dos 50 itens ser concluída.</Text>
+      <PrimaryButton label="Pesquisar no Wger" onPress={onSearchWger} />
+      <PrimaryButton secondary label="Criar exercício personalizado" onPress={onCreate} />
+      <Pressable accessibilityRole="button" onPress={onContinue} style={styles.continue}>
+        <Text style={styles.continueText}>Continuar sem exercícios</Text>
+      </Pressable>
+    </View>
   )
 }
 
@@ -378,6 +415,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   favoriteText: { color: colors.primary, fontSize: 24 },
   arrow: { color: colors.gray400, fontSize: 25 },
   empty: { color: colors.gray500, padding: 30, textAlign: 'center' },
+  emptyCard: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 20, borderWidth: 1, gap: 12, marginVertical: 16, padding: 18 },
+  emptyTitle: { color: colors.textPrimary, fontSize: 22, fontWeight: '900' },
+  emptyCopy: { color: colors.textSecondary, fontSize: 15, lineHeight: 22 },
+  emptyHint: { color: colors.textSecondary, fontSize: 12, lineHeight: 18 },
+  continue: { alignItems: 'center', minHeight: 48, justifyContent: 'center' },
+  continueText: { color: colors.textPrimary, fontSize: 14, fontWeight: '800' },
   fab: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 19, bottom: 24, height: 56, justifyContent: 'center', position: 'absolute', right: 20, width: 56 },
   fabText: { color: colors.onPrimary, fontSize: 22 },
   backdrop: { backgroundColor: colors.overlay, flex: 1, justifyContent: 'flex-end' },

@@ -18,9 +18,8 @@ import {
   APP_METADATA_KEYS,
   clearUserData,
   initializeFirstInstallation,
-  resetToSeed,
 } from '../database/installation'
-import type { SeedData } from '../database/seed'
+import { insertSeed, type SeedData } from '../database/seed'
 import { createLocalRepositories } from '../repositories'
 
 const directories: string[] = []
@@ -146,22 +145,22 @@ describe('SQLite local schema', () => {
       .toThrow('prototype')
   })
 
-  it('separa primeira instalação, apagar dados e recriar seed', async () => {
+  it('inicia vazio, marca onboarding e continua vazio após apagar dados', async () => {
     const path = newDatabase()
     const database = betterDatabase(path)
     await runMigrations(database)
-    expect(await initializeFirstInstallation(database, seedData())).toBe(true)
-    expect(query(path, 'SELECT COUNT(*) AS value FROM exercise_definitions')[0]?.value).toBe(1)
+    expect(await initializeFirstInstallation(database)).toBe(true)
+    expect(query(path, 'SELECT COUNT(*) AS value FROM exercise_definitions')[0]?.value).toBe(0)
+    expect(query(path, 'SELECT COUNT(*) AS value FROM training_plans')[0]?.value).toBe(0)
+    expect(query(path, 'SELECT COUNT(*) AS value FROM workout_sessions')[0]?.value).toBe(0)
+    expect(query(path, `SELECT value_json FROM app_metadata WHERE key='${APP_METADATA_KEYS.onboardingEligible}'`)[0]?.value_json)
+      .toBe('true')
     await clearUserData(database)
     expect(query(path, 'SELECT COUNT(*) AS value FROM exercise_definitions')[0]?.value).toBe(0)
     expect(query(path, `SELECT value_json FROM app_metadata WHERE key='${APP_METADATA_KEYS.seedSuppressed}'`)[0]?.value_json)
       .toBe('true')
-    expect(await initializeFirstInstallation(database, seedData())).toBe(false)
+    expect(await initializeFirstInstallation(database)).toBe(false)
     expect(query(path, 'SELECT COUNT(*) AS value FROM exercise_definitions')[0]?.value).toBe(0)
-    await resetToSeed(database, seedData())
-    expect(query(path, 'SELECT COUNT(*) AS value FROM exercise_definitions')[0]?.value).toBe(1)
-    expect(query(path, `SELECT value_json FROM app_metadata WHERE key='${APP_METADATA_KEYS.seedSuppressed}'`)[0]?.value_json)
-      .toBe('false')
     await database.close()
   })
 
@@ -169,7 +168,7 @@ describe('SQLite local schema', () => {
     const path = newDatabase()
     let database = betterDatabase(path)
     await runMigrations(database)
-    await initializeFirstInstallation(database, seedData())
+    await initializeSeededInstallation(database, seedData())
     let repositories = createLocalRepositories(database)
     const initialPlan = (await repositories.plans.list())[0]!
     const initialPlanCount = (await repositories.plans.list()).length
@@ -233,8 +232,8 @@ describe('SQLite local schema', () => {
       );
       ${MIGRATIONS.map((migration) => migration.sql).join('\n')}
     `)
-    expect(await initializeFirstInstallation(database, seedData())).toBe(true)
-    expect(await initializeFirstInstallation(database, seedData())).toBe(false)
+    expect(await initializeSeededInstallation(database, seedData())).toBe(true)
+    expect(await initializeSeededInstallation(database, seedData())).toBe(false)
 
     let repositories = createLocalRepositories(database)
     const plan = (await repositories.plans.list())[0]!
@@ -380,7 +379,7 @@ describe('SQLite local schema', () => {
         migration.version, migration.name, migration.checksum, '2026-07-29T00:00:00.000Z',
       )
     }
-    await initializeFirstInstallation(database, seedData())
+    await initializeSeededInstallation(database, seedData())
     const before = await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM training_plans')
     await runMigrations(database)
     await runMigrations(database)
@@ -474,7 +473,7 @@ describe('SQLite local schema', () => {
     const path = newDatabase()
     const database = betterDatabase(path)
     await runMigrations(database)
-    await initializeFirstInstallation(database, seedData())
+    await initializeSeededInstallation(database, seedData())
     const repositories = createLocalRepositories(database)
     const plan = (await repositories.plans.list())[0]!
     const archived = await repositories.plans.archive(plan.id)
@@ -530,7 +529,7 @@ describe('SQLite local schema', () => {
     const path = newDatabase()
     const database = betterDatabase(path)
     await runMigrations(database)
-    await initializeFirstInstallation(database, seedData())
+    await initializeSeededInstallation(database, seedData())
     const repositories = createLocalRepositories(database)
     const first = (await repositories.plans.list())[0]!
     const blocked = await repositories.plans.create({
@@ -559,7 +558,7 @@ describe('SQLite local schema', () => {
     const path = newDatabase()
     const database = betterDatabase(path)
     await runMigrations(database)
-    await initializeFirstInstallation(database, seedData())
+    await initializeSeededInstallation(database, seedData())
     const repositories = createLocalRepositories(database)
     const plan = (await repositories.plans.list())[0]!
     const deletedAt = new Date().toISOString()
@@ -601,7 +600,7 @@ describe('SQLite local schema', () => {
         migration.version, migration.name, migration.checksum, '2026-07-29T00:00:00.000Z',
       )
     }
-    await initializeFirstInstallation(database, seedData())
+    await initializeSeededInstallation(database, seedData())
     const beforeSeed = await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM exercise_definitions')
     await runMigrations(database)
     await runMigrations(database)
@@ -777,7 +776,7 @@ describe('SQLite local schema', () => {
     const path = newDatabase()
     const database = betterDatabase(path)
     await runMigrations(database)
-    await initializeFirstInstallation(database, seedData())
+    await initializeSeededInstallation(database, seedData())
     const repositories = createLocalRepositories(database)
     const original = (await repositories.plans.list())[0]!
     const originalDay = original.days[0]!
@@ -869,7 +868,7 @@ describe('SQLite local schema', () => {
     const path = newDatabase()
     let database = betterDatabase(path)
     await runMigrations(database)
-    await initializeFirstInstallation(database, seedData())
+    await initializeSeededInstallation(database, seedData())
     let repositories = createLocalRepositories(database)
     const original = (await repositories.plans.list())[0]!
     await repositories.plans.addRestActivity(original.id, original.days[0]!.id, {
@@ -909,7 +908,7 @@ describe('SQLite local schema', () => {
         migration.version, migration.name, migration.checksum, '2026-07-30T00:00:00.000Z',
       )
     }
-    await initializeFirstInstallation(database, bundledSeedData())
+    await initializeSeededInstallation(database, bundledSeedData())
     const before = await database.first<{ exercises: number; plans: number; sessions: number }>(`
       SELECT
         (SELECT COUNT(*) FROM exercise_definitions) AS exercises,
@@ -945,7 +944,7 @@ describe('SQLite local schema', () => {
     const path = newDatabase()
     let database = betterDatabase(path)
     await runMigrations(database)
-    await initializeFirstInstallation(database, bundledSeedData())
+    await initializeSeededInstallation(database, bundledSeedData())
     let repositories = createLocalRepositories(database)
     const legacy = await repositories.exercises.findById(1)
     const custom = await repositories.exercises.create({
@@ -1072,11 +1071,11 @@ describe('SQLite local schema', () => {
     await database.close()
   })
 
-  it('reverte toda a restauração quando a sincronização do catálogo falha', async () => {
+  it('restaura referências legadas sem ressuscitar o catálogo gerado', async () => {
     const path = newDatabase()
     let database = betterDatabase(path)
     await runMigrations(database)
-    await initializeFirstInstallation(database, bundledSeedData())
+    await initializeSeededInstallation(database, bundledSeedData())
     await syncBundledCatalog(database, bundledCatalog())
     let repositories = createLocalRepositories(database)
     const backup = await repositories.backup.export('0.8.0')
@@ -1086,16 +1085,16 @@ describe('SQLite local schema', () => {
       difficulty: 'Teste', instructions: '', notes: 'Não apagar',
       unilateral: false, timed: false,
     })
-    await database.close()
-
-    database = betterDatabase(path, failOn('INSERT INTO exercise_catalog_entries'))
-    repositories = createLocalRepositories(database)
-    await expect(repositories.backup.restore(backup)).rejects.toThrow('injetada')
-    expect(await repositories.exercises.findById(original.id)).toMatchObject({
-      name: 'Estado anterior preservado',
-      notes: 'Não apagar',
-    })
-    expect(await repositories.exercises.list({ source: 'BUNDLED' })).toHaveLength(40)
+    await repositories.backup.restore(backup)
+    expect(await repositories.exercises.findById(original.id)).toBeNull()
+    expect(await database.first(`
+      SELECT COUNT(*) AS count FROM exercise_definitions
+      WHERE source = 'SYSTEM' AND archived = 0
+    `)).toEqual({ count: 0 })
+    expect(await database.first(`
+      SELECT COUNT(*) AS count FROM exercise_definitions
+      WHERE source = 'SYSTEM' AND archived = 1
+    `)).toEqual({ count: 40 })
     await database.close()
   })
 
@@ -1147,11 +1146,96 @@ describe('SQLite local schema', () => {
     await database.close()
   })
 
+  it('migra 7 para 8 arquivando conteúdo gerado sem romper referências', async () => {
+    const path = newDatabase()
+    const database = betterDatabase(path)
+    await database.exec(`
+      CREATE TABLE schema_migrations (
+        version INTEGER PRIMARY KEY, name TEXT NOT NULL, checksum TEXT NOT NULL, applied_at TEXT NOT NULL
+      )
+    `)
+    for (const migration of MIGRATIONS.slice(0, 7)) {
+      await database.exec(migration.sql)
+      await database.run(
+        'INSERT INTO schema_migrations(version, name, checksum, applied_at) VALUES (?, ?, ?, ?)',
+        migration.version, migration.name, migration.checksum, '2026-07-30T00:00:00.000Z',
+      )
+    }
+    const createdAt = '2026-07-30T00:00:00.000Z'
+    const exercise = await database.run(`
+      INSERT INTO exercise_definitions(
+        name, normalized_name, primary_muscle_group, equipment, category,
+        difficulty, source, archived, created_at, updated_at
+      ) VALUES ('Legado', 'legado', 'Peitoral', 'Barra', 'STRENGTH',
+        'Teste', 'SYSTEM', 0, ?, ?)
+    `, createdAt, createdAt)
+    const plan = await database.run(`
+      INSERT INTO training_plans(
+        name, category, difficulty, active, archived, created_at, updated_at
+      ) VALUES ('Ficha legada', 'Força', 'Teste', 0, 0, ?, ?)
+    `, createdAt, createdAt)
+    const day = await database.run(`
+      INSERT INTO training_plan_days(
+        training_plan_id, weekday, title, sort_order, rest_day
+      ) VALUES (?, 'MONDAY', 'Segunda', 0, 0)
+    `, plan.lastInsertRowId)
+    await database.run(`
+      INSERT INTO training_day_exercises(
+        training_plan_day_id, exercise_definition_id, sort_order, sets,
+        min_reps, max_reps, rest_seconds, set_type
+      ) VALUES (?, ?, 0, 3, 8, 10, 60, 'NORMAL')
+    `, day.lastInsertRowId, exercise.lastInsertRowId)
+
+    await runMigrations(database)
+    expect(await database.first(
+      'SELECT archived FROM exercise_definitions WHERE id = ?',
+      exercise.lastInsertRowId,
+    )).toEqual({ archived: 1 })
+    expect(await database.first(
+      'SELECT exercise_definition_id FROM training_day_exercises',
+    )).toEqual({ exercise_definition_id: exercise.lastInsertRowId })
+    expect(await database.first('SELECT COUNT(*) AS count FROM schema_migrations'))
+      .toEqual({ count: 8 })
+    await database.close()
+  })
+
+  it('reverte integralmente a progressão quando a atualização SQLite falha', async () => {
+    const path = newDatabase()
+    let database = betterDatabase(path)
+    await runMigrations(database)
+    await initializeSeededInstallation(database, seedData())
+    let repositories = createLocalRepositories(database)
+    const plan = (await repositories.plans.list())[0]!
+    const day = plan.days.find((item) => item.exercises.length)!
+    let session = await repositories.sessions.start(plan.id, day.id)
+    session = await repositories.sessions.addSet(session.id, session.exercises[0]!.id)
+    session = await repositories.sessions.addSet(session.id, session.exercises[0]!.id)
+    const exercise = session.exercises[0]!
+    await database.close()
+
+    database = betterDatabase(path, failOn('UPDATE workout_set_logs'))
+    repositories = createLocalRepositories(database)
+    await expect(repositories.sessions.applyProgression(session.id, exercise.id, {
+      type: 'INCREASE_REPS',
+      reason: 'Teste de rollback',
+      proposedLoad: null,
+      proposedReps: 12,
+      proposedDurationSeconds: null,
+    })).rejects.toThrow('injetada')
+    await database.close()
+
+    database = betterDatabase(path)
+    repositories = createLocalRepositories(database)
+    expect((await repositories.sessions.findById(session.id))
+      ?.exercises[0]?.sets.map((item) => item.reps)).toEqual([5, 0, 0])
+    await database.close()
+  })
+
   it('preserva anotações, substituição, reinício, histórico e backup v2 antigo', async () => {
     const path = newDatabase()
     let database = betterDatabase(path)
     await runMigrations(database)
-    await initializeFirstInstallation(database, seedData())
+    await initializeSeededInstallation(database, seedData())
     let repositories = createLocalRepositories(database)
     const plan = (await repositories.plans.list())[0]!
     const day = plan.days.find((item) => !item.restDay && item.exercises.length)!
@@ -1168,7 +1252,9 @@ describe('SQLite local schema', () => {
       unilateral: false,
       timed: false,
     })
-    const started = await repositories.sessions.start(plan.id, day.id)
+    let started = await repositories.sessions.start(plan.id, day.id)
+    started = await repositories.sessions.addSet(started.id, started.exercises[0]!.id)
+    started = await repositories.sessions.addSet(started.id, started.exercises[0]!.id)
     const exercise = started.exercises[0]!
     const set = exercise.sets[0]!
     await repositories.sessions.updateSet(started.id, exercise.id, set.id, {
@@ -1180,6 +1266,15 @@ describe('SQLite local schema', () => {
       completed: true,
       notes: 'Observação da série',
     })
+    await repositories.sessions.applyProgression(started.id, exercise.id, {
+      type: 'INCREASE_REPS',
+      reason: 'Teste transacional',
+      proposedLoad: null,
+      proposedReps: 12,
+      proposedDurationSeconds: null,
+    })
+    const progressed = await repositories.sessions.findById(started.id)
+    expect(progressed?.exercises[0]?.sets.map((item) => item.reps)).toEqual([8, 12, 12])
     await repositories.sessions.updateExerciseNotes(started.id, exercise.id, 'Anotação do exercício')
     await repositories.sessions.updateSessionNotes(started.id, 'Anotação da sessão')
     const substituted = await repositories.sessions.substituteExercise(
@@ -1192,7 +1287,6 @@ describe('SQLite local schema', () => {
       name: 'Flexão',
       substituteName: 'Flexão inclinada',
     })
-    await repositories.sessions.undoSubstitution(started.id, exercise.id)
     await repositories.sessions.pause(started.id)
     await database.close()
 
@@ -1202,13 +1296,18 @@ describe('SQLite local schema', () => {
     expect(recovered).toMatchObject({ status: 'PAUSED', notes: 'Anotação da sessão' })
     expect(recovered?.exercises[0]).toMatchObject({
       userNotes: 'Anotação do exercício',
-      substituteName: null,
+      substituteName: 'Flexão inclinada',
     })
     expect(recovered?.exercises[0]?.sets[0]?.notes).toBe('Observação da série')
     await repositories.sessions.resume(started.id)
     await repositories.sessions.complete(started.id, 7, 'Anotação da sessão')
     const completed = (await repositories.sessions.getHistory())[0]!
     expect(completed.exercises[0]?.userNotes).toBe('Anotação do exercício')
+    expect(completed.exercises[0]).toMatchObject({
+      exerciseDefinitionId: exercise.exerciseDefinitionId,
+      substituteExerciseDefinitionId: replacement.id,
+      substituteName: 'Flexão inclinada',
+    })
 
     const backup = await repositories.backup.export('0.9.0')
     await repositories.backup.reset()
@@ -1405,6 +1504,12 @@ function betterDatabase(
     return database
   }
   return adapter()
+}
+
+async function initializeSeededInstallation(database: SqlDatabase, seed: SeedData) {
+  const initialized = await initializeFirstInstallation(database)
+  if (initialized) await insertSeed(database, seed)
+  return initialized
 }
 
 function seedData(): SeedData {

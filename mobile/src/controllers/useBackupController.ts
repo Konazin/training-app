@@ -14,7 +14,6 @@ export function useBackupController(
   repository: BackupRepository,
   metadata: AppMetadataRepository,
   appVersion: string,
-  recreateSeed: () => Promise<void>,
   onChanged: () => Promise<RefreshAllResult>,
 ) {
   const [busy, setBusy] = useState(false)
@@ -47,8 +46,7 @@ export function useBackupController(
     try {
       const result = await operation()
       await refreshBackups()
-      postCommitRetry.current = null
-      setRefreshPending(false)
+      setRefreshPending(postCommitRetry.current !== null)
       if (result) {
         setMessageKind('success')
         setMessage(result)
@@ -155,6 +153,11 @@ export function useBackupController(
     }
   }, [refreshCommitted])
 
+  const dismissRetry = useCallback(() => {
+    postCommitRetry.current = null
+    setRefreshPending(false)
+  }, [])
+
   return {
     busy,
     message,
@@ -171,6 +174,7 @@ export function useBackupController(
       return 'Backup exportado.'
     }),
     retryRefresh,
+    dismissRetry,
     importBackup: () => runCommitted(async () => {
       const selected = await pickBackup()
       if (!selected) return false
@@ -188,16 +192,6 @@ export function useBackupController(
       }
     }, 'Todos os dados foram apagados.',
     'Todos os dados foram apagados, mas algumas informações não puderam ser atualizadas.'),
-    resetSeed: () => runCommitted(async () => {
-      const backup = await automatic.create('BEFORE_RESET_SEED')
-      await recreateSeed()
-      const date = formatDate(backup.createdAt)
-      return {
-        success: `Dados iniciais recriados. Backup de segurança criado em ${date}.`,
-        warning: `Os dados iniciais foram recriados e o backup de segurança foi criado em ${date}, mas algumas informações não puderam ser atualizadas.`,
-      }
-    }, 'Dados iniciais recriados.',
-    'Os dados foram recriados, mas algumas informações não puderam ser atualizadas.'),
     restoreAutomatic: (uri: string) => runCommitted(async () => {
       await automatic.create('BEFORE_IMPORT')
       return automatic.restore(uri)

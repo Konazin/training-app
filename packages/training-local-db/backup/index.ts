@@ -1,10 +1,7 @@
 import { DomainError, type BackupRepository, type TrainingBackup } from '@training/training-domain'
 import type { BindValue, SqlDatabase } from '../database'
-import {
-  defaultBundledCatalog,
-  syncBundledCatalogInTransaction,
-} from '../database/catalog'
 import { clearUserData, deleteUserRows } from '../database/installation'
+import { retireLegacyGeneratedExercises } from '../database/legacyCatalog'
 import type { Row } from '../mappers'
 
 export const BACKUP_LIMITS = {
@@ -100,7 +97,7 @@ export function createBackupRepository(database: SqlDatabase): BackupRepository 
                 AND session.status IN ('IN_PROGRESS','PAUSED')
             )
         `, new Date().toISOString())
-        await syncBundledCatalogInTransaction(transaction, defaultBundledCatalog)
+        await retireLegacyGeneratedExercises(transaction)
       })
     },
     reset: () => clearUserData(database),

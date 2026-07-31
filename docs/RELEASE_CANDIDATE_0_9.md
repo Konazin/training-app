@@ -1,7 +1,9 @@
 # Release candidate 0.9.0
 
-Estado: **PRONTO PARA TESTES**. As verificações automatizadas e a geração do
-APK foram concluídas; o smoke test em aparelho físico permanece pendente.
+Estado histórico: **SUBSTITUÍDO — NÃO SUBMETER A TESTES FORMAIS**.
+
+O APK permanece registrado apenas para rastreabilidade. A direção de conteúdo
+foi revista na estabilização 0.9.1.
 
 ## Escopo
 

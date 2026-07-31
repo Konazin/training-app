@@ -5,11 +5,8 @@ import {
   markSuccessfulStartup,
   openTrainingDatabase,
   type LocalRepositories,
-  type SeedData,
   type SqlDatabase,
 } from '@training/training-local-db'
-import seed from '../../../assets/seeds/exercises.v1.json'
-import { bundledCatalog } from '../exercise-library/bundledCatalog'
 import { createLocalRuntimeManager } from './localRuntime'
 
 export type LocalRuntimeState =
@@ -39,10 +36,9 @@ export function useLocalRuntime(): LocalRuntime {
     open: (onMigration) => openTrainingDatabase((progress) => {
       onMigration(`${progress.version} · ${progress.name}`)
     }),
-    initialize: (opened) => initializeFirstInstallation(opened, seed as SeedData).then(() => undefined),
+    initialize: (opened) => initializeFirstInstallation(opened).then(() => undefined),
     createRepositories: createLocalRepositories,
     afterInitialize: async (repositories) => {
-      await repositories.catalog.sync(bundledCatalog)
       await repositories.planTrash.purgeExpired()
     },
     markStartup: markSuccessfulStartup,

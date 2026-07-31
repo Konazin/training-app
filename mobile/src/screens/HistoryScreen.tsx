@@ -67,6 +67,13 @@ export function HistoryScreen({
             {' · '}{formatDuration(session.totalDurationSeconds)}
             {session.totalVolume > 0 ? ` · ${Math.round(session.totalVolume)} kg` : ''}
           </Text>
+          {session.exercises.map((exercise) => (
+            <Text key={exercise.id} style={styles.exercise}>
+              {exercise.substituteName
+                ? `Planejado: ${exercise.name} · Realizado: ${exercise.substituteName}`
+                : exercise.name}
+            </Text>
+          ))}
         </View>
       ))}
     </ScreenScrollView>
@@ -107,5 +114,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   title: { ...typography.body, color: colors.textPrimary, fontWeight: '800' },
   day: { ...typography.bodySmall, color: colors.textSecondary, marginTop: 2 },
   meta: { ...typography.caption, color: colors.textSecondary, lineHeight: 18, marginTop: 7 },
+  exercise: { ...typography.caption, color: colors.textSecondary, lineHeight: 18, marginTop: 5 },
   empty: { alignItems: 'center', justifyContent: 'center', minHeight: 240 },
 })

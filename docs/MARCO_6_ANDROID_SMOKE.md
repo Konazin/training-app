@@ -1,33 +1,18 @@
-# Smoke Android — Marco 6
+# Smoke Android — estabilização 0.9.1
 
-Candidato: `0.9.0`, Android `versionCode` 12, package
-`com.konazin.trainingapp`.
+Estado: **PENDENTE E BLOQUEADO**. O APK 0.9.0 foi substituído e o APK 0.9.1
+não pode ser gerado enquanto as 50 intenções Wger não forem aprovadas.
 
-Este roteiro permanece pendente até ser executado em aparelho ou emulador
-Android. Não confundir export do bundle ou integridade do APK com smoke físico.
+Quando houver candidato válido, testar:
 
-## Instalação nova
+- instalação nova offline com zero exercícios, fichas e sessões;
+- onboarding visível, três etapas, fonte ampliada, TalkBack, voltar e reabertura;
+- biblioteca vazia sem requisição automática;
+- busca e importação Wger somente após confirmação;
+- pacote opcional completo, mídia local e rollback de falha;
+- substituição concluída mostrando **Planejado** e **Realizado**;
+- progressão atômica e RPE ausente sem aumento;
+- backup v2, catálogo legado arquivado e retry de preferências preservado;
+- reinício, modo avião, todos os temas e processo encerrado.
 
-- [ ] instalar o APK e abrir sem rede;
-- [ ] concluir ou pular os três passos do onboarding;
-- [ ] fechar e abrir: onboarding não reaparece;
-- [ ] reabrir em **Mais → Conhecer o aplicativo**;
-- [ ] confirmar catálogo e ficha inicial sem requisição Wger.
-
-## Sessão
-
-- [ ] iniciar treino e verificar **Último desempenho** quando houver histórico;
-- [ ] aplicar e dispensar uma **Sugestão local**;
-- [ ] escolher e desfazer substituição sem alterar a ficha;
-- [ ] salvar observação de série, exercício e sessão;
-- [ ] pausar, matar o processo, abrir e retomar com notas preservadas;
-- [ ] concluir e confirmar snapshots no histórico;
-- [ ] repetir com abandono.
-
-## Offline, provider e backup
-
-- [ ] em modo avião, usar biblioteca, ficha, sessão, histórico e backup local;
-- [ ] confirmar que Wger só consulta após ação explícita;
-- [ ] simular mídia externa indisponível e dispensar o aviso;
-- [ ] exportar backup, restaurar e conferir notas;
-- [ ] testar fonte ampliada, TalkBack, tema escuro e alto contraste.
+Não registrar smoke como concluído sem instalação física ou emulador Android.

@@ -10,6 +10,9 @@
   "engines": {
     "node": ">=20.19.4"
   },
+  "scripts": {
+    "curate:wger-starter-pack": "node tools/curate-wger-starter-pack.mjs"
+  },
   "devDependencies": {
     "expo-font": "56.0.7"
   }

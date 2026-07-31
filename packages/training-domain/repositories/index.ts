@@ -20,6 +20,7 @@ import type {
   TrainingPlanInput,
   WorkoutSession,
 } from '../model'
+import type { LocalProgressionSuggestion } from '../intelligence'
 import type {
   TrainingPlanCreationInput,
   TrainingPlanDuplicateMode,
@@ -75,6 +76,7 @@ export interface WorkoutSessionRepository {
   findById(id: number): Promise<WorkoutSession | null>
   start(trainingPlanId: number, planDayId: number): Promise<WorkoutSession>
   updateSet(sessionId: number, exerciseId: number, setId: number, input: SetLogInput): Promise<WorkoutSession>
+  applyProgression(sessionId: number, exerciseId: number, suggestion: LocalProgressionSuggestion): Promise<WorkoutSession>
   addSet(sessionId: number, exerciseId: number): Promise<WorkoutSession>
   removeSet(sessionId: number, exerciseId: number, setId: number): Promise<WorkoutSession>
   updateExerciseStatus(sessionId: number, exerciseId: number, status: SessionExerciseStatus): Promise<WorkoutSession>

@@ -56,7 +56,7 @@ export function useWorkoutSessionController(
   }, [repository])
 
   const mutate = useCallback(async (key: string, operation: () => Promise<WorkoutSession>) => {
-    if (busy.current.has(key)) return false
+    if (busy.current.size > 0) return false
     busy.current.add(key)
     setBusyKeys(new Set(busy.current))
     setErrors((current) => ({ ...current, [key]: '' }))
@@ -74,7 +74,7 @@ export function useWorkoutSessionController(
   }, [])
 
   const start = useCallback(async (planId: number, dayId: number) => {
-    if (busy.current.has('start')) return false
+    if (busy.current.size > 0) return false
     busy.current.add('start')
     setBusyKeys(new Set(busy.current))
     setMessage('')
@@ -147,23 +147,11 @@ export function useWorkoutSessionController(
     exerciseId: number,
     suggestion: LocalProgressionSuggestion,
   ) => {
-    const exercise = activeSession?.exercises.find((item) => item.id === exerciseId)
-    if (!activeSession || !exercise || busy.current.has(`suggestion:${exerciseId}`)) return false
-    return mutate(`suggestion:${exerciseId}`, async () => {
-      let updated = activeSession
-      for (const set of exercise.sets.filter((item) => !item.completed)) {
-        updated = await repository.updateSet(activeSession.id, exerciseId, set.id, {
-          reps: suggestion.proposedReps ?? set.reps,
-          load: suggestion.proposedLoad ?? set.load,
-          durationSeconds: suggestion.proposedDurationSeconds ?? set.durationSeconds,
-          distance: set.distance,
-          rpe: set.rpe,
-          completed: false,
-          notes: set.notes,
-        })
-      }
-      return updated
-    })
+    if (!activeSession?.exercises.some((item) => item.id === exerciseId)) return false
+    return mutate(
+      `suggestion:${exerciseId}`,
+      () => repository.applyProgression(activeSession.id, exerciseId, suggestion),
+    )
   }, [activeSession, mutate, repository])
 
   const pause = useCallback(async () => {
@@ -195,7 +183,7 @@ export function useWorkoutSessionController(
   }, [activeSession, mutate, repository])
 
   const finish = useCallback(async (operation: (id: number) => Promise<WorkoutSession>) => {
-    if (!activeSession || busy.current.has('session')) return false
+    if (!activeSession || busy.current.size > 0) return false
     busy.current.add('session')
     setBusyKeys(new Set(busy.current))
     try {

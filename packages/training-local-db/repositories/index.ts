@@ -62,10 +62,8 @@ import { createBackupRepository } from '../backup'
 import {
   clearUserData,
   createAppMetadataRepository,
-  resetToSeed,
   type AppMetadataRepository,
 } from '../database/installation'
-import type { SeedData } from '../database/seed'
 import { syncBundledCatalog, type BundledCatalog, type CatalogSyncResult } from '../database/catalog'
 
 export interface LocalRepositories {
@@ -82,7 +80,6 @@ export interface LocalRepositories {
   metadata: AppMetadataRepository
   maintenance: {
     clearUserData(): Promise<void>
-    resetToSeed(seed: SeedData): Promise<void>
   }
   catalog: {
     sync(catalog: BundledCatalog): Promise<CatalogSyncResult>
@@ -111,7 +108,6 @@ export function createLocalRepositories(database: SqlDatabase): LocalRepositorie
     metadata: createAppMetadataRepository(database),
     maintenance: {
       clearUserData: () => clearUserData(database),
-      resetToSeed: (seed) => resetToSeed(database, seed),
     },
     catalog: {
       sync: (catalog) => syncBundledCatalog(database, catalog),
@@ -1144,6 +1140,24 @@ function sessionRepository(database: SqlDatabase): WorkoutSessionRepository {
       }
     },
     updateSet: mutateSet,
+    applyProgression: (sessionId, exerciseId, suggestion) =>
+      database.transaction(async (transaction) => {
+        await assertEditableSession(transaction, sessionId)
+        const owner = await transaction.first<Row>(`
+          SELECT id FROM workout_session_exercises
+          WHERE id = ? AND workout_session_id = ?
+        `, exerciseId, sessionId)
+        if (!owner) throw notFound('Exercício da sessão')
+        await transaction.run(`
+          UPDATE workout_set_logs
+          SET reps = COALESCE(?, reps),
+              load = COALESCE(?, load),
+              duration_seconds = COALESCE(?, duration_seconds)
+          WHERE workout_session_exercise_id = ? AND completed = 0
+        `, suggestion.proposedReps, suggestion.proposedLoad,
+        suggestion.proposedDurationSeconds, exerciseId)
+        return (await loadSession(transaction, sessionId))!
+      }),
     addSet: (sessionId, exerciseId) => database.transaction(async (transaction) => {
       await assertEditableSession(transaction, sessionId)
       const owner = await transaction.first<Row>(`
@@ -1230,6 +1244,17 @@ function sessionRepository(database: SqlDatabase): WorkoutSessionRepository {
         WHERE id = ? AND archived = 0
       `, replacementId)
       if (!replacement) throw notFound('Exercício substituto')
+      const duplicate = await database.first<Row>(`
+        SELECT id FROM workout_session_exercises
+        WHERE workout_session_id = ? AND id <> ?
+          AND COALESCE(substitute_exercise_definition_id, exercise_definition_id) = ?
+      `, sessionId, exerciseId, replacementId)
+      if (duplicate) {
+        throw new DomainError(
+          'DUPLICATE_SESSION_EXERCISE',
+          'Este exercício já está presente na sessão.',
+        )
+      }
       const result = await database.run(`
         UPDATE workout_session_exercises
         SET substitute_exercise_definition_id = ?, substitute_name = ?, substitution_reason = ?

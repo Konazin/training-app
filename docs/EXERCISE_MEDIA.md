@@ -1,31 +1,15 @@
 # Mídia de exercícios
 
-A biblioteca usa um resolvedor central para escolher entre imagem local, URL de
-imagem já armazenada, vídeo local, URL de vídeo já armazenada, ilustração
-genérica empacotada e ausência de mídia.
+A biblioteca resolve imagem local, URL remota armazenada, vídeo ou ausência de
+mídia. Placeholders legados são apenas estados visuais: nunca são apresentados
+como demonstração técnica ou conteúdo canônico.
 
-## Imagens e ilustrações
+Mídia real importada preserva URL de origem, autor, licença e URL da licença.
+Nenhuma mídia é solicitada no bootstrap. Vídeos nunca iniciam automaticamente.
 
-Imagens ocupam um contêiner de proporção fixa e voltam para uma ilustração
-genérica se houver erro. As cinco ilustrações neutras são desenhadas pelo
-próprio aplicativo para força, mobilidade, cardio, peso corporal e equipamento.
-Elas não ensinam a técnica exata e aparecem como **Ilustração genérica do
-aplicativo**.
+O pacote recomendado exigiria ao menos uma imagem real por exercício, baixada
+somente após confirmação e validada antes do commit SQLite. Como a curadoria
+está incompleta, esse fluxo e seu manifesto permanecem desabilitados.
 
-Mídia real e ilustração genérica são identificadas separadamente no detalhe.
-Nenhum arquivo remoto é baixado ou armazenado automaticamente.
-
-## Vídeos
-
-Vídeos nunca iniciam sozinhos. O player só é criado depois de **Reproduzir
-vídeo**, inicia pausado, pausa quando a tela perde foco e volta ao início ao
-desmontar. Falhas preservam a tela e retornam ao placeholder.
-
-## Atribuição
-
-Quando disponível, mídia importada mantém fonte, autor, licença, URL da licença
-e URL original. A tela de detalhe apresenta esses campos sem aplicar uma
-licença global. Placeholders internos usam atribuição própria do aplicativo.
-
-O bootstrap não resolve nem solicita URLs remotas. O Wger e qualquer mídia
-externa continuam dependentes de ação explícita do usuário.
+Na busca manual atual, metadados ficam no SQLite, mas a mídia ainda pode
+depender da URL remota. Falhas de mídia não removem os dados do exercício.

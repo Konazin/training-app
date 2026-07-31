@@ -1,57 +1,38 @@
 # Biblioteca de exercícios
 
-O aplicativo inclui exatamente 40 exercícios originais em português do Brasil.
-O catálogo cobre força, mobilidade, condicionamento, peso corporal, halteres,
-barra, máquinas, elásticos e exercícios sem equipamento. Ele fica no pacote de
-domínio como dados TypeScript imutáveis; não depende de internet ou do Wger.
+Instalações novas começam com zero exercícios. O aplicativo não gera nem
+sincroniza conteúdo canônico. A biblioteca distingue:
 
-Cada item possui slug estável, nome normalizado, aliases, descrição, músculos,
-equipamento, categoria, dificuldade, instruções, flags de exercício unilateral
-e cronometrado, metadados de mídia e origem `BUNDLED`.
+- exercícios personalizados escritos pelo usuário (`CUSTOM`);
+- cópias importadas explicitamente do Wger (`WGER`);
+- definições `SYSTEM/BUNDLED` legadas, sempre arquivadas.
 
-## Sincronização local
+## Conteúdo legado
 
-Na abertura do banco, depois das migrations, o catálogo é sincronizado em uma
-transação SQLite. A chave lógica é `BUNDLED + slug`. A sincronização:
+O catálogo gerado antigo não é recriado no bootstrap, foreground, refresh,
+reset ou restauração. A migration 8 arquiva linhas `SYSTEM` existentes sem
+apagar IDs, referências de fichas, snapshots, notas, favoritos ou uso recente.
+As migrations 1 a 7 permanecem inalteradas.
 
-- cria itens ausentes e atualiza metadados canônicos quando a versão muda;
-- mantém ID SQLite, notas, arquivamento, favoritos e uso recente;
-- incorpora itens equivalentes do seed antigo sem duplicá-los;
-- não altera exercícios `CUSTOM` ou `WGER`;
-- não faz requisições de rede.
+## Estado vazio
 
-A migration 6 adiciona apenas metadados de catálogo, aliases, favoritos e uso
-recente. Por compatibilidade com a restrição publicada na migration 1, a linha
-base de um item empacotado continua fisicamente marcada como `SYSTEM`; o mapper
-expõe `BUNDLED` quando existe o respectivo registro de catálogo.
+Quando não há exercícios visíveis, a interface explica que nenhum conteúdo é
+baixado automaticamente e oferece:
 
-## Busca e navegação
+- **Importar pacote recomendado**, desabilitado enquanto a curadoria estiver
+  incompleta;
+- **Pesquisar no Wger**, com rede somente após confirmação;
+- **Criar exercício personalizado**;
+- **Continuar sem exercícios**.
 
-A busca local ignora caixa, acentos, pontuação e espaços repetidos. A ordem de
-relevância prioriza nome exato, prefixo do nome, alias, trecho do nome e, por
-fim, músculo ou equipamento.
+Importar exercícios nunca cria uma ficha. O onboarding apresenta as mesmas
+escolhas sem iniciar requisições.
 
-Os filtros incluem Todos, Favoritos, Recentes, Com mídia, Peso corporal,
-equipamento, grupo muscular, categoria e fonte. **Com mídia** considera somente
-imagem ou vídeo real; uma URI `placeholder://` é uma ilustração genérica e não
-entra no filtro. Cartões e seletor diferenciam Imagem, Vídeo, Imagem e vídeo,
-Ilustração genérica e Sem mídia.
+## Busca local
 
-O seletor **Lista / Por músculo** alterna entre a lista normal e seções reais
-por músculo principal, sempre reutilizando a mesma busca e os mesmos filtros.
-Há também quatro packs definidos por slug:
+A busca ignora caixa, acentos, pontuação e espaços repetidos. Filtros,
+favoritos, recentes, notas e agrupamento por músculo operam apenas sobre linhas
+visíveis no SQLite.
 
-- **Começar na academia**;
-- **Treino em casa**;
-- **Mobilidade e recuperação**;
-- **Condicionamento**.
-
-Packs servem apenas para explorar a biblioteca; não criam fichas
-automaticamente.
-
-## Favoritos, recentes e notas
-
-Favoritos são alterados somente por uma ação dedicada. Recentes são registrados
-ao abrir explicitamente um detalhe ou adicionar o exercício a um dia da ficha,
-sem duplicação e com até 20 itens visíveis. Notas são editáveis separadamente e
-não substituem as instruções canônicas do catálogo.
+O pacote recomendado só poderá ser habilitado após as 50 intenções possuírem
+IDs Wger únicos, imagem HTTPS, texto real e atribuição revisada.
