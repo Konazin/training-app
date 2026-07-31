@@ -1,7 +1,7 @@
 # Smoke Android — candidato 0.9.2
 
-Estado: **PENDENTE E BLOQUEADO**. O APK 0.9.2 ainda não pode ser gerado:
-o manifesto contém 12 aprovados e o gate exige pelo menos 35.
+Estado: **GO-TESTS / PENDENTE DE SMOKE FÍSICO**. O manifesto 0.9.2 contém 40
+aprovados e o APK 0.9.2/build 14 foi gerado e verificado.
 
 Todos os itens desta lista permanecem **PENDING** até teste em dispositivo real.
 

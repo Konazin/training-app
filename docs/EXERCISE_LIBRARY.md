@@ -19,8 +19,8 @@ As migrations 1 a 7 permanecem inalteradas.
 Quando não há exercícios visíveis, a interface explica que nenhum conteúdo é
 baixado automaticamente e oferece:
 
-- **Importar pacote recomendado**, desabilitado enquanto a curadoria estiver
-  incompleta;
+- **Importar pacote recomendado**, habilitado para o manifesto validado de 40
+  itens e desabilitado se o gate 35–50 deixar de passar;
 - **Pesquisar no Wger**, com rede somente após confirmação;
 - **Criar exercício personalizado**;
 - **Continuar sem exercícios**.

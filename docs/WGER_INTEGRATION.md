@@ -40,9 +40,9 @@ app não reescreve, traduz ou gera instruções.
 
 ## Pacote recomendado
 
-A lista de 50 intenções é uma especificação de desenvolvimento, não conteúdo
-do provider. A curadoria real não aprovou todas as intenções, portanto não há
-manifesto de produção e a ação permanece desabilitada. Consulte
+A lista de 50 intenções é um pool de candidatos, não conteúdo do provider. O
+manifesto real contém 40 exercícios revisados; a ação usa esse manifesto e só
+fica habilitada quando o gate 35–50 passa. Consulte
 [`WGER_STARTER_PACK_CURATION.md`](WGER_STARTER_PACK_CURATION.md).
 
 ## Atualizar importados
@@ -59,8 +59,9 @@ categoria, atribuição e metadados de mídia ficam no SQLite. O exercício apar
 na biblioteca, pode ser adicionado a uma ficha e usado em uma sessão em modo
 avião.
 
-Imagens e vídeos não são baixados nesta versão. Portanto, mídia remota pode
-ficar indisponível sem internet. Vídeos nunca iniciam automaticamente e sua
+O pacote recomendado consulta e valida a mídia depois da confirmação. A cópia
+persistida mantém a URL remota e os metadados de atribuição; imagens não são
+solicitadas no bootstrap. Vídeos nunca iniciam automaticamente e sua
 indisponibilidade não bloqueia o treino.
 
 O catálogo gerado antigo foi aposentado e não reaparece em restaurações.

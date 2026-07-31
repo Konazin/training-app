@@ -214,6 +214,6 @@ o teste físico em modo avião com
 [o roteiro local-only](docs/LOCAL_ONLY_SMOKE_TEST.md).
 O roteiro específico desta entrega está em
 [smoke Android dos Marcos 4 e 5](docs/MARCO_4_5_ANDROID_SMOKE.md).
-O APK 0.9.0 foi substituído e não deve seguir para teste formal. A tentativa
-0.9.2 está bloqueada porque a curadoria Wger aprovou 12 de 50 intenções;
-consulte [o relatório 0.9.2](docs/RELEASE_CANDIDATE_0_9_2.md).
+O APK 0.9.0 foi substituído e não deve seguir para teste formal. O candidato
+0.9.2 contém manifesto Wger com 40 aprovados e está liberado somente para teste
+físico Android; consulte [o relatório 0.9.2](docs/RELEASE_CANDIDATE_0_9_2.md).
