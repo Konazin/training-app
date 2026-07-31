@@ -188,9 +188,28 @@ export function useStarterPackImportController(
         publish({ status: 'FETCHING', completed: index, total: manifest.length })
         const candidate = await provider.findByExternalId(String(item.providerExerciseId), 'pt-br', controller.signal)
         if (!isCurrent()) return false
-        const failure = candidate ? validateCurrentEntry(item, candidate) : 'ID não encontrado no Wger.'
-        if (failure) failures.push({ intentKey: item.intentKey, name: item.reviewedPtBrName, reason: failure })
-        else candidates.push(candidate)
+
+        if (!candidate) {
+          failures.push({
+            intentKey: item.intentKey,
+            name: item.reviewedPtBrName,
+            reason: 'ID não encontrado no Wger.',
+          })
+          continue
+        }
+
+        const failure = validateCurrentEntry(item, candidate)
+
+        if (failure) {
+          failures.push({
+            intentKey: item.intentKey,
+            name: item.reviewedPtBrName,
+            reason: failure,
+          })
+          continue
+        }
+
+        candidates.push(candidate)
       }
 
       if (!isCurrent()) return false

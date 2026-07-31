@@ -12,7 +12,8 @@
   },
   "scripts": {
     "curate:wger-starter-pack": "node tools/curate-wger-starter-pack.mjs",
-    "validate:wger-manifest": "node tools/validate-wger-manifest.mjs"
+    "validate:wger-manifest": "node tools/validate-wger-manifest.mjs",
+    "postinstall": "node scripts/patch-rn-foojay.mjs"
   },
   "devDependencies": {
     "expo-font": "56.0.7"
