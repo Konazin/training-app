@@ -19,6 +19,7 @@ import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import {
   EXERCISE_PACKS,
+  recommendedPackEnabled,
   type ExerciseDefinition,
   type ExerciseDefinitionInput,
 } from '@training/training-domain'
@@ -49,6 +50,9 @@ export function ExerciseLibraryScreen({
   onUpdate,
   onArchive,
   onFavorite,
+  onImportStarterPack,
+  starterPackBusy,
+  starterPackMessage,
 }: {
   exercises: ExerciseDefinition[]
   loading: boolean
@@ -56,6 +60,9 @@ export function ExerciseLibraryScreen({
   onUpdate: (id: number, payload: ExerciseDefinitionInput) => Promise<boolean>
   onArchive: (id: number) => Promise<boolean>
   onFavorite: (id: number, favorite: boolean) => Promise<boolean>
+  onImportStarterPack?: () => void
+  starterPackBusy?: boolean
+  starterPackMessage?: string
 }) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>()
   const { colors } = useTheme()
@@ -123,6 +130,9 @@ export function ExerciseLibraryScreen({
     : !exercises.length && !query && filter.kind === 'ALL'
       ? <EmptyLibrary
           approvedCount={WGER_STARTER_PACK.length}
+          onImportStarterPack={onImportStarterPack}
+          starterPackBusy={starterPackBusy}
+          starterPackMessage={starterPackMessage}
           onCreate={() => setEditing('new')}
           onSearchWger={() => navigation.navigate('WgerIntegration')}
           onContinue={() => navigation.goBack()}
@@ -199,11 +209,17 @@ function EmptyLibrary({
   onCreate,
   onSearchWger,
   onContinue,
+  onImportStarterPack,
+  starterPackBusy = false,
+  starterPackMessage = '',
 }: {
   approvedCount: number
   onCreate: () => void
   onSearchWger: () => void
   onContinue: () => void
+  onImportStarterPack?: () => void
+  starterPackBusy?: boolean
+  starterPackMessage?: string
 }) {
   const { colors } = useTheme()
   const styles = createStyles(colors)
@@ -216,9 +232,15 @@ function EmptyLibrary({
       <Text style={styles.emptyCopy}>
         Consultas ao provedor exigem internet, mas o conteúdo importado fica no aparelho. Nenhuma ficha é criada e nenhum dado é enviado automaticamente.
       </Text>
-      <PrimaryButton disabled={approvedCount < 35} label="Importar pacote recomendado" onPress={() => undefined} />
+      <PrimaryButton
+        disabled={!recommendedPackEnabled(approvedCount, 0) || starterPackBusy}
+        label="Importar pacote recomendado"
+        onPress={onImportStarterPack ?? onSearchWger}
+        loading={starterPackBusy}
+      />
       <Text style={styles.emptyHint}>Pacote atual · {approvedCount} exercícios</Text>
       <Text style={styles.emptyHint}>O pacote recomendado contém exercícios revisados individualmente. A quantidade pode variar conforme a disponibilidade e a qualidade dos dados do provider.</Text>
+      {!!starterPackMessage && <Text accessibilityLiveRegion="polite" style={styles.emptyHint}>{starterPackMessage}</Text>}
       <PrimaryButton label="Pesquisar no Wger" onPress={onSearchWger} />
       <PrimaryButton secondary label="Criar exercício personalizado" onPress={onCreate} />
       <Pressable accessibilityRole="button" onPress={onContinue} style={styles.continue}>

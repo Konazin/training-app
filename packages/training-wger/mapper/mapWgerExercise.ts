@@ -66,6 +66,7 @@ function mapMedia(
   if (!Array.isArray(value)) return []
   return value.flatMap((item, sortOrder): ExternalExerciseMediaCandidate[] => {
     if (!isObject(item)) return []
+    if (item.is_ai_generated === true) return []
     const externalId = externalIdentifier(item)
     const remoteUrl = secureUrl(type === 'IMAGE' ? item.image : item.video)
     const width = optionalNonNegative(item.width)

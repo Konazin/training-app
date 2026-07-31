@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef } from 'react'
+import { Alert } from 'react-native'
 import {
   DefaultTheme,
   NavigationContainer,
@@ -59,6 +60,8 @@ import { systemBarStyle } from './src/theme/uiContracts'
 import { isUiPreferences, type UiPreferences } from './src/theme/preferences'
 import { Onboarding } from './src/features/onboarding/Onboarding'
 import { useOnboarding } from './src/features/onboarding/useOnboarding'
+import { useStarterPackImportController } from './src/features/exercise-library/useStarterPackImportController'
+import { WGER_STARTER_PACK, recommendedPackEnabled } from '@training/training-domain'
 
 const Stack = createNativeStackNavigator<RootStackParamList>()
 const Tabs = createBottomTabNavigator<MainTabParamList>()
@@ -120,6 +123,17 @@ function LocalApp({
   const trainingPlan = useTrainingPlanController(repositories.plans, controller.refresh)
   const workoutSession = useWorkoutSessionController(repositories.sessions, controller.refresh)
   const onboarding = useOnboarding(repositories.metadata)
+  const starterPack = useStarterPackImportController(repositories.externalExerciseImport, controller.refresh)
+  const starterPackAction = useCallback(() => {
+    Alert.alert(
+      'Importar pacote recomendado?',
+      `${WGER_STARTER_PACK.length} exercícios serão consultados no Wger. É necessária internet; nenhum plano será criado.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Importar', onPress: () => void starterPack.run() },
+      ],
+    )
+  }, [starterPack])
   const trashRefresh = useRef<() => Promise<boolean>>(async () => true)
   const refreshAll = useCallback((): Promise<RefreshAllResult> => runRefreshParts([
     { name: 'sessão', refresh: workoutSession.refresh },
@@ -239,6 +253,9 @@ function LocalApp({
                     onUpdate={controller.updateExerciseDefinition}
                     onArchive={controller.archiveExerciseDefinition}
                     onFavorite={controller.setExerciseFavorite}
+                    onImportStarterPack={starterPackAction}
+                    starterPackBusy={starterPackBusy(starterPack.state)}
+                    starterPackMessage={starterPackMessage(starterPack.state)}
                   />
                 )}
               </Stack.Screen>
@@ -420,9 +437,27 @@ function LocalApp({
         onCreateCustom={() => {
           if (navigationRef.isReady()) navigationRef.navigate('Library')
         }}
+        onImportStarterPack={starterPackAction}
+        starterPackEnabled={recommendedPackEnabled(WGER_STARTER_PACK.length, 0)}
+        starterPackBusy={starterPackBusy(starterPack.state)}
       />
     </>
   )
+}
+
+function starterPackBusy(state: ReturnType<typeof useStarterPackImportController>['state']) {
+  return state.status === 'FETCHING' || state.status === 'DOWNLOADING_MEDIA'
+    || state.status === 'VALIDATING' || state.status === 'COMMITTING'
+}
+
+function starterPackMessage(state: ReturnType<typeof useStarterPackImportController>['state']) {
+  if (state.status === 'FETCHING') return `Consultando Wger… ${state.completed}/${state.total}`
+  if (state.status === 'DOWNLOADING_MEDIA') return `Baixando mídia… ${state.completed}/${state.total}`
+  if (state.status === 'VALIDATING') return 'Validando conteúdo recebido do Wger…'
+  if (state.status === 'COMMITTING') return `Salvando ${state.total} exercícios…`
+  if (state.status === 'SUCCESS') return `${state.imported} importado(s); ${state.skipped} indisponível(is).`
+  if (state.status === 'ERROR') return state.message
+  return ''
 }
 
 function MainTabs({

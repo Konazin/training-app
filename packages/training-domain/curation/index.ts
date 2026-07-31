@@ -11,7 +11,8 @@ export interface StarterPackIntent {
   imageRequired: boolean
 }
 
-export const STARTER_PACK_TARGET = 50
+export const STARTER_PACK_TARGET = 40
+export const STARTER_PACK_INTENT_POOL_TARGET = 50
 export const STARTER_PACK_MINIMUM = 35
 export const STARTER_PACK_MAXIMUM = 50
 
@@ -37,7 +38,7 @@ export interface RankedCurationCandidate {
 }
 
 export function validateStarterPackIntents(intents: readonly StarterPackIntent[]) {
-  if (intents.length !== STARTER_PACK_TARGET) throw new Error(`A curadoria deve conter exatamente ${STARTER_PACK_TARGET} intenções.`)
+  if (intents.length !== STARTER_PACK_INTENT_POOL_TARGET) throw new Error(`O pool de curadoria deve conter exatamente ${STARTER_PACK_INTENT_POOL_TARGET} intenções.`)
   const keys = new Set<string>()
   for (const intent of intents) {
     if (!/^[a-z0-9_]+$/.test(intent.semanticKey) || keys.has(intent.semanticKey)) {

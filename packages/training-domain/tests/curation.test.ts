@@ -9,6 +9,10 @@ import {
   recommendedPackEnabled,
   type StarterPackIntent,
 } from '../curation'
+import {
+  WGER_STARTER_PACK,
+  validateWgerStarterPackManifest,
+} from '../curation/wger-starter-pack.v1'
 
 const list = JSON.parse(readFileSync(
   new URL('../../../tools/wger-starter-pack-intents.v1.json', import.meta.url),
@@ -64,6 +68,13 @@ describe('curadoria estrita do pacote Wger', () => {
     expect(recommendedPackEnabled(34, 0)).toBe(false)
     expect(recommendedPackEnabled(35, 0)).toBe(true)
     expect(recommendedPackEnabled(50, 1)).toBe(false)
+  })
+
+  it('valida o manifesto de produção estruturado', () => {
+    expect(validateWgerStarterPackManifest(WGER_STARTER_PACK)).toHaveLength(40)
+    expect(new Set(WGER_STARTER_PACK.map((item) => `${item.provider}:${item.providerExerciseId}`)).size).toBe(40)
+    expect(WGER_STARTER_PACK.filter((item) => item.mediaRequirement === 'REQUIRED')).toHaveLength(38)
+    expect(WGER_STARTER_PACK.filter((item) => item.mediaRequirement === 'OPTIONAL')).toHaveLength(2)
   })
 })
 

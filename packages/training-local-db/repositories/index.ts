@@ -225,14 +225,15 @@ async function upsertImportedMedia(
     await database.run(`
       INSERT INTO exercise_media(
         exercise_definition_id, type, source, external_id, remote_url, thumbnail_remote_url,
-        mime_type, width, height, duration_seconds, is_main, sort_order, license_name,
-        license_url, author, source_url, created_at, updated_at
-      ) VALUES (?, ?, 'WGER', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        local_uri, mime_type, width, height, duration_seconds, is_main, sort_order, license_name,
+        license_url, author, source_url, downloaded_at, created_at, updated_at
+      ) VALUES (?, ?, 'WGER', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(source, external_id) WHERE external_id IS NOT NULL DO UPDATE SET
         exercise_definition_id = excluded.exercise_definition_id,
         type = excluded.type,
         remote_url = excluded.remote_url,
         thumbnail_remote_url = excluded.thumbnail_remote_url,
+        local_uri = excluded.local_uri,
         mime_type = excluded.mime_type,
         width = excluded.width,
         height = excluded.height,
@@ -243,11 +244,12 @@ async function upsertImportedMedia(
         license_url = excluded.license_url,
         author = excluded.author,
         source_url = excluded.source_url,
+        downloaded_at = excluded.downloaded_at,
         updated_at = excluded.updated_at
     `, exerciseId, media.type, media.externalId, media.remoteUrl, media.thumbnailRemoteUrl,
-    media.mimeType, media.width, media.height, media.durationSeconds, Number(media.main),
-    media.sortOrder, media.licenseName, media.licenseUrl, media.author, media.sourceUrl,
-    timestamp, timestamp)
+    media.localUri ?? null, media.mimeType, media.width, media.height, media.durationSeconds,
+    Number(media.main), media.sortOrder, media.licenseName, media.licenseUrl, media.author,
+    media.sourceUrl, media.downloadedAt ?? null, timestamp, timestamp)
   }
 }
 

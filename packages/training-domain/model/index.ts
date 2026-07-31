@@ -143,6 +143,8 @@ export interface ExternalExerciseMediaCandidate {
   licenseUrl: string | null
   author: string | null
   sourceUrl: string | null
+  localUri?: string
+  downloadedAt?: string
 }
 
 export interface ExternalExerciseCandidate {

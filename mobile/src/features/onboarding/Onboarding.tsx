@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { type ThemeColors, useTheme } from '../../theme'
 import { typography } from '../../theme/typography'
 import { WGER_STARTER_PACK } from '@training/training-domain'
+import { recommendedPackEnabled } from '@training/training-domain'
 
 const STEPS = [
   {
@@ -26,12 +27,18 @@ export function Onboarding({
   onComplete,
   onOpenWger,
   onCreateCustom,
+  onImportStarterPack,
+  starterPackEnabled = recommendedPackEnabled(WGER_STARTER_PACK.length, 0),
+  starterPackBusy = false,
 }: {
   visible: boolean
   onSkip: () => Promise<void>
   onComplete: () => Promise<void>
   onOpenWger?: () => void
   onCreateCustom?: () => void
+  onImportStarterPack?: () => void
+  starterPackEnabled?: boolean
+  starterPackBusy?: boolean
 }) {
   const [step, setStep] = useState(0)
   const { colors } = useTheme()
@@ -67,9 +74,10 @@ export function Onboarding({
               <View style={styles.choices}>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityState={{ disabled: true }}
-                  disabled
-                  style={[styles.choice, styles.disabled]}
+                  accessibilityState={{ disabled: !starterPackEnabled || starterPackBusy, busy: starterPackBusy }}
+                  disabled={!starterPackEnabled || starterPackBusy}
+                  onPress={() => void onComplete().then(onImportStarterPack)}
+                  style={[styles.choice, (!starterPackEnabled || starterPackBusy) && styles.disabled]}
                 >
                   <Text style={styles.choiceTitle}>Importar pacote recomendado</Text>
                   <Text style={styles.choiceDetail}>Pacote atual · {WGER_STARTER_PACK.length} exercícios</Text>

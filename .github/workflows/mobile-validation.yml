@@ -19,7 +19,16 @@ jobs:
       - run: npm test --workspace @training/training-domain
       - run: npm run typecheck --workspace @training/training-local-db
       - run: npm test --workspace @training/training-local-db
+      - run: npm run typecheck --workspace @training/training-wger
+      - run: npm test --workspace @training/training-wger
       - run: npm run typecheck --workspace training-mobile
-      - run: npm test --workspace training-mobile
+      - run: npm run test --workspace training-mobile
+      - run: npm run test:behavior --workspace training-mobile
+      - run: npm run typecheck --workspace umamusume-mobile
       - run: npx expo config --type public --json --working-dir mobile
+      - run: EXPO_NO_TELEMETRY=1 npm exec --workspace=training-mobile -- expo install --check
+      - run: cd mobile && npx expo-doctor
+      - run: EXPO_NO_TELEMETRY=1 npm exec --workspace=training-mobile -- expo export --platform android --output-dir dist
+      - run: git diff --check
       - run: npm run validate:wger-manifest
+      - run: if git ls-files | grep -Eq 'candidate-audit|artifacts/curation'; then echo 'Dump bruto de curadoria rastreado'; exit 1; fi
