@@ -1,1402 +1,874 @@
-Continue o desenvolvimento do repositório `training-app` a partir do commit:
+Work on the repository:
 
-85e951baa963068e2816e3bee79aa963f596bbbd
+Konazin/training-app
 
-Este é o MARCO 2 do roadmap:
+Base commit:
 
-EDITOR DE FICHA, TEMPLATES E DUPLICAÇÃO CONFIGURÁVEL
+6dbc5bc21864a0a547f8622b2ba5e3b34348f1ec
 
-O Marco 1 está estabilizado no núcleo. Antes de implementar qualquer função
-nova deste marco, concluir a Etapa 2.0 com três ajustes operacionais pendentes.
+Goal:
 
-O aplicativo deve permanecer:
+Complete the curated Wger starter-pack workflow, implement the real package
+import, pass all automated gates, generate a verified Android APK, and mark
+version 0.9.2 as GO-TESTS.
 
-- local-only;
-- offline-first;
-- sem backend obrigatório;
-- sem VPS;
-- sem login;
-- com SQLite como fonte de verdade;
-- compatível com backup schemaVersion 2;
-- compatível com fichas arquivadas e lixeira;
-- compatível com o catálogo Wger opcional.
+GO-TESTS means only:
 
-Trabalhar principalmente em:
+- ready for installation and physical Android testing;
+- automated validation passed;
+- real APK generated and verified;
+- physical smoke still pending;
+- not approved for production or public release.
 
-packages/training-domain/
-packages/training-local-db/
-mobile/
-docs/
-.github/workflows/
+All user-facing text, documentation, commit messages and the final report must
+be written in Brazilian Portuguese. Code identifiers may remain in English.
 
-Não alterar funcionalmente:
+Do not fabricate successful tests, Wger IDs, provider data, URLs, licenses,
+images, APK metadata, hashes or CI results.
 
-backend/
-web/
-umamusume-mobile/
-packages/training-wger/
+======================================================================
+1. CLOSED PRODUCT SCOPE
+======================================================================
 
-Não implementar neste marco:
+Preserve these product decisions:
+
+- fresh installations start with zero exercises;
+- fresh installations start with zero training plans;
+- no demonstration plan;
+- no generated exercise catalog;
+- no automatic provider request;
+- no network request during bootstrap, migration, foreground or render;
+- SQLite remains the local source of truth;
+- no login, server, VPS, cloud sync, analytics or telemetry;
+- manual custom exercises remain supported;
+- Wger remains the only implemented external provider;
+- provider content is obtained only after an explicit user action;
+- imported content remains available locally afterward;
+- importing exercises never creates a training plan;
+- no exercise descriptions or technical instructions may be written by Codex.
 
-- nova Home semanal;
-- skins ou temas novos;
-- animações gerais do aplicativo;
-- catálogo inicial expandido;
-- thumbnails;
-- favoritos;
-- múltiplos providers;
-- progressão automática;
-- IA;
-- Health Connect;
-- nuvem;
-- alterações de mídia;
-- APK final.
+Do not modify `umamusume-mobile` functionally.
+
+Do not add:
 
-==================================================
-1. EXECUÇÃO EM ETAPAS
-==================================================
+- AI-generated content;
+- another provider;
+- accounts;
+- subscriptions;
+- push notifications;
+- background synchronization;
+- automatic Wger refresh;
+- automatic plan creation;
+- automatic progression application.
+
+======================================================================
+2. RELEASE IDENTITY
+======================================================================
+
+Keep the candidate identity:
 
-Executar obrigatoriamente nesta ordem:
+- app version: 0.9.2
+- Android versionCode: 14
+- Android package: com.konazin.trainingapp
 
-ETAPA 2.0
-Fechamento operacional da lixeira.
+Do not bump to 0.9.3 unless a real 0.9.2 APK was already successfully generated
+and distributed outside the repository. The current repository documentation
+states that no legitimate 0.9.2 APK exists.
 
-ETAPA 2.1
-Seletores de categoria e dificuldade.
+Final implementation commit:
+
+fix(mobile): complete curated starter pack import
+
+Final release/documentation commit:
+
+chore(mobile): mark 0.9.2 as go-tests candidate
+
+======================================================================
+3. CURRENT BLOCKERS THAT MUST BE CLOSED
+======================================================================
 
-ETAPA 2.2
-Templates locais de ficha.
+The current repository has these known blockers:
+
+1. the immutable manifest contains only 12 approved exercises;
+2. the minimum GO-TESTS gate is 35;
+3. the empty-library import button has an empty callback;
+4. the onboarding package option is permanently disabled;
+5. there is no real starter-pack import service;
+6. there is no transactional batch import;
+7. no package import progress or confirmation exists;
+8. the current manifest validator relies on source regex instead of loading and
+   validating the real structured manifest;
+9. the CI workflow is incomplete;
+10. the raw generated candidate audit remains tracked;
+11. no real APK 0.9.2 has been generated or verified;
+12. some documentation still describes outdated 50-of-50 behavior.
+
+Do not declare GO-TESTS until all of these are resolved.
+
+======================================================================
+4. CURATION DECISION: 35 TO 50 REAL EXERCISES
+======================================================================
+
+The original list of 50 intentions is now a curation candidate pool, not a rule
+that every original intention must be represented.
+
+Final package rules:
+
+- target: 40 approved exercises;
+- minimum: 35 approved exercises;
+- maximum: 50 approved exercises;
+- zero rejected items included;
+- zero fabricated provider identities;
+- zero duplicate provider identities;
+- zero duplicate effective movements;
+- balanced coverage of common training needs.
+
+The package must have reasonable coverage across:
+
+- chest and upper-body push;
+- back and upper-body pull;
+- shoulders;
+- arms;
+- quadriceps;
+- posterior chain and glutes;
+- calves;
+- core;
+- bodyweight movements;
+- mobility or conditioning.
+
+Do not fill the package with obscure movements or several nearly identical
+variations merely to reach the minimum.
+
+The final package does not need to preserve unsupported original intentions.
+
+When an original intention cannot be satisfied, it may be replaced by another
+common and useful Wger exercise when:
+
+- it is a real provider exercise;
+- it is technically distinct from other selected items;
+- it has valid provider content;
+- it improves package coverage;
+- the replacement is documented.
 
-ETAPA 2.3
-Prévia semanal.
+Do not stop after one search pass.
+
+For unresolved intentions:
 
-ETAPA 2.4
-Duplicação configurável.
+1. try the PT-BR query;
+2. try provider Portuguese content;
+3. try English terms;
+4. search by known muscle and equipment metadata;
+5. inspect full Wger exercise-info records;
+6. inspect provider base/exercise relationships when applicable;
+7. review nearby candidates manually;
+8. replace unsupported intentions with other common exercises when justified.
 
-ETAPA 2.5
-Testes, documentação e validação geral.
+Only finish with NO-GO when an exhaustive real-provider attempt still cannot
+reach 35 valid exercises.
 
-Não iniciar a Etapa 2.1 enquanto os testes da Etapa 2.0 não estiverem passando.
+======================================================================
+5. WGER CONTENT TRUST POLICY
+======================================================================
 
-Não marcar o Marco 2 como concluído se alguma etapa estiver parcial.
+The final manifest must not contain Codex-written:
 
-==================================================
-2. ETAPA 2.0 — SNACKBAR DURANTE DESFAZER
-==================================================
+- descriptions;
+- execution instructions;
+- technique explanations;
+- muscles;
+- equipment claims;
+- attribution text;
+- license claims.
 
-O controller da lixeira atualmente limpa a mensagem ao adquirir qualquer lock.
+These fields must be fetched from Wger at runtime after explicit user
+confirmation.
 
-Isso faz o Snackbar desaparecer assim que o usuário toca em Desfazer, mesmo
-existindo suporte visual para “Desfazendo…”.
+The manifest may contain only reviewed identity and validation metadata such as:
 
-Corrigir sem remover as proteções de concorrência já implementadas.
+- manifest version;
+- semantic key;
+- provider ID;
+- Wger external ID;
+- Wger base/exercise ID when applicable;
+- original provider name;
+- reviewed PT-BR display label;
+- expected primary muscle;
+- expected equipment;
+- broad category;
+- media policy;
+- expected source URL;
+- expected license identifier;
+- expected real-media presence;
+- review status;
+- reviewed-at date.
 
-Fluxo esperado:
+The PT-BR display label may be manually reviewed, but it must not replace or
+alter the original provider name.
 
-1. Snackbar mostra:
-   “Ficha movida para a lixeira.”
-   ação “Desfazer”.
+Preserve both:
 
-2. usuário toca em Desfazer;
+- original provider name;
+- reviewed display label.
 
-3. Snackbar permanece visível;
+Do not translate technical instructions using Codex.
 
-4. ação muda para:
-   “Desfazendo…”;
+Language priority at import time:
 
-5. botão da ação e botão fechar ficam desativados;
+1. Brazilian Portuguese supplied by Wger;
+2. Portuguese supplied by Wger;
+3. English supplied by Wger.
 
-6. repository.restore confirma;
+When English content is used, preserve it and identify its language.
 
-7. refresh é tentado;
+======================================================================
+6. MEDIA POLICY
+======================================================================
 
-8. Snackbar anterior fecha;
+Use a per-entry media policy.
 
-9. nova mensagem mostra:
-   “Ficha restaurada.”
+`REQUIRED`:
 
-Em refresh falho:
+- strength exercises;
+- machine exercises;
+- movements where setup or execution requires demonstration.
 
-“Ficha restaurada, mas a tela não pôde ser atualizada.”
+These must have:
 
-Em restore falho:
+- at least one real provider image;
+- HTTPS media URL;
+- correct exercise correspondence;
+- source/author attribution when available;
+- valid license metadata.
 
-- manter Snackbar visível;
-- retornar a ação para “Desfazer”;
-- permitir nova tentativa enquanto o token estiver válido;
-- não limpar pending undo;
-- mostrar mensagem de erro sem perder a possibilidade de tentar novamente.
+`OPTIONAL`:
 
-Alterar `acquireOperation` para aceitar comportamento explícito, por exemplo:
+- basic mobility;
+- stretching;
+- simple conditioning movements.
 
-acquireOperation(key, {
-  clearMessage: boolean
-})
+These may be accepted without an image only when:
 
-Para operações `trash:undo:*`:
+- provider description or instructions are valid;
+- exercise identity is unambiguous;
+- the UI displays “Sem demonstração visual”;
+- no generic placeholder pretends to demonstrate technique.
 
-clearMessage = false
+Do not use:
 
-Não depender de verificar prefixo de string em vários lugares.
+- AI-generated exercise images;
+- unrelated stock photographs;
+- generic illustrations labelled as exercise demonstrations;
+- insecure HTTP media;
+- fabricated attribution.
 
-Centralizar essa decisão.
+======================================================================
+7. STRUCTURED IMMUTABLE MANIFEST
+======================================================================
 
-==================================================
-3. ETAPA 2.0 — REFRESH GLOBAL
-==================================================
+Complete the real production manifest with 35 to 50 approved entries.
 
-O `refreshAll` atual considera uma Promise resolvida com `false` como sucesso.
+The application must consume exactly this reviewed manifest.
 
-Corrigir para que cada atualização seja validada.
+The manifest must be:
 
-Criar contrato estruturado semelhante a:
+- immutable;
+- versioned;
+- typed;
+- deterministic;
+- loaded as structured data;
+- validated through actual runtime objects, not regex parsing;
+- free from rejected candidates.
 
-interface RefreshPartResult {
-  name: string
-  success: boolean
-  error?: unknown
-}
+Keep or create a function similar to:
 
-interface RefreshAllResult {
-  success: boolean
-  failedParts: string[]
-}
+validateStarterPackManifest(manifest)
 
-Ou implementação equivalente.
+It must validate:
 
-O refresh global deve considerar:
-
-- sessão;
-- fichas;
-- dashboard/biblioteca;
-- lixeira;
-- badge.
-
-Usar `Promise.allSettled` quando as atualizações forem independentes.
-
-Não interromper a coleta no primeiro erro.
-
-Não repetir mutation para corrigir refresh.
-
-Quando qualquer refresh retornar false ou rejeitar:
-
-- considerar o refresh incompleto;
-- informar quais partes falharam;
-- não afirmar que toda a interface foi atualizada.
-
-==================================================
-4. ETAPA 2.0 — BACKUP E MUTATION CONFIRMADA
-==================================================
-
-O `useBackupController` também não deve tratar mutation confirmada mais refresh
-falho como se a mutation inteira tivesse falhado.
-
-Aplicar separação explícita ao menos às operações:
-
-- importar backup;
-- restaurar backup automático;
-- apagar todos os dados;
-- recriar dados iniciais.
-
-Distinguir:
-
-1. backup ou mutation falhou antes do commit;
-2. banco foi alterado e refresh passou;
-3. banco foi alterado e refresh falhou.
-
-Exemplos:
-
-Restauração confirmada e refresh completo:
-
-“Backup restaurado com sucesso.”
-
-Restauração confirmada e refresh incompleto:
-
-“Backup restaurado, mas algumas telas não puderam ser atualizadas.”
-
-Reset confirmado e refresh incompleto:
-
-“Os dados foram recriados, mas algumas telas não puderam ser atualizadas.”
-
-Nunca repetir restore/reset automaticamente por falha de refresh.
-
-Nunca afirmar que a restauração falhou quando o SQLite já confirmou a operação.
-
-Manter o backup de segurança criado.
-
-Adicionar um método de retry apenas para refresh quando necessário.
-
-==================================================
-5. ETAPA 2.0 — MODAL DE ESVAZIAMENTO
-==================================================
-
-Enquanto `busy === true`:
-
-- botão Cancelar desativado;
-- `onRequestClose` não fecha o modal;
-- voltar do Android não fecha o modal;
-- input continua desativado;
-- botão destrutivo continua desativado;
-- modal permanece visível;
-- indicador de carregamento permanece;
-- não permitir segunda submissão.
-
-Se backup falhar:
-
-- modal permanece aberto;
-- dados permanecem;
-- confirmação digitada pode permanecer;
-- mostrar erro.
-
-Se emptyTrash confirmar e refresh falhar:
-
-- fechar modal;
-- mostrar warning;
-- não comunicar cancelamento;
-- não repetir emptyTrash.
-
-Adicionar acessibilidade:
-
-- modal anunciado como operação em andamento;
-- botão Cancelar com estado disabled;
-- texto “Esvaziando lixeira…” durante busy.
-
-==================================================
-6. TESTES OBRIGATÓRIOS DA ETAPA 2.0
-==================================================
-
-Adicionar testes para:
-
-1. Snackbar permanece durante restore pendente;
-2. actionBusyLabel mostra “Desfazendo…”;
-3. botão fechar fica desativado durante restore;
-4. restore falho mantém ação disponível;
-5. restore bem-sucedido fecha Snackbar anterior;
-6. refresh falho após restore mostra warning;
-7. `trashRefresh` retornando false torna refreshAll incompleto;
-8. refreshAll coleta múltiplas falhas;
-9. restore de backup confirmado não é tratado como falha por refresh;
-10. modal não fecha por Cancelar durante busy;
-11. modal não fecha por onRequestClose durante busy;
-12. modal fecha após emptyTrash confirmado;
-13. modal permanece após falha do backup;
-14. duplo toque continua bloqueado.
-
-Somente após estes testes passarem, iniciar a Etapa 2.1.
-
-==================================================
-7. ETAPA 2.1 — CATEGORIAS PADRÃO
-==================================================
-
-Criar presets no domínio:
-
-TRAINING_PLAN_CATEGORY_PRESETS
-
-Valores de exibição e persistência:
-
-- Força
-- Hipertrofia
-- Resistência muscular
-- Condicionamento
-- Mobilidade
-- Recuperação
-- Técnica
-- Mista
-
-Adicionar opção visual:
-
-- Outra
-
-“Outra” é apenas uma opção de interface.
-
-Nunca persistir literalmente:
-
-Outra
-
-Quando Outra estiver selecionada:
-
-- exibir campo “Categoria personalizada”;
-- exigir valor não vazio;
-- normalizar espaços;
-- limitar a 50 caracteres;
-- persistir o texto personalizado.
-
-Ao editar ficha antiga:
-
-- se a categoria pertence aos presets, selecionar o preset;
-- caso contrário, selecionar Outra;
-- preencher o campo personalizado com o valor existente;
-- não perder categorias antigas.
-
-Criar funções puras:
-
-resolveTrainingPlanCategorySelection(value)
-
-normalizeTrainingPlanCategory(value)
-
-isTrainingPlanCategoryPreset(value)
-
-Não criar enum SQLite.
-
-Continuar persistindo categoria como TEXT.
-
-==================================================
-8. ETAPA 2.1 — DIFICULDADES PADRÃO
-==================================================
-
-Criar presets no domínio:
-
-TRAINING_PLAN_DIFFICULTY_PRESETS
-
-Valores:
-
-- Iniciante
-- Intermediário
-- Avançado
-- Adaptável
-
-Adicionar opção visual:
-
-- Outra
-
-Não incluir Deload como dificuldade.
-
-Deload é fase de programação e pertence a uma futura evolução do modelo.
-
-Quando Outra estiver selecionada:
-
-- exibir campo “Dificuldade personalizada”;
-- exigir valor não vazio;
-- normalizar espaços;
-- limitar a 50 caracteres;
-- persistir somente o valor personalizado.
-
-Ao editar valor antigo não reconhecido:
-
-- selecionar Outra;
-- preservar o texto anterior.
-
-Criar funções puras equivalentes às de categoria.
-
-==================================================
-9. COMPONENTE DE SELEÇÃO
-==================================================
-
-Criar componente reutilizável:
-
-OptionPickerField
-
-Responsabilidades:
-
-- label;
-- valor atual;
-- placeholder;
-- erro;
-- disabled;
-- acessibilidade;
-- abrir seletor;
-- mostrar seleção;
-- indicar que é interativo.
-
-Criar seletor mobile:
-
-OptionPickerModal
-
-Ou bottom sheet sem biblioteca externa.
-
-Requisitos:
-
-- SafeAreaView ou insets;
-- KeyboardAvoidingView quando houver campo customizado;
-- conteúdo rolável;
-- touch targets mínimos;
-- opção selecionada claramente;
-- suporte a tema claro e escuro;
-- botão Cancelar;
-- botão Confirmar;
-- fechar pelo Android apenas quando não estiver processando;
-- não depender somente da cor;
-- suporte a fonte ampliada.
-
-Não instalar biblioteca de dropdown.
-
-Não usar Picker nativo com comportamento inconsistente entre plataformas.
-
-==================================================
-10. EDITOR DE FICHA
-==================================================
-
-Substituir no TrainingPlanEditorScreen:
-
-- FormField livre de Categoria;
-- FormField livre de Dificuldade.
-
-Usar os novos seletores.
-
-Manter:
-
-- Nome;
-- Descrição;
-- Salvar;
-- Ativar;
-- Duplicar;
-- Arquivar;
-- Zona de perigo;
-- Mover para lixeira.
-
-Organizar visualmente em seções:
-
-DADOS DA FICHA
-
-- nome;
-- descrição;
-- categoria;
-- dificuldade.
-
-ESTRUTURA SEMANAL
-
-- prévia da semana;
-- template selecionado quando aplicável.
-
-GESTÃO
-
-- ativar;
-- duplicar;
-- arquivar.
-
-ZONA DE PERIGO
-
-- mover para lixeira.
-
-Não transformar o editor em um formulário excessivamente longo sem separadores.
-
-==================================================
-11. VALIDAÇÃO DO FORMULÁRIO
-==================================================
-
-Validar:
-
-Nome:
-- obrigatório;
-- trim;
-- máximo 80 caracteres.
-
-Descrição:
-- opcional;
-- máximo 500 caracteres.
-
-Categoria:
-- preset válido ou personalizada;
-- máximo 50 caracteres.
-
-Dificuldade:
-- preset válido ou personalizada;
-- máximo 50 caracteres.
-
-Mostrar erro no campo correspondente.
-
-Não mostrar apenas erro geral no topo.
-
-O botão Salvar deve:
-
-- permanecer disponível visualmente;
-- rejeitar submissão inválida;
-- mover foco ou rolar até o primeiro erro quando viável.
-
-Não remover useUnsavedChangesGuard.
-
-A troca de template, categoria ou dificuldade deve marcar o formulário como sujo.
-
-==================================================
-12. SEM MIGRATION NESTE MARCO
-==================================================
-
-Não criar migration 6.
-
-Categoria e dificuldade continuam TEXT.
-
-Templates são definições de código e não registros permanentes próprios.
-
-Modos de duplicação são parâmetros de operação e não campos do banco.
-
-Backup continua:
-
-schemaVersion: 2
-
-Não alterar formato do backup.
-
-Não editar migrations 1 a 5.
-
-==================================================
-13. ETAPA 2.2 — MODELO DE TEMPLATE
-==================================================
-
-Criar no domínio:
-
-TrainingPlanTemplateId
-
-Valores:
-
-- PPL_3X
-- FULL_BODY_3X
-- UPPER_LOWER_4X
-- RUNNING_BEGINNER
-- MOBILITY_3X
-- BLANK
-
-Criar:
-
-TrainingPlanTemplate
-
-Campos sugeridos:
-
-- id;
-- name;
-- description;
+- count between 35 and 50;
+- unique semantic keys;
+- unique provider plus external ID;
+- unique effective movement;
+- supported provider;
+- positive numeric external IDs where applicable;
+- required identity fields;
+- expected muscle;
+- expected equipment;
 - category;
-- difficulty;
-- summary;
-- days.
+- media policy;
+- source URL format;
+- license metadata;
+- HTTPS media for REQUIRED entries;
+- no `REJECTED`, `PENDING` or unreviewed entries;
+- no empty display or original names;
+- no generated description or instruction fields.
+
+The CI validator must import and validate the actual manifest.
+
+Do not count lines with regular expressions.
+
+Do not validate only synthetic test fixtures.
+
+Add a test that passes the production manifest itself to the domain validator.
+
+======================================================================
+8. REAL STARTER-PACK IMPORT ARCHITECTURE
+======================================================================
+
+Implement a complete user-triggered starter-pack import flow.
+
+Suggested layers:
+
+- domain pack validation and result types;
+- Wger exact-ID fetch service;
+- mobile import controller;
+- SQLite transactional batch-import repository operation;
+- mobile confirmation/progress/result UI.
+
+Suggested controller states:
+
+type StarterPackImportState =
+  | { status: 'IDLE' }
+  | { status: 'CONFIRMING'; count: number }
+  | { status: 'FETCHING'; completed: number; total: number }
+  | { status: 'DOWNLOADING_MEDIA'; completed: number; total: number }
+  | { status: 'VALIDATING'; total: number }
+  | { status: 'AWAITING_PARTIAL_CONFIRMATION'; valid: number; unavailable: PackFailure[] }
+  | { status: 'COMMITTING'; total: number }
+  | { status: 'SUCCESS'; imported: number; skipped: number }
+  | { status: 'ERROR'; message: string }
+
+Equivalent typed states are acceptable.
+
+The package import must:
+
+1. start only after a visible user action;
+2. show a confirmation before the first request;
+3. fetch the exact external IDs from the approved manifest;
+4. never search for automatic replacements at runtime;
+5. retrieve current Wger metadata;
+6. retrieve provider descriptions and instructions;
+7. retrieve muscles, equipment, category, language and attribution;
+8. retrieve valid real media;
+9. compare current provider identity with manifest expectations;
+10. stage all valid provider records;
+11. stage media files when caching is enabled;
+12. validate the staged set;
+13. ask explicit confirmation when some items are unavailable;
+14. insert the approved selected set in one SQLite transaction;
+15. report imported, skipped and failed counts;
+16. leave the existing library intact on pre-commit failure;
+17. work offline after successful local persistence.
+
+No network operation may begin merely because a component rendered.
+
+======================================================================
+9. UNAVAILABLE PROVIDER ITEMS
+======================================================================
+
+When one or more approved IDs become unavailable or no longer satisfy the
+manifest:
+
+- show the exact failed exercise names/keys;
+- show a concise reason;
+- do not silently replace them;
+- do not silently import a different search result;
+- default action is cancellation;
+- allow “Importar somente os disponíveis” after explicit confirmation;
+- commit the selected valid subset atomically;
+- record skipped manifest keys in the result;
+- do not claim the complete package was imported.
+
+The runtime subset may contain fewer than 35 when provider data changed after
+release, but the immutable release manifest itself must contain at least 35
+approved entries.
+
+======================================================================
+10. SQLITE TRANSACTIONAL BATCH IMPORT
+======================================================================
+
+Add a repository operation such as:
+
+importProviderExercisesBatch(input)
+
+It must run inside one SQLite transaction.
+
+Requirements:
+
+- all selected rows import or none import;
+- provider plus external ID deduplication;
+- no duplicate external references;
+- no duplicate media rows;
+- no duplicate aliases;
+- preserve existing CUSTOM exercises;
+- preserve existing WGER user notes;
+- preserve favorites;
+- preserve recent usage;
+- preserve archive state unless explicitly restored;
+- preserve local user edits that are intentionally user-owned;
+- do not create a plan;
+- do not create a session;
+- do not create history;
+- no nested transaction;
+- rollback on injected failure;
+- idempotent repeated package import.
+
+The result should expose:
 
-Cada dia deve conter:
+- imported;
+- alreadyPresent;
+- updated;
+- skipped;
+- failures.
 
-- weekday;
-- name;
-- description;
-- isRestDay;
-- focus opcional.
+Do not count an already imported provider exercise as newly imported.
 
-Não incluir IDs SQLite.
+======================================================================
+11. MEDIA DOWNLOAD AND OFFLINE USE
+======================================================================
 
-Não incluir IDs de exercícios.
+After explicit confirmation, cache at least one primary image for REQUIRED
+starter-pack exercises.
 
-Não realizar chamadas Wger.
+Use application-owned storage.
 
-Não criar exercícios automaticamente.
+Suggested staged flow:
 
-Os templates deste marco definem a estrutura semanal, não uma prescrição
-completa de exercícios.
+1. create a temporary import directory;
+2. download approved HTTPS media;
+3. validate HTTP success;
+4. validate MIME type;
+5. validate file size;
+6. enforce per-file and total-size limits;
+7. create deterministic destination names;
+8. keep temporary files outside permanent media paths;
+9. commit SQLite rows only after required media has been validated;
+10. move files into final paths in a controlled commit/finalization sequence;
+11. clean temporary files after success or failure;
+12. prevent permanent orphan files after rollback.
 
-O catálogo inicial completo pertence ao Marco 5.
+When atomicity across SQLite and filesystem cannot be literal:
 
-==================================================
-14. TEMPLATES INICIAIS
-==================================================
+- use an explicit staged state;
+- never expose incomplete rows;
+- reconcile and clean files deterministically;
+- document the consistency strategy;
+- test failure between database and file finalization.
 
-Implementar:
+Optional-media items may be imported without media.
 
-1. PPL 3x
+Do not include media bytes inside JSON backups.
 
-- segunda: Push;
-- quarta: Pull;
-- sexta: Legs;
-- demais dias: descanso.
+Backups preserve:
 
-Categoria:
-Hipertrofia
+- remote media URL;
+- attribution;
+- license;
+- local cache metadata where applicable.
+
+After restore, missing local media must fall back safely without an automatic
+network request.
+
+======================================================================
+12. EMPTY LIBRARY UI
+======================================================================
+
+Replace the current no-op callback.
 
-Dificuldade:
-Intermediário
+When the production manifest passes the gate, show:
+
+“Importar pacote recomendado · X exercícios”
 
-2. Full Body 3x
+Where X is the actual approved manifest count.
 
-- segunda: Full Body A;
-- quarta: Full Body B;
-- sexta: Full Body C;
-- demais dias: descanso.
+The button must:
 
-Categoria:
-Mista
+- use `recommendedPackEnabled(...)`;
+- open the import confirmation;
+- never use an empty callback;
+- remain disabled below the gate;
+- expose an accessible disabled state;
+- show the real count;
+- not hardcode 35, 40 or 50 in the visual label.
 
-Dificuldade:
-Iniciante
+Keep:
 
-3. Upper/Lower 4x
+- “Pesquisar no Wger”
+- “Criar exercício personalizado”
+- “Continuar sem exercícios”
 
-- segunda: Upper A;
-- terça: Lower A;
-- quinta: Upper B;
-- sexta: Lower B;
-- demais dias: descanso.
+Display:
 
-Categoria:
-Hipertrofia
+“O pacote recomendado contém exercícios revisados individualmente. A quantidade
+pode variar conforme a disponibilidade e a qualidade dos dados do provider.”
 
-Dificuldade:
-Intermediário
+Also explain:
 
-4. Corrida iniciante
+- internet is required for the initial provider import;
+- imported content remains on the device;
+- nothing is downloaded automatically;
+- no training plan will be created.
 
-- terça: Corrida leve;
-- quinta: Estímulo técnico;
-- sábado: Corrida longa;
-- demais dias: descanso ou recuperação.
+======================================================================
+13. ONBOARDING INTEGRATION
+======================================================================
 
-Categoria:
-Condicionamento
+The onboarding package action must use the same gate and manifest as the
+library.
 
-Dificuldade:
-Iniciante
+It must not remain permanently disabled when the manifest is valid.
 
-Não prescrever velocidades ou distâncias médicas neste template.
+On the final onboarding step:
 
-5. Mobilidade 3x
+- show the actual package count;
+- allow package import when enabled;
+- allow Wger manual search;
+- allow custom exercise creation;
+- allow continuing without exercises;
+- do not trigger provider calls during render;
+- do not force import;
+- do not force plan creation.
 
-- segunda: Mobilidade A;
-- quarta: Mobilidade B;
-- sexta: Mobilidade C;
-- demais dias: descanso.
+The import may:
 
-Categoria:
-Mobilidade
+- open the library import flow;
+- or use the same shared controller inside onboarding.
 
-Dificuldade:
-Adaptável
+Do not create a second independent implementation.
 
-6. Ficha vazia
+Retest the previously collapsed Android modal:
 
-- sete dias criados;
-- nenhum dia de treino pré-configurado;
-- nenhum exercício;
-- categoria e dificuldade escolhidas pelo usuário.
+- first automatic opening;
+- next steps;
+- completion;
+- skip;
+- Android back;
+- reopening;
+- small screen;
+- large fonts;
+- all themes.
 
-==================================================
-15. SELEÇÃO DE TEMPLATE
-==================================================
+======================================================================
+14. MANUAL WGER SEARCH
+======================================================================
 
-Na criação de nova ficha, mostrar:
+Preserve manual Wger search independently from the recommended package.
 
-COMEÇAR COM UM TEMPLATE
+Validate:
 
-Cards para os seis templates.
+- user-triggered request only;
+- free-text query;
+- pagination;
+- PT/English provider fallback;
+- exercise preview;
+- source and attribution;
+- individual import;
+- multi-selection import when already implemented;
+- duplicate detection;
+- local persistence;
+- no bootstrap request;
+- no automatic import.
 
-Cada card deve mostrar:
+Use the same provider parsing and storage rules as the package import where
+possible.
 
-- nome;
-- resumo;
-- frequência;
-- categoria sugerida;
-- dificuldade sugerida.
+Do not maintain two contradictory Wger mapping implementations.
 
-Adicionar ação:
+======================================================================
+15. REMOVE RAW GENERATED AUDIT FROM GIT
+======================================================================
 
-“Começar do zero”
+The existing raw candidate audit is already tracked.
 
-Ao tocar em um template:
+Adding it to `.gitignore` is insufficient.
 
-- abrir prévia;
-- não criar ainda;
-- permitir Cancelar;
-- permitir “Usar este template”.
+Remove the tracked raw generated audit using Git, while preserving a concise
+auditable summary.
 
-Ao confirmar:
+Keep versioned:
 
-- preencher o draft do editor;
-- preencher categoria e dificuldade;
-- preencher a estrutura semanal;
-- preencher nome apenas se o campo estiver vazio;
-- não salvar automaticamente;
-- marcar formulário como alterado.
+- final manifest;
+- human-readable curation summary;
+- approved count;
+- rejected count;
+- replacement decisions;
+- provider timestamp;
+- regeneration command;
+- optional hash of the raw audit.
 
-O usuário deve poder editar nome, descrição, categoria e dificuldade antes de
-salvar.
+Store future raw outputs only under an ignored path such as:
 
-Trocar de template com alterações existentes deve pedir confirmação quando
-substituir estrutura semanal.
+artifacts/curation/
 
-==================================================
-16. CRIAÇÃO TRANSACIONAL COM ESTRUTURA SEMANAL
-==================================================
+Verify with:
 
-Adicionar contrato explícito:
+git ls-files | grep -E 'candidate-audit|artifacts/curation'
 
-TrainingPlanCreationInput
+The command must not show a tracked raw API dump.
 
-Estrutura sugerida:
+======================================================================
+16. CURATION DOCUMENTATION
+======================================================================
 
-{
-  plan: TrainingPlanInput
-  days: TrainingPlanDayCreationInput[]
-  templateId?: TrainingPlanTemplateId
-}
+Update `docs/WGER_STARTER_PACK_CURATION.md`.
 
-`templateId` pode ser usado durante a operação ou para telemetria local futura,
-mas não deve ser persistido sem necessidade.
+It must list every approved entry with:
 
-Criar método repository:
+- semantic key;
+- Wger external ID;
+- original provider name;
+- reviewed display name;
+- category;
+- primary muscle;
+- equipment;
+- media policy;
+- media status;
+- language;
+- source;
+- license;
+- review outcome.
 
-createWithDays(input: TrainingPlanCreationInput):
-  Promise<TrainingPlan>
+Document replacements:
 
-O método deve executar em uma transação:
+- original unsupported intention;
+- approved replacement;
+- reason.
 
-1. validar ficha;
-2. validar exatamente sete weekdays sem duplicatas;
-3. inserir training_plan;
-4. criar sete dias;
-5. aplicar nomes, descrições e descanso;
-6. retornar ficha completa.
+Do not claim all original 50 intentions were approved unless true.
 
-Falha em qualquer dia:
+Do not say the production manifest was not generated after it exists.
 
-- rollback integral;
-- nenhuma ficha parcial;
-- nenhum dia órfão.
+======================================================================
+17. ACTUAL MANIFEST VALIDATION COMMAND
+======================================================================
 
-O método create atual pode delegar para createWithDays usando a estrutura padrão.
+Replace the regex-based validator.
 
-Não ativar automaticamente.
+`npm run validate:wger-manifest` must:
 
-Não arquivar.
-
-Não marcar como excluída.
-
-==================================================
-17. VALIDAÇÃO DOS TEMPLATES
-==================================================
-
-Criar validação pura:
-
-validateTrainingPlanTemplate(template)
-
-Rejeitar:
-
-- ID vazio;
-- nome vazio;
-- menos ou mais de sete dias;
-- weekday duplicado;
-- weekday ausente;
-- dia sem nome;
-- categoria vazia;
-- dificuldade vazia.
-
-Validar todos os templates em teste.
-
-Os templates devem ser imutáveis.
-
-Usar readonly ou Object.freeze quando adequado.
-
-Não permitir que alterações no draft modifiquem o objeto global do template.
-
-==================================================
-18. ETAPA 2.3 — PRÉVIA SEMANAL
-==================================================
-
-Criar componente:
-
-TrainingPlanWeekPreview
-
-Exibir os sete dias na ordem local:
-
-- SEG
-- TER
-- QUA
-- QUI
-- SEX
-- SÁB
-- DOM
-
-Cada item deve mostrar:
-
-- abreviação;
-- nome do dia;
-- treino ou descanso;
-- quantidade de exercícios quando existir;
-- quantidade de atividades quando existir.
-
-Estados visuais:
-
-- treino configurado;
-- descanso;
-- dia vazio;
-- dia com aviso.
-
-A prévia deve funcionar para:
-
-- template ainda não salvo;
-- ficha existente;
-- ficha recém-criada;
-- ficha sem exercícios.
-
-==================================================
-19. AVISOS DA PRÉVIA
-==================================================
-
-Criar análise pura:
-
-analyzeTrainingPlanWeekPreview(days)
-
-Retornar avisos como:
-
-- nenhum dia de treino configurado;
-- dia de treino sem exercícios;
-- weekday duplicado;
-- weekday ausente;
-- nome vazio;
-- sete dias consecutivos de treino;
-- nenhum dia de descanso.
-
-Neste marco:
-
-- avisos não bloqueiam salvar, salvo estrutura inválida;
-- weekday duplicado ou ausente bloqueia criação;
-- treino sem exercícios é apenas aviso;
-- nenhum dia de descanso é warning;
-- não emitir recomendação médica.
-
-Mostrar mensagens claras:
-
-“Este dia ainda não possui exercícios.”
-
-“Esta ficha não possui dias de descanso.”
-
-Não usar linguagem acusatória.
-
-==================================================
-20. PRÉVIA ANTES DE USAR TEMPLATE
-==================================================
-
-O modal de template deve mostrar:
-
-- nome;
-- descrição;
-- categoria;
-- dificuldade;
-- divisão dos sete dias;
-- quantidade de dias de treino;
-- quantidade de dias de descanso;
-- aviso de que exercícios serão adicionados depois.
-
-Texto obrigatório:
-
-“Este template cria a divisão semanal. Os exercícios podem ser adicionados
-depois na ficha.”
-
-Ações:
-
-- Cancelar;
-- Usar este template.
-
-==================================================
-21. PRÉVIA NO EDITOR
-==================================================
-
-Depois de escolher um template:
-
-- exibir a prévia dentro do editor;
-- permitir trocar template;
-- permitir voltar para ficha vazia;
-- não permitir editar dias diretamente nesta tela se isso exigir duplicar o
-  editor de dias existente;
-- após salvar, usar as telas de dia já existentes para editar detalhes.
-
-Para ficha existente:
-
-- mostrar a estrutura atual;
-- mudanças feitas nas telas de dia devem aparecer após refresh.
-
-==================================================
-22. ETAPA 2.4 — MODOS DE DUPLICAÇÃO
-==================================================
-
-Criar:
-
-TrainingPlanDuplicateMode
-
-Valores:
-
-- COMPLETE
-- STRUCTURE_ONLY
-- WITHOUT_LOADS
-
-Alterar repository:
-
-duplicate(
-  planId: number,
-  mode: TrainingPlanDuplicateMode
-): Promise<TrainingPlan>
-
-Não manter uma segunda implementação antiga sem modo.
-
-==================================================
-23. DUPLICAR COMPLETA
-==================================================
-
-COMPLETE:
-
-Copiar:
-
-- nome com sufixo de cópia;
-- descrição;
-- categoria;
-- dificuldade;
-- datas atualmente copiadas pela implementação existente;
-- dias;
-- nomes e descrições dos dias;
-- dias de descanso;
-- exercícios;
-- ordem;
-- séries;
-- repetições;
-- cargas planejadas;
-- duração;
-- distância;
-- RPE;
-- descansos;
-- tipos de série;
-- notas de programação;
-- alternativas;
-- atividades de descanso.
-
-Não copiar:
-
-- ID da ficha;
-- IDs de dias;
-- IDs das configurações;
-- estado ativo;
-- estado arquivado;
-- deletedAt;
-- purgeAt;
-- sessões;
-- histórico;
-- snapshots.
-
-Nova ficha:
-
-- active = false;
-- archived = false;
-- deletedAt = null;
-- purgeAt = null.
-
-==================================================
-24. DUPLICAR APENAS ESTRUTURA
-==================================================
-
-STRUCTURE_ONLY:
-
-Copiar:
-
-- dados gerais da ficha;
-- dias;
-- nomes;
-- descrições;
-- descanso;
-- exercícios escolhidos;
-- ordem dos exercícios;
-- quantidade de séries;
-- faixa de repetições;
-- tempo de descanso;
-- tipo de série;
-- atividades de descanso.
-
-Limpar:
-
-- carga planejada;
-- RPE planejado;
-- notas específicas dos exercícios;
-- alternativa específica quando representar escolha temporária.
-
-Preservar:
-
-- referência ao exercício;
-- sets;
-- minReps;
-- maxReps;
-- restSeconds;
-- setType.
-
-Documentar exatamente os campos preservados e limpos.
-
-==================================================
-25. DUPLICAR SEM CARGAS
-==================================================
-
-WITHOUT_LOADS:
-
-Copiar tudo o que COMPLETE copia, exceto:
-
-- plannedLoad deve ser null.
-
-Preservar:
-
-- séries;
-- repetições;
-- descanso;
-- RPE;
-- duração;
-- distância;
-- notas;
-- alternativas;
-- atividades.
-
-Não interpretar duração ou distância como carga.
-
-==================================================
-26. NOMES DAS CÓPIAS
-==================================================
-
-Gerar nome legível e não conflitante:
-
-Original:
-“PPL”
-
-Primeira cópia:
-“PPL — Cópia”
-
-Segunda:
-“PPL — Cópia 2”
-
-Terceira:
-“PPL — Cópia 3”
-
-Consultar fichas normais e arquivadas.
-
-Ignorar fichas permanentemente apagadas.
-
-Evitar conflito case-insensitive e com espaços normalizados.
-
-O nome continua editável depois.
-
-==================================================
-27. UI DE DUPLICAÇÃO
-==================================================
-
-Ao tocar em “Duplicar ficha”, abrir modal com:
-
-- Duplicar completa;
-- Apenas estrutura;
-- Sem cargas planejadas.
-
-Cada opção deve mostrar descrição curta.
-
-Completa:
-
-“Copia toda a programação, incluindo cargas e notas.”
-
-Apenas estrutura:
-
-“Copia a divisão, exercícios, séries e repetições, mas limpa dados pessoais de
-progressão.”
-
-Sem cargas:
-
-“Copia toda a programação e remove apenas as cargas planejadas.”
-
-Ações:
-
-- Cancelar;
-- Duplicar.
-
-Não duplicar imediatamente ao tocar no botão principal.
-
-Durante duplicação:
-
-- modal não fecha;
-- opções ficam desativadas;
-- indicador de carregamento;
-- duplo toque bloqueado.
-
-Após sucesso:
-
-- fechar modal;
-- selecionar a nova ficha;
-- voltar ou navegar de acordo com o fluxo atual;
-- mostrar feedback.
-
-==================================================
-28. DUPLICAÇÃO TRANSACIONAL
-==================================================
-
-Todo o processo deve ocorrer em uma transação.
-
-Falha em qualquer cópia:
-
-- rollback integral;
-- nenhuma ficha parcial;
-- nenhum dia órfão;
-- nenhum exercício órfão;
-- nenhuma atividade órfã.
-
-Adicionar falha injetada em teste SQLite.
-
-Não copiar sessões.
-
-Não alterar a ficha original.
-
-Não ativar a cópia automaticamente.
-
-==================================================
-29. CONTROLLER DE FICHAS
-==================================================
-
-Atualizar useTrainingPlanController.
-
-Adicionar:
-
-- createWithDays;
-- duplicate com mode;
-- resultados claros para operações novas.
-
-Não repetir o problema anterior de mutation + refresh em um booleano ambíguo.
-
-Para novas operações, distinguir:
-
-- mutation falhou;
-- mutation confirmou e atualização passou;
-- mutation confirmou e atualização falhou.
-
-Pode criar:
-
-type TrainingPlanUiResult =
-  | { status: 'success'; refreshWarning: boolean; plan: TrainingPlan }
-  | { status: 'failed' }
-
-A UI deve considerar sucesso quando a mutation foi confirmada, mesmo com
-refreshWarning.
-
-Não é obrigatório refatorar todas as operações antigas neste marco, mas:
-
-- createWithDays;
-- duplicate;
-- template creation
-
-devem usar o contrato correto.
-
-==================================================
-30. ESTADO NÃO SALVO
-==================================================
-
-O guard deve considerar:
-
-- nome;
-- descrição;
-- categoria resolvida;
-- dificuldade resolvida;
-- categoria customizada;
-- dificuldade customizada;
-- template;
-- draft dos dias.
-
-Ao trocar de template com alterações:
-
-- pedir confirmação;
-- não descartar silenciosamente.
-
-Ao sair:
-
-- manter alerta de alterações não salvas.
-
-Após salvar:
-
-- atualizar baseline corretamente.
-
-==================================================
-31. ACESSIBILIDADE
-==================================================
-
-Garantir:
-
-- seletores anunciados como botão;
-- valor atual lido pelo leitor;
-- modal com foco adequado;
-- opção selecionada anunciada;
-- cards de template com descrição;
-- prévia semanal legível;
-- textos não dependem somente de cor;
-- touch targets mínimos de 48 dp;
-- fonte ampliada sem corte;
-- botões destrutivos identificados;
-- loading anunciado.
-
-==================================================
-32. TESTES DE DOMÍNIO
-==================================================
-
-Adicionar testes para:
-
-- presets de categoria;
-- presets de dificuldade;
-- valor customizado;
-- normalização;
-- limite de tamanho;
-- valor antigo não preset;
-- templates imutáveis;
-- sete weekdays;
-- duplicidade de weekday;
-- template incompleto;
-- análise semanal;
-- dia de treino sem exercício;
-- ausência de descanso;
-- modos de duplicação;
-- nome de cópia;
-- segunda e terceira cópia.
-
-==================================================
-33. TESTES SQLITE
-==================================================
-
-Adicionar testes reais para:
-
-1. createWithDays cria ficha e sete dias;
-2. rollback quando criação de um dia falha;
-3. template PPL;
-4. template Full Body;
-5. template Upper/Lower;
-6. template corrida;
-7. template mobilidade;
-8. template vazio;
-9. criação nunca ativa automaticamente;
-10. criação nunca arquiva;
-11. criação nunca entra na lixeira;
-12. duplicação COMPLETE;
-13. duplicação STRUCTURE_ONLY;
-14. duplicação WITHOUT_LOADS;
-15. IDs novos;
-16. ficha original inalterada;
-17. cópia inativa;
-18. cópia fora da lixeira;
-19. sessões não copiadas;
-20. atividades copiadas corretamente;
-21. notas limpas apenas no modo correto;
-22. carga limpa apenas nos modos corretos;
-23. rollback de duplicação;
-24. nomes sem colisão;
-25. backup schemaVersion 2 continua funcionando;
-26. migrations continuam em versão 5.
-
-==================================================
-34. TESTES MOBILE
-==================================================
-
-Adicionar testes para:
-
-- categoria preset;
-- categoria Outra;
-- dificuldade preset;
-- dificuldade Outra;
-- edição de valor antigo;
-- erro de custom vazio;
-- seletor acessível;
-- template preview;
-- cancelar template;
-- usar template;
-- trocar template com confirmação;
-- prévia dos sete dias;
-- aviso sem exercícios;
-- opção ficha vazia;
-- modal de duplicação;
-- COMPLETE;
-- STRUCTURE_ONLY;
-- WITHOUT_LOADS;
-- loading;
-- duplo toque;
-- formulário sujo;
-- sucesso com refreshWarning;
-- Etapa 2.0 integralmente coberta.
-
-==================================================
-35. TESTE MANUAL ANDROID
-==================================================
-
-Executar no aparelho ou emulador disponível:
-
-1. abrir editor;
-2. selecionar categoria;
-3. selecionar dificuldade;
-4. usar categoria Outra;
-5. usar dificuldade Outra;
-6. fechar e reabrir ficha;
-7. confirmar persistência;
-8. escolher PPL;
-9. revisar prévia;
-10. salvar;
-11. editar dias;
-12. duplicar completa;
-13. duplicar apenas estrutura;
-14. duplicar sem cargas;
-15. comparar as três;
-16. mover uma cópia para lixeira;
-17. tocar Desfazer;
-18. confirmar Snackbar “Desfazendo…”;
-19. esvaziar lixeira;
-20. tentar fechar modal durante loading;
-21. verificar backup e badge.
-
-Registrar em:
-
-docs/MARCO_2_ANDROID_SMOKE.md
-
-Caso não exista aparelho:
-
-- registrar claramente como pendente;
-- não inventar evidência.
-
-==================================================
-36. DOCUMENTAÇÃO
-==================================================
-
-Criar:
-
-docs/TRAINING_PLAN_EDITOR.md
-docs/TRAINING_PLAN_TEMPLATES.md
-
-Documentar:
-
-- categorias;
-- dificuldades;
-- valores personalizados;
-- templates;
-- limitações dos templates;
-- prévia semanal;
-- modos de duplicação;
-- diferenças entre os modos;
-- ausência de dependência da internet;
-- ausência de criação automática de exercícios.
-
-Atualizar:
-
-README.md
-docs/PRODUCT_ROADMAP.md
-docs/TRAINING_PLAN_LIFECYCLE.md
-
-No roadmap:
-
-- Marco 1 permanece ESTABILIZADO;
-- Marco 2 fica EM VALIDAÇÃO durante implementação;
-- marcar CONCLUÍDO apenas após todas as validações.
-
-==================================================
-37. VERSÃO
-==================================================
-
-Ao concluir todas as etapas:
-
-mobile/app.json:
-- version: 0.5.0
-- android.versionCode: 7
-
-mobile/package.json:
-- version: 0.5.0
-
-Não alterar:
-
-- package;
-- slug;
-- scheme;
-- projectId;
-- versão Umamusume.
-
-Não gerar APK neste marco.
-
-O APK será produzido após revisão rigorosa do commit.
-
-==================================================
-38. VALIDAÇÃO
-==================================================
-
-Executar na raiz:
+- load the actual production manifest;
+- execute the domain validator;
+- print approved count;
+- print min/max gate;
+- print media REQUIRED count;
+- print media OPTIONAL count;
+- print entries without media;
+- print duplicate checks;
+- exit non-zero on any violation.
+
+It must not:
+
+- count source lines;
+- search source strings for `REJECTED`;
+- trust documentation values;
+- call Wger;
+- depend on network;
+- mutate files.
+
+Add tests for the validation command or its underlying pure function.
+
+======================================================================
+18. COMPLETE CI WORKFLOW
+======================================================================
+
+Fix `.github/workflows/mobile-validation.yml`.
+
+Use Node compatible with the repository engines.
+
+Run at least:
+
+- checkout;
+- Node setup with npm cache;
+- `npm ci`;
+- domain typecheck;
+- domain tests;
+- local-db typecheck;
+- local-db SQLite tests;
+- Wger package typecheck;
+- Wger package tests;
+- mobile typecheck;
+- mobile Vitest tests;
+- mobile behavioral Jest/RNTL tests;
+- Umamusume typecheck;
+- structured manifest validation;
+- Expo dependency check;
+- Expo Doctor;
+- Android Expo export;
+- `git diff --check`;
+- tracked raw-audit check.
+
+Do not call the live Wger API in CI.
+
+Do not build a signed APK in pull-request CI when credentials are unavailable.
+
+The CI must validate deterministic local code and manifest data.
+
+Ensure `.eas-inspect`, `.expo` and export folders are not collected as tests.
+
+After pushing, inspect the actual workflow result.
+
+Do not claim CI success while no run exists or while it is still pending.
+
+======================================================================
+19. REGRESSION GATE FOR MARCO 6
+======================================================================
+
+Do not redesign the Marco 6 features.
+
+Run regression tests for:
+
+- substituted exercise effective identity;
+- history assigned to the performed substitute;
+- original planned exercise preserved for audit;
+- previous-load reference after substitution;
+- duplicate substitution prevention;
+- atomic progression application;
+- no load increase without valid RPE;
+- set fields updating after suggestion;
+- set notes;
+- exercise annotations;
+- session notes;
+- process restart;
+- completed and abandoned history;
+- backup and restore;
+- post-restore preference retry;
+- retry never repeats SQLite restore;
+- legacy generated exercises remain archived;
+- fresh installation remains empty;
+- no network during startup.
+
+Fix only genuine regressions.
+
+======================================================================
+20. REQUIRED DOMAIN TESTS
+======================================================================
+
+Add or update tests for:
+
+- production manifest itself passes validation;
+- approved count between 35 and 50;
+- no rejected entries;
+- unique intent keys;
+- unique provider identities;
+- unique effective movements;
+- correct media policies;
+- REQUIRED media missing;
+- OPTIONAL media missing;
+- invalid HTTPS URL;
+- invalid license metadata;
+- invalid source metadata;
+- unsupported provider;
+- empty provider name;
+- runtime provider identity mismatch;
+- immutable inputs;
+- balanced category coverage check or documented coverage summary.
+
+Do not test only synthetic fixtures.
+
+======================================================================
+21. REQUIRED WGER TESTS
+======================================================================
+
+Using mocks or fixtures from real provider response shapes, test:
+
+- fetch by exact approved external ID;
+- PT-BR preference;
+- Portuguese fallback;
+- English fallback;
+- description/instruction parsing;
+- muscles;
+- equipment;
+- source;
+- license;
+- media;
+- malformed response;
+- unavailable ID;
+- identity mismatch;
+- HTTPS validation;
+- timeout;
+- cancellation;
+- pagination for manual search;
+- no automatic replacement.
+
+Do not call the live provider in normal automated tests.
+
+======================================================================
+22. REQUIRED SQLITE TESTS
+======================================================================
+
+Test with real SQLite:
+
+- fresh database contains zero exercises and zero plans;
+- first package import;
+- repeated package import;
+- partial library already containing Wger items;
+- CUSTOM name conflict;
+- provider external-ID conflict;
+- user notes preserved;
+- favorite preserved;
+- recent usage preserved;
+- archive state preserved;
+- aliases imported once;
+- media imported once;
+- rollback on exercise insertion failure;
+- rollback on media insertion failure;
+- rollback on alias insertion failure;
+- no plan created;
+- no session created;
+- no provider request during restore;
+- old backup compatibility;
+- package not automatically recreated after restore;
+- legacy generated exercises remain hidden.
+
+======================================================================
+23. REQUIRED MOBILE BEHAVIORAL TESTS
+======================================================================
+
+Test rendered behavior for:
+
+- empty library package button enabled when manifest is valid;
+- disabled below the minimum using a dependency-injected test manifest;
+- actual count displayed;
+- button opens confirmation;
+- no request during initial render;
+- cancel before request;
+- fetch progress;
+- media progress;
+- validation progress;
+- success result;
+- already-present result;
+- partial-provider-failure summary;
+- explicit valid-subset confirmation;
+- full failure;
+- cancellation;
+- no double tap;
+- retry does not duplicate imports;
+- no plan creation;
+- onboarding package action;
+- continue without exercises;
+- Wger manual search action;
+- custom exercise action;
+- large fonts;
+- small Android screen;
+- accessibility roles and states.
+
+Do not replace behavior tests with source-string checks.
+
+======================================================================
+24. LOCAL VALIDATION COMMANDS
+======================================================================
+
+Run from the repository root.
+
+Clean generated output first:
+
+rm -rf mobile/.eas-inspect mobile/.expo mobile/dist artifacts/curation/tmp
+
+Install:
 
 npm ci
+
+Run all workspace checks:
 
 npm run typecheck --workspace=@training/training-domain
 npm run test --workspace=@training/training-domain
@@ -1409,74 +881,310 @@ npm run test --workspace=@training/training-wger
 
 npm run typecheck --workspace=training-mobile
 npm run test --workspace=training-mobile
+npm run test:behavior --workspace=training-mobile
 
 npm run typecheck --workspace=umamusume-mobile
 
+Run the real manifest validation:
+
+npm run validate:wger-manifest
+
+Check Expo dependencies:
+
 EXPO_NO_TELEMETRY=1 npm exec --workspace=training-mobile -- expo install --check
+
+Run Expo Doctor:
+
+cd mobile
+npx expo-doctor
+cd ..
+
+Generate Android JS export:
 
 EXPO_NO_TELEMETRY=1 npm exec --workspace=training-mobile -- expo export \
   --platform android \
   --output-dir dist
 
+Rerun mobile tests after export:
+
+npm run test --workspace=training-mobile
+npm run test:behavior --workspace=training-mobile
+
+Repository checks:
+
 git diff --check
+git status --short
+git ls-files | grep -E 'candidate-audit|artifacts/curation' || true
 
-Não declarar conclusão se qualquer comando falhar.
+Record exact:
 
-==================================================
-39. CRITÉRIOS DE CONCLUSÃO
-==================================================
+- suite counts;
+- test counts;
+- warnings;
+- skipped tests;
+- command exit codes.
 
-O Marco 2 estará aprovado somente quando:
+Do not hide or skip legitimate SQLite tests.
 
-- Snackbar permanecer durante Desfazer;
-- refreshAll tratar false como falha;
-- backup distinguir commit de refresh;
-- modal não fechar durante emptyTrash;
-- categoria e dificuldade usarem seletores;
-- valores antigos forem preservados;
-- Outra funcionar;
-- seis templates estiverem disponíveis;
-- templates criarem estrutura transacional;
-- nenhum template depender de exercícios externos;
-- prévia semanal mostrar sete dias;
-- avisos forem claros;
-- duplicação possuir três modos;
-- duplicação for transacional;
-- cópias nunca forem ativas ou excluídas;
-- histórico não for copiado;
-- backup v2 continuar compatível;
-- nenhuma migration nova for criada;
-- testes passarem;
-- export Android passar.
+When `better-sqlite3` has a Node ABI mismatch, rebuild it for the active Node
+version and rerun the complete SQLite suite.
 
-==================================================
-40. ENTREGA
-==================================================
+======================================================================
+25. ANDROID APK BUILD
+======================================================================
 
-Informar:
+Do not generate the APK until every mandatory local validation passes.
 
-1. commit final;
-2. resultado da Etapa 2.0;
-3. correção do Snackbar;
-4. contrato de refreshAll;
-5. comportamento de backup com refresh falho;
-6. bloqueio do modal;
-7. presets criados;
-8. tratamento de valores customizados;
-9. templates implementados;
-10. estratégia transacional de criação;
-11. prévia semanal;
-12. avisos semanais;
-13. modos de duplicação;
-14. campos preservados por modo;
-15. testes de domínio;
-16. testes SQLite;
-17. testes mobile;
-18. smoke Android;
-19. documentação;
-20. versão e versionCode;
-21. resultado de todos os comandos;
-22. limitações restantes;
-23. confirmação de que o Marco 2 está CONCLUÍDO ou EM VALIDAÇÃO.
+Keep the existing EAS `preview` profile configured as:
 
-Não iniciar o Marco 3.
+- internal distribution;
+- Android APK;
+- no development-server dependency.
+
+Build with:
+
+cd mobile
+npx eas-cli@latest build --platform android --profile preview --json
+
+Use `--non-interactive` only when credentials are already configured.
+
+When EAS cloud is unavailable and the local Android toolchain is valid:
+
+npx eas-cli@latest build --platform android --profile preview --local
+
+Do not treat `expo export` as an APK.
+
+Download or copy the finished APK to:
+
+artifacts/training-app-0.9.2-go-tests.apk
+
+Verify:
+
+file artifacts/training-app-0.9.2-go-tests.apk
+sha256sum artifacts/training-app-0.9.2-go-tests.apk
+unzip -t artifacts/training-app-0.9.2-go-tests.apk
+
+Confirm:
+
+- it is an APK, not AAB;
+- ZIP integrity passes;
+- version is 0.9.2;
+- versionCode is 14;
+- package is com.konazin.trainingapp.
+
+Do not commit:
+
+- APK;
+- AAB;
+- keystore;
+- credentials;
+- downloaded provider media;
+- temporary Wger responses;
+- `.eas-inspect`;
+- `.expo`;
+- `dist`;
+- raw curation dumps.
+
+======================================================================
+26. CI VALIDATION AFTER PUSH
+======================================================================
+
+Push the final commits.
+
+Inspect the actual GitHub Actions run for the final commit.
+
+Record:
+
+- workflow name;
+- workflow run ID;
+- conclusion;
+- failing job when applicable;
+- relevant warning.
+
+GO-TESTS requires a successful `mobile-validation` workflow run.
+
+When GitHub Actions cannot run for an external platform reason:
+
+- report it explicitly;
+- do not claim CI success;
+- final state remains NO-GO until the run succeeds.
+
+======================================================================
+27. DOCUMENTATION
+======================================================================
+
+Update:
+
+- README.md
+- docs/PRODUCT_ROADMAP.md
+- docs/EXERCISE_LIBRARY.md
+- docs/EXERCISE_MEDIA.md
+- docs/WGER_INTEGRATION.md
+- docs/PROVIDER_ARCHITECTURE.md
+- docs/WGER_STARTER_PACK_CURATION.md
+- docs/BACKUP_AND_RESTORE.md
+- docs/MARCO_6_ANDROID_SMOKE.md
+- docs/RELEASE_CANDIDATE_0_9_2.md
+- docs/LOCAL_ANDROID_APK.md
+
+The release document must contain:
+
+- status;
+- manifest version;
+- approved count;
+- rejected count included;
+- original intentions replaced;
+- REQUIRED media count;
+- OPTIONAL media count;
+- entries without media;
+- all validation commands;
+- test counts;
+- CI run and result;
+- APK build ID;
+- APK filename;
+- APK size;
+- SHA-256;
+- physical smoke status;
+- known warnings.
+
+Use exactly:
+
+GO-TESTS
+PHYSICAL ANDROID SMOKE: PENDING
+PRODUCTION RELEASE: NOT APPROVED
+
+Also include:
+
+“GO-TESTS autoriza apenas o teste em dispositivo Android físico. Não representa
+aprovação para publicação ou uso em produção.”
+
+Do not mark any physical test as completed.
+
+======================================================================
+28. PHYSICAL SMOKE CHECKLIST
+======================================================================
+
+Prepare but leave all items PENDING:
+
+- clean installation;
+- upgrade from 0.9.0 when technically supported;
+- startup in airplane mode;
+- empty library on clean install;
+- onboarding visible;
+- onboarding navigation;
+- continue without exercises;
+- no startup network request;
+- package confirmation;
+- package import;
+- package media;
+- import repeated without duplicates;
+- manual Wger search;
+- custom exercise creation;
+- plan creation;
+- workout start;
+- set editing;
+- annotations;
+- pause;
+- process restart;
+- resume;
+- substitution;
+- previous performance;
+- local progression;
+- history;
+- backup export;
+- backup restore;
+- theme;
+- large font;
+- TalkBack;
+- no hidden or overlapping controls;
+- no dependency on server, VPS or computer.
+
+======================================================================
+29. HARD STOP CONDITIONS
+======================================================================
+
+Finish with NO-GO instead of manipulating the gate when any condition remains:
+
+- fewer than 35 approved manifest entries;
+- more than 50 manifest entries;
+- a rejected or unreviewed entry is included;
+- duplicate provider identity;
+- duplicate effective movement;
+- generated description or instruction;
+- missing required attribution;
+- missing required media;
+- package button still has an empty callback;
+- onboarding package action remains permanently disabled;
+- import is not transactional;
+- repeated import duplicates data;
+- package creates a plan;
+- startup performs provider requests;
+- restore automatically imports the package;
+- raw API dump remains tracked;
+- regex-based manifest validation remains;
+- any mandatory typecheck or test fails;
+- Expo validation fails;
+- GitHub Actions fails or has no successful final run;
+- APK build fails;
+- APK does not exist;
+- APK integrity cannot be verified;
+- known high-impact bug remains;
+- physical smoke is falsely marked complete.
+
+Do not lower the 35-entry gate.
+
+Do not add invented exercises to satisfy the gate.
+
+Do not change documentation to GO-TESTS without the actual APK and evidence.
+
+======================================================================
+30. FINAL REPORT
+======================================================================
+
+Write the final response in Brazilian Portuguese.
+
+Include:
+
+1. base commit;
+2. implementation commit;
+3. release commit;
+4. approved exercise count;
+5. selected Wger IDs;
+6. rejected count included;
+7. replaced intentions;
+8. manifest version;
+9. REQUIRED and OPTIONAL media counts;
+10. entries without media;
+11. import architecture;
+12. SQLite transaction behavior;
+13. repeated-import result;
+14. migrations added or confirmation of none;
+15. exact typecheck results;
+16. exact Vitest results;
+17. exact SQLite test results;
+18. exact Jest/RNTL results;
+19. Expo dependency-check result;
+20. Expo Doctor result;
+21. Android export result;
+22. GitHub Actions run ID and conclusion;
+23. APK build method;
+24. EAS build ID;
+25. APK path;
+26. APK filename;
+27. APK size;
+28. APK SHA-256;
+29. ZIP integrity result;
+30. physical smoke status;
+31. remaining warnings;
+32. final decision.
+
+The final decision must be exactly one of:
+
+GO-TESTS
+
+or:
+
+NO-GO PARA TESTES
+
+Do not report GO-TESTS unless every automated, CI and APK requirement has
+objective evidence.
