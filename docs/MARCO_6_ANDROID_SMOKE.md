@@ -1,7 +1,7 @@
-# Smoke Android — candidato 0.9.2
+# Smoke Android — candidato 0.9.3
 
-Estado: **GO-TESTS / PENDENTE DE SMOKE FÍSICO**. O manifesto 0.9.2 contém 40
-aprovados e o APK 0.9.2/build 14 foi gerado e verificado.
+Estado: **NO-GO PARA TESTES**. O manifesto 0.9.3 mantém 40 aprovados, mas o APK
+0.9.3/build 15 não foi gerado porque a quota mensal gratuita do EAS foi excedida.
 
 Todos os itens desta lista permanecem **PENDING** até teste em dispositivo real.
 

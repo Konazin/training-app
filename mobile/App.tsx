@@ -179,7 +179,9 @@ function LocalApp({
     controller.refresh,
     trash.refresh,
   ])
-  const notification = trash.message
+  const notification = starterPack.state.status === 'SUCCESS_WITH_WARNING'
+    ? { message: starterPack.state.message, kind: 'warning' as const, source: 'starter' as const }
+    : trash.message
     ? { message: trash.message, kind: trash.messageKind, source: 'trash' as const }
     : workoutSession.message
       ? { message: workoutSession.message, kind: 'error' as const, source: 'other' as const }
@@ -254,6 +256,8 @@ function LocalApp({
                     onArchive={controller.archiveExerciseDefinition}
                     onFavorite={controller.setExerciseFavorite}
                     onImportStarterPack={starterPackAction}
+                    onCancelStarterPack={starterPack.cancel}
+                    starterPackCancellable={starterPackCancellable(starterPack.state)}
                     starterPackBusy={starterPackBusy(starterPack.state)}
                     starterPackMessage={starterPackMessage(starterPack.state)}
                   />
@@ -406,14 +410,20 @@ function LocalApp({
         message={notification.message}
         kind={notification.kind}
         notificationId={notification.source === 'trash' ? trash.notificationId : undefined}
-        actionLabel={notification.source === 'trash' && trash.pendingUndo
+        actionLabel={notification.source === 'starter'
+          ? 'Atualizar tela'
+          : notification.source === 'trash' && trash.pendingUndo
           ? 'Desfazer'
           : notification.source === 'backup' && backup.refreshPending
             ? 'Tentar novamente'
             : undefined}
-        actionBusyLabel={notification.source === 'backup' ? 'Tentando novamente…' : 'Desfazendo…'}
+        actionBusyLabel={notification.source === 'starter'
+          ? 'Atualizando…'
+          : notification.source === 'backup' ? 'Tentando novamente…' : 'Desfazendo…'}
         onAction={notification.source === 'trash' && trash.pendingUndo
           ? () => trash.undoMoveToTrash(trash.pendingUndo!.token)
+          : notification.source === 'starter'
+            ? starterPack.retryRefresh
           : notification.source === 'backup' && backup.refreshPending
             ? backup.retryRefresh
             : undefined}
@@ -447,7 +457,12 @@ function LocalApp({
 
 function starterPackBusy(state: ReturnType<typeof useStarterPackImportController>['state']) {
   return state.status === 'FETCHING' || state.status === 'DOWNLOADING_MEDIA'
-    || state.status === 'VALIDATING' || state.status === 'COMMITTING'
+    || state.status === 'VALIDATING' || state.status === 'AWAITING_PARTIAL_CONFIRMATION'
+    || state.status === 'COMMITTING'
+}
+
+function starterPackCancellable(state: ReturnType<typeof useStarterPackImportController>['state']) {
+  return state.status === 'FETCHING' || state.status === 'DOWNLOADING_MEDIA' || state.status === 'VALIDATING'
 }
 
 function starterPackMessage(state: ReturnType<typeof useStarterPackImportController>['state']) {
@@ -455,7 +470,8 @@ function starterPackMessage(state: ReturnType<typeof useStarterPackImportControl
   if (state.status === 'DOWNLOADING_MEDIA') return `Baixando mídia… ${state.completed}/${state.total}`
   if (state.status === 'VALIDATING') return 'Validando conteúdo recebido do Wger…'
   if (state.status === 'COMMITTING') return `Salvando ${state.total} exercícios…`
-  if (state.status === 'SUCCESS') return `${state.imported} importado(s); ${state.skipped} indisponível(is).`
+  if (state.status === 'SUCCESS') return `${state.imported} importado(s); ${state.skipped} indisponível(is).${state.withoutDemo ? ` ${state.withoutDemo} sem demonstração visual.` : ''}`
+  if (state.status === 'SUCCESS_WITH_WARNING') return state.message
   if (state.status === 'ERROR') return state.message
   return ''
 }

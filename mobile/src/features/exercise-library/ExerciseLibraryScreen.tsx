@@ -51,6 +51,8 @@ export function ExerciseLibraryScreen({
   onArchive,
   onFavorite,
   onImportStarterPack,
+  onCancelStarterPack,
+  starterPackCancellable,
   starterPackBusy,
   starterPackMessage,
 }: {
@@ -61,6 +63,8 @@ export function ExerciseLibraryScreen({
   onArchive: (id: number) => Promise<boolean>
   onFavorite: (id: number, favorite: boolean) => Promise<boolean>
   onImportStarterPack?: () => void
+  onCancelStarterPack?: () => void
+  starterPackCancellable?: boolean
   starterPackBusy?: boolean
   starterPackMessage?: string
 }) {
@@ -131,6 +135,8 @@ export function ExerciseLibraryScreen({
       ? <EmptyLibrary
           approvedCount={WGER_STARTER_PACK.length}
           onImportStarterPack={onImportStarterPack}
+          onCancelStarterPack={onCancelStarterPack}
+          starterPackCancellable={starterPackCancellable}
           starterPackBusy={starterPackBusy}
           starterPackMessage={starterPackMessage}
           onCreate={() => setEditing('new')}
@@ -210,6 +216,8 @@ function EmptyLibrary({
   onSearchWger,
   onContinue,
   onImportStarterPack,
+  onCancelStarterPack,
+  starterPackCancellable = false,
   starterPackBusy = false,
   starterPackMessage = '',
 }: {
@@ -218,6 +226,8 @@ function EmptyLibrary({
   onSearchWger: () => void
   onContinue: () => void
   onImportStarterPack?: () => void
+  onCancelStarterPack?: () => void
+  starterPackCancellable?: boolean
   starterPackBusy?: boolean
   starterPackMessage?: string
 }) {
@@ -238,6 +248,13 @@ function EmptyLibrary({
         onPress={onImportStarterPack ?? onSearchWger}
         loading={starterPackBusy}
       />
+      {starterPackCancellable && (
+        <PrimaryButton
+          secondary
+          label="Cancelar importação"
+          onPress={onCancelStarterPack ?? (() => undefined)}
+        />
+      )}
       <Text style={styles.emptyHint}>Pacote atual · {approvedCount} exercícios</Text>
       <Text style={styles.emptyHint}>O pacote recomendado contém exercícios revisados individualmente. A quantidade pode variar conforme a disponibilidade e a qualidade dos dados do provider.</Text>
       {!!starterPackMessage && <Text accessibilityLiveRegion="polite" style={styles.emptyHint}>{starterPackMessage}</Text>}

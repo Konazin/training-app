@@ -87,7 +87,7 @@ Consulte [biblioteca de exercícios](docs/EXERCISE_LIBRARY.md) e
 [mídia de exercícios](docs/EXERCISE_MEDIA.md).
 
 O primeiro uso também apresenta até três passos locais e dispensáveis. Bancos
-existentes atualizados para 0.9.2 não recebem onboarding forçado; a apresentação
+existentes atualizados para 0.9.3 não recebem onboarding forçado; a apresentação
 pode ser reaberta em **Mais → Conhecer o aplicativo**.
 
 ## Backup
@@ -215,5 +215,5 @@ o teste físico em modo avião com
 O roteiro específico desta entrega está em
 [smoke Android dos Marcos 4 e 5](docs/MARCO_4_5_ANDROID_SMOKE.md).
 O APK 0.9.0 foi substituído e não deve seguir para teste formal. O candidato
-0.9.2 contém manifesto Wger com 40 aprovados e está liberado somente para teste
-físico Android; consulte [o relatório 0.9.2](docs/RELEASE_CANDIDATE_0_9_2.md).
+0.9.3 mantém o manifesto Wger com 40 aprovados, mas permanece bloqueado até que
+o APK seja gerado; consulte [o relatório 0.9.3](docs/RELEASE_CANDIDATE_0_9_3.md).
