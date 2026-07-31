@@ -25,7 +25,7 @@ jobs:
       - run: npm run test --workspace training-mobile
       - run: npm run test:behavior --workspace training-mobile
       - run: npm run typecheck --workspace umamusume-mobile
-      - run: npx expo config --type public --json --working-dir mobile
+      - run: cd mobile && npx expo config --type public --json
       - run: EXPO_NO_TELEMETRY=1 npm exec --workspace=training-mobile -- expo install --check
       - run: cd mobile && npx expo-doctor
       - run: EXPO_NO_TELEMETRY=1 npm exec --workspace=training-mobile -- expo export --platform android --output-dir dist
