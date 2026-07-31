@@ -11,7 +11,8 @@
     "node": ">=20.19.4"
   },
   "scripts": {
-    "curate:wger-starter-pack": "node tools/curate-wger-starter-pack.mjs"
+    "curate:wger-starter-pack": "node tools/curate-wger-starter-pack.mjs",
+    "validate:wger-manifest": "node tools/validate-wger-manifest.mjs"
   },
   "devDependencies": {
     "expo-font": "56.0.7"

@@ -81,6 +81,7 @@ mobile/GoogleService-Info.plist
 .eas-inspect/
 *.apk
 artifacts/
+docs/wger-starter-pack-candidate-audit*.json
 umamusume-mobile/.expo/
 umamusume-mobile/.expo-shared/
 umamusume-mobile/.cache/

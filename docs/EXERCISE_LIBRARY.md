@@ -34,5 +34,6 @@ A busca ignora caixa, acentos, pontuação e espaços repetidos. Filtros,
 favoritos, recentes, notas e agrupamento por músculo operam apenas sobre linhas
 visíveis no SQLite.
 
-O pacote recomendado só poderá ser habilitado após as 50 intenções possuírem
-IDs Wger únicos, imagem HTTPS, texto real e atribuição revisada.
+O pacote recomendado tem alvo de 50 itens e só poderá ser habilitado com 35 a
+50 exercícios aprovados, zero rejeitados incluídos e atribuição revisada. Mídia
+é obrigatória para força/máquinas e opcional para mobilidade/condicionamento.

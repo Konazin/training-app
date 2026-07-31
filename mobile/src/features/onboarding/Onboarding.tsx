@@ -3,6 +3,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { type ThemeColors, useTheme } from '../../theme'
 import { typography } from '../../theme/typography'
+import { WGER_STARTER_PACK } from '@training/training-domain'
 
 const STEPS = [
   {
@@ -71,7 +72,8 @@ export function Onboarding({
                   style={[styles.choice, styles.disabled]}
                 >
                   <Text style={styles.choiceTitle}>Importar pacote recomendado</Text>
-                  <Text style={styles.choiceDetail}>Indisponível enquanto a curadoria Wger não estiver completa.</Text>
+                  <Text style={styles.choiceDetail}>Pacote atual · {WGER_STARTER_PACK.length} exercícios</Text>
+                  <Text style={styles.choiceDetail}>O pacote recomendado contém exercícios revisados individualmente. A quantidade pode variar conforme a disponibilidade e a qualidade dos dados do provider.</Text>
                 </Pressable>
                 <Pressable
                   accessibilityRole="button"

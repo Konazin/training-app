@@ -1,6 +1,6 @@
 # Curadoria do pacote inicial Wger
 
-Gerada em 2026-07-31T00:59:10.972Z. Resultado: **12/50 aprovados**.
+Gerada em 2026-07-31T01:22:40.165Z. Resultado: **12/50 aprovados**.
 
 O manifesto de produção não foi gerado. O pacote recomendado permanece
 desabilitado até que todas as 50 intenções tenham um exercício real, imagem

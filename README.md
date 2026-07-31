@@ -87,7 +87,7 @@ Consulte [biblioteca de exercícios](docs/EXERCISE_LIBRARY.md) e
 [mídia de exercícios](docs/EXERCISE_MEDIA.md).
 
 O primeiro uso também apresenta até três passos locais e dispensáveis. Bancos
-existentes atualizados para 0.9.1 não recebem onboarding forçado; a apresentação
+existentes atualizados para 0.9.2 não recebem onboarding forçado; a apresentação
 pode ser reaberta em **Mais → Conhecer o aplicativo**.
 
 ## Backup
@@ -215,5 +215,5 @@ o teste físico em modo avião com
 O roteiro específico desta entrega está em
 [smoke Android dos Marcos 4 e 5](docs/MARCO_4_5_ANDROID_SMOKE.md).
 O APK 0.9.0 foi substituído e não deve seguir para teste formal. A tentativa
-0.9.1 está bloqueada porque a curadoria Wger aprovou menos de 50 intenções;
-consulte [o relatório 0.9.1](docs/RELEASE_CANDIDATE_0_9_1.md).
+0.9.2 está bloqueada porque a curadoria Wger aprovou 12 de 50 intenções;
+consulte [o relatório 0.9.2](docs/RELEASE_CANDIDATE_0_9_2.md).

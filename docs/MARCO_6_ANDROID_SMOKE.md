@@ -1,7 +1,9 @@
-# Smoke Android — estabilização 0.9.1
+# Smoke Android — candidato 0.9.2
 
-Estado: **PENDENTE E BLOQUEADO**. O APK 0.9.0 foi substituído e o APK 0.9.1
-não pode ser gerado enquanto as 50 intenções Wger não forem aprovadas.
+Estado: **PENDENTE E BLOQUEADO**. O APK 0.9.2 ainda não pode ser gerado:
+o manifesto contém 12 aprovados e o gate exige pelo menos 35.
+
+Todos os itens desta lista permanecem **PENDING** até teste em dispositivo real.
 
 Quando houver candidato válido, testar:
 

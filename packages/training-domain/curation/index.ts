@@ -8,7 +8,25 @@ export interface StarterPackIntent {
   expectedPrimaryMuscle: string
   equipmentAliases: readonly string[]
   expectedCategory: string
-  imageRequired: true
+  imageRequired: boolean
+}
+
+export const STARTER_PACK_TARGET = 50
+export const STARTER_PACK_MINIMUM = 35
+export const STARTER_PACK_MAXIMUM = 50
+
+export type MediaPolicy = 'REQUIRED' | 'OPTIONAL'
+
+export function mediaPolicyFor(intent: Pick<StarterPackIntent, 'expectedCategory'>): MediaPolicy {
+  return ['mobilidade', 'alongamento', 'condicionamento'].includes(normalizeName(intent.expectedCategory))
+    ? 'OPTIONAL'
+    : 'REQUIRED'
+}
+
+export function recommendedPackEnabled(approvedCount: number, rejectedItemsIncluded = 0) {
+  return approvedCount >= STARTER_PACK_MINIMUM
+    && approvedCount <= STARTER_PACK_MAXIMUM
+    && rejectedItemsIncluded === 0
 }
 
 export interface RankedCurationCandidate {
@@ -19,7 +37,7 @@ export interface RankedCurationCandidate {
 }
 
 export function validateStarterPackIntents(intents: readonly StarterPackIntent[]) {
-  if (intents.length !== 50) throw new Error('A curadoria deve conter exatamente 50 intenções.')
+  if (intents.length !== STARTER_PACK_TARGET) throw new Error(`A curadoria deve conter exatamente ${STARTER_PACK_TARGET} intenções.`)
   const keys = new Set<string>()
   for (const intent of intents) {
     if (!/^[a-z0-9_]+$/.test(intent.semanticKey) || keys.has(intent.semanticKey)) {
@@ -27,7 +45,7 @@ export function validateStarterPackIntents(intents: readonly StarterPackIntent[]
     }
     if (!intent.ptBrQuery.trim() || !intent.enQuery.trim()
       || !intent.expectedPrimaryMuscle.trim() || !intent.expectedCategory.trim()
-      || !intent.equipmentAliases.length || !intent.imageRequired) {
+      || !intent.equipmentAliases.length || typeof intent.imageRequired !== 'boolean') {
       throw new Error(`Intenção incompleta: ${intent.semanticKey}`)
     }
     keys.add(intent.semanticKey)
@@ -66,8 +84,8 @@ function validateCandidate(
   }
   const image = candidate.media.find((item) => item.type === 'IMAGE' && item.main)
     ?? candidate.media.find((item) => item.type === 'IMAGE')
-  if (!image) reasons.push('imagem real ausente')
-  else if (!isHttps(image.remoteUrl)) reasons.push('URL de imagem insegura')
+  if (mediaPolicyFor(intent) === 'REQUIRED' && !image) reasons.push('imagem real ausente')
+  else if (image && !isHttps(image.remoteUrl)) reasons.push('URL de imagem insegura')
   if (!isHttps(candidate.sourceUrl) || !candidate.licenseName?.trim()
     || !isHttps(candidate.licenseUrl)) {
     reasons.push('atribuição ou licença incompleta')

@@ -84,7 +84,7 @@ emulador Android com TalkBack, fonte ampliada e redução de movimento.
 O Marco 5 permanece em validação até o smoke Android do catálogo, mídia,
 upgrade e backup. O Wger continua manual e não participa do bootstrap.
 
-## Marco 6 — estabilização 0.9.1
+## Marco 6 — candidato Android 0.9.2
 
 - registry tipado de providers, mantendo Wger como integração manual;
 - último desempenho baseado em snapshots concluídos;
@@ -95,11 +95,11 @@ upgrade e backup. O Wger continua manual e não participa do bootstrap.
 - backups v2 antigos compatíveis;
 - avisos locais e onboarding dispensável somente em instalações novas;
 - migration 8 arquiva conteúdo `SYSTEM` legado sem apagar dados;
-- versão mobile de desenvolvimento 0.9.1, `versionCode` 13;
-- curadoria real do Wger incompleta.
+- versão mobile candidata 0.9.2, `versionCode` 14;
+- manifesto Wger com 12 aprovados; gate mínimo de 35 ainda não atingido.
 
 O candidato 0.9.0 foi substituído e não deve ser submetido a teste formal. O
-0.9.1 permanece **NO-GO PARA TESTES**: não há manifesto completo nem APK novo.
+0.9.2 permanece **NO-GO PARA TESTES**: não há manifesto completo nem APK novo.
 O smoke físico segue pendente e o produto não está pronto para produção.
 
 ## Adiado

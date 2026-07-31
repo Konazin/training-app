@@ -1,10 +1,11 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 
 const API = 'https://wger.de/api/v2'
 const intentsPath = new URL('./wger-starter-pack-intents.v1.json', import.meta.url)
-const auditPath = new URL('../docs/wger-starter-pack-candidate-audit.v1.json', import.meta.url)
+const auditPath = new URL('../artifacts/curation/wger-starter-pack-candidate-audit.v1.json', import.meta.url)
 const reportPath = new URL('../docs/WGER_STARTER_PACK_CURATION.md', import.meta.url)
 const { intents, version } = JSON.parse(await readFile(intentsPath, 'utf8'))
+await mkdir(new URL('../artifacts/curation/', import.meta.url), { recursive: true })
 const muscleAliases = {
   peitoral: ['chest', 'pectoralis'],
   costas: ['back', 'latissimus', 'trapezius'],
@@ -138,7 +139,7 @@ function validate(intent, item, languageMap, licenseMap) {
   if (!equipmentCompatible) reasons.push('equipamento incompatível')
   const categoryCompatible = compatibleCategory(intent.expectedCategory, item?.category?.name)
   if (!categoryCompatible) reasons.push('categoria incompatível')
-  if (!image) reasons.push('imagem real ausente')
+  if (mediaPolicy(intent) === 'REQUIRED' && !image) reasons.push('imagem real ausente')
   if (image && !https(image.image)) reasons.push('imagem sem HTTPS')
   if (!https(sourceUrl) || !text(license?.full_name || license?.short_name)
     || !https(license?.url)) reasons.push('fonte ou licença incompleta')
@@ -262,9 +263,8 @@ Distribuição de idioma: ${Object.entries(languages).map(([language, count]) =>
 
 ${unresolved.map((item) => `- \`${item.semanticKey}\`: ${item.validationResult}`).join('\n') || '- Nenhuma.'}
 
-O relatório completo, incluindo IDs candidatos, idiomas, fontes, licenças e
-motivos de rejeição, está em
-\`docs/wger-starter-pack-candidate-audit.v1.json\`.
+  O audit bruto fica em artefato local ignorado em
+  \`artifacts/curation/wger-starter-pack-candidate-audit.v1.json\`.
 `
 }
 
@@ -291,4 +291,10 @@ function https(value) {
   } catch {
     return false
   }
+}
+
+function mediaPolicy(intent) {
+  return ['mobilidade', 'alongamento', 'condicionamento'].includes(normalize(intent.expectedCategory))
+    ? 'OPTIONAL'
+    : 'REQUIRED'
 }

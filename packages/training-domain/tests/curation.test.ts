@@ -5,6 +5,8 @@ import {
   rankCurationCandidates,
   selectStrictCurationCandidate,
   validateStarterPackIntents,
+  mediaPolicyFor,
+  recommendedPackEnabled,
   type StarterPackIntent,
 } from '../curation'
 
@@ -54,6 +56,14 @@ describe('curadoria estrita do pacote Wger', () => {
       name: 'Pike Push Up',
       equipment: 'none (bodyweight exercise)',
     })])[0]?.reasons).toContain('variante diferente da intenção')
+  })
+
+  it('permite mídia ausente apenas em mobilidade/condicionamento', () => {
+    expect(mediaPolicyFor({ expectedCategory: 'Mobilidade' })).toBe('OPTIONAL')
+    expect(mediaPolicyFor({ expectedCategory: 'Força' })).toBe('REQUIRED')
+    expect(recommendedPackEnabled(34, 0)).toBe(false)
+    expect(recommendedPackEnabled(35, 0)).toBe(true)
+    expect(recommendedPackEnabled(50, 1)).toBe(false)
   })
 })
 

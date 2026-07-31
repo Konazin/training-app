@@ -1,0 +1,25 @@
+name: mobile-validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck --workspace @training/training-domain
+      - run: npm test --workspace @training/training-domain
+      - run: npm run typecheck --workspace @training/training-local-db
+      - run: npm test --workspace @training/training-local-db
+      - run: npm run typecheck --workspace training-mobile
+      - run: npm test --workspace training-mobile
+      - run: npx expo config --type public --json --working-dir mobile
+      - run: npm run validate:wger-manifest

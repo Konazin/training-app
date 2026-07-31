@@ -22,6 +22,7 @@ import {
   type ExerciseDefinition,
   type ExerciseDefinitionInput,
 } from '@training/training-domain'
+import { WGER_STARTER_PACK } from '@training/training-domain'
 import { FormField } from '../../components/FormField'
 import { PrimaryButton } from '../../components/PrimaryButton'
 import { Screen } from '../../components/Screen'
@@ -121,6 +122,7 @@ export function ExerciseLibraryScreen({
     ? <SkeletonList />
     : !exercises.length && !query && filter.kind === 'ALL'
       ? <EmptyLibrary
+          approvedCount={WGER_STARTER_PACK.length}
           onCreate={() => setEditing('new')}
           onSearchWger={() => navigation.navigate('WgerIntegration')}
           onContinue={() => navigation.goBack()}
@@ -193,10 +195,12 @@ export function ExerciseLibraryScreen({
 }
 
 function EmptyLibrary({
+  approvedCount,
   onCreate,
   onSearchWger,
   onContinue,
 }: {
+  approvedCount: number
   onCreate: () => void
   onSearchWger: () => void
   onContinue: () => void
@@ -212,8 +216,9 @@ function EmptyLibrary({
       <Text style={styles.emptyCopy}>
         Consultas ao provedor exigem internet, mas o conteúdo importado fica no aparelho. Nenhuma ficha é criada e nenhum dado é enviado automaticamente.
       </Text>
-      <PrimaryButton disabled label="Importar pacote recomendado" onPress={() => undefined} />
-      <Text style={styles.emptyHint}>Pacote opcional indisponível até a curadoria dos 50 itens ser concluída.</Text>
+      <PrimaryButton disabled={approvedCount < 35} label="Importar pacote recomendado" onPress={() => undefined} />
+      <Text style={styles.emptyHint}>Pacote atual · {approvedCount} exercícios</Text>
+      <Text style={styles.emptyHint}>O pacote recomendado contém exercícios revisados individualmente. A quantidade pode variar conforme a disponibilidade e a qualidade dos dados do provider.</Text>
       <PrimaryButton label="Pesquisar no Wger" onPress={onSearchWger} />
       <PrimaryButton secondary label="Criar exercício personalizado" onPress={onCreate} />
       <Pressable accessibilityRole="button" onPress={onContinue} style={styles.continue}>
