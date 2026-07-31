@@ -143,10 +143,15 @@ function externalExerciseImportRepository(database: SqlDatabase): ExternalExerci
         )
         const before = existing ? await loadExercise(transaction, existing.id) : null
         const unchanged = before ? importedExerciseMatches(before, candidate) : false
+        if (unchanged) {
+          result.unchanged += 1
+          result.affectedIds.push(existing!.id)
+          result.warnings.push(...candidate.warnings.map((warning) => `${candidate.name}: ${warning}`))
+          continue
+        }
         const exerciseId = await upsertImportedExercise(transaction, candidate, existing?.id)
         await upsertImportedMedia(transaction, exerciseId, candidate)
         if (!existing) result.created += 1
-        else if (unchanged) result.unchanged += 1
         else result.updated += 1
         result.affectedIds.push(exerciseId)
         result.warnings.push(...candidate.warnings.map((warning) => `${candidate.name}: ${warning}`))
@@ -300,7 +305,7 @@ function importedExerciseMatches(
     licenseUrl: item.licenseUrl, author: item.author, sourceUrl: item.sourceUrl,
   }))
   const candidateMedia = candidate.media.filter(isValidImportedMedia)
-    .map(({ source: _source, ...item }) => item)
+    .map(({ source: _source, localUri: _localUri, downloadedAt: _downloadedAt, ...item }) => item)
   return JSON.stringify({
     name: current.name,
     description: current.description,

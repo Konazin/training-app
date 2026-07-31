@@ -43,6 +43,21 @@ function Harness({ metadata }: { metadata: AppMetadataRepository }) {
   )
 }
 
+const starterPackCalls: string[] = []
+
+function StarterPackHarness() {
+  return (
+    <Onboarding
+      visible
+      onSkip={async () => undefined}
+      onComplete={async () => { starterPackCalls.push('complete') }}
+      onOpenLibrary={() => { starterPackCalls.push('library') }}
+      onImportStarterPack={() => { starterPackCalls.push('import') }}
+      starterPackEnabled
+    />
+  )
+}
+
 describe('onboarding local', () => {
   it('aparece só em instalação elegível, persiste o pulo e pode ser reaberto', async () => {
     const values = new Map<string, unknown>([
@@ -76,6 +91,15 @@ describe('onboarding local', () => {
       fireEvent.press(screen.getByText('Continuar sem exercícios'))
     })
     await waitFor(() => expect(screen.queryByText('Biblioteca, backup e integrações')).toBeNull())
+  })
+
+  it('conclui, navega para a Biblioteca e só então abre a importação', async () => {
+    starterPackCalls.length = 0
+    await renderAsync(createElement(StarterPackHarness))
+    fireEvent.press(screen.getByText('Próximo'))
+    fireEvent.press(screen.getByText('Próximo'))
+    await act(async () => { fireEvent.press(screen.getByText('Importar pacote recomendado')) })
+    expect(starterPackCalls).toEqual(['complete', 'library', 'import'])
   })
 
   it('fecha pelo botão voltar do Android e não atualiza depois do unmount', async () => {

@@ -19,7 +19,11 @@ Correções implementadas no controller existente:
 - arquivos temporários e permanentes novos são registrados imediatamente e
   removidos em cancelamento, falha SQLite, falha parcial e desmontagem;
 - arquivos locais válidos não são baixados novamente;
-- segunda importação permanece idempotente e preserva dados locais;
+- segunda importação confirma 40 `unchanged`, zero inserts/updates e preserva
+  notas, favoritos, recentes e arquivamento;
+- cancelamento e desmontagem invalidam a operação imediatamente, inclusive no
+  último download e na confirmação parcial;
+- cache local corrompido ou incompatível é removido isoladamente e redownloadado;
 - cancelamento visível durante busca/download e bloqueio de operações concorrentes;
 - MIME, assinatura, limite de 8 MB por imagem, limite total de 150 MB, HTTPS e
   atribuição/licença são validados antes do commit;
@@ -30,11 +34,11 @@ Validações concluídas:
 - `npm ci`: passou, com avisos de engine porque o Node local é `20.19.2` e o
   projeto exige `>=20.19.4`;
 - domínio: typecheck e **41 testes** passaram;
-- SQLite local: typecheck e **22 testes** passaram;
+- SQLite local: typecheck e **23 testes** passaram;
 - Wger: typecheck e **13 testes** passaram;
-- mobile: typecheck, **124 testes Vitest**, **16 testes Jest/RNTL** e **16 testes
-  comportamentais** passaram;
-- novos testes focados: **15 passaram**;
+- mobile: typecheck, **129 testes Vitest** e **17 testes Jest/RNTL** passaram;
+- novos testes de cancelamento, desmontagem, cache, idempotência e onboarding
+  passaram;
 - Umamusume: typecheck passou;
 - manifesto: 40 aprovados, gate 35–50, 0 duplicidades;
 - Expo Doctor: **21/21 verificações passaram**;

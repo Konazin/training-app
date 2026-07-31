@@ -444,6 +444,9 @@ function LocalApp({
         onOpenWger={() => {
           if (navigationRef.isReady()) navigationRef.navigate('WgerIntegration')
         }}
+        onOpenLibrary={() => {
+          if (navigationRef.isReady()) navigationRef.navigate('Library')
+        }}
         onCreateCustom={() => {
           if (navigationRef.isReady()) navigationRef.navigate('Library')
         }}

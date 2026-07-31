@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   BUNDLED_EXERCISES,
   TRAINING_PLAN_TEMPLATES,
+  WGER_STARTER_PACK,
   type ExternalExerciseCandidate,
   type TrainingBackup,
 } from '@training/training-domain'
@@ -741,6 +742,39 @@ describe('SQLite local schema', () => {
     await database.close()
   })
 
+  it('importa o pacote Wger duas vezes sem inserts/updates e preserva dados locais', async () => {
+    const path = newDatabase()
+    const database = betterDatabase(path)
+    await runMigrations(database)
+    const repositories = createLocalRepositories(database)
+    const candidates = WGER_STARTER_PACK.map(starterPackCandidate)
+
+    const first = await repositories.externalExerciseImport.importSelected(candidates)
+    expect(first).toMatchObject({ created: 40, updated: 0, unchanged: 0 })
+    const firstIds = first.affectedIds.slice().sort((a, b) => a - b)
+    const id = first.affectedIds[0]!
+    await repositories.exercises.updateNotes(id, 'Nota pessoal')
+    await repositories.exercises.setFavorite(id, true)
+    await repositories.exercises.recordRecentUsage(id, '2026-07-31T10:00:00.000Z')
+    await repositories.exercises.archive(id)
+    const before = await database.all<{ id: number; created_at: string; updated_at: string }>(
+      "SELECT id, created_at, updated_at FROM exercise_definitions WHERE source = 'WGER' ORDER BY id",
+    )
+
+    const second = await repositories.externalExerciseImport.importSelected(candidates)
+    expect(second).toMatchObject({ created: 0, updated: 0, unchanged: 40 })
+    expect(second.affectedIds.slice().sort((a, b) => a - b)).toEqual(firstIds)
+    expect(await database.all("SELECT id, created_at, updated_at FROM exercise_definitions WHERE source = 'WGER' ORDER BY id"))
+      .toEqual(before)
+    expect(await repositories.exercises.findById(id)).toMatchObject({
+      id, notes: 'Nota pessoal', archived: true, favorite: true,
+    })
+    expect(await database.first<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM exercise_recent_usage WHERE exercise_id = ?', id,
+    )).toEqual({ count: 1 })
+    await database.close()
+  })
+
   it('update geral preserva integralmente os sete dias persistidos', async () => {
     const path = newDatabase()
     const database = betterDatabase(path)
@@ -1405,6 +1439,23 @@ function validBackup(): TrainingBackup {
     }],
     setLogs: [{ id: 9, workout_session_exercise_id: 8, set_number: 1, reps: 0 }],
     settings: [],
+  }
+}
+
+function starterPackCandidate(item: typeof WGER_STARTER_PACK[number]): ExternalExerciseCandidate {
+  return {
+    provider: 'WGER', externalId: String(item.providerExerciseId), name: item.reviewedPtBrName,
+    description: `Descrição de ${item.intentKey}.`, primaryMuscleGroup: item.expectedPrimaryMuscles[0]!,
+    secondaryMuscleGroups: item.expectedPrimaryMuscles.slice(1), equipment: item.expectedEquipment.join(', '),
+    category: 'STRENGTH', difficulty: 'Não informado', instructions: `Instruções de ${item.intentKey}.`,
+    unilateral: false, timed: false, sourceUrl: item.sourceUrl, licenseName: item.license,
+    licenseUrl: item.licenseUrl, author: item.attribution,
+    media: item.imageUrl ? [{ type: 'IMAGE', source: 'WGER', externalId: `media-${item.providerExerciseId}`,
+      remoteUrl: item.imageUrl, thumbnailRemoteUrl: null, mimeType: 'image/png', width: 100, height: 100,
+      durationSeconds: null, main: true, sortOrder: 0, licenseName: item.license,
+      licenseUrl: item.licenseUrl, author: item.attribution, sourceUrl: item.sourceUrl,
+      localUri: `file:///cache/${item.providerExerciseId}.png`, downloadedAt: '2026-07-31T10:00:00.000Z' }] : [],
+    warnings: [], language: 'pt-br', original: {},
   }
 }
 

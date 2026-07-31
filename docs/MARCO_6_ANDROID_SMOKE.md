@@ -1,7 +1,8 @@
 # Smoke Android — candidato 0.9.3
 
-Estado: **NO-GO PARA TESTES**. O manifesto 0.9.3 mantém 40 aprovados, mas o APK
-0.9.3/build 15 não foi gerado porque a quota mensal gratuita do EAS foi excedida.
+Estado: **NO-GO PARA TESTES**. O manifesto 0.9.3 mantém 40 aprovados e os gates
+locais passaram, mas o APK 0.9.3/build 15 não foi gerado porque a quota mensal
+gratuita do EAS foi excedida.
 
 Todos os itens desta lista permanecem **PENDING** até teste em dispositivo real.
 

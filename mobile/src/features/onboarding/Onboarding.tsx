@@ -26,6 +26,7 @@ export function Onboarding({
   onSkip,
   onComplete,
   onOpenWger,
+  onOpenLibrary,
   onCreateCustom,
   onImportStarterPack,
   starterPackEnabled = recommendedPackEnabled(WGER_STARTER_PACK.length, 0),
@@ -35,6 +36,7 @@ export function Onboarding({
   onSkip: () => Promise<void>
   onComplete: () => Promise<void>
   onOpenWger?: () => void
+  onOpenLibrary?: () => void
   onCreateCustom?: () => void
   onImportStarterPack?: () => void
   starterPackEnabled?: boolean
@@ -76,7 +78,10 @@ export function Onboarding({
                   accessibilityRole="button"
                   accessibilityState={{ disabled: !starterPackEnabled || starterPackBusy, busy: starterPackBusy }}
                   disabled={!starterPackEnabled || starterPackBusy}
-                  onPress={() => void onComplete().then(onImportStarterPack)}
+                  onPress={() => void onComplete().then(() => {
+                    onOpenLibrary?.()
+                    onImportStarterPack?.()
+                  })}
                   style={[styles.choice, (!starterPackEnabled || starterPackBusy) && styles.disabled]}
                 >
                   <Text style={styles.choiceTitle}>Importar pacote recomendado</Text>

@@ -217,3 +217,5 @@ O roteiro específico desta entrega está em
 O APK 0.9.0 foi substituído e não deve seguir para teste formal. O candidato
 0.9.3 mantém o manifesto Wger com 40 aprovados, mas permanece bloqueado até que
 o APK seja gerado; consulte [o relatório 0.9.3](docs/RELEASE_CANDIDATE_0_9_3.md).
+O importador também invalida operações canceladas/desmontadas, reutiliza cache
+válido e mantém a segunda importação sem alterações SQLite.

@@ -41,18 +41,13 @@ export function useStarterPackImportController(
   const stateRef = useRef<StarterPackImportState>({ status: 'IDLE' })
   const mountedRef = useRef(true)
   const activeRef = useRef(false)
+  const operationIdRef = useRef(0)
   const abort = useRef<AbortController | null>(null)
   const validCandidates = useRef<ExternalExerciseCandidate[]>([])
   const unavailable = useRef<PackFailure[]>([])
   const ownedFiles = useRef(new Set<File>())
   const ownedDirectories = useRef(new Set<Directory>())
   const cleanupPending = useRef<(() => void) | undefined>(undefined)
-
-  useEffect(() => () => {
-    mountedRef.current = false
-    abort.current?.abort()
-    cleanupPending.current?.()
-  }, [])
 
   const publish = useCallback((next: StarterPackImportState) => {
     stateRef.current = next
@@ -71,18 +66,50 @@ export function useStarterPackImportController(
     cleanupPending.current = undefined
   }, [])
 
+  const invalidateOperation = useCallback((expectedId?: number) => {
+    if (expectedId !== undefined && operationIdRef.current !== expectedId) return false
+    operationIdRef.current += 1
+    abort.current?.abort()
+    abort.current = null
+    activeRef.current = false
+    validCandidates.current = []
+    unavailable.current = []
+    clearOwnedFiles()
+    if (mountedRef.current) publish({ status: 'IDLE' })
+    return true
+  }, [clearOwnedFiles, publish])
+
+  useEffect(() => () => {
+    mountedRef.current = false
+    operationIdRef.current += 1
+    abort.current?.abort()
+    abort.current = null
+    activeRef.current = false
+    clearOwnedFiles()
+  }, [clearOwnedFiles])
+
   const releaseOperation = useCallback(() => {
     activeRef.current = false
     abort.current = null
   }, [])
 
-  const commit = useCallback(async (candidates: ExternalExerciseCandidate[], skipped: number, withoutDemo: number) => {
+  const commit = useCallback(async (
+    candidates: ExternalExerciseCandidate[],
+    skipped: number,
+    withoutDemo: number,
+    operationId: number,
+    controller: AbortController,
+  ) => {
+    const isCurrent = () => isCurrentOperation(operationId, controller.signal, mountedRef.current, operationIdRef.current)
+    if (!isCurrent()) return false
     publish({ status: 'COMMITTING', total: candidates.length })
     let result
     try {
+      if (!isCurrent()) return false
       result = await imports.importSelected(candidates)
     } catch (error) {
       clearOwnedFiles()
+      if (!isCurrent()) return false
       releaseOperation()
       publish({ status: 'ERROR', message: messageFrom(error) })
       return false
@@ -92,13 +119,25 @@ export function useStarterPackImportController(
     ownedFiles.current.clear()
     ownedDirectories.current.clear()
     cleanupPending.current = undefined
+    if (!isCurrent()) {
+      releaseOperation()
+      return true
+    }
     try {
       const refreshed = await onImported()
+      if (!isCurrent()) {
+        releaseOperation()
+        return true
+      }
       if (refreshed === false) throw new Error(POST_COMMIT_REFRESH_WARNING)
       releaseOperation()
       publish({ status: 'SUCCESS', imported: result.created + result.updated, skipped, withoutDemo })
       return true
     } catch {
+      if (!isCurrent()) {
+        releaseOperation()
+        return true
+      }
       releaseOperation()
       publish({
         status: 'SUCCESS_WITH_WARNING',
@@ -111,37 +150,50 @@ export function useStarterPackImportController(
     }
   }, [clearOwnedFiles, imports, onImported, publish, releaseOperation])
 
-  const importAvailable = useCallback(() => {
-    if (!activeRef.current || stateRef.current.status !== 'AWAITING_PARTIAL_CONFIRMATION') return false
-    return commit(validCandidates.current, unavailable.current.length, countWithoutDemo(validCandidates.current))
+  const importAvailable = useCallback((expectedId?: number) => {
+    const operationId = expectedId ?? operationIdRef.current
+    const controller = abort.current
+    if (!activeRef.current || !controller || operationIdRef.current !== operationId
+      || stateRef.current.status !== 'AWAITING_PARTIAL_CONFIRMATION') return false
+    return commit(
+      validCandidates.current,
+      unavailable.current.length,
+      countWithoutDemo(validCandidates.current),
+      operationId,
+      controller,
+    )
   }, [commit])
 
   const run = useCallback(async () => {
     if (activeRef.current) return false
+    const operationId = operationIdRef.current + 1
+    operationIdRef.current = operationId
     activeRef.current = true
     const controller = new AbortController()
     abort.current = controller
-    const owned = () => {
+    const isCurrent = () => isCurrentOperation(operationId, controller.signal, mountedRef.current, operationIdRef.current)
+    cleanupPending.current = () => {
       for (const file of ownedFiles.current) if (file.exists) file.delete()
       for (const directory of ownedDirectories.current) if (directory.exists) directory.delete()
       ownedFiles.current.clear()
       ownedDirectories.current.clear()
       cleanupPending.current = undefined
     }
-    cleanupPending.current = owned
     const candidates: ExternalExerciseCandidate[] = []
     const failures: PackFailure[] = []
     try {
       const manifest = validateWgerStarterPackManifest(WGER_STARTER_PACK)
       for (const [index, item] of manifest.entries()) {
-        if (controller.signal.aborted) throw new Error('Importação cancelada.')
+        if (!isCurrent()) return false
         publish({ status: 'FETCHING', completed: index, total: manifest.length })
         const candidate = await provider.findByExternalId(String(item.providerExerciseId), 'pt-br', controller.signal)
+        if (!isCurrent()) return false
         const failure = candidate ? validateCurrentEntry(item, candidate) : 'ID não encontrado no Wger.'
         if (failure) failures.push({ intentKey: item.intentKey, name: item.reviewedPtBrName, reason: failure })
-        else candidates.push(candidate!)
+        else candidates.push(candidate)
       }
 
+      if (!isCurrent()) return false
       publish({ status: 'VALIDATING', total: manifest.length })
       const downloadedCandidates: ExternalExerciseCandidate[] = []
       const importDirectory = new Directory(Paths.document, 'training-app', 'wger-media')
@@ -152,7 +204,7 @@ export function useStarterPackImportController(
       let totalBytes = 0
 
       for (const [index, candidate] of candidates.entries()) {
-        if (controller.signal.aborted) throw new Error('Importação cancelada.')
+        if (!isCurrent()) return false
         publish({ status: 'DOWNLOADING_MEDIA', completed: index, total: candidates.length })
         const item = manifest.find((entry) => String(entry.providerExerciseId) === candidate.externalId)!
         const media = candidate.media.find((entry) => entry.type === 'IMAGE' && entry.remoteUrl === item.imageUrl)
@@ -174,9 +226,19 @@ export function useStarterPackImportController(
           const extension = extensionFor(media.remoteUrl)
           const name = `wger-${candidate.externalId}-${media.externalId}.${extension}`
           const destination = new File(importDirectory, name)
+          let cacheValid = false
           if (destination.exists) {
-            const bytes = new Uint8Array(await destination.arrayBuffer())
-            validateImagePayload(media.mimeType, bytes, totalBytes)
+            try {
+              const bytes = new Uint8Array(await destination.arrayBuffer())
+              if (!isCurrent()) return false
+              validateImagePayload(media.mimeType, bytes, totalBytes)
+              cacheValid = true
+            } catch (error) {
+              if (!isCurrent()) return false
+              if (destination.exists) destination.delete()
+            }
+          }
+          if (cacheValid) {
             downloadedCandidates.push(withLocalImage(candidate, media, destination.uri))
             continue
           }
@@ -184,18 +246,23 @@ export function useStarterPackImportController(
           const staged = new File(temporaryDirectory, name)
           ownedFiles.current.add(staged)
           const bytes = await fetchImage(media.remoteUrl, controller.signal, totalBytes, media.mimeType)
+          if (!isCurrent()) return false
           staged.write(bytes)
-          await staged.move(destination)
-          ownedFiles.current.delete(staged)
+          if (!isCurrent()) return false
+          if (destination.exists) destination.delete()
           ownedFiles.current.add(destination)
+          await staged.move(destination)
+          if (!isCurrent()) return false
+          ownedFiles.current.delete(staged)
           totalBytes += bytes.byteLength
           downloadedCandidates.push(withLocalImage(candidate, media, destination.uri))
         } catch (error) {
-          if (controller.signal.aborted) throw error
+          if (!isCurrent()) return false
           if (item.mediaRequirement === 'OPTIONAL') downloadedCandidates.push(withoutImage(candidate))
           else failures.push({ intentKey: item.intentKey, name: item.reviewedPtBrName, reason: `Mídia indisponível: ${messageFrom(error)}` })
         }
       }
+      if (!isCurrent()) return false
       if (temporaryDirectory.exists) temporaryDirectory.delete()
       ownedDirectories.current.delete(temporaryDirectory)
       candidates.length = 0
@@ -210,19 +277,21 @@ export function useStarterPackImportController(
           publish({ status: 'ERROR', message: 'Nenhum exercício do pacote está disponível para importação.' })
           return false
         }
+        if (!isCurrent()) return false
         publish({ status: 'AWAITING_PARTIAL_CONFIRMATION', valid: candidates.length, unavailable: failures })
         Alert.alert(
           'Parte do pacote indisponível',
           failures.map((item) => `${item.name}: ${item.reason}`).join('\n'),
           [
-            { text: 'Cancelar', style: 'cancel', onPress: () => cancelOperation() },
-            { text: 'Importar disponíveis', onPress: () => void importAvailable() },
+            { text: 'Cancelar', style: 'cancel', onPress: () => { if (isCurrent()) invalidateOperation(operationId) } },
+            { text: 'Importar disponíveis', onPress: () => { if (isCurrent()) void importAvailable(operationId) } },
           ],
         )
         return false
       }
-      return commit(candidates, 0, countWithoutDemo(candidates))
+      return commit(candidates, 0, countWithoutDemo(candidates), operationId, controller)
     } catch (error) {
+      if (!isCurrent()) return false
       clearOwnedFiles()
       releaseOperation()
       if (controller.signal.aborted || (error instanceof WgerHttpError && error.code === 'ABORTED')) {
@@ -232,35 +301,28 @@ export function useStarterPackImportController(
       publish({ status: 'ERROR', message: messageFrom(error) })
       return false
     }
-
-    function cancelOperation() {
-      controller.abort()
-      clearOwnedFiles()
-      releaseOperation()
-      publish({ status: 'IDLE' })
-    }
-  }, [clearOwnedFiles, commit, importAvailable, provider, publish, releaseOperation])
+  }, [clearOwnedFiles, commit, importAvailable, invalidateOperation, provider, publish, releaseOperation])
 
   const cancel = useCallback(() => {
     if (!activeRef.current || stateRef.current.status === 'COMMITTING') return false
-    abort.current?.abort()
-    clearOwnedFiles()
-    releaseOperation()
-    publish({ status: 'IDLE' })
-    return true
-  }, [clearOwnedFiles, publish, releaseOperation])
+    return invalidateOperation(operationIdRef.current)
+  }, [invalidateOperation])
 
   const retryRefresh = useCallback(async () => {
     if (activeRef.current || stateRef.current.status !== 'SUCCESS_WITH_WARNING') return false
+    const previous = stateRef.current
+    const operationId = operationIdRef.current + 1
+    operationIdRef.current = operationId
     activeRef.current = true
     try {
       const refreshed = await onImported()
+      if (!mountedRef.current || operationIdRef.current !== operationId) return false
       if (refreshed === false) throw new Error(POST_COMMIT_REFRESH_WARNING)
       releaseOperation()
-      publish({ status: 'SUCCESS', imported: stateRef.current.imported, skipped: stateRef.current.skipped, withoutDemo: stateRef.current.withoutDemo })
+      publish({ status: 'SUCCESS', imported: previous.imported, skipped: previous.skipped, withoutDemo: previous.withoutDemo })
       return true
     } catch {
-      releaseOperation()
+      if (operationIdRef.current === operationId) releaseOperation()
       return false
     }
   }, [onImported, publish, releaseOperation])
@@ -288,16 +350,7 @@ export function validateCurrentEntry(item: ApprovedWgerExercise, candidate: Exte
   return null
 }
 
-function hasValidMediaAttribution(item: ApprovedWgerExercise, media: ExternalExerciseCandidate['media'][number]) {
-  return media.licenseName === item.license && media.licenseUrl === item.licenseUrl
-    && (Boolean(media.author?.trim()) || Boolean(media.sourceUrl?.startsWith('https://')))
-}
-
-export function validateImagePayload(
-  mimeType: string | null,
-  bytes: Uint8Array,
-  totalBytes: number,
-) {
+export function validateImagePayload(mimeType: string | null, bytes: Uint8Array, totalBytes: number) {
   const mime = mimeType?.split(';')[0]?.trim().toLowerCase()
   if (!mime || !['image/jpeg', 'image/png', 'image/webp'].includes(mime)) throw new Error('MIME de imagem inválido.')
   if (!bytes.byteLength || bytes.byteLength > MAX_IMAGE_BYTES) throw new Error('Mídia excede o limite de 8 MB.')
@@ -312,6 +365,15 @@ async function fetchImage(url: string, signal: AbortSignal, totalBytes: number, 
   const bytes = new Uint8Array(await response.arrayBuffer())
   validateImagePayload(response.headers.get('content-type') ?? expectedMime, bytes, totalBytes)
   return bytes
+}
+
+function isCurrentOperation(operationId: number, signal: AbortSignal, mounted: boolean, currentId: number) {
+  return mounted && currentId === operationId && !signal.aborted
+}
+
+function hasValidMediaAttribution(item: ApprovedWgerExercise, media: ExternalExerciseCandidate['media'][number]) {
+  return media.licenseName === item.license && media.licenseUrl === item.licenseUrl
+    && (Boolean(media.author?.trim()) || Boolean(media.sourceUrl?.startsWith('https://')))
 }
 
 function matchesImageSignature(mime: string, bytes: Uint8Array) {

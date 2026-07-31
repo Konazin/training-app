@@ -6,8 +6,8 @@ continua gerando APK interno para `com.konazin.trainingapp`.
 ## Estado
 
 - `0.9.0` (`versionCode` 12): substituído; não submeter a testes formais;
-- `0.9.3` (`versionCode` 15): **NO-GO PARA TESTES**; o EAS recusou o build por
-  quota mensal gratuita excedida.
+- `0.9.3` (`versionCode` 15): **NO-GO PARA TESTES**; gates locais concluídos,
+  mas o EAS recusou o build por quota mensal gratuita excedida.
 
 A curadoria real aprovou 40 exercícios Wger no manifesto `wger-starter-pack.v1`.
 Não existe APK 0.9.3, ID de build, tamanho ou SHA-256 para registrar.

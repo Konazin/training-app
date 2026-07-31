@@ -121,6 +121,23 @@ describe('importação do pacote recomendado', () => {
     hook.unmount()
   })
 
+  it('cancela durante o download da última imagem sem alterar o SQLite', async () => {
+    const last = WGER_STARTER_PACK.at(-1)!
+    let resolveFetch!: (value: unknown) => void
+    const pending = new Promise((resolve) => { resolveFetch = resolve })
+    vi.stubGlobal('fetch', vi.fn((url: string) => url === last.imageUrl ? pending : Promise.resolve(imageResponse(url))))
+    const imports = importRepository()
+    const hook = await renderHook(() => useStarterPackImportController(imports, async () => undefined, provider()))
+    const running = hook.current.run()
+    await vi.waitFor(() => expect(hook.current.state).toMatchObject({ status: 'DOWNLOADING_MEDIA', completed: 39 }))
+    hook.current.cancel()
+    resolveFetch(imageResponse(last.imageUrl!))
+    await act(async () => { await running })
+    expect(imports.importSelected).not.toHaveBeenCalled()
+    expect(fileSystem.files.size).toBe(0)
+    hook.unmount()
+  })
+
   it('cancela a importação parcial e remove os downloads já feitos', async () => {
     const partialProvider = provider((item, index) => index === 0 ? null : candidate(item))
     const imports = importRepository()
@@ -155,6 +172,38 @@ describe('importação do pacote recomendado', () => {
     await act(async () => { await hook.current.run() })
     expect(fetchMock).toHaveBeenCalledTimes(39)
     expect(fileSystem.files.get(path)).toEqual(imageBytes(item.imageUrl!))
+    hook.unmount()
+  })
+
+  it('descarta cache corrompido e baixa novamente apenas esse item', async () => {
+    const item = WGER_STARTER_PACK[0]!
+    const path = mediaPath(item)
+    fileSystem.files.set(path, new Uint8Array([1, 2, 3]))
+    const fetchMock = vi.mocked(fetch)
+    const hook = await renderHook(() => useStarterPackImportController(importRepository(), async () => undefined, provider()))
+    await act(async () => { await hook.current.run() })
+    expect(fetchMock).toHaveBeenCalledTimes(40)
+    expect(fileSystem.files.get(path)).toEqual(imageBytes(item.imageUrl!))
+    hook.unmount()
+  })
+
+  it('mantém caches válidos quando o redownload de outro item falha', async () => {
+    const failed = WGER_STARTER_PACK[0]!
+    const preserved = WGER_STARTER_PACK[1]!
+    fileSystem.files.set(mediaPath(failed), new Uint8Array([1, 2, 3]))
+    fileSystem.files.set(mediaPath(preserved), imageBytes(preserved.imageUrl!))
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url === failed.imageUrl) throw new Error('offline')
+      return imageResponse(url)
+    }))
+    const imports = importRepository()
+    const hook = await renderHook(() => useStarterPackImportController(imports, async () => undefined, provider()))
+    await act(async () => { await hook.current.run() })
+    expect(hook.current.state).toMatchObject({ status: 'AWAITING_PARTIAL_CONFIRMATION', valid: 39 })
+    expect(fileSystem.files.has(mediaPath(failed))).toBe(false)
+    expect(fileSystem.files.get(mediaPath(preserved))).toEqual(imageBytes(preserved.imageUrl!))
+    alerts.buttons?.find((button) => button.text === 'Importar disponíveis')?.onPress?.()
+    await vi.waitFor(() => expect(imports.importSelected).toHaveBeenCalledTimes(1))
     hook.unmount()
   })
 
@@ -238,6 +287,34 @@ describe('importação do pacote recomendado', () => {
     resolveFirst(candidate(WGER_STARTER_PACK[0]!))
     await expect(running).resolves.toBe(false)
   })
+
+  it('não faz commit nem atualiza estado ao desmontar durante download', async () => {
+    const last = WGER_STARTER_PACK.at(-1)!
+    let resolveFetch!: (value: unknown) => void
+    const pending = new Promise((resolve) => { resolveFetch = resolve })
+    vi.stubGlobal('fetch', vi.fn((url: string) => url === last.imageUrl ? pending : Promise.resolve(imageResponse(url))))
+    const imports = importRepository()
+    const hook = await renderHook(() => useStarterPackImportController(imports, async () => undefined, provider()))
+    const running = hook.current.run()
+    await vi.waitFor(() => expect(hook.current.state).toMatchObject({ status: 'DOWNLOADING_MEDIA', completed: 39 }))
+    await act(async () => { hook.unmount() })
+    resolveFetch(imageResponse(last.imageUrl!))
+    await expect(running).resolves.toBe(false)
+    expect(imports.importSelected).not.toHaveBeenCalled()
+    expect(fileSystem.files.size).toBe(0)
+  })
+
+  it('invalida a confirmação parcial antiga ao desmontar', async () => {
+    const imports = importRepository()
+    const hook = await renderHook(() => useStarterPackImportController(
+      imports, async () => undefined, provider((item, index) => index === 0 ? null : candidate(item)),
+    ))
+    await act(async () => { await hook.current.run() })
+    await act(async () => { hook.unmount() })
+    alerts.buttons?.find((button) => button.text === 'Importar disponíveis')?.onPress?.()
+    expect(imports.importSelected).not.toHaveBeenCalled()
+    expect(fileSystem.files.size).toBe(0)
+  })
 })
 
 function importRepository() {
@@ -298,6 +375,10 @@ function mime(url: string) {
 
 function extension(url: string) {
   return url.match(/\.(png|jpe?g|webp)(?:$|\?)/i)?.[1]?.toLowerCase() ?? 'img'
+}
+
+function mediaPath(item: typeof WGER_STARTER_PACK[number]) {
+  return `file:///document/training-app/wger-media/wger-${item.providerExerciseId}-media-${item.providerExerciseId}.${extension(item.imageUrl!)}`
 }
 
 async function renderHook<T>(callback: () => T) {
