@@ -438,7 +438,7 @@ function SkeletonList() {
 }
 
 function sourceLabel(source: ExerciseDefinition['source']) {
-  return { BUNDLED: 'Integrado', SYSTEM: 'Sistema', CUSTOM: 'Personalizado', WGER: 'Wger' }[source]
+  return { BUNDLED: 'Integrado', SYSTEM: 'Sistema', CUSTOM: 'Personalizado', WGER: 'Wger', EXERCISEDB: 'ExerciseDB' }[source]
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({

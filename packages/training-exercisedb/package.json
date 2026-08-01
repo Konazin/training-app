@@ -1,0 +1,10 @@
+{
+  "name": "@training/training-exercisedb",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",
+  "types": "index.ts",
+  "scripts": { "typecheck": "tsc --noEmit", "test": "vitest run" },
+  "dependencies": { "@training/training-domain": "*" },
+  "devDependencies": { "typescript": "~6.0.3", "vitest": "^4.1.10" }
+}

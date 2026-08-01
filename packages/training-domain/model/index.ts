@@ -12,9 +12,9 @@ export type Weekday = typeof WEEKDAYS[number]
 export type ExerciseCategory =
   | 'STRENGTH' | 'HYPERTROPHY' | 'ENDURANCE' | 'CARDIO'
   | 'MOBILITY' | 'STRETCHING' | 'TECHNIQUE' | 'RECOVERY'
-export type ExerciseSource = 'SYSTEM' | 'BUNDLED' | 'CUSTOM' | 'WGER'
+export type ExerciseSource = 'SYSTEM' | 'BUNDLED' | 'CUSTOM' | 'WGER' | 'EXERCISEDB'
 export type ExerciseMediaType = 'IMAGE' | 'VIDEO'
-export type ExerciseMediaSource = 'SYSTEM' | 'BUNDLED' | 'CUSTOM' | 'WGER' | 'LEGACY'
+export type ExerciseMediaSource = 'SYSTEM' | 'BUNDLED' | 'CUSTOM' | 'WGER' | 'EXERCISEDB' | 'LEGACY'
 export type SetType =
   | 'NORMAL' | 'WARM_UP' | 'DROP_SET' | 'BI_SET'
   | 'CIRCUIT' | 'TO_FAILURE' | 'CONTROLLED_TEMPO'

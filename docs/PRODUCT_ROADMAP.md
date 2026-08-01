@@ -6,6 +6,15 @@
 4. **Temas, movimento e acessibilidade — Marco 4 IMPLEMENTADO, smoke físico pendente**
 5. **Biblioteca e mídia — Marco 5 IMPLEMENTADO, direção de conteúdo revisada**
 6. **Providers, inteligência local e release candidate — Marco 6 BLOQUEADO PARA TESTES**
+7. **Catálogo multiprovider e redesign visual — Marco 0.10.0 NO-GO**
+
+## Marco 0.10.0 — em validação
+
+- ExerciseDB/AscendAPI como busca manual primária e Wger como fallback;
+- provider, externalId, origem, licença e atribuição preservados;
+- timeout, cancelamento, paginação, schema validation e mídia HTTPS;
+- versão mobile 0.10.0, `versionCode` 16;
+- export Android, Expo Doctor, smoke visual e testes SQLite ainda pendentes.
 
 ## Marco 1 estabilizado
 

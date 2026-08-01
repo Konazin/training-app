@@ -323,6 +323,24 @@ UPDATE exercise_definitions
 SET archived = 1
 WHERE source = 'SYSTEM' AND archived = 0;
 `
+const exerciseDbProviderMetadata = `
+PRAGMA foreign_keys = OFF;
+ALTER TABLE exercise_definitions RENAME TO exercise_definitions_legacy;
+CREATE TABLE exercise_definitions (
+  id INTEGER PRIMARY KEY, name TEXT NOT NULL, normalized_name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '', primary_muscle_group TEXT NOT NULL,
+  secondary_muscle_groups_json TEXT NOT NULL DEFAULT '[]', equipment TEXT NOT NULL,
+  category TEXT NOT NULL CHECK (category IN ('STRENGTH','HYPERTROPHY','ENDURANCE','CARDIO','MOBILITY','STRETCHING','TECHNIQUE','RECOVERY')),
+  difficulty TEXT NOT NULL, instructions TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '',
+  unilateral INTEGER NOT NULL DEFAULT 0 CHECK (unilateral IN (0,1)), timed INTEGER NOT NULL DEFAULT 0 CHECK (timed IN (0,1)),
+  source TEXT NOT NULL CHECK (source IN ('SYSTEM','CUSTOM','WGER','EXERCISEDB')), external_id TEXT,
+  source_url TEXT, license_name TEXT, license_url TEXT, author TEXT, archived INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0,1)),
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(source, external_id)
+);
+INSERT INTO exercise_definitions SELECT * FROM exercise_definitions_legacy;
+DROP TABLE exercise_definitions_legacy;
+CREATE TABLE exercise_provider_metadata (provider TEXT PRIMARY KEY, last_synced_at TEXT, cache_expires_at TEXT);
+`
 
 export const MIGRATIONS: Migration[] = [
   migration(1, 'local_training_schema', schema),
@@ -333,6 +351,7 @@ export const MIGRATIONS: Migration[] = [
   migration(6, 'bundled_exercise_library', bundledExerciseLibrary),
   migration(7, 'local_workout_intelligence', localWorkoutIntelligence),
   migration(8, 'retire_generated_exercise_catalog', retireGeneratedExerciseCatalog),
+  migration(9, 'exercise_db_provider_metadata', exerciseDbProviderMetadata),
 ]
 
 export async function runMigrations(database: SqlDatabase, onProgress?: (progress: MigrationProgress) => void) {

@@ -26,7 +26,7 @@ export function IntegrationsScreen() {
           accessibilityState={{ disabled: provider.supportState !== 'SUPPORTED' }}
           disabled={provider.supportState !== 'SUPPORTED'}
           onPress={() => {
-            if (provider.integrationRoute === 'WGER_CATALOG') {
+            if (provider.integrationRoute === 'WGER_CATALOG' || provider.integrationRoute === 'EXERCISEDB_CATALOG') {
               navigation.navigate('WgerIntegration')
             }
           }}

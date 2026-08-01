@@ -18,7 +18,7 @@ import {
 
 describe('inteligência local de treino', () => {
   it('expõe capacidades imutáveis do provider manual', () => {
-    expect(listExerciseProviders()).toHaveLength(1)
+    expect(listExerciseProviders()).toHaveLength(2)
     expect(getExerciseProviderDescriptor('WGER')).toMatchObject({
       requiresNetwork: true,
       automaticBootstrap: false,

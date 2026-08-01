@@ -348,9 +348,9 @@ function assertLibraryOptionalRows(backup: Partial<TrainingBackup>) {
 
 function assertEnums(backup: Partial<TrainingBackup>) {
   enumRows(backup.exercises!, 'category', ['STRENGTH', 'HYPERTROPHY', 'ENDURANCE', 'CARDIO', 'MOBILITY', 'STRETCHING', 'TECHNIQUE', 'RECOVERY'])
-  enumRows(backup.exercises!, 'source', ['SYSTEM', 'CUSTOM', 'WGER'])
+  enumRows(backup.exercises!, 'source', ['SYSTEM', 'BUNDLED', 'CUSTOM', 'WGER', 'EXERCISEDB'])
   enumRows(backup.media!, 'type', ['IMAGE', 'VIDEO'])
-  enumRows(backup.media!, 'source', ['SYSTEM', 'CUSTOM', 'WGER', 'LEGACY'])
+  enumRows(backup.media!, 'source', ['SYSTEM', 'BUNDLED', 'CUSTOM', 'WGER', 'EXERCISEDB', 'LEGACY'])
   enumRows(backup.trainingPlanDays!, 'weekday', ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'])
   enumRows(backup.trainingDayExercises!, 'set_type', ['NORMAL', 'WARM_UP', 'DROP_SET', 'BI_SET', 'CIRCUIT', 'TO_FAILURE', 'CONTROLLED_TEMPO'])
   enumRows(backup.sessions!, 'status', ['IN_PROGRESS', 'PAUSED', 'COMPLETED', 'ABANDONED'])

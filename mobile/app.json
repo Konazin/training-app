@@ -4,7 +4,7 @@
     "slug": "training-app",
     "scheme": "trainingapp",
     "icon": "./assets/icon.png",
-    "version": "0.9.3",
+    "version": "0.10.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "ios": {
@@ -13,7 +13,7 @@
     },
     "android": {
       "package": "com.konazin.trainingapp",
-      "versionCode": 15,
+      "versionCode": 16,
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#101216"

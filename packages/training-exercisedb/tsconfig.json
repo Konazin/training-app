@@ -1,0 +1,1 @@
+{ "extends": "../../packages/training-domain/tsconfig.json", "include": ["**/*.ts"] }

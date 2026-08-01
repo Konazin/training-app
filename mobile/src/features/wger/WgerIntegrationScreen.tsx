@@ -49,8 +49,8 @@ export function WgerIntegrationScreen({
       <ScreenScrollView contentContainerStyle={styles.content}>
         <ScreenHeader
           eyebrow="Integração opcional"
-          title="Catálogo Wger"
-          description="Consulte o catálogo público e mantenha uma cópia dos exercícios escolhidos no aparelho."
+          title="Catálogo de exercícios"
+          description="ExerciseDB é consultado primeiro; Wger complementa quando necessário. A cópia escolhida fica no aparelho."
         />
 
         <View style={styles.notice}>

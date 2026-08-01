@@ -118,8 +118,8 @@ export interface SecretsRepository {
 }
 
 export interface ExternalExerciseCatalogProvider {
-  search(query: ExternalExerciseCatalogQuery): Promise<ExternalExerciseCatalogPage>
-  findByExternalId(externalId: string, language?: string): Promise<ExternalExerciseCandidate | null>
+  search(query: ExternalExerciseCatalogQuery, signal?: AbortSignal): Promise<ExternalExerciseCatalogPage>
+  findByExternalId(externalId: string, language?: string, signal?: AbortSignal): Promise<ExternalExerciseCandidate | null>
 }
 
 export interface ExternalExerciseImportRepository {

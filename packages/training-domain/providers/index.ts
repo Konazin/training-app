@@ -1,4 +1,4 @@
-export type ExerciseProviderId = 'WGER'
+export type ExerciseProviderId = 'EXERCISEDB' | 'WGER'
 
 export type ExerciseProviderCapability =
   | 'SEARCH'
@@ -14,11 +14,21 @@ export interface ExerciseProviderDescriptor {
   requiresNetwork: boolean
   automaticBootstrap: false
   manualOnly: true
-  integrationRoute: 'WGER_CATALOG' | null
+  integrationRoute: 'EXERCISEDB_CATALOG' | 'WGER_CATALOG' | null
   supportState: 'SUPPORTED' | 'UNSUPPORTED'
 }
 
 const PROVIDERS: readonly ExerciseProviderDescriptor[] = Object.freeze([
+  Object.freeze({
+    id: 'EXERCISEDB',
+    name: 'ExerciseDB',
+    capabilities: Object.freeze(['SEARCH', 'IMPORT', 'REFRESH', 'MEDIA', 'ATTRIBUTION'] as const),
+    requiresNetwork: true,
+    automaticBootstrap: false,
+    manualOnly: true,
+    integrationRoute: 'EXERCISEDB_CATALOG',
+    supportState: 'SUPPORTED',
+  }),
   Object.freeze({
     id: 'WGER',
     name: 'Wger',

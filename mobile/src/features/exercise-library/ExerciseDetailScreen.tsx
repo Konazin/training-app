@@ -54,7 +54,7 @@ export function ExerciseDetailScreen({
   const videoMedia = exercise.hasVideo ? resolveExerciseMedia(exercise, 'VIDEO') : null
   const displayedAttribution = showVideo && videoMedia ? videoMedia.attribution : imageMedia.attribution
   const fallbackAttribution = resolveMediaAttribution(null, exercise)
-  const source = { BUNDLED: 'Integrado', SYSTEM: 'Sistema', CUSTOM: 'Personalizado', WGER: 'Wger' }[exercise.source]
+  const source = { BUNDLED: 'Integrado', SYSTEM: 'Sistema', CUSTOM: 'Personalizado', WGER: 'Wger', EXERCISEDB: 'ExerciseDB' }[exercise.source]
 
   const saveNotes = async () => {
     const success = await onUpdateNotes(exercise.id, notes)

@@ -6,6 +6,7 @@ import type {
   ExternalExerciseImportRepository,
 } from '@training/training-domain'
 import { WgerExerciseCatalogProvider, WgerHttpError } from '@training/training-wger'
+import { ExerciseDbClient } from '@training/training-exercisedb'
 import type { ToastKind } from '../../components/Toast'
 
 export const DEFAULT_WGER_QUERY: ExternalExerciseCatalogQuery = {
@@ -25,9 +26,10 @@ export function useWgerIntegrationController(
   imports: ExternalExerciseImportRepository,
   exercises: ExerciseLibraryRepository,
   onImported: () => Promise<unknown>,
-  providerOverride?: WgerExerciseCatalogProvider,
+  providerOverride?: WgerExerciseCatalogProvider | ExerciseDbClient,
 ) {
-  const provider = useRef(providerOverride ?? new WgerExerciseCatalogProvider()).current
+  const provider = useRef(providerOverride ?? new ExerciseDbClient()).current
+  const fallback = useRef(new WgerExerciseCatalogProvider()).current
   const [query, setQuery] = useState(DEFAULT_WGER_QUERY)
   const [items, setItems] = useState<ExternalExerciseCandidate[]>([])
   const [selected, setSelected] = useState<Map<string, ExternalExerciseCandidate>>(new Map())
@@ -43,7 +45,11 @@ export function useWgerIntegrationController(
   const abort = useRef<AbortController | null>(null)
 
   const loadImportedCount = useCallback(async () => {
-    setImportedCount((await exercises.list({ source: 'WGER', includeArchived: true })).length)
+    const [wger, exercisedb] = await Promise.all([
+      exercises.list({ source: 'WGER', includeArchived: true }),
+      exercises.list({ source: 'EXERCISEDB', includeArchived: true }),
+    ])
+    setImportedCount(wger.length + exercisedb.length)
   }, [exercises])
 
   useEffect(() => {
@@ -64,7 +70,13 @@ export function useWgerIntegrationController(
     setPhase('loading')
     setMessage({ text: '', kind: 'info' })
     try {
-      const result = await provider.search(nextQuery, controller.signal)
+      let result
+      try { result = await provider.search(nextQuery, controller.signal) }
+      catch (error) {
+        if (provider.descriptor.id !== 'EXERCISEDB') throw error
+        setMessage({ text: 'ExerciseDB indisponível; tentando Wger…', kind: 'warning' })
+        result = await fallback.search(nextQuery, controller.signal)
+      }
       if (requestId.current !== currentRequest) return false
       const previewExisting = await imports.previewExisting(result.items)
       if (requestId.current !== currentRequest) return false
@@ -84,7 +96,7 @@ export function useWgerIntegrationController(
       setMessage({ text: messageFrom(error), kind: 'error' })
       return false
     }
-  }, [imports, provider, query])
+  }, [fallback, imports, provider, query])
 
   const toggle = useCallback((candidate: ExternalExerciseCandidate) => {
     setSelected((current) => {

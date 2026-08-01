@@ -122,7 +122,7 @@ function externalExerciseImportRepository(database: SqlDatabase): ExternalExerci
       if (!externalIds.length) return []
       const rows = await database.all<{ id: number; external_id: string }>(
         `SELECT id, external_id FROM exercise_definitions
-         WHERE source = 'WGER' AND external_id IN (${externalIds.map(() => '?').join(',')})`,
+         WHERE source IN ('WGER', 'EXERCISEDB') AND external_id IN (${externalIds.map(() => '?').join(',')})`,
         ...externalIds,
       )
       const ids = new Map(rows.map((row) => [row.external_id, row.id]))
@@ -138,8 +138,8 @@ function externalExerciseImportRepository(database: SqlDatabase): ExternalExerci
       result.skipped = candidates.length - selected.length
       for (const candidate of selected) {
         const existing = await transaction.first<{ id: number }>(
-          `SELECT id FROM exercise_definitions WHERE source = 'WGER' AND external_id = ?`,
-          candidate.externalId,
+          `SELECT id FROM exercise_definitions WHERE source = ? AND external_id = ?`,
+          candidate.provider, candidate.externalId,
         )
         const before = existing ? await loadExercise(transaction, existing.id) : null
         const unchanged = before ? importedExerciseMatches(before, candidate) : false
@@ -181,12 +181,12 @@ async function upsertImportedExercise(
         secondary_muscle_groups_json = ?, equipment = ?, category = ?, difficulty = ?,
         instructions = ?, unilateral = ?, timed = ?, source_url = ?, license_name = ?,
         license_url = ?, author = ?, updated_at = ?
-      WHERE id = ? AND source = 'WGER'
+      WHERE id = ? AND source = ?
     `, candidate.name, normalizeName(candidate.name), candidate.description,
     candidate.primaryMuscleGroup, serializeJson(candidate.secondaryMuscleGroups),
     candidate.equipment, candidate.category, candidate.difficulty, candidate.instructions,
     Number(candidate.unilateral), Number(candidate.timed), candidate.sourceUrl,
-    candidate.licenseName, candidate.licenseUrl, candidate.author, timestamp, existingId)
+    candidate.licenseName, candidate.licenseUrl, candidate.author, timestamp, existingId, candidate.provider)
     return existingId
   }
   const inserted = await database.run(`
@@ -194,11 +194,11 @@ async function upsertImportedExercise(
       name, normalized_name, description, primary_muscle_group, secondary_muscle_groups_json,
       equipment, category, difficulty, instructions, notes, unilateral, timed, source,
       external_id, source_url, license_name, license_url, author, archived, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, 'WGER', ?, ?, ?, ?, ?, 0, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
   `, candidate.name, normalizeName(candidate.name), candidate.description,
   candidate.primaryMuscleGroup, serializeJson(candidate.secondaryMuscleGroups),
   candidate.equipment, candidate.category, candidate.difficulty, candidate.instructions,
-  Number(candidate.unilateral), Number(candidate.timed), candidate.externalId,
+  Number(candidate.unilateral), Number(candidate.timed), candidate.provider, candidate.externalId,
   candidate.sourceUrl, candidate.licenseName, candidate.licenseUrl, candidate.author,
   timestamp, timestamp)
   return inserted.lastInsertRowId
@@ -215,15 +215,15 @@ async function upsertImportedMedia(
   if (mediaIds.length) {
     await database.run(
       `DELETE FROM exercise_media
-       WHERE exercise_definition_id = ? AND source = 'WGER'
+       WHERE exercise_definition_id = ? AND source = ?
          AND external_id NOT IN (${mediaIds.map(() => '?').join(',')})`,
-      exerciseId,
+      exerciseId, candidate.provider,
       ...mediaIds,
     )
   } else {
     await database.run(
-      `DELETE FROM exercise_media WHERE exercise_definition_id = ? AND source = 'WGER'`,
-      exerciseId,
+      `DELETE FROM exercise_media WHERE exercise_definition_id = ? AND source = ?`,
+      exerciseId, candidate.provider,
     )
   }
   for (const media of mediaCandidates) {
@@ -232,7 +232,7 @@ async function upsertImportedMedia(
         exercise_definition_id, type, source, external_id, remote_url, thumbnail_remote_url,
         local_uri, mime_type, width, height, duration_seconds, is_main, sort_order, license_name,
         license_url, author, source_url, downloaded_at, created_at, updated_at
-      ) VALUES (?, ?, 'WGER', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(source, external_id) WHERE external_id IS NOT NULL DO UPDATE SET
         exercise_definition_id = excluded.exercise_definition_id,
         type = excluded.type,
@@ -251,7 +251,7 @@ async function upsertImportedMedia(
         source_url = excluded.source_url,
         downloaded_at = excluded.downloaded_at,
         updated_at = excluded.updated_at
-    `, exerciseId, media.type, media.externalId, media.remoteUrl, media.thumbnailRemoteUrl,
+    `, exerciseId, media.type, media.source, media.externalId, media.remoteUrl, media.thumbnailRemoteUrl,
     media.localUri ?? null, media.mimeType, media.width, media.height, media.durationSeconds,
     Number(media.main), media.sortOrder, media.licenseName, media.licenseUrl, media.author,
     media.sourceUrl, media.downloadedAt ?? null, timestamp, timestamp)
@@ -259,7 +259,7 @@ async function upsertImportedMedia(
 }
 
 function isValidImportedMedia(media: ExternalExerciseCandidate['media'][number]) {
-  if (media.source !== 'WGER' || !media.externalId.trim()) return false
+  if (!['WGER', 'EXERCISEDB'].includes(media.source) || !media.externalId.trim()) return false
   if (!['IMAGE', 'VIDEO'].includes(media.type)) return false
   try {
     if (new URL(media.remoteUrl).protocol !== 'https:') return false
@@ -273,7 +273,7 @@ function isValidImportedMedia(media: ExternalExerciseCandidate['media'][number])
 function uniqueCandidates(candidates: ExternalExerciseCandidate[]) {
   const unique = new Map<string, ExternalExerciseCandidate>()
   for (const candidate of candidates) {
-    if (candidate.provider === 'WGER' && /^\d+$/.test(candidate.externalId) && candidate.name.trim()) {
+    if (['WGER', 'EXERCISEDB'].includes(candidate.provider) && candidate.externalId.trim() && candidate.name.trim()) {
       unique.set(candidate.externalId, candidate)
     }
   }
@@ -297,7 +297,7 @@ function importedExerciseMatches(
   candidate: ExternalExerciseCandidate,
 ) {
   if (!current) return false
-  const currentMedia = current.media.filter((item) => item.source === 'WGER').map((item) => ({
+  const currentMedia = current.media.filter((item) => item.source === candidate.provider).map((item) => ({
     type: item.type, externalId: item.externalId, remoteUrl: item.remoteUrl,
     thumbnailRemoteUrl: item.thumbnailRemoteUrl, mimeType: item.mimeType,
     width: item.width, height: item.height, durationSeconds: item.durationSeconds,
