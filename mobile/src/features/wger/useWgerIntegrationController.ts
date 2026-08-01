@@ -13,7 +13,7 @@ import type { ToastKind } from '../../components/Toast'
 export const DEFAULT_WGER_QUERY: ExternalExerciseCatalogQuery = {
   page: 1,
   pageSize: 20,
-  language: 'pt-br',
+  language: 'auto',
   fallbackLanguage: 'en',
   text: '',
   categoryIds: [],
@@ -71,7 +71,7 @@ export function useWgerIntegrationController(
     abort.current = controller
     const currentRequest = ++requestId.current
     const nextQuery = { ...query, page }
-    const requestQuery = { ...nextQuery, language: query.language === 'auto' ? 'pt-br' : query.language }
+    const requestQuery = { ...nextQuery, language: query.language === 'auto' ? deviceLocale() : query.language }
     setQuery(nextQuery)
     setPhase('loading')
     setMessage({ text: '', kind: 'info' })
@@ -107,9 +107,11 @@ export function useWgerIntegrationController(
   const loadLanguages = useCallback(async () => {
     if (languages.length) return languages
     if (!languageRequest.current) {
+      setLanguagesFailed(false)
       setLanguagesLoading(true)
       languageRequest.current = fallback.getLanguages().then((result) => {
         setLanguages(result)
+        setLanguagesFailed(false)
         return result
       }).catch(() => {
         setLanguagesFailed(true)
@@ -250,4 +252,8 @@ export function useWgerIntegrationController(
 
 function messageFrom(error: unknown) {
   return error instanceof Error ? error.message : 'Falha inesperada na integração Wger.'
+}
+
+export function deviceLocale() {
+  return Intl.DateTimeFormat().resolvedOptions().locale.replace('_', '-').toLowerCase() || 'en'
 }

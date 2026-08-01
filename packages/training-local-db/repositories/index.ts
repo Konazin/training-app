@@ -196,7 +196,7 @@ async function upsertImportedExercise(
       name, normalized_name, description, primary_muscle_group, secondary_muscle_groups_json,
       equipment, category, difficulty, instructions, notes, unilateral, timed, source,
       external_id, source_url, license_name, license_url, author, archived, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
   `, candidate.name, normalizeName(candidate.name), candidate.description,
   candidate.primaryMuscleGroup, serializeJson(candidate.secondaryMuscleGroups),
   candidate.equipment, candidate.category, candidate.difficulty, candidate.instructions,
@@ -234,7 +234,7 @@ async function upsertImportedMedia(
         exercise_definition_id, type, source, external_id, remote_url, thumbnail_remote_url,
         local_uri, mime_type, width, height, duration_seconds, is_main, sort_order, license_name,
         license_url, author, source_url, downloaded_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(source, external_id) WHERE external_id IS NOT NULL DO UPDATE SET
         exercise_definition_id = excluded.exercise_definition_id,
         type = excluded.type,

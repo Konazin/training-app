@@ -66,7 +66,7 @@ describe('avisos e provider renderizados', () => {
 
   it('declara Wger como consulta manual e só navega por ação explícita', async () => {
     await renderAsync(createElement(IntegrationsScreen))
-    expect(screen.getByText('Manual · Requer internet · Sem sincronização automática')).toBeTruthy()
+    expect(screen.getAllByText('Manual · Requer internet · Sem sincronização automática')).toHaveLength(2)
     expect(mockNavigation.navigate).not.toHaveBeenCalled()
     fireEvent.press(screen.getByText('Catálogo Wger'))
     expect(mockNavigation.navigate).toHaveBeenCalledWith('WgerIntegration')

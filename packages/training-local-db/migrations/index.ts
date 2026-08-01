@@ -324,8 +324,7 @@ SET archived = 1
 WHERE source = 'SYSTEM' AND archived = 0;
 `
 const exerciseDbProviderMetadata = `
-ALTER TABLE exercise_definitions RENAME TO exercise_definitions_legacy;
-CREATE TABLE exercise_definitions (
+CREATE TABLE exercise_definitions_new (
   id INTEGER PRIMARY KEY, name TEXT NOT NULL, normalized_name TEXT NOT NULL,
   description TEXT NOT NULL DEFAULT '', primary_muscle_group TEXT NOT NULL,
   secondary_muscle_groups_json TEXT NOT NULL DEFAULT '[]', equipment TEXT NOT NULL,
@@ -336,8 +335,43 @@ CREATE TABLE exercise_definitions (
   source_url TEXT, license_name TEXT, license_url TEXT, author TEXT, archived INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0,1)),
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(source, external_id)
 );
-INSERT INTO exercise_definitions SELECT * FROM exercise_definitions_legacy;
-DROP TABLE exercise_definitions_legacy;
+CREATE TABLE exercise_media_new (
+  id INTEGER PRIMARY KEY,
+  exercise_definition_id INTEGER NOT NULL REFERENCES exercise_definitions(id) ON DELETE CASCADE,
+  type TEXT NOT NULL CHECK (type IN ('IMAGE','VIDEO')),
+  source TEXT NOT NULL CHECK (source IN ('SYSTEM','CUSTOM','WGER','EXERCISEDB','LEGACY')),
+  external_id TEXT,
+  remote_url TEXT,
+  local_uri TEXT,
+  thumbnail_remote_url TEXT,
+  thumbnail_local_uri TEXT,
+  mime_type TEXT,
+  width INTEGER,
+  height INTEGER,
+  duration_seconds INTEGER,
+  is_main INTEGER NOT NULL DEFAULT 0 CHECK (is_main IN (0,1)),
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  license_name TEXT,
+  license_url TEXT,
+  author TEXT,
+  source_url TEXT,
+  downloaded_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+INSERT INTO exercise_definitions_new SELECT * FROM exercise_definitions;
+INSERT INTO exercise_media_new SELECT * FROM exercise_media;
+DROP TABLE exercise_media;
+DROP TABLE exercise_definitions;
+ALTER TABLE exercise_definitions_new RENAME TO exercise_definitions;
+ALTER TABLE exercise_media_new RENAME TO exercise_media;
+CREATE INDEX exercise_definition_search ON exercise_definitions(normalized_name, primary_muscle_group, equipment);
+CREATE INDEX exercise_media_owner ON exercise_media(exercise_definition_id, type, is_main, sort_order);
+CREATE UNIQUE INDEX exercise_media_source_external
+  ON exercise_media(source, external_id)
+  WHERE external_id IS NOT NULL;
+CREATE INDEX exercise_definition_external_lookup
+  ON exercise_definitions(source, external_id, archived);
 CREATE TABLE exercise_provider_metadata (provider TEXT PRIMARY KEY, last_synced_at TEXT, cache_expires_at TEXT);
 `
 
@@ -379,6 +413,10 @@ export async function runMigrations(database: SqlDatabase, onProgress?: (progres
       try {
         await database.transaction(async (transaction) => {
           await transaction.exec(item.sql)
+          if (rebuild) {
+            const violations = await transaction.all('PRAGMA foreign_key_check')
+            if (violations.length) throw new Error(`foreign_key_check encontrou ${violations.length} violação(ões)`)
+          }
           await transaction.run(
             'INSERT INTO schema_migrations(version, name, checksum, applied_at) VALUES (?, ?, ?, ?)',
             item.version,
@@ -389,10 +427,6 @@ export async function runMigrations(database: SqlDatabase, onProgress?: (progres
         })
       } finally {
         if (rebuild) await database.exec('PRAGMA foreign_keys = ON')
-      }
-      if (rebuild) {
-        const violations = await database.all('PRAGMA foreign_key_check')
-        if (violations.length) throw new Error(`foreign_key_check encontrou ${violations.length} violação(ões)`)
       }
     } catch (cause) {
       throw new MigrationError(item, cause instanceof Error ? cause.message : String(cause))

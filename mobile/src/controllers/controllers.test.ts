@@ -740,9 +740,12 @@ describe('controllers locais', () => {
     const hook = await renderController(() => useWgerIntegrationController(imports, exercises, vi.fn(async () => {}), provider))
     await act(async () => {
       expect(await hook.current.loadLanguages()).toEqual([])
+      languages.mockResolvedValue([{ code: 'de', name: 'Deutsch' }])
+      expect(await hook.current.loadLanguages()).toEqual([{ code: 'de', name: 'Deutsch' }])
       expect(await hook.current.search()).toBe(true)
     })
     expect(hook.current.items).toEqual([candidate])
+    expect(hook.current.languagesFailed).toBe(false)
     hook.unmount()
     languages.mockRestore()
   })

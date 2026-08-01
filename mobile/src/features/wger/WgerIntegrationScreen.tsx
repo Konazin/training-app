@@ -59,7 +59,7 @@ export function WgerIntegrationScreen({
           description="ExerciseDB é consultado primeiro; Wger complementa quando necessário. A cópia escolhida fica no aparelho."
         />
 
-        <View style={styles.notice}>
+        {!consented && <View style={styles.notice}>
           <Text style={styles.noticeTitle}>Você controla cada consulta</Text>
           <Text style={styles.noticeText}>
             O app faz apenas requisições GET ao ExerciseDB e ao Wger. Nenhuma ficha, sessão, série, nota ou identificador local é enviado.
@@ -67,10 +67,8 @@ export function WgerIntegrationScreen({
           <Text style={styles.noticeText}>
             Exercícios escolhidos ficam no SQLite. Imagens e vídeos remotos podem precisar de internet e cada item mantém autoria e licença.
           </Text>
-          {!consented && (
-            <PrimaryButton label="Entendi e quero continuar" onPress={() => setConsented(true)} />
-          )}
-        </View>
+          <PrimaryButton label="Entendi e quero continuar" onPress={() => setConsented(true)} />
+        </View>}
 
         {consented && (
           <View style={styles.searchArea}>
@@ -143,6 +141,7 @@ export function WgerIntegrationScreen({
       </View>
       <FlatList
         data={controller.items}
+        style={styles.list}
         extraData={[controller.selected, controller.existing, controller.phase]}
         keyExtractor={(item) => exerciseIdentity(item.provider, item.externalId)}
         keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
@@ -433,6 +432,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   header: { gap: 10, paddingHorizontal: shared.screen.horizontalPadding, paddingTop: 8 },
   searchArea: { gap: 8 },
   listContent: { flexGrow: 1, paddingBottom: 12, paddingHorizontal: shared.screen.horizontalPadding, paddingTop: 8 },
+  list: { flex: 1, minHeight: 120 },
   itemSeparator: { height: 8 },
   empty: { ...typography.bodySmall, color: colors.textSecondary, padding: 20, textAlign: 'center' },
   notice: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 20, borderWidth: 1, gap: 10, padding: 18 },

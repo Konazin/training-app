@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   BUNDLED_EXERCISES,
   TRAINING_PLAN_TEMPLATES,
+  WEEKDAYS,
   WGER_STARTER_PACK,
   type ExternalExerciseCandidate,
   type TrainingBackup,
@@ -93,6 +94,81 @@ describe('SQLite local schema', () => {
     `], { encoding: 'utf8', timeout: 5_000 })
     expect(restoreFailure.status).not.toBe(0)
     expect(query(path, `SELECT key FROM app_settings WHERE key='preserved';`)[0]?.key).toBe('preserved')
+  })
+
+  it('faz upgrade real de v8 para v9 sem perder referências, índices ou IDs', async () => {
+    const path = newDatabase()
+    const database = betterDatabase(path)
+    await database.exec('CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL, checksum TEXT NOT NULL, applied_at TEXT NOT NULL)')
+    for (const migration of MIGRATIONS.slice(0, 8)) {
+      await database.exec(migration.sql)
+      await database.run('INSERT INTO schema_migrations VALUES (?, ?, ?, ?)', migration.version, migration.name, migration.checksum, '2026-08-01T00:00:00.000Z')
+    }
+    const repositories = createLocalRepositories(database)
+    const custom = await repositories.exercises.create({
+      name: 'Custom v8', description: '', primaryMuscleGroup: 'Peito', secondaryMuscleGroups: [],
+      equipment: 'Barra', category: 'STRENGTH', difficulty: 'Iniciante', instructions: '', notes: '', unilateral: false, timed: false,
+    })
+    const wger = await repositories.externalExerciseImport.importSelected([wgerCandidate()])
+    const imported = (await repositories.exercises.findById(wger.affectedIds[0]!))!
+    await database.run('INSERT INTO exercise_aliases(exercise_id, alias, normalized_alias, origin) VALUES (?, ?, ?, ?)', custom.id, 'Customizado', 'customizado', 'USER')
+    await repositories.exercises.setFavorite(custom.id, true)
+    await repositories.exercises.recordRecentUsage(custom.id, '2026-08-01T10:00:00.000Z')
+    const plan = await repositories.plans.createWithDays({
+      plan: { name: 'Plano v8', description: '', category: 'Força', difficulty: 'Iniciante' },
+      days: WEEKDAYS.map((weekday) => ({ weekday, title: weekday, description: '', restDay: false, estimatedDurationMinutes: 30, notes: '' })),
+    })
+    await repositories.plans.addExercise(plan.id, plan.days[0]!.id, {
+      exerciseDefinitionId: custom.id, sets: 1, minReps: 5, maxReps: 8, plannedLoad: null,
+      plannedDurationSeconds: null, plannedDistance: null, restSeconds: 30, plannedRpe: null,
+      setType: 'NORMAL', notes: '', alternativeExerciseId: null,
+    })
+    const session = await repositories.sessions.start(plan.id, plan.days[0]!.id)
+    const sessionSet = session.exercises[0]!.sets[0]!
+    await repositories.sessions.updateSet(session.id, session.exercises[0]!.id, sessionSet.id, {
+      reps: 6, load: 10, durationSeconds: 0, distance: 0, rpe: 7, completed: true, notes: '',
+    })
+    const tables = ['exercise_definitions', 'exercise_media', 'exercise_aliases', 'exercise_favorites', 'exercise_recent_usage', 'training_plans', 'training_plan_days', 'training_day_exercises', 'workout_sessions', 'workout_session_exercises', 'workout_set_logs']
+    const before = new Map<string, { count: number; ids: number[] }>()
+    for (const table of tables) {
+      const idColumn = ['exercise_favorites', 'exercise_recent_usage'].includes(table) ? 'exercise_id' : 'id'
+      before.set(table, {
+        count: (await database.first<{ count: number }>(`SELECT COUNT(*) AS count FROM ${table}`))!.count,
+        ids: (await database.all<{ value: number }>(`SELECT ${idColumn} AS value FROM ${table} ORDER BY ${idColumn}`)).map((row) => row.value),
+      })
+    }
+    await runMigrations(database)
+    expect(await database.first<{ foreign_keys: number }>('PRAGMA foreign_keys')).toEqual({ foreign_keys: 1 })
+    for (const table of tables) {
+      expect(await database.first<{ count: number }>(`SELECT COUNT(*) AS count FROM ${table}`)).toEqual({ count: before.get(table)!.count })
+      const idColumn = ['exercise_favorites', 'exercise_recent_usage'].includes(table) ? 'exercise_id' : 'id'
+      expect((await database.all<{ value: number }>(`SELECT ${idColumn} AS value FROM ${table} ORDER BY ${idColumn}`)).map((row) => row.value)).toEqual(before.get(table)!.ids)
+    }
+    expect(await database.all('PRAGMA foreign_key_check')).toEqual([])
+    expect(await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM schema_migrations')).toEqual({ count: 9 })
+    for (const index of ['exercise_definition_search', 'exercise_media_owner', 'exercise_media_source_external', 'exercise_definition_external_lookup']) {
+      expect(await database.first(`SELECT name FROM sqlite_master WHERE type = 'index' AND name = ?`, index)).toBeTruthy()
+    }
+    const exercisedb = { ...wgerCandidate(), provider: 'EXERCISEDB' as const, media: [{ ...wgerCandidate().media[0]!, source: 'EXERCISEDB' as const, mimeType: 'image/gif', remoteUrl: 'https://cdn.example/exercise.gif' }] }
+    await expect(repositories.externalExerciseImport.importSelected([exercisedb])).resolves.toMatchObject({ created: 1 })
+    expect(await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM exercise_definitions WHERE external_id = ?', '983')).toEqual({ count: 2 })
+    await database.close()
+  })
+
+  it('reverte integralmente uma falha durante a migration 9 e reativa foreign_keys', async () => {
+    const path = newDatabase()
+    const database = betterDatabase(path, failOn('DROP TABLE exercise_definitions'))
+    await database.exec('CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL, checksum TEXT NOT NULL, applied_at TEXT NOT NULL)')
+    for (const migration of MIGRATIONS.slice(0, 8)) {
+      await database.exec(migration.sql)
+      await database.run('INSERT INTO schema_migrations VALUES (?, ?, ?, ?)', migration.version, migration.name, migration.checksum, '2026-08-01T00:00:00.000Z')
+    }
+    await expect(runMigrations(database)).rejects.toThrow('Migration 9')
+    expect(await database.first('SELECT name FROM sqlite_master WHERE type = \'table\' AND name = \'exercise_definitions\'')).toBeTruthy()
+    expect(await database.first('SELECT name FROM sqlite_master WHERE type = \'table\' AND name = \'exercise_definitions_new\'')).toBeNull()
+    expect(await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM schema_migrations')).toEqual({ count: 8 })
+    expect(await database.first<{ foreign_keys: number }>('PRAGMA foreign_keys')).toEqual({ foreign_keys: 1 })
+    await database.close()
   })
 
   it('valida formato, referências e sessão única antes de restaurar', () => {
@@ -1251,7 +1327,7 @@ describe('SQLite local schema', () => {
       'SELECT exercise_definition_id FROM training_day_exercises',
     )).toEqual({ exercise_definition_id: exercise.lastInsertRowId })
     expect(await database.first('SELECT COUNT(*) AS count FROM schema_migrations'))
-      .toEqual({ count: 8 })
+      .toEqual({ count: 9 })
     await database.close()
   })
 
