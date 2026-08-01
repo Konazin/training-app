@@ -19,6 +19,7 @@ import type {
   ExternalExerciseCandidate,
   ExternalExerciseImportRepository,
 } from '@training/training-domain'
+import { exerciseIdentity } from '@training/training-domain'
 import { FormField } from '../../components/FormField'
 import { PrimaryButton } from '../../components/PrimaryButton'
 import { ScreenScrollView } from '../../components/Screen'
@@ -151,10 +152,10 @@ export function WgerIntegrationScreen({
             </View>
             {controller.items.map((item) => (
               <ResultCard
-                key={item.externalId}
+                key={exerciseIdentity(item.provider, item.externalId)}
                 item={item}
-                selected={controller.selected.has(item.externalId)}
-                existing={controller.existing.has(item.externalId)}
+                selected={controller.selected.has(exerciseIdentity(item.provider, item.externalId))}
+                existing={controller.existing.has(exerciseIdentity(item.provider, item.externalId))}
                 onToggle={() => controller.toggle(item)}
                 onPreview={() => controller.setPreview(item)}
               />

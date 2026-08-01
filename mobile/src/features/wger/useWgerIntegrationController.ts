@@ -5,6 +5,7 @@ import type {
   ExternalExerciseCatalogQuery,
   ExternalExerciseImportRepository,
 } from '@training/training-domain'
+import { exerciseIdentity } from '@training/training-domain'
 import { WgerExerciseCatalogProvider, WgerHttpError } from '@training/training-wger'
 import { ExerciseDbClient } from '@training/training-exercisedb'
 import type { ToastKind } from '../../components/Toast'
@@ -73,7 +74,7 @@ export function useWgerIntegrationController(
       let result
       try { result = await provider.search(nextQuery, controller.signal) }
       catch (error) {
-        if (provider.descriptor.id !== 'EXERCISEDB') throw error
+        if (provider.descriptor?.id !== 'EXERCISEDB') throw error
         setMessage({ text: 'ExerciseDB indisponível; tentando Wger…', kind: 'warning' })
         result = await fallback.search(nextQuery, controller.signal)
       }
@@ -81,7 +82,7 @@ export function useWgerIntegrationController(
       const previewExisting = await imports.previewExisting(result.items)
       if (requestId.current !== currentRequest) return false
       setItems(result.items)
-      setExisting(new Set(previewExisting.filter((item) => item.alreadyImported).map((item) => item.externalId)))
+      setExisting(new Set(previewExisting.filter((item) => item.alreadyImported).map((item) => exerciseIdentity(item.provider, item.externalId))))
       setTotal(result.total)
       setHasNext(result.hasNext)
       setHasPrevious(result.hasPrevious)
@@ -101,23 +102,25 @@ export function useWgerIntegrationController(
   const toggle = useCallback((candidate: ExternalExerciseCandidate) => {
     setSelected((current) => {
       const next = new Map(current)
-      if (next.has(candidate.externalId)) next.delete(candidate.externalId)
-      else next.set(candidate.externalId, candidate)
+      const key = exerciseIdentity(candidate.provider, candidate.externalId)
+      if (next.has(key)) next.delete(key)
+      else next.set(key, candidate)
       return next
     })
   }, [])
 
   const selectPage = useCallback(() => {
-    setSelected((current) => new Map([...current, ...items.map((item) => [item.externalId, item] as const)]))
+    setSelected((current) => new Map([...current, ...items.map((item) => [exerciseIdentity(item.provider, item.externalId), item] as const)]))
   }, [items])
 
   const clearSelection = useCallback(() => setSelected(new Map()), [])
 
   const savePreview = useCallback((candidate: ExternalExerciseCandidate) => {
-    setItems((current) => current.map((item) => item.externalId === candidate.externalId ? candidate : item))
+    setItems((current) => current.map((item) => exerciseIdentity(item.provider, item.externalId) === exerciseIdentity(candidate.provider, candidate.externalId) ? candidate : item))
     setSelected((current) => {
-      if (!current.has(candidate.externalId)) return current
-      return new Map(current).set(candidate.externalId, candidate)
+      const key = exerciseIdentity(candidate.provider, candidate.externalId)
+      if (!current.has(key)) return current
+      return new Map(current).set(key, candidate)
     })
     setPreview(null)
   }, [])
@@ -151,15 +154,29 @@ export function useWgerIntegrationController(
     const currentRequest = ++requestId.current
     setPhase('loading')
     try {
-      const local = await exercises.list({ source: 'WGER', includeArchived: true })
+      const local = (await Promise.all([
+        exercises.list({ source: 'WGER', includeArchived: true }),
+        exercises.list({ source: 'EXERCISEDB', includeArchived: true }),
+      ])).flat()
       const refreshed: ExternalExerciseCandidate[] = []
       const warnings: string[] = []
-      for (const item of local) {
+      const groups = new Map<string, typeof local>()
+      for (const item of local) groups.set(item.source, [...(groups.get(item.source) ?? []), item])
+      for (const [sourceId, group] of groups) {
+        const source = sourceId === 'WGER' ? fallback : provider
+        for (const item of group) {
         if (!item.externalId) continue
-        const candidate = await provider.findByExternalId(item.externalId, 'pt-br', controller.signal)
-        if (requestId.current !== currentRequest) return false
-        if (candidate) refreshed.push(candidate)
-        else warnings.push(`${item.name}: não encontrado no Wger; cópia local mantida.`)
+        try {
+          const candidate = await source.findByExternalId(item.externalId, 'pt-br', controller.signal)
+          if (requestId.current !== currentRequest) return false
+          if (candidate) refreshed.push(candidate)
+          else warnings.push(`${item.name}: não encontrado; cópia local mantida.`)
+        } catch (error) {
+          if (controller.signal.aborted) return false
+          if (error instanceof WgerHttpError && error.code === 'ABORTED') return false
+          warnings.push(`${item.name}: fonte indisponível; cópia local mantida.`)
+        }
+        }
       }
       const result = await imports.importSelected(refreshed)
       await Promise.all([onImported(), loadImportedCount()])

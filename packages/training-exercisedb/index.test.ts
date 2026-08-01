@@ -10,6 +10,8 @@ describe('ExerciseDB provider', () => {
     const fetcher = vi.fn(async () => response([row]))
     const page = await new ExerciseDbClient({ fetch: fetcher }).search(query)
     expect(page.items[0]).toMatchObject({ provider: 'EXERCISEDB', externalId: 'bench-1', name: 'barbell bench press', licenseName: expect.any(String) })
+    expect(page.items[0]?.media).toEqual([expect.objectContaining({ type: 'IMAGE', mimeType: 'image/gif' })])
+    expect(page.items[0]?.media.some((media) => media.type === 'VIDEO')).toBe(false)
     expect(fetcher).toHaveBeenCalledWith(expect.stringContaining('search=bench+press'), expect.any(Object))
   })
   it('rejeita schema inválido e respeita cancelamento/timeout', async () => {

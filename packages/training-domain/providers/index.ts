@@ -1,5 +1,9 @@
 export type ExerciseProviderId = 'EXERCISEDB' | 'WGER'
 
+export function exerciseIdentity(provider: ExerciseProviderId, externalId: string) {
+  return `${provider}:${externalId}`
+}
+
 export type ExerciseProviderCapability =
   | 'SEARCH'
   | 'IMPORT'

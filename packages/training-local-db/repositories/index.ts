@@ -1,5 +1,6 @@
 import {
   DomainError,
+  exerciseIdentity,
   WEEKDAYS,
   activeSessionExists,
   activeSessionUsesTrainingPlan,
@@ -118,18 +119,19 @@ export function createLocalRepositories(database: SqlDatabase): LocalRepositorie
 function externalExerciseImportRepository(database: SqlDatabase): ExternalExerciseImportRepository {
   return {
     previewExisting: async (candidates) => {
-      const externalIds = uniqueCandidates(candidates).map((item) => item.externalId)
-      if (!externalIds.length) return []
-      const rows = await database.all<{ id: number; external_id: string }>(
-        `SELECT id, external_id FROM exercise_definitions
-         WHERE source IN ('WGER', 'EXERCISEDB') AND external_id IN (${externalIds.map(() => '?').join(',')})`,
-        ...externalIds,
+      const selected = uniqueCandidates(candidates)
+      if (!selected.length) return []
+      const rows = await database.all<{ id: number; source: ExternalExerciseCandidate['provider']; external_id: string }>(
+        `SELECT id, source, external_id FROM exercise_definitions
+         WHERE source IN ('WGER', 'EXERCISEDB') AND external_id IN (${selected.map(() => '?').join(',')})`,
+        ...selected.map((item) => item.externalId),
       )
-      const ids = new Map(rows.map((row) => [row.external_id, row.id]))
-      return externalIds.map((externalId) => ({
-        externalId,
-        existingId: ids.get(externalId) ?? null,
-        alreadyImported: ids.has(externalId),
+      const ids = new Map(rows.map((row) => [exerciseIdentity(row.source, row.external_id), row.id]))
+      return selected.map((item) => ({
+        provider: item.provider,
+        externalId: item.externalId,
+        existingId: ids.get(exerciseIdentity(item.provider, item.externalId)) ?? null,
+        alreadyImported: ids.has(exerciseIdentity(item.provider, item.externalId)),
       }))
     },
     importSelected: (candidates) => database.transaction(async (transaction) => {
@@ -274,7 +276,7 @@ function uniqueCandidates(candidates: ExternalExerciseCandidate[]) {
   const unique = new Map<string, ExternalExerciseCandidate>()
   for (const candidate of candidates) {
     if (['WGER', 'EXERCISEDB'].includes(candidate.provider) && candidate.externalId.trim() && candidate.name.trim()) {
-      unique.set(candidate.externalId, candidate)
+      unique.set(exerciseIdentity(candidate.provider, candidate.externalId), candidate)
     }
   }
   return [...unique.values()]

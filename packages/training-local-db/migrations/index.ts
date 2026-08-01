@@ -324,7 +324,6 @@ SET archived = 1
 WHERE source = 'SYSTEM' AND archived = 0;
 `
 const exerciseDbProviderMetadata = `
-PRAGMA foreign_keys = OFF;
 ALTER TABLE exercise_definitions RENAME TO exercise_definitions_legacy;
 CREATE TABLE exercise_definitions (
   id INTEGER PRIMARY KEY, name TEXT NOT NULL, normalized_name TEXT NOT NULL,
@@ -375,16 +374,26 @@ export async function runMigrations(database: SqlDatabase, onProgress?: (progres
     if (known) continue
     onProgress?.({ version: item.version, name: item.name, current: index + 1, total: MIGRATIONS.length })
     try {
-      await database.transaction(async (transaction) => {
-        await transaction.exec(item.sql)
-        await transaction.run(
-          'INSERT INTO schema_migrations(version, name, checksum, applied_at) VALUES (?, ?, ?, ?)',
-          item.version,
-          item.name,
-          item.checksum,
-          new Date().toISOString(),
-        )
-      })
+      const rebuild = item.version === 9
+      if (rebuild) await database.exec('PRAGMA foreign_keys = OFF')
+      try {
+        await database.transaction(async (transaction) => {
+          await transaction.exec(item.sql)
+          await transaction.run(
+            'INSERT INTO schema_migrations(version, name, checksum, applied_at) VALUES (?, ?, ?, ?)',
+            item.version,
+            item.name,
+            item.checksum,
+            new Date().toISOString(),
+          )
+        })
+      } finally {
+        if (rebuild) await database.exec('PRAGMA foreign_keys = ON')
+      }
+      if (rebuild) {
+        const violations = await database.all('PRAGMA foreign_key_check')
+        if (violations.length) throw new Error(`foreign_key_check encontrou ${violations.length} violação(ões)`)
+      }
     } catch (cause) {
       throw new MigrationError(item, cause instanceof Error ? cause.message : String(cause))
     }

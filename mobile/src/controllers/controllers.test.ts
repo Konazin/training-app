@@ -694,6 +694,35 @@ describe('controllers locais', () => {
     expect(hook.current.message).toMatchObject({ kind: 'error', text: 'Sem internet' })
     hook.unmount()
   })
+
+  it('atualiza cada cópia pela fonte correta e mantém a local quando uma fonte falha', async () => {
+    const wger = wgerCandidate('123', 'Wger local')
+    const exercisedb = { ...wger, provider: 'EXERCISEDB' as const, name: 'ExerciseDB local' }
+    const wgerFind = vi.spyOn(WgerExerciseCatalogProvider.prototype, 'findByExternalId')
+      .mockResolvedValue(wger)
+    const exercisedbProvider = {
+      descriptor: { id: 'EXERCISEDB' as const },
+      findByExternalId: vi.fn(async () => exercisedb),
+      search: vi.fn(),
+    } as unknown as import('@training/training-exercisedb').ExerciseDbClient
+    const imports = {
+      previewExisting: vi.fn(async () => []),
+      importSelected: vi.fn(async () => ({
+        created: 0, updated: 2, unchanged: 0, skipped: 0, failed: 0,
+        warnings: [], affectedIds: [1, 2],
+      })),
+    } as unknown as ExternalExerciseImportRepository
+    const exercises = {
+      list: vi.fn(async (query?: { source?: string }) => query?.source === 'WGER' ? [{ id: 1, source: 'WGER', externalId: '123', name: 'Wger local' } as never] : [{ id: 2, source: 'EXERCISEDB', externalId: '123', name: 'ExerciseDB local' } as never]),
+    } as unknown as ExerciseLibraryRepository
+    const hook = await renderController(() => useWgerIntegrationController(imports, exercises, vi.fn(async () => {}), exercisedbProvider))
+    await act(async () => { await hook.current.refreshImported() })
+    expect(wgerFind).toHaveBeenCalledWith('123', 'pt-br', expect.any(AbortSignal))
+    expect(exercisedbProvider.findByExternalId).toHaveBeenCalledWith('123', 'pt-br', expect.any(AbortSignal))
+    expect(imports.importSelected).toHaveBeenCalledWith([wger, exercisedb])
+    hook.unmount()
+    wgerFind.mockRestore()
+  })
 })
 
 async function renderController<T>(useController: () => T) {

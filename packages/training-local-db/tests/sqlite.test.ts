@@ -231,8 +231,15 @@ describe('SQLite local schema', () => {
       CREATE TABLE schema_migrations (
         version INTEGER PRIMARY KEY, name TEXT NOT NULL, checksum TEXT NOT NULL, applied_at TEXT NOT NULL
       );
-      ${MIGRATIONS.map((migration) => migration.sql).join('\n')}
     `)
+    for (const migration of MIGRATIONS.slice(0, 8)) {
+      await database.exec(migration.sql)
+      await database.run(
+        'INSERT INTO schema_migrations VALUES (?, ?, ?, ?)',
+        migration.version, migration.name, migration.checksum, '2026-07-31T00:00:00.000Z',
+      )
+    }
+    await runMigrations(database)
     expect(await initializeSeededInstallation(database, seedData())).toBe(true)
     expect(await initializeSeededInstallation(database, seedData())).toBe(false)
 
@@ -615,7 +622,7 @@ describe('SQLite local schema', () => {
     let repositories = createLocalRepositories(database)
     const candidate = wgerCandidate()
     expect(await repositories.externalExerciseImport.previewExisting([candidate])).toEqual([{
-      externalId: '983', existingId: null, alreadyImported: false,
+      provider: 'WGER', externalId: '983', existingId: null, alreadyImported: false,
     }])
     const created = await repositories.externalExerciseImport.importSelected([candidate])
     expect(created).toMatchObject({ created: 1, updated: 0, unchanged: 0 })
@@ -971,6 +978,21 @@ describe('SQLite local schema', () => {
       `INSERT INTO exercise_favorites(exercise_id, created_at) VALUES (9999, ?)`,
       '2026-07-30T00:00:00.000Z',
     )).rejects.toThrow('FOREIGN KEY')
+    await database.close()
+  })
+
+  it('usa provider e externalId como identidade, inclusive em colisões', async () => {
+    const path = newDatabase()
+    const database = betterDatabase(path)
+    await runMigrations(database)
+    const repositories = createLocalRepositories(database)
+    const wger = wgerCandidate()
+    const exercisedb = { ...wger, provider: 'EXERCISEDB' as const, media: wger.media.map((media) => ({ ...media, source: 'EXERCISEDB' as const })) }
+    const preview = await repositories.externalExerciseImport.previewExisting([wger, exercisedb])
+    expect(preview.map(({ provider, externalId }) => `${provider}:${externalId}`)).toEqual(['WGER:983', 'EXERCISEDB:983'])
+    expect((await repositories.externalExerciseImport.importSelected([wger, exercisedb])).created).toBe(2)
+    expect(await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM exercise_definitions WHERE external_id = ?', '983'))
+      .toEqual({ count: 2 })
     await database.close()
   })
 

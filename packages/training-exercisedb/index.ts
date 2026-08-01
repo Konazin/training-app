@@ -53,12 +53,12 @@ function mapExerciseDb(value: Record<string, unknown> | null, language = 'en'): 
   const gif = typeof value.gifUrl === 'string' ? value.gifUrl : object(value.gifUrls) ? firstUrl(value.gifUrls) : null
   const images = object(value.imageUrls) ? firstUrl(value.imageUrls) : null
   const media: ExternalExerciseMediaCandidate[] = []
-  if (gif && secure(gif)) media.push(mediaItem('VIDEO', gif, value.exerciseId, sourceUrl))
+  if (gif && secure(gif)) media.push(mediaItem('IMAGE', gif, value.exerciseId, sourceUrl))
   if (images && secure(images)) media.push(mediaItem('IMAGE', images, `${value.exerciseId}-image`, sourceUrl))
   const overview = typeof value.overview === 'string' ? value.overview : ''
   return { provider: 'EXERCISEDB', externalId: value.exerciseId, name: value.name, description: overview, primaryMuscleGroup: primary[0] ?? 'Não informado', secondaryMuscleGroups: secondary, equipment: equipment.join(', ') || 'Não informado', category: category(strings('exerciseTypes')), difficulty: typeof value.difficulty === 'string' ? value.difficulty : 'Não informado', instructions: strings('instructions').join('\n'), unilateral: false, timed: false, sourceUrl, licenseName: LICENSE, licenseUrl: 'https://docs.ascendapi.com/products/edb-v1/overview', author: 'AscendAPI', media, warnings: media.length ? [] : ['A fonte não forneceu mídia válida'], language, original: value }
 }
-function mediaItem(type: 'IMAGE' | 'VIDEO', url: string, id: string, sourceUrl: string): ExternalExerciseMediaCandidate { return { type, source: 'EXERCISEDB', externalId: id, remoteUrl: url, thumbnailRemoteUrl: null, mimeType: type === 'IMAGE' ? 'image/*' : 'image/gif', width: null, height: null, durationSeconds: null, main: true, sortOrder: 0, licenseName: LICENSE, licenseUrl: 'https://docs.ascendapi.com/products/edb-v1/overview', author: 'AscendAPI', sourceUrl } }
+function mediaItem(type: 'IMAGE' | 'VIDEO', url: string, id: string, sourceUrl: string): ExternalExerciseMediaCandidate { return { type, source: 'EXERCISEDB', externalId: id, remoteUrl: url, thumbnailRemoteUrl: null, mimeType: type === 'IMAGE' ? (url.toLowerCase().includes('.gif') ? 'image/gif' : 'image/*') : 'video/*', width: null, height: null, durationSeconds: null, main: true, sortOrder: 0, licenseName: LICENSE, licenseUrl: 'https://docs.ascendapi.com/products/edb-v1/overview', author: 'AscendAPI', sourceUrl } }
 function firstUrl(value: Record<string, unknown>) { return Object.values(value).find((item): item is string => typeof item === 'string' && item.startsWith('https://')) ?? null }
 function secure(value: string) { return value.startsWith('https://') }
 function object(value: unknown): value is Record<string, any> { return !!value && typeof value === 'object' && !Array.isArray(value) }

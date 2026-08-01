@@ -1,3 +1,5 @@
+import type { ExerciseProviderId } from '../providers'
+
 export const WEEKDAYS = [
   'MONDAY',
   'TUESDAY',
@@ -181,6 +183,7 @@ export interface ExternalExerciseCatalogPage {
 }
 
 export interface ExternalExerciseImportPreview {
+  provider: ExerciseProviderId
   externalId: string
   existingId: number | null
   alreadyImported: boolean
