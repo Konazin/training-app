@@ -723,6 +723,53 @@ describe('controllers locais', () => {
     hook.unmount()
     wgerFind.mockRestore()
   })
+
+  it('mantém a busca disponível quando os idiomas do Wger falham', async () => {
+    const languages = vi.spyOn(WgerExerciseCatalogProvider.prototype, 'getLanguages').mockRejectedValue(new Error('idiomas offline'))
+    const candidate = wgerCandidate('321', 'Catálogo')
+    const provider = {
+      descriptor: { id: 'EXERCISEDB' as const },
+      search: vi.fn(async () => page(candidate, 1)),
+      findByExternalId: vi.fn(),
+    } as unknown as import('@training/training-exercisedb').ExerciseDbClient
+    const imports = {
+      previewExisting: vi.fn(async () => []),
+      importSelected: vi.fn(),
+    } as unknown as ExternalExerciseImportRepository
+    const exercises = { list: vi.fn(async () => []) } as unknown as ExerciseLibraryRepository
+    const hook = await renderController(() => useWgerIntegrationController(imports, exercises, vi.fn(async () => {}), provider))
+    await act(async () => {
+      expect(await hook.current.loadLanguages()).toEqual([])
+      expect(await hook.current.search()).toBe(true)
+    })
+    expect(hook.current.items).toEqual([candidate])
+    hook.unmount()
+    languages.mockRestore()
+  })
+
+  it('mantém seleção e importação ao trocar de página', async () => {
+    const first = wgerCandidate('1', 'Primeiro')
+    const second = wgerCandidate('2', 'Segundo')
+    const provider = {
+      descriptor: { id: 'EXERCISEDB' as const },
+      search: vi.fn().mockResolvedValueOnce(page(first, 1)).mockResolvedValueOnce(page(second, 2)),
+      findByExternalId: vi.fn(),
+    } as unknown as import('@training/training-exercisedb').ExerciseDbClient
+    const imports = {
+      previewExisting: vi.fn(async () => []),
+      importSelected: vi.fn(async () => ({ created: 2, updated: 0, unchanged: 0, skipped: 0, failed: 0, warnings: [], affectedIds: [1, 2] })),
+    } as unknown as ExternalExerciseImportRepository
+    const exercises = { list: vi.fn(async () => []) } as unknown as ExerciseLibraryRepository
+    const hook = await renderController(() => useWgerIntegrationController(imports, exercises, vi.fn(async () => {}), provider))
+    await act(async () => { await hook.current.search(1) })
+    act(() => hook.current.toggle(first))
+    await act(async () => { await hook.current.search(2) })
+    act(() => hook.current.toggle(second))
+    expect(hook.current.selected.size).toBe(2)
+    await act(async () => { await hook.current.importSelected() })
+    expect(imports.importSelected).toHaveBeenCalledWith([first, second])
+    hook.unmount()
+  })
 })
 
 async function renderController<T>(useController: () => T) {

@@ -6,7 +6,7 @@ import type {
   ExternalExerciseImportRepository,
 } from '@training/training-domain'
 import { exerciseIdentity } from '@training/training-domain'
-import { WgerExerciseCatalogProvider, WgerHttpError } from '@training/training-wger'
+import { WgerExerciseCatalogProvider, WgerHttpError, type WgerLanguageOption } from '@training/training-wger'
 import { ExerciseDbClient } from '@training/training-exercisedb'
 import type { ToastKind } from '../../components/Toast'
 
@@ -42,6 +42,10 @@ export function useWgerIntegrationController(
   const [hasNext, setHasNext] = useState(false)
   const [hasPrevious, setHasPrevious] = useState(false)
   const [importedCount, setImportedCount] = useState(0)
+  const [languages, setLanguages] = useState<WgerLanguageOption[]>([])
+  const [languagesLoading, setLanguagesLoading] = useState(false)
+  const [languagesFailed, setLanguagesFailed] = useState(false)
+  const languageRequest = useRef<Promise<WgerLanguageOption[]> | null>(null)
   const requestId = useRef(0)
   const abort = useRef<AbortController | null>(null)
 
@@ -67,16 +71,17 @@ export function useWgerIntegrationController(
     abort.current = controller
     const currentRequest = ++requestId.current
     const nextQuery = { ...query, page }
+    const requestQuery = { ...nextQuery, language: query.language === 'auto' ? 'pt-br' : query.language }
     setQuery(nextQuery)
     setPhase('loading')
     setMessage({ text: '', kind: 'info' })
     try {
       let result
-      try { result = await provider.search(nextQuery, controller.signal) }
+      try { result = await provider.search(requestQuery, controller.signal) }
       catch (error) {
         if (provider.descriptor?.id !== 'EXERCISEDB') throw error
         setMessage({ text: 'ExerciseDB indisponível; tentando Wger…', kind: 'warning' })
-        result = await fallback.search(nextQuery, controller.signal)
+        result = await fallback.search(requestQuery, controller.signal)
       }
       if (requestId.current !== currentRequest) return false
       const previewExisting = await imports.previewExisting(result.items)
@@ -98,6 +103,24 @@ export function useWgerIntegrationController(
       return false
     }
   }, [fallback, imports, provider, query])
+
+  const loadLanguages = useCallback(async () => {
+    if (languages.length) return languages
+    if (!languageRequest.current) {
+      setLanguagesLoading(true)
+      languageRequest.current = fallback.getLanguages().then((result) => {
+        setLanguages(result)
+        return result
+      }).catch(() => {
+        setLanguagesFailed(true)
+        return []
+      }).finally(() => {
+        languageRequest.current = null
+        setLanguagesLoading(false)
+      })
+    }
+    return languageRequest.current
+  }, [fallback, languages])
 
   const toggle = useCallback((candidate: ExternalExerciseCandidate) => {
     setSelected((current) => {
@@ -165,17 +188,17 @@ export function useWgerIntegrationController(
       for (const [sourceId, group] of groups) {
         const source = sourceId === 'WGER' ? fallback : provider
         for (const item of group) {
-        if (!item.externalId) continue
-        try {
-          const candidate = await source.findByExternalId(item.externalId, 'pt-br', controller.signal)
-          if (requestId.current !== currentRequest) return false
-          if (candidate) refreshed.push(candidate)
-          else warnings.push(`${item.name}: não encontrado; cópia local mantida.`)
-        } catch (error) {
-          if (controller.signal.aborted) return false
-          if (error instanceof WgerHttpError && error.code === 'ABORTED') return false
-          warnings.push(`${item.name}: fonte indisponível; cópia local mantida.`)
-        }
+          if (!item.externalId) continue
+          try {
+            const candidate = await source.findByExternalId(item.externalId, 'pt-br', controller.signal)
+            if (requestId.current !== currentRequest) return false
+            if (candidate) refreshed.push(candidate)
+            else warnings.push(`${item.name}: não encontrado; cópia local mantida.`)
+          } catch (error) {
+            if (controller.signal.aborted) return false
+            if (error instanceof WgerHttpError && error.code === 'ABORTED') return false
+            warnings.push(`${item.name}: fonte indisponível; cópia local mantida.`)
+          }
         }
       }
       const result = await imports.importSelected(refreshed)
@@ -210,6 +233,10 @@ export function useWgerIntegrationController(
     hasNext,
     hasPrevious,
     importedCount,
+    languages,
+    languagesLoading,
+    languagesFailed,
+    loadLanguages,
     search,
     toggle,
     selectPage,

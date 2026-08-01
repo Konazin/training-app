@@ -37,6 +37,16 @@ describe('WgerClient', () => {
     expect(page).toMatchObject({ count: 42, results: [{ id: 1 }] })
   })
 
+  it('carrega idiomas com nome completo e reutiliza o cache de metadados', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(json({ count: 1, next: null, previous: null, results: [{ id: 99, short_name: 'pt-br', full_name: 'Português do Brasil' }] }))
+      .mockResolvedValueOnce(json({ count: 0, next: null, previous: null, results: [] }))
+    const client = new WgerClient({ fetch: fetcher })
+    await expect(client.getLanguages()).resolves.toEqual([{ code: 'pt-br', name: 'Português do Brasil' }])
+    await expect(client.getLanguages()).resolves.toEqual([{ code: 'pt-br', name: 'Português do Brasil' }])
+    expect(fetcher).toHaveBeenCalledTimes(2)
+  })
+
   it('limita página e rejeita host/protocolo de paginação', async () => {
     const fetcher = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(json({ count: 0, next: null, previous: null, results: [] }))

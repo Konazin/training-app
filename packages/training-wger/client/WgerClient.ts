@@ -1,6 +1,6 @@
 import type { ExternalExerciseCatalogQuery } from '@training/training-domain'
 import { WgerHttpError } from './WgerHttpError'
-import type { WgerClientOptions, WgerLanguage, WgerLicense, WgerMetadata, WgerPage } from './types'
+import type { WgerClientOptions, WgerLanguage, WgerLanguageOption, WgerLicense, WgerMetadata, WgerPage } from './types'
 
 const DEFAULT_BASE_URL = 'https://wger.de/api/v2'
 const DEFAULT_TIMEOUT_MS = 15_000
@@ -14,6 +14,7 @@ export class WgerClient {
   private readonly maxResponseBytes: number
   private readonly fetcher: typeof fetch
   private metadata?: WgerMetadata
+  private languageOptions?: WgerLanguageOption[]
 
   constructor(options: WgerClientOptions = {}) {
     this.baseUrl = validateBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL)
@@ -52,13 +53,23 @@ export class WgerClient {
       this.request(this.url('/language/?limit=100'), signal),
       this.request(this.url('/license/?limit=100'), signal),
     ])
+    const languages = parseList<WgerLanguage>(languagePage, isLanguage)
+    this.languageOptions = languages.map((item) => ({
+      code: normalizeLanguage(item.short_name),
+      name: item.full_name || item.full_name_en || item.short_name,
+    }))
     this.metadata = {
-      languages: new Map(parseList<WgerLanguage>(languagePage, isLanguage).map((item) => [
+      languages: new Map(languages.map((item) => [
         item.id, normalizeLanguage(item.short_name),
       ])),
       licenses: new Map(parseList<WgerLicense>(licensePage, isLicense).map((item) => [item.id, item])),
     }
     return this.metadata
+  }
+
+  async getLanguages(signal?: AbortSignal): Promise<WgerLanguageOption[]> {
+    await this.getMetadata(signal)
+    return [...this.languageOptions ?? []]
   }
 
   private url(path: string) {

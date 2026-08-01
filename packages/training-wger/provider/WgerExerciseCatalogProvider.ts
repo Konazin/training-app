@@ -6,6 +6,7 @@ import type {
 } from '@training/training-domain'
 import { getExerciseProviderDescriptor } from '@training/training-domain'
 import { WgerClient } from '../client/WgerClient'
+import type { WgerLanguageOption } from '../client/types'
 import { mapWgerExercise } from '../mapper/mapWgerExercise'
 
 export class WgerExerciseCatalogProvider implements ExternalExerciseCatalogProvider {
@@ -40,5 +41,9 @@ export class WgerExerciseCatalogProvider implements ExternalExerciseCatalogProvi
       this.client.getMetadata(signal),
     ])
     return item ? mapWgerExercise(item, metadata, language, 'en') : null
+  }
+
+  getLanguages(signal?: AbortSignal): Promise<WgerLanguageOption[]> {
+    return this.client.getLanguages(signal)
   }
 }

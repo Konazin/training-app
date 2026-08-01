@@ -12,6 +12,11 @@ export interface WgerLanguage {
   full_name_en?: string
 }
 
+export interface WgerLanguageOption {
+  code: string
+  name: string
+}
+
 export interface WgerLicense {
   id: number
   full_name: string
