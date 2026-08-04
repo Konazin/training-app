@@ -93,7 +93,7 @@ export function Onboarding({
                   onPress={() => void onComplete().then(onOpenWger)}
                   style={styles.choice}
                 >
-                  <Text style={styles.choiceTitle}>Pesquisar no Wger</Text>
+                  <Text style={styles.choiceTitle}>Explorar catálogo externo</Text>
                   <Text style={styles.choiceDetail}>Requer internet e só consulta após sua ação.</Text>
                 </Pressable>
                 <Pressable

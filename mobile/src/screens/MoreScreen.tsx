@@ -108,8 +108,8 @@ export function MoreScreen({
       />
       <Text style={styles.section}>INTEGRAÇÕES</Text>
       <MenuItem
-        label="Catálogo Wger"
-        detail="Busca exercícios públicos e salva uma cópia no aparelho."
+        label="Fontes de exercícios"
+        detail="Catálogos externos opcionais e cópias salvas no aparelho."
         onPress={onIntegrations}
         disabled={busy}
       />

@@ -258,7 +258,7 @@ function EmptyLibrary({
       <Text style={styles.emptyHint}>Pacote atual · {approvedCount} exercícios</Text>
       <Text style={styles.emptyHint}>O pacote recomendado contém exercícios revisados individualmente. A quantidade pode variar conforme a disponibilidade e a qualidade dos dados do provider.</Text>
       {!!starterPackMessage && <Text accessibilityLiveRegion="polite" style={styles.emptyHint}>{starterPackMessage}</Text>}
-      <PrimaryButton label="Pesquisar no Wger" onPress={onSearchWger} />
+      <PrimaryButton label="Explorar catálogo externo" onPress={onSearchWger} />
       <PrimaryButton secondary label="Criar exercício personalizado" onPress={onCreate} />
       <Pressable accessibilityRole="button" onPress={onContinue} style={styles.continue}>
         <Text style={styles.continueText}>Continuar sem exercícios</Text>

@@ -1,4 +1,10 @@
-import { DomainError, type BackupRepository, type TrainingBackup } from '@training/training-domain'
+import {
+  DomainError,
+  LOCAL_PREFERENCES_KEY,
+  resolveDisplayName,
+  type BackupRepository,
+  type TrainingBackup,
+} from '@training/training-domain'
 import type { BindValue, SqlDatabase } from '../database'
 import { clearUserData, deleteUserRows } from '../database/installation'
 import { retireLegacyGeneratedExercises } from '../database/legacyCatalog'
@@ -87,7 +93,7 @@ export function createBackupRepository(database: SqlDatabase): BackupRepository 
         await insertRows(transaction, 'workout_sessions', backup.sessions)
         await insertRows(transaction, 'workout_session_exercises', backup.sessionExercises)
         await insertRows(transaction, 'workout_set_logs', backup.setLogs)
-        await insertRows(transaction, 'app_settings', backup.settings)
+        await insertRows(transaction, 'app_settings', normalizeLocalPreferenceRows(backup.settings))
         await transaction.run(`
           DELETE FROM training_plans
           WHERE deleted_at IS NOT NULL AND julianday(purge_at) <= julianday(?)
@@ -102,6 +108,26 @@ export function createBackupRepository(database: SqlDatabase): BackupRepository 
     },
     reset: () => clearUserData(database),
   }
+}
+
+function normalizeLocalPreferenceRows(rows: unknown[]) {
+  return rows.map((row) => {
+    if (!row || typeof row !== 'object') return row
+    const candidate = row as Record<string, unknown>
+    if (candidate.key !== LOCAL_PREFERENCES_KEY) return row
+    let preferences: unknown = null
+    try {
+      preferences = typeof candidate.value_json === 'string'
+        ? JSON.parse(candidate.value_json)
+        : null
+    } catch {
+      preferences = null
+    }
+    return {
+      ...candidate,
+      value_json: JSON.stringify({ displayName: resolveDisplayName(preferences) }),
+    }
+  })
 }
 
 export async function exportBackup(database: SqlDatabase, appVersion: string): Promise<TrainingBackup> {

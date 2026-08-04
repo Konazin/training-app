@@ -92,7 +92,7 @@ describe('biblioteca renderizada', () => {
     expect(screen.getByText('Sua biblioteca está vazia')).toBeTruthy()
     expect(screen.getByText('Importar pacote recomendado')).toBeTruthy()
     expect(mockNavigation.navigate).not.toHaveBeenCalled()
-    fireEvent.press(screen.getByText('Pesquisar no Wger'))
+    fireEvent.press(screen.getByText('Explorar catálogo externo'))
     expect(mockNavigation.navigate).toHaveBeenCalledWith('WgerIntegration')
     fireEvent.press(screen.getByText('Continuar sem exercícios'))
     expect(mockNavigation.goBack).toHaveBeenCalledTimes(1)

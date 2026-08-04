@@ -1,0 +1,5 @@
+export * from './MuscleMap'
+export * from './muscleRegions'
+export * from './muscleAliases'
+export * from './resolveMuscleRegions'
+export * from './anatomyPaths'

@@ -21,6 +21,7 @@ export interface ThemeColors {
   background: string
   surface: string
   surfaceSecondary: string
+  surfaceTertiary: string
   card: string
   border: string
   primary: string
@@ -52,7 +53,7 @@ export interface ThemeColors {
 }
 
 const whiteBlueLight: ThemeColors = {
-  background: '#F5F7FA', surface: '#FFFFFF', surfaceSecondary: '#EAF0F7', card: '#FFFFFF',
+  background: '#F5F7FA', surface: '#FFFFFF', surfaceSecondary: '#EAF0F7', surfaceTertiary: '#DCE5F0', card: '#FFFFFF',
   border: '#CBD5E1', primary: '#155EEF', primaryPressed: '#124DC5', onPrimary: '#FFFFFF',
   textPrimary: '#111827', textSecondary: '#4B5563', success: '#147A3D', successSurface: '#DCFCE7',
   warning: '#9A4D00', danger: '#B42318', dangerSurface: '#FEE4E2', focus: '#2563EB',
@@ -67,7 +68,7 @@ const whiteBlueLight: ThemeColors = {
 }
 
 const whiteBlueDark: ThemeColors = {
-  background: '#0B1220', surface: '#121C2E', surfaceSecondary: '#1B2940', card: '#121C2E',
+  background: '#0B1220', surface: '#121C2E', surfaceSecondary: '#1B2940', surfaceTertiary: '#263751', card: '#121C2E',
   border: '#40516B', primary: '#74A7FF', primaryPressed: '#4D8FF7', onPrimary: '#07101F',
   textPrimary: '#F8FAFC', textSecondary: '#C0CAD8', success: '#5EE68A', successSurface: '#143522',
   warning: '#FFD166', danger: '#FF8A80', dangerSurface: '#431C20', focus: '#9BC1FF',
@@ -83,16 +84,16 @@ const whiteBlueDark: ThemeColors = {
 
 const darkBlueLight: ThemeColors = {
   ...whiteBlueLight,
-  background: '#EEF4FA', surfaceSecondary: '#E1EBF5', primary: '#075985', primaryPressed: '#064667',
+  background: '#EEF4FA', surfaceSecondary: '#E1EBF5', surfaceTertiary: '#D3E1EE', primary: '#075985', primaryPressed: '#064667',
   focus: '#0369A1', tabBar: '#F8FBFF', gray100: '#E1EBF5',
   workout: { ...whiteBlueLight.workout, completed: '#14532D', timer: '#082F49' },
 }
 
 const darkBlueDark: ThemeColors = {
   ...whiteBlueDark,
-  background: '#071421', surface: '#0D2133', surfaceSecondary: '#143047', card: '#0D2133',
-  border: '#315979', primary: '#56B4F4', primaryPressed: '#2E9DDF', onPrimary: '#03111D',
-  tabBar: '#0A1B2A', nearBlack: '#0D2133', gray200: '#315979', gray100: '#143047',
+  background: '#07101F', surface: '#111F35', surfaceSecondary: '#172A44', surfaceTertiary: '#203652', card: '#111F35',
+  border: '#263B59', primary: '#5B8CFF', primaryPressed: '#79A4FF', onPrimary: '#07101F',
+  tabBar: '#0B1629', nearBlack: '#111F35', gray200: '#263B59', gray100: '#172A44',
   workout: { ...whiteBlueDark.workout, background: '#020B12', surface: '#0A1B2A', border: '#9AD9FF', pending: '#0A1B2A' },
 }
 

@@ -72,6 +72,14 @@ it('mantém escala tipográfica e alvos mínimos', async () => {
   expect(tabColors(lightColors).active).not.toBe(tabColors(lightColors).inactive)
 })
 
+it('expõe a fundação de espaçamento, raios, controles e movimento da 0.11', () => {
+  expect(Object.values(shared.radii)).toEqual([14, 18, 22, 26])
+  expect(Object.values(shared.spacing).every((value) => value % 4 === 0)).toBe(true)
+  expect(shared.control.primaryHeight).toBeGreaterThanOrEqual(52)
+  expect(shared.control.primaryHeight).toBeLessThanOrEqual(56)
+  expect(Object.values(shared.motion).every((value) => value >= 150 && value <= 250)).toBe(true)
+})
+
 it.each([320, 360, 375, 390, 412, 430, 480])('mantém a grade da Home dentro de %i px', (viewport) => {
   const content = viewport - shared.screen.horizontalPadding * 2
   const minimumGrid = shared.responsive.metricMinWidth * 2 + shared.responsive.twoColumnGap

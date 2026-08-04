@@ -41,9 +41,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   button: {
     alignItems: 'center',
     backgroundColor: colors.primary,
-    borderRadius: 16,
+    borderRadius: shared.radii?.sm ?? 14,
     justifyContent: 'center',
-    minHeight: shared.touchTarget.minimum,
+    minHeight: shared.control?.primaryHeight ?? 54,
     paddingHorizontal: 18,
   },
   secondary: {

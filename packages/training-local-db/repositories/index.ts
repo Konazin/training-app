@@ -1,4 +1,5 @@
 import {
+  createLocalPreferencesRepository,
   DomainError,
   exerciseIdentity,
   WEEKDAYS,
@@ -36,6 +37,7 @@ import {
   type ExternalExerciseImportResult,
   type ExerciseLibraryQuery,
   type ExerciseLibraryRepository,
+  type LocalPreferencesRepository,
   type SetLogInput,
   type SettingsRepository,
   type TrainingPlan,
@@ -77,6 +79,7 @@ export interface LocalRepositories {
   sessions: WorkoutSessionRepository
   dashboard: DashboardRepository
   settings: SettingsRepository
+  preferences: LocalPreferencesRepository
   backup: BackupRepository
   metadata: AppMetadataRepository
   maintenance: {
@@ -92,6 +95,7 @@ export function createLocalRepositories(database: SqlDatabase): LocalRepositorie
   const plans = planRepository(database)
   const sessions = sessionRepository(database)
   const planTrash = trainingPlanTrashRepository(database)
+  const settings = settingsRepository(database)
   return {
     exercises,
     externalExerciseImport: externalExerciseImportRepository(database),
@@ -104,7 +108,8 @@ export function createLocalRepositories(database: SqlDatabase): LocalRepositorie
         return calculateDashboard(history, allPlans.find((plan) => plan.active && !plan.archived) ?? null)
       },
     },
-    settings: settingsRepository(database),
+    settings,
+    preferences: createLocalPreferencesRepository(settings),
     backup: createBackupRepository(database),
     metadata: createAppMetadataRepository(database),
     maintenance: {

@@ -22,6 +22,8 @@ export interface ExerciseProviderDescriptor {
   supportState: 'SUPPORTED' | 'UNSUPPORTED'
 }
 
+export type ExerciseSources = readonly ExerciseProviderDescriptor[]
+
 const PROVIDERS: readonly ExerciseProviderDescriptor[] = Object.freeze([
   Object.freeze({
     id: 'EXERCISEDB',
@@ -45,7 +47,7 @@ const PROVIDERS: readonly ExerciseProviderDescriptor[] = Object.freeze([
   }),
 ])
 
-export function listExerciseProviders() {
+export function listExerciseProviders(): ExerciseSources {
   return PROVIDERS
 }
 

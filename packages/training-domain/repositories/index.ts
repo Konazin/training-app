@@ -122,6 +122,12 @@ export interface ExternalExerciseCatalogProvider {
   findByExternalId(externalId: string, language?: string, signal?: AbortSignal): Promise<ExternalExerciseCandidate | null>
 }
 
+/** Nome de domínio para o catálogo local unificado. */
+export type ExerciseCatalog = ExerciseLibraryRepository
+
+/** Nome de domínio para qualquer catálogo externo, sem expor o provider na apresentação. */
+export type ExternalExerciseCatalog = ExternalExerciseCatalogProvider
+
 export interface ExternalExerciseImportRepository {
   previewExisting(candidates: ExternalExerciseCandidate[]): Promise<ExternalExerciseImportPreview[]>
   importSelected(candidates: ExternalExerciseCandidate[]): Promise<ExternalExerciseImportResult>

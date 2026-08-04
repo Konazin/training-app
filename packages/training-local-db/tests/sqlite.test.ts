@@ -1,7 +1,6 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { spawnSync } from 'node:child_process'
 import Database from 'better-sqlite3'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
@@ -83,7 +82,7 @@ describe('SQLite local schema', () => {
     expect(query(path, `SELECT COUNT(*) AS value FROM app_settings;`)[0]?.value).toBe(0)
 
     execute(path, `INSERT INTO app_settings VALUES ('preserved','{"ok":true}','x');`)
-    const restoreFailure = spawnSync('sqlite3', ['-bail', path, `
+    const restoreFailure = run(path, `
       PRAGMA foreign_keys=ON;
       BEGIN;
       DELETE FROM app_settings;
@@ -91,9 +90,10 @@ describe('SQLite local schema', () => {
         training_plan_day_id,exercise_definition_id,sort_order,sets,min_reps,max_reps,rest_seconds,set_type
       ) VALUES (999,1,0,3,8,12,60,'NORMAL');
       COMMIT;
-    `], { encoding: 'utf8', timeout: 5_000 })
+    `)
     expect(restoreFailure.status).not.toBe(0)
     expect(query(path, `SELECT key FROM app_settings WHERE key='preserved';`)[0]?.key).toBe('preserved')
+    await database.close()
   })
 
   it('faz upgrade real de v8 para v9 sem perder referências, índices ou IDs', async () => {
@@ -1479,6 +1479,41 @@ describe('SQLite local schema', () => {
     expect((await repositories.exercises.findById(replacement.id))?.notes).toBe('Nota canônica')
     await database.close()
   })
+
+  it('persiste displayName no app_settings e mantém backup retrocompatível', async () => {
+    const path = newDatabase()
+    const database = betterDatabase(path)
+    await runMigrations(database)
+    const repositories = createLocalRepositories(database)
+
+    await expect(repositories.preferences.load()).resolves.toEqual({ displayName: 'Atleta' })
+    await expect(repositories.preferences.saveDisplayName('  Marina  ')).resolves.toEqual({ displayName: 'Marina' })
+    expect(await repositories.settings.get('preferences.local')).toEqual({ displayName: 'Marina' })
+
+    const backup = await repositories.backup.export('0.10.0')
+    expect(backup.settings).toContainEqual(expect.objectContaining({
+      key: 'preferences.local',
+      value_json: JSON.stringify({ displayName: 'Marina' }),
+    }))
+    await repositories.backup.reset()
+    await expect(repositories.preferences.load()).resolves.toEqual({ displayName: 'Atleta' })
+    await repositories.backup.restore(backup)
+    await expect(repositories.preferences.load()).resolves.toEqual({ displayName: 'Marina' })
+
+    const oldBackup = { ...backup, settings: [] }
+    await repositories.backup.restore(oldBackup)
+    await expect(repositories.preferences.load()).resolves.toEqual({ displayName: 'Atleta' })
+
+    const invalidBackup = {
+      ...backup,
+      settings: backup.settings.map((row) => (row as { key?: unknown }).key === 'preferences.local'
+        ? { ...row as object, value_json: JSON.stringify({ displayName: 42 }) }
+        : row),
+    }
+    await repositories.backup.restore(invalidBackup)
+    await expect(repositories.preferences.load()).resolves.toEqual({ displayName: 'Atleta' })
+    await database.close()
+  })
 })
 
 function newDatabase() {
@@ -1488,7 +1523,17 @@ function newDatabase() {
 }
 
 function run(database: string, sql: string) {
-  return spawnSync('sqlite3', [database, sql], { encoding: 'utf8', timeout: 5_000 })
+  const native = new Database(database)
+  try {
+    native.pragma('foreign_keys = ON')
+    native.exec(sql)
+    return { status: 0, stderr: '', stdout: '' }
+  } catch (error) {
+    if (native.inTransaction) native.exec('ROLLBACK')
+    return { status: 1, error: error as Error, stderr: '', stdout: '' }
+  } finally {
+    native.close()
+  }
 }
 
 function execute(database: string, sql: string) {
@@ -1497,9 +1542,12 @@ function execute(database: string, sql: string) {
 }
 
 function query(database: string, sql: string) {
-  const result = spawnSync('sqlite3', ['-json', database, sql], { encoding: 'utf8', timeout: 5_000 })
-  if (result.status !== 0) throw new Error(result.error?.message || result.stderr || result.stdout)
-  return JSON.parse(result.stdout || '[]') as Array<Record<string, string | number>>
+  const native = new Database(database, { readonly: true })
+  try {
+    return native.prepare(sql).all() as Array<Record<string, string | number>>
+  } finally {
+    native.close()
+  }
 }
 
 function validBackup(): TrainingBackup {
