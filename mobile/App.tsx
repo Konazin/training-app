@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, AppState } from 'react-native'
 import {
   DefaultTheme,
@@ -40,6 +40,7 @@ import { HomeScreen } from './src/screens/HomeScreen'
 import { HistoryScreen } from './src/screens/HistoryScreen'
 import { MoreScreen } from './src/screens/MoreScreen'
 import { NutritionScreen } from './src/features/nutrition/NutritionScreen'
+import { NutritionGoalsScreen } from './src/features/nutrition/NutritionGoalsScreen'
 import { AppearanceSettingsScreen } from './src/screens/AppearanceSettingsScreen'
 import { IntegrationsScreen } from './src/screens/IntegrationsScreen'
 import { WgerIntegrationScreen } from './src/features/wger/WgerIntegrationScreen'
@@ -122,12 +123,13 @@ function LocalApp({
     savedPreferences,
   } = useTheme()
   const controller = useTrainingController(repositories.exercises, repositories.dashboard)
+  const [nutritionMaintenanceError, setNutritionMaintenanceError] = useState<string | null>(null)
   const maintenanceRun = useRef<Promise<void> | null>(null)
   const runNutritionMaintenance = useCallback(() => {
-    if (!maintenanceRun.current) maintenanceRun.current = repositories.nutritionMaintenance.run(localDateKey(new Date())).catch(() => undefined).finally(() => { maintenanceRun.current = null })
+    if (!maintenanceRun.current) maintenanceRun.current = repositories.nutritionMaintenance.run(localDateKey(new Date())).then(() => setNutritionMaintenanceError(null)).catch((error) => { setNutritionMaintenanceError(error instanceof Error ? error.message : 'A manutenção da nutrição falhou.') }).finally(() => { maintenanceRun.current = null })
     return maintenanceRun.current
   }, [repositories])
-  useEffect(() => { const subscription = AppState.addEventListener('change', (state) => { if (state === 'active') void runNutritionMaintenance() }); return () => subscription.remove() }, [runNutritionMaintenance])
+  useEffect(() => { void runNutritionMaintenance(); const subscription = AppState.addEventListener('change', (state) => { if (state === 'active') void runNutritionMaintenance() }); return () => subscription.remove() }, [runNutritionMaintenance])
   const trainingPlan = useTrainingPlanController(repositories.plans, controller.refresh)
   const workoutSession = useWorkoutSessionController(repositories.sessions, controller.refresh)
   const onboarding = useOnboarding(repositories.metadata)
@@ -235,6 +237,8 @@ function LocalApp({
                 {({ navigation }) => (
                   <MainTabs
                     repositories={repositories}
+                    nutritionMaintenanceError={nutritionMaintenanceError}
+                    onRetryNutritionMaintenance={runNutritionMaintenance}
                     navigation={navigation}
                     controller={controller}
                     trainingPlan={trainingPlan}
@@ -293,6 +297,9 @@ function LocalApp({
                 )}
               </Stack.Screen>
               <Stack.Screen name="AppearanceSettings" component={AppearanceSettingsScreen} />
+              <Stack.Screen name="NutritionGoals">
+                {() => <NutritionGoalsScreen repositories={repositories} />}
+              </Stack.Screen>
               <Stack.Screen name="TrainingPlanEditor">
                 {() => (
                   <TrainingPlanEditorScreen
@@ -490,6 +497,8 @@ function starterPackMessage(state: ReturnType<typeof useStarterPackImportControl
 
 function MainTabs({
   repositories,
+  nutritionMaintenanceError,
+  onRetryNutritionMaintenance,
   navigation,
   controller,
   trainingPlan,
@@ -501,6 +510,8 @@ function MainTabs({
   onOnboarding,
 }: {
   repositories: LocalRepositories
+  nutritionMaintenanceError: string | null
+  onRetryNutritionMaintenance: () => Promise<void>
   navigation: NativeStackNavigationProp<RootStackParamList>
   controller: ReturnType<typeof useTrainingController>
   trainingPlan: ReturnType<typeof useTrainingPlanController>
@@ -630,13 +641,14 @@ function MainTabs({
         )}
       </Tabs.Screen>
       <Tabs.Screen name="Nutrition">
-        {() => <NutritionScreen repositories={repositories} />}
+        {() => <NutritionScreen repositories={repositories} maintenanceError={nutritionMaintenanceError} onRetryMaintenance={onRetryNutritionMaintenance} onConfigureGoals={() => navigation.navigate('NutritionGoals')} />}
       </Tabs.Screen>
       <Tabs.Screen name="More">
         {() => (
           <MoreScreen
             busy={backup.busy}
             onAppearance={() => navigation.navigate('AppearanceSettings')}
+            onNutrition={() => navigation.navigate('NutritionGoals')}
             onLibrary={() => navigation.navigate('Library')}
             onTrash={() => navigation.navigate('TrainingPlanTrash')}
             trashCount={trash.count}

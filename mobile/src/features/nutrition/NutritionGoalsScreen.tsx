@@ -1,0 +1,20 @@
+import { useEffect, useState } from 'react'
+import { StyleSheet, Text, TextInput, View } from 'react-native'
+import { localDateKey, validateNutritionGoals, type NutritionGoals } from '@training/training-domain'
+import type { LocalRepositories } from '@training/training-local-db'
+import { BottomActionBar, InlineNotice, SettingsGroup, SettingsRow } from '../../components/ui'
+import { ScreenScrollView } from '../../components/Screen'
+import { ScreenHeader } from '../../components/ScreenHeader'
+import { useTheme } from '../../theme'
+
+const empty: NutritionGoals = { caloriesKcal: null, proteinGrams: null, carbohydratesGrams: null, fatGrams: null, fiberGrams: null }
+const fields: Array<[keyof NutritionGoals, string]> = [['caloriesKcal', 'Calorias (kcal)'], ['proteinGrams', 'Proteína (g)'], ['carbohydratesGrams', 'Carboidratos (g)'], ['fatGrams', 'Gordura (g)'], ['fiberGrams', 'Fibra (g)']]
+export function NutritionGoalsScreen({ repositories }: { repositories: LocalRepositories }) {
+  const { colors } = useTheme(); const [values, setValues] = useState(empty); const [dirty, setDirty] = useState(false); const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [error, setError] = useState('')
+  useEffect(() => { let active = true; void repositories.settings.get<unknown>('nutrition.goals').then((stored) => { if (!active || dirty) return; setValues(stored && typeof stored === 'object' ? { ...empty, ...(stored as NutritionGoals) } : empty) }).catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : 'Não foi possível carregar as metas.') }).finally(() => { if (active) setLoading(false) }); return () => { active = false } }, [dirty, repositories])
+  const save = async () => { setError(''); setSaving(true); try { const valid = validateNutritionGoals(values); await repositories.settings.set('nutrition.goals', valid); await repositories.nutritionMaintenance.aggregateDay(localDateKey(new Date())); setValues(valid); setDirty(false) } catch (cause) { setError(cause instanceof Error ? cause.message : 'Não foi possível salvar as metas.') } finally { setSaving(false) } }
+  return <ScreenScrollView><ScreenHeader eyebrow="Nutrição" title="Metas nutricionais" description="Defina apenas as metas que deseja acompanhar." />{!!error && <InlineNotice tone="danger" message={error} />}{loading ? <Text style={{ color: colors.textSecondary }}>Carregando…</Text> : <SettingsGroup title="Metas configuradas por você">{fields.map(([key, label]) => <SettingsRow key={key} title={label} description={limit(key)} trailing={<TextInput keyboardType="decimal-pad" value={values[key] == null ? '' : String(values[key])} onChangeText={(text) => { setDirty(true); setValues({ ...values, [key]: text.trim() ? Number(text.replace(',', '.')) : null }) }} style={styles.input} placeholder="Opcional" placeholderTextColor={colors.textSecondary} />}/>)}</SettingsGroup>}<Text style={{ color: colors.textSecondary, marginTop: 16 }}>Estas metas são definidas por você e não substituem orientação profissional.</Text><BottomActionBar><Action label={saving ? 'Salvando…' : 'Salvar metas'} onPress={() => void save()} disabled={saving} /></BottomActionBar></ScreenScrollView>
+}
+const limit = (key: keyof NutritionGoals) => ({ caloriesKcal: 'Entre 1 e 20.000 kcal.', proteinGrams: 'Entre 1 e 2.000 g.', carbohydratesGrams: 'Entre 1 e 3.000 g.', fatGrams: 'Entre 1 e 2.000 g.', fiberGrams: 'Entre 1 e 500 g.' })[key]
+const styles = StyleSheet.create({ input: { borderColor: '#999', borderRadius: 8, borderWidth: 1, minWidth: 90, padding: 8, textAlign: 'right' } })
+function Action({ label, onPress, disabled }: { label: string; onPress: () => void; disabled?: boolean }) { const { colors } = useTheme(); return <Text accessibilityRole="button" onPress={disabled ? undefined : onPress} style={{ backgroundColor: colors.primary, borderRadius: 10, color: colors.onPrimary, padding: 14, textAlign: 'center', fontWeight: '800' }}>{label}</Text> }

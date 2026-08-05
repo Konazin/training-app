@@ -7,7 +7,6 @@ import {
   type LocalRepositories,
   type SqlDatabase,
 } from '@training/training-local-db'
-import { localDateKey } from '@training/training-domain'
 import { createLocalRuntimeManager } from './localRuntime'
 
 export type LocalRuntimeState =
@@ -39,10 +38,7 @@ export function useLocalRuntime(): LocalRuntime {
     }),
     initialize: (opened) => initializeFirstInstallation(opened).then(() => undefined),
     createRepositories: createLocalRepositories,
-    afterInitialize: async (repositories) => {
-      await repositories.planTrash.purgeExpired()
-      await repositories.nutritionMaintenance.run(localDateKey(new Date()))
-    },
+    afterInitialize: async (repositories) => { await repositories.planTrash.purgeExpired() },
     markStartup: markSuccessfulStartup,
   }))
 

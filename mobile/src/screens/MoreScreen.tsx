@@ -15,6 +15,7 @@ export function MoreScreen({
   busy,
   onIntegrations,
   onAppearance,
+  onNutrition,
   onLibrary,
   onTrash,
   trashCount,
@@ -32,6 +33,7 @@ export function MoreScreen({
   busy: boolean
   onIntegrations: () => void
   onAppearance: () => void
+  onNutrition?: () => void
   onLibrary: () => void
   onTrash: () => void
   trashCount: number
@@ -97,6 +99,7 @@ export function MoreScreen({
         disabled={busy}
       />
       <Text style={styles.section}>CONTEÚDO</Text>
+      <MenuItem label="Metas nutricionais" detail="Configurar metas locais" onPress={onNutrition ?? (() => undefined)} disabled={busy || !onNutrition} />
       <MenuItem label="Biblioteca de exercícios" detail="Criar e editar" onPress={onLibrary} disabled={busy} />
       <MenuItem
         label="Lixeira de fichas"

@@ -6,6 +6,9 @@ export const MICRONUTRIENT_CODES = [
 
 export type MicronutrientCode = typeof MICRONUTRIENT_CODES[number]
 export type MicronutrientTotals = Partial<Record<MicronutrientCode, number>>
+export const MICRONUTRIENT_METADATA: Record<MicronutrientCode, { name: string; unit: string; category: 'mineral' | 'vitamin'; order: number }> = {
+  sodium_mg: { name: 'Sódio', unit: 'mg', category: 'mineral', order: 1 }, potassium_mg: { name: 'Potássio', unit: 'mg', category: 'mineral', order: 2 }, calcium_mg: { name: 'Cálcio', unit: 'mg', category: 'mineral', order: 3 }, iron_mg: { name: 'Ferro', unit: 'mg', category: 'mineral', order: 4 }, magnesium_mg: { name: 'Magnésio', unit: 'mg', category: 'mineral', order: 5 }, zinc_mg: { name: 'Zinco', unit: 'mg', category: 'mineral', order: 6 }, vitamin_a_mcg_rae: { name: 'Vitamina A', unit: 'mcg RAE', category: 'vitamin', order: 7 }, vitamin_c_mg: { name: 'Vitamina C', unit: 'mg', category: 'vitamin', order: 8 }, vitamin_d_mcg: { name: 'Vitamina D', unit: 'mcg', category: 'vitamin', order: 9 }, vitamin_e_mg: { name: 'Vitamina E', unit: 'mg', category: 'vitamin', order: 10 }, vitamin_k_mcg: { name: 'Vitamina K', unit: 'mcg', category: 'vitamin', order: 11 }, vitamin_b1_mg: { name: 'Vitamina B1', unit: 'mg', category: 'vitamin', order: 12 }, vitamin_b2_mg: { name: 'Vitamina B2', unit: 'mg', category: 'vitamin', order: 13 }, vitamin_b3_mg: { name: 'Vitamina B3', unit: 'mg', category: 'vitamin', order: 14 }, vitamin_b6_mg: { name: 'Vitamina B6', unit: 'mg', category: 'vitamin', order: 15 }, vitamin_b9_mcg: { name: 'Vitamina B9', unit: 'mcg', category: 'vitamin', order: 16 }, vitamin_b12_mcg: { name: 'Vitamina B12', unit: 'mcg', category: 'vitamin', order: 17 },
+}
 export type NutritionMealType = 'BREAKFAST' | 'MORNING_SNACK' | 'LUNCH' | 'AFTERNOON_SNACK' | 'DINNER' | 'SUPPER' | 'OTHER'
 export type NutritionMealSource = 'MANUAL' | 'CAMERA' | 'GALLERY' | 'BARCODE' | 'SAVED_MEAL'
 export type NutritionDataSource = 'MANUAL' | 'LOCAL_DATABASE' | 'USDA' | 'OPEN_FOOD_FACTS' | 'AI_ESTIMATE'
@@ -26,13 +29,35 @@ export interface DailyNutritionSummary {
   id: number; localDate: string; totalCaloriesKcal: number; totalProteinGrams: number; totalCarbohydratesGrams: number
   totalFatGrams: number; totalFiberGrams: number; totalMicronutrients: MicronutrientTotals; mealCount: number; itemCount: number
   goalCaloriesKcal: number | null; goalProteinGrams: number | null; goalCarbohydratesGrams: number | null; goalFatGrams: number | null; goalFiberGrams: number | null
-  closedAt: string; updatedAt: string
+  closedAt: string; finalized: boolean; detailsPurgedAt: string | null; updatedAt: string
 }
 export type DailyNutritionSummaryInput = Omit<DailyNutritionSummary, 'id'> & { id?: number }
 export interface NutritionGoals { caloriesKcal: number | null; proteinGrams: number | null; carbohydratesGrams: number | null; fatGrams: number | null; fiberGrams: number | null }
 export interface NutritionMealRepository { create(input: NutritionMealInput): Promise<NutritionMeal>; update(id: number, input: NutritionMealInput): Promise<NutritionMeal>; delete(id: number): Promise<void>; findById(id: number): Promise<NutritionMeal | null>; listByDate(localDate: string): Promise<NutritionMeal[]>; listBetweenDates(startDate: string, endDate: string): Promise<NutritionMeal[]> }
 export interface NutritionSummaryRepository { findByDate(localDate: string): Promise<DailyNutritionSummary | null>; listBetweenDates(startDate: string, endDate: string): Promise<DailyNutritionSummary[]>; upsert(summary: DailyNutritionSummaryInput): Promise<DailyNutritionSummary> }
 export interface NutritionMaintenanceRepository { aggregateDay(localDate: string): Promise<DailyNutritionSummary | null>; closePendingDays(today: string): Promise<void>; purgeExpiredMealDetails(today: string, retentionDays?: number): Promise<number>; run(today: string): Promise<void> }
+
+export class NutritionDataError extends Error {
+  constructor(message: string, public readonly cause?: unknown) { super(message); this.name = 'NutritionDataError' }
+}
+
+export const NUTRITION_GOAL_LIMITS = {
+  caloriesKcal: 20_000,
+  proteinGrams: 2_000,
+  carbohydratesGrams: 3_000,
+  fatGrams: 2_000,
+  fiberGrams: 500,
+} as const
+
+export function validateNutritionGoals(input: NutritionGoals): NutritionGoals {
+  for (const key of Object.keys(NUTRITION_GOAL_LIMITS) as Array<keyof NutritionGoals>) {
+    const value = input[key]
+    if (value !== null && (typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || value > NUTRITION_GOAL_LIMITS[key])) {
+      throw new Error(`${key} deve ser vazio ou ficar entre 1 e ${NUTRITION_GOAL_LIMITS[key]}.`)
+    }
+  }
+  return input
+}
 
 const NUTRIENT_FIELDS = ['caloriesKcal', 'proteinGrams', 'carbohydratesGrams', 'fatGrams', 'fiberGrams'] as const
 const finiteNonNegative = (value: unknown, label: string) => {
@@ -62,5 +87,5 @@ export function aggregateNutritionDay(meals: NutritionMeal[], goals: NutritionGo
     for (const code of MICRONUTRIENT_CODES) if (item.micronutrients[code] !== undefined) micronutrients[code] = (micronutrients[code] ?? 0) + item.micronutrients[code]!
   }
   const round = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100
-  return { localDate: meals[0]!.localDate, totalCaloriesKcal: round(totals.caloriesKcal), totalProteinGrams: round(totals.proteinGrams), totalCarbohydratesGrams: round(totals.carbohydratesGrams), totalFatGrams: round(totals.fatGrams), totalFiberGrams: round(totals.fiberGrams), totalMicronutrients: Object.fromEntries(Object.entries(micronutrients).map(([key, value]) => [key, round(value)])), mealCount: meals.length, itemCount, goalCaloriesKcal: goals.caloriesKcal, goalProteinGrams: goals.proteinGrams, goalCarbohydratesGrams: goals.carbohydratesGrams, goalFatGrams: goals.fatGrams, goalFiberGrams: goals.fiberGrams, closedAt: now.toISOString(), updatedAt: now.toISOString() }
+  return { localDate: meals[0]!.localDate, totalCaloriesKcal: round(totals.caloriesKcal), totalProteinGrams: round(totals.proteinGrams), totalCarbohydratesGrams: round(totals.carbohydratesGrams), totalFatGrams: round(totals.fatGrams), totalFiberGrams: round(totals.fiberGrams), totalMicronutrients: Object.fromEntries(Object.entries(micronutrients).map(([key, value]) => [key, round(value)])), mealCount: meals.length, itemCount, goalCaloriesKcal: goals.caloriesKcal, goalProteinGrams: goals.proteinGrams, goalCarbohydratesGrams: goals.carbohydratesGrams, goalFatGrams: goals.fatGrams, goalFiberGrams: goals.fiberGrams, closedAt: now.toISOString(), finalized: false, detailsPurgedAt: null, updatedAt: now.toISOString() }
 }

@@ -413,6 +413,10 @@ export const MIGRATIONS: Migration[] = [
   migration(8, 'retire_generated_exercise_catalog', retireGeneratedExerciseCatalog),
   migration(9, 'exercise_db_provider_metadata', exerciseDbProviderMetadata),
   migration(10, 'nutrition_mode', nutrition),
+  migration(11, 'nutrition_summary_retention_state', `
+ALTER TABLE nutrition_daily_summaries ADD COLUMN finalized INTEGER NOT NULL DEFAULT 0 CHECK (finalized IN (0,1));
+ALTER TABLE nutrition_daily_summaries ADD COLUMN details_purged_at TEXT;
+`),
 ]
 
 export async function runMigrations(database: SqlDatabase, onProgress?: (progress: MigrationProgress) => void) {

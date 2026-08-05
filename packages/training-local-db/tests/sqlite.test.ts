@@ -30,6 +30,25 @@ afterEach(() => {
 })
 
 describe('SQLite local schema', () => {
+  it('agrega e remove o resumo editável ao apagar a última refeição e finaliza o histórico no purge', async () => {
+    const database = betterDatabase(newDatabase())
+    await runMigrations(database)
+    const repositories = createLocalRepositories(database)
+    const input = (date: string) => ({ localDate: date, consumedAt: `${date}T12:00:00.000Z`, mealType: 'LUNCH' as const, title: 'Almoço', notes: '', source: 'MANUAL' as const, items: [{ name: 'Arroz', portionDescription: 'porção', estimatedGrams: 100, caloriesKcal: 10, proteinGrams: 2, carbohydratesGrams: 3, fatGrams: 1, fiberGrams: 0, micronutrients: { vitamin_c_mg: 1 }, confidence: null, dataSource: 'MANUAL' as const, sortOrder: 0 }] })
+    const meal = await repositories.nutritionMeals.create(input('2026-08-04'))
+    expect((await repositories.nutritionSummaries.findByDate('2026-08-04'))?.totalCaloriesKcal).toBe(10)
+    await repositories.nutritionMeals.delete(meal.id)
+    expect(await repositories.nutritionSummaries.findByDate('2026-08-04')).toBeNull()
+    await repositories.nutritionMeals.create(input('2026-07-27'))
+    await repositories.nutritionMaintenance.run('2026-08-04')
+    const historical = await repositories.nutritionSummaries.findByDate('2026-07-27')
+    expect(historical?.finalized).toBe(true)
+    expect(historical?.detailsPurgedAt).toBeTruthy()
+    expect(await repositories.nutritionMeals.listByDate('2026-07-27')).toEqual([])
+    await repositories.backup.reset()
+    expect(await repositories.nutritionSummaries.findByDate('2026-07-27')).toBeNull()
+    await database.close()
+  })
   it('cria banco vazio, reaplica provider com segurança e garante constraints', async () => {
     const path = newDatabase()
     const database = betterDatabase(path)
@@ -145,7 +164,7 @@ describe('SQLite local schema', () => {
       expect((await database.all<{ value: number }>(`SELECT ${idColumn} AS value FROM ${table} ORDER BY ${idColumn}`)).map((row) => row.value)).toEqual(before.get(table)!.ids)
     }
     expect(await database.all('PRAGMA foreign_key_check')).toEqual([])
-    expect(await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM schema_migrations')).toEqual({ count: 10 })
+    expect(await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM schema_migrations')).toEqual({ count: 11 })
     for (const index of ['exercise_definition_search', 'exercise_media_owner', 'exercise_media_source_external', 'exercise_definition_external_lookup']) {
       expect(await database.first(`SELECT name FROM sqlite_master WHERE type = 'index' AND name = ?`, index)).toBeTruthy()
     }
@@ -1327,7 +1346,7 @@ describe('SQLite local schema', () => {
       'SELECT exercise_definition_id FROM training_day_exercises',
     )).toEqual({ exercise_definition_id: exercise.lastInsertRowId })
     expect(await database.first('SELECT COUNT(*) AS count FROM schema_migrations'))
-      .toEqual({ count: 10 })
+      .toEqual({ count: 11 })
     await database.close()
   })
 

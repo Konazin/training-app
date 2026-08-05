@@ -15,6 +15,7 @@ export type RootStackParamList = {
   Integrations: undefined
   WgerIntegration: undefined
   AppearanceSettings: undefined
+  NutritionGoals: undefined
   Session: undefined
   ArchivedTrainingPlans: undefined
   TrainingPlanTrash: undefined

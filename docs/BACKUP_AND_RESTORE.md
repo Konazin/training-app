@@ -1,9 +1,12 @@
 # Backup e restauração
 
-O formato permanece em `schemaVersion: 2`; backups v1 e v2 anteriores continuam
+O formato atual é `schemaVersion: 3`; backups v1 e v2 anteriores continuam
 aceitos. O JSON contém exercícios, metadados de mídia, fichas, dias, atividades,
 sessões, substituições, anotações, séries, configurações, favoritos, recentes e
 aliases opcionais. Bytes de imagens não são incorporados.
+Backups v3 também incluem refeições, itens, resumos nutricionais, estados de
+retenção e a configuração local de metas. Coleções nutricionais ausentes em
+backups antigos significam coleção vazia.
 
 ## Restauração
 
