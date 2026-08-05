@@ -68,6 +68,7 @@ import {
   type AppMetadataRepository,
 } from '../database/installation'
 import { syncBundledCatalog, type BundledCatalog, type CatalogSyncResult } from '../database/catalog'
+import { nutritionRepositories } from './nutrition'
 
 export interface LocalRepositories {
   exercises: ExerciseLibraryRepository
@@ -88,6 +89,9 @@ export interface LocalRepositories {
   catalog: {
     sync(catalog: BundledCatalog): Promise<CatalogSyncResult>
   }
+  nutritionMeals: import('@training/training-domain').NutritionMealRepository
+  nutritionSummaries: import('@training/training-domain').NutritionSummaryRepository
+  nutritionMaintenance: import('@training/training-domain').NutritionMaintenanceRepository
 }
 
 export function createLocalRepositories(database: SqlDatabase): LocalRepositories {
@@ -96,6 +100,7 @@ export function createLocalRepositories(database: SqlDatabase): LocalRepositorie
   const sessions = sessionRepository(database)
   const planTrash = trainingPlanTrashRepository(database)
   const settings = settingsRepository(database)
+  const nutrition = nutritionRepositories(database)
   return {
     exercises,
     externalExerciseImport: externalExerciseImportRepository(database),
@@ -118,6 +123,9 @@ export function createLocalRepositories(database: SqlDatabase): LocalRepositorie
     catalog: {
       sync: (catalog) => syncBundledCatalog(database, catalog),
     },
+    nutritionMeals: nutrition.meals,
+    nutritionSummaries: nutrition.summaries,
+    nutritionMaintenance: nutrition.maintenance,
   }
 }
 

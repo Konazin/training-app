@@ -5,6 +5,7 @@ export type MainTabParamList = {
   Plan: undefined
   History: undefined
   More: undefined
+  Nutrition: undefined
 }
 
 export type RootStackParamList = {

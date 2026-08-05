@@ -72,6 +72,9 @@ const TABLES = {
   exercise_aliases: ['id', 'exercise_id', 'alias', 'normalized_alias', 'origin'],
   exercise_favorites: ['exercise_id', 'created_at'],
   exercise_recent_usage: ['exercise_id', 'last_used_at', 'use_count'],
+  nutrition_meals: ['id', 'local_date', 'consumed_at', 'meal_type', 'title', 'notes', 'source', 'created_at', 'updated_at'],
+  nutrition_meal_items: ['id', 'meal_id', 'name', 'portion_description', 'estimated_grams', 'calories_kcal', 'protein_grams', 'carbohydrates_grams', 'fat_grams', 'fiber_grams', 'micronutrients_json', 'confidence', 'data_source', 'sort_order', 'created_at', 'updated_at'],
+  nutrition_daily_summaries: ['id', 'local_date', 'total_calories_kcal', 'total_protein_grams', 'total_carbohydrates_grams', 'total_fat_grams', 'total_fiber_grams', 'total_micronutrients_json', 'meal_count', 'item_count', 'goal_calories_kcal', 'goal_protein_grams', 'goal_carbohydrates_grams', 'goal_fat_grams', 'goal_fiber_grams', 'closed_at', 'updated_at'],
 } as const
 
 export function createBackupRepository(database: SqlDatabase): BackupRepository {
@@ -94,6 +97,9 @@ export function createBackupRepository(database: SqlDatabase): BackupRepository 
         await insertRows(transaction, 'workout_session_exercises', backup.sessionExercises)
         await insertRows(transaction, 'workout_set_logs', backup.setLogs)
         await insertRows(transaction, 'app_settings', normalizeLocalPreferenceRows(backup.settings))
+        await insertRows(transaction, 'nutrition_meals', backup.nutritionMeals ?? [])
+        await insertRows(transaction, 'nutrition_meal_items', backup.nutritionMealItems ?? [])
+        await insertRows(transaction, 'nutrition_daily_summaries', backup.nutritionDailySummaries ?? [])
         await transaction.run(`
           DELETE FROM training_plans
           WHERE deleted_at IS NOT NULL AND julianday(purge_at) <= julianday(?)
@@ -134,7 +140,7 @@ export async function exportBackup(database: SqlDatabase, appVersion: string): P
   const [
     exercises, media, trainingPlans, trainingPlanDays, trainingDayExercises,
     restActivities, sessions, sessionExercises, setLogs, settings,
-    exerciseAliases, exerciseFavorites, exerciseRecentUsage,
+    exerciseAliases, exerciseFavorites, exerciseRecentUsage, nutritionMeals, nutritionMealItems, nutritionDailySummaries,
   ] = await Promise.all([
     database.all<Row>('SELECT * FROM exercise_definitions ORDER BY id'),
     database.all<Row>('SELECT * FROM exercise_media ORDER BY id'),
@@ -149,9 +155,12 @@ export async function exportBackup(database: SqlDatabase, appVersion: string): P
     database.all<Row>(`SELECT * FROM exercise_aliases WHERE origin = 'USER' ORDER BY id`),
     database.all<Row>('SELECT * FROM exercise_favorites ORDER BY exercise_id'),
     database.all<Row>('SELECT * FROM exercise_recent_usage ORDER BY last_used_at DESC'),
+    database.all<Row>('SELECT * FROM nutrition_meals ORDER BY id'),
+    database.all<Row>('SELECT * FROM nutrition_meal_items ORDER BY meal_id, sort_order, id'),
+    database.all<Row>('SELECT * FROM nutrition_daily_summaries ORDER BY local_date'),
   ])
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     appVersion,
     exportedAt: new Date().toISOString(),
     exercises,
@@ -167,13 +176,14 @@ export async function exportBackup(database: SqlDatabase, appVersion: string): P
     exerciseAliases,
     exerciseFavorites,
     exerciseRecentUsage,
+    nutritionMeals, nutritionMealItems, nutritionDailySummaries,
   }
 }
 
 export function validateBackup(candidate: unknown): asserts candidate is TrainingBackup {
   assertPlainObject(candidate, 'arquivo não é um objeto JSON')
   const backup = candidate as Partial<TrainingBackup>
-  if (backup.schemaVersion !== 1 && backup.schemaVersion !== 2) {
+  if (backup.schemaVersion !== 1 && backup.schemaVersion !== 2 && backup.schemaVersion !== 3) {
     throw invalidBackup('versão não suportada')
   }
   if ('app_metadata' in candidate || 'appMetadata' in candidate) {
@@ -190,6 +200,11 @@ export function validateBackup(candidate: unknown): asserts candidate is Trainin
     sessionExercises: BACKUP_LIMITS.setLogs,
     setLogs: BACKUP_LIMITS.setLogs,
     settings: 10_000,
+  }
+  for (const [key, limit] of [['nutritionMeals', BACKUP_LIMITS.sessions], ['nutritionMealItems', BACKUP_LIMITS.setLogs], ['nutritionDailySummaries', BACKUP_LIMITS.sessions]] as const) {
+    const rows = backup[key]
+    if (rows !== undefined && (!Array.isArray(rows) || rows.length > limit)) throw invalidBackup(`coleção ${key} inválida`)
+    rows?.forEach((row) => assertPlainObject(row, `linha inválida em ${key}`))
   }
   for (const [key, limit] of Object.entries(limits)) {
     const rows = backup[key as keyof TrainingBackup]
@@ -224,6 +239,8 @@ export function validateBackup(candidate: unknown): asserts candidate is Trainin
   const sessionIds = ids(backup.sessions!, 'sessions')
   const sessionExerciseIds = ids(backup.sessionExercises!, 'sessionExercises')
   ids(backup.setLogs!, 'setLogs')
+  const nutritionMealIds = ids(backup.nutritionMeals ?? [], 'nutritionMeals')
+  ids(backup.nutritionDailySummaries ?? [], 'nutritionDailySummaries')
   requireReferences(backup.media!, 'exercise_definition_id', exerciseIds)
   requireReferences(backup.trainingPlanDays!, 'training_plan_id', planIds)
   requireReferences(backup.trainingDayExercises!, 'training_plan_day_id', dayIds)
@@ -231,6 +248,7 @@ export function validateBackup(candidate: unknown): asserts candidate is Trainin
   requireReferences(backup.restActivities!, 'training_plan_day_id', dayIds)
   requireReferences(backup.sessionExercises!, 'workout_session_id', sessionIds)
   requireReferences(backup.setLogs!, 'workout_session_exercise_id', sessionExerciseIds)
+  requireReferences(backup.nutritionMealItems ?? [], 'meal_id', nutritionMealIds)
   requireReferences(backup.exerciseAliases ?? [], 'exercise_id', exerciseIds)
   requireReferences(backup.exerciseFavorites ?? [], 'exercise_id', exerciseIds)
   requireReferences(backup.exerciseRecentUsage ?? [], 'exercise_id', exerciseIds)
@@ -453,10 +471,10 @@ function assertDates(backup: Partial<TrainingBackup>) {
   }
 }
 
-function assertTrainingPlanLifecycle(rows: unknown[], schemaVersion: 1 | 2) {
+function assertTrainingPlanLifecycle(rows: unknown[], schemaVersion: 1 | 2 | 3) {
   for (const row of rows) {
     const record = row as Record<string, unknown>
-    if (schemaVersion === 2 && (!('deleted_at' in record) || !('purge_at' in record))) {
+    if ((schemaVersion === 2 || schemaVersion === 3) && (!('deleted_at' in record) || !('purge_at' in record))) {
       throw invalidBackup('ciclo de vida da ficha ausente')
     }
     const active = value(row, 'active') === 1
