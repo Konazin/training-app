@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useRef } from 'react'
-import { Alert } from 'react-native'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { Alert, AppState } from 'react-native'
 import {
   DefaultTheme,
   NavigationContainer,
@@ -16,6 +16,7 @@ import { type LocalRepositories } from '@training/training-local-db'
 import {
   buildLocalNotices,
   calculateHistoryProgress,
+  localDateKey,
   type BackupRepository,
 } from '@training/training-domain'
 import type { MainTabParamList, RootStackParamList } from './src/navigation/types'
@@ -38,6 +39,7 @@ import { LibraryScreen } from './src/screens/LibraryScreen'
 import { HomeScreen } from './src/screens/HomeScreen'
 import { HistoryScreen } from './src/screens/HistoryScreen'
 import { MoreScreen } from './src/screens/MoreScreen'
+import { NutritionScreen } from './src/features/nutrition/NutritionScreen'
 import { AppearanceSettingsScreen } from './src/screens/AppearanceSettingsScreen'
 import { IntegrationsScreen } from './src/screens/IntegrationsScreen'
 import { WgerIntegrationScreen } from './src/features/wger/WgerIntegrationScreen'
@@ -120,6 +122,12 @@ function LocalApp({
     savedPreferences,
   } = useTheme()
   const controller = useTrainingController(repositories.exercises, repositories.dashboard)
+  const maintenanceRun = useRef<Promise<void> | null>(null)
+  const runNutritionMaintenance = useCallback(() => {
+    if (!maintenanceRun.current) maintenanceRun.current = repositories.nutritionMaintenance.run(localDateKey(new Date())).catch(() => undefined).finally(() => { maintenanceRun.current = null })
+    return maintenanceRun.current
+  }, [repositories])
+  useEffect(() => { const subscription = AppState.addEventListener('change', (state) => { if (state === 'active') void runNutritionMaintenance() }); return () => subscription.remove() }, [runNutritionMaintenance])
   const trainingPlan = useTrainingPlanController(repositories.plans, controller.refresh)
   const workoutSession = useWorkoutSessionController(repositories.sessions, controller.refresh)
   const onboarding = useOnboarding(repositories.metadata)
@@ -226,6 +234,7 @@ function LocalApp({
               <Stack.Screen name="MainTabs">
                 {({ navigation }) => (
                   <MainTabs
+                    repositories={repositories}
                     navigation={navigation}
                     controller={controller}
                     trainingPlan={trainingPlan}
@@ -480,6 +489,7 @@ function starterPackMessage(state: ReturnType<typeof useStarterPackImportControl
 }
 
 function MainTabs({
+  repositories,
   navigation,
   controller,
   trainingPlan,
@@ -490,6 +500,7 @@ function MainTabs({
   notices,
   onOnboarding,
 }: {
+  repositories: LocalRepositories
   navigation: NativeStackNavigationProp<RootStackParamList>
   controller: ReturnType<typeof useTrainingController>
   trainingPlan: ReturnType<typeof useTrainingPlanController>
@@ -507,8 +518,9 @@ function MainTabs({
     Plan: 'clipboard-outline',
     History: 'time-outline',
     More: 'ellipsis-horizontal-circle-outline',
+    Nutrition: 'nutrition-outline',
   }
-  const labels: Record<keyof MainTabParamList, string> = { Today: 'Hoje', Plan: 'Ficha', History: 'Progresso', More: 'Mais' }
+  const labels: Record<keyof MainTabParamList, string> = { Today: 'Hoje', Plan: 'Ficha', History: 'Progresso', Nutrition: 'Nutrição', More: 'Mais' }
   const { clock, refreshClock } = useLocalCalendarClock()
   const historySessions = useMemo(
     () => workoutSession.activeSession
@@ -616,6 +628,9 @@ function MainTabs({
             onDateChange={refreshClock}
           />
         )}
+      </Tabs.Screen>
+      <Tabs.Screen name="Nutrition">
+        {() => <NutritionScreen repositories={repositories} />}
       </Tabs.Screen>
       <Tabs.Screen name="More">
         {() => (

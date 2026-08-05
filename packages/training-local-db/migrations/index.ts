@@ -375,6 +375,33 @@ CREATE INDEX exercise_definition_external_lookup
 CREATE TABLE exercise_provider_metadata (provider TEXT PRIMARY KEY, last_synced_at TEXT, cache_expires_at TEXT);
 `
 
+const nutrition = `
+CREATE TABLE nutrition_meals (
+  id INTEGER PRIMARY KEY, local_date TEXT NOT NULL, consumed_at TEXT NOT NULL,
+  meal_type TEXT NOT NULL, title TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '',
+  source TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE TABLE nutrition_meal_items (
+  id INTEGER PRIMARY KEY, meal_id INTEGER NOT NULL REFERENCES nutrition_meals(id) ON DELETE CASCADE,
+  name TEXT NOT NULL, portion_description TEXT NOT NULL DEFAULT '', estimated_grams REAL,
+  calories_kcal REAL NOT NULL CHECK (calories_kcal >= 0), protein_grams REAL NOT NULL CHECK (protein_grams >= 0),
+  carbohydrates_grams REAL NOT NULL CHECK (carbohydrates_grams >= 0), fat_grams REAL NOT NULL CHECK (fat_grams >= 0),
+  fiber_grams REAL NOT NULL CHECK (fiber_grams >= 0), micronutrients_json TEXT NOT NULL DEFAULT '{}',
+  confidence REAL CHECK (confidence IS NULL OR (confidence >= 0 AND confidence <= 1)), data_source TEXT NOT NULL,
+  sort_order INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE TABLE nutrition_daily_summaries (
+  id INTEGER PRIMARY KEY, local_date TEXT NOT NULL UNIQUE, total_calories_kcal REAL NOT NULL,
+  total_protein_grams REAL NOT NULL, total_carbohydrates_grams REAL NOT NULL, total_fat_grams REAL NOT NULL,
+  total_fiber_grams REAL NOT NULL, total_micronutrients_json TEXT NOT NULL DEFAULT '{}', meal_count INTEGER NOT NULL,
+  item_count INTEGER NOT NULL, goal_calories_kcal REAL, goal_protein_grams REAL, goal_carbohydrates_grams REAL,
+  goal_fat_grams REAL, goal_fiber_grams REAL, closed_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE INDEX nutrition_meal_items_owner ON nutrition_meal_items(meal_id, sort_order, id);
+CREATE INDEX nutrition_meals_date ON nutrition_meals(local_date, consumed_at, id);
+CREATE INDEX nutrition_summaries_date ON nutrition_daily_summaries(local_date);
+`
+
 export const MIGRATIONS: Migration[] = [
   migration(1, 'local_training_schema', schema),
   migration(2, 'local_query_indexes', indexes),
@@ -385,6 +412,7 @@ export const MIGRATIONS: Migration[] = [
   migration(7, 'local_workout_intelligence', localWorkoutIntelligence),
   migration(8, 'retire_generated_exercise_catalog', retireGeneratedExerciseCatalog),
   migration(9, 'exercise_db_provider_metadata', exerciseDbProviderMetadata),
+  migration(10, 'nutrition_mode', nutrition),
 ]
 
 export async function runMigrations(database: SqlDatabase, onProgress?: (progress: MigrationProgress) => void) {

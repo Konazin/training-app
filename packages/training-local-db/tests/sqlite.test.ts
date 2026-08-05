@@ -145,7 +145,7 @@ describe('SQLite local schema', () => {
       expect((await database.all<{ value: number }>(`SELECT ${idColumn} AS value FROM ${table} ORDER BY ${idColumn}`)).map((row) => row.value)).toEqual(before.get(table)!.ids)
     }
     expect(await database.all('PRAGMA foreign_key_check')).toEqual([])
-    expect(await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM schema_migrations')).toEqual({ count: 9 })
+    expect(await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM schema_migrations')).toEqual({ count: 10 })
     for (const index of ['exercise_definition_search', 'exercise_media_owner', 'exercise_media_source_external', 'exercise_definition_external_lookup']) {
       expect(await database.first(`SELECT name FROM sqlite_master WHERE type = 'index' AND name = ?`, index)).toBeTruthy()
     }
@@ -184,7 +184,7 @@ describe('SQLite local schema', () => {
       })),
     }
     expect(() => validateBackup(v2)).not.toThrow()
-    expect(() => validateBackup({ ...backup, schemaVersion: 3 })).toThrow('versão')
+    expect(() => validateBackup({ ...backup, schemaVersion: 4 })).toThrow('versão')
     expect(() => validateBackup({ ...v2, trainingPlans: backup.trainingPlans })).toThrow('ciclo de vida')
     expect(() => validateBackup({
       ...v2,
@@ -423,7 +423,7 @@ describe('SQLite local schema', () => {
     expect(history[0]?.totalVolume).toBe(40)
 
     const backup = await repositories.backup.export('test')
-    expect(backup.schemaVersion).toBe(2)
+    expect(backup.schemaVersion).toBe(3)
     await expect(repositories.backup.restore({
       ...backup,
       media: [{ id: 999, exercise_definition_id: 999 }],
@@ -1150,7 +1150,7 @@ describe('SQLite local schema', () => {
       .toMatchObject({ externalId: '983', name: 'Rosca sem peso' })
 
     const backup = await repositories.backup.export('0.8.0')
-    expect(backup.schemaVersion).toBe(2)
+    expect(backup.schemaVersion).toBe(3)
     expect(backup.exerciseFavorites).toHaveLength(1)
     expect(backup.exerciseRecentUsage).toHaveLength(2)
     expect(backup.exerciseAliases).toHaveLength(1)
@@ -1327,7 +1327,7 @@ describe('SQLite local schema', () => {
       'SELECT exercise_definition_id FROM training_day_exercises',
     )).toEqual({ exercise_definition_id: exercise.lastInsertRowId })
     expect(await database.first('SELECT COUNT(*) AS count FROM schema_migrations'))
-      .toEqual({ count: 9 })
+      .toEqual({ count: 10 })
     await database.close()
   })
 

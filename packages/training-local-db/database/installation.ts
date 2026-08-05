@@ -59,6 +59,9 @@ export async function markSuccessfulStartup(database: SqlDatabase, now = new Dat
 
 export async function deleteUserRows(database: SqlDatabase) {
   for (const table of [
+    'nutrition_meal_items',
+    'nutrition_meals',
+    'nutrition_daily_summaries',
     'workout_set_logs',
     'workout_session_exercises',
     'workout_sessions',

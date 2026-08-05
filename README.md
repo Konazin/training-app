@@ -6,6 +6,8 @@ com repositories `expo-sqlite`, sem exigir servidor, VPS, IP, conta ou internet.
 
 ## O que funciona offline
 
+- registrar refeições manuais com vários alimentos, metas locais e resumo diário;
+
 - criar, editar e arquivar exercícios;
 - criar fichas do zero ou com seis templates semanais;
 - editar categoria e dificuldade com presets ou valores personalizados;

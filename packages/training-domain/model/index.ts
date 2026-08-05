@@ -410,7 +410,7 @@ export interface ExerciseLibraryQuery {
 }
 
 export interface TrainingBackup {
-  schemaVersion: 1 | 2
+  schemaVersion: 1 | 2 | 3
   appVersion: string
   exportedAt: string
   exercises: unknown[]
@@ -427,4 +427,7 @@ export interface TrainingBackup {
   exerciseFavorites?: unknown[]
   exerciseRecentUsage?: unknown[]
   uiPreferences?: unknown
+  nutritionMeals?: unknown[]
+  nutritionMealItems?: unknown[]
+  nutritionDailySummaries?: unknown[]
 }
