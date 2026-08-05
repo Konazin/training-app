@@ -1,18 +1,18 @@
-# Marco 0.10.0 — catálogo e interface
+Estado: GO para APK de testes internos.
 
-Estado: **NO-GO**. O adaptador ExerciseDB/AscendAPI foi integrado como fonte
-primária manual, com Wger como fallback, paginação, cancelamento, timeout,
-schema validation, atribuição e importação local idempotente. Nenhuma chamada
-é feita no bootstrap e a mídia continua remota até importação explícita.
+Validações:
+- Typechecks dos workspaces aprovados.
+- Testes mobile: 132/132.
+- Testes RNTL: 18/18.
+- Testes behavior: 18/18.
+- Expo Doctor: 21/21.
+- Export Android concluído.
+- Manifesto: 40 exercícios, 0 duplicidades.
+- Migration v8 → v9 testada com preservação de IDs e referências.
 
-Aliases locais PT-BR/EN existentes foram ampliados para `puxada alta`,
-`lat pulldown`, `rosca direta`, `biceps curl` e equivalentes já curados.
-
-Verificações: typecheck do domínio, ExerciseDB, local-db, Wger e mobile;
-testes Wger (13) passaram; testes ExerciseDB adicionados. Testes SQLite não
-executaram por incompatibilidade do binário nativo `better-sqlite3` com o Node
-disponível. Expo Doctor e export Android não foram executados.
-
-Risco de licença: ExerciseDB/AscendAPI exige revisão/aceite das condições de
-redistribuição da mídia antes de persistir GIFs; o adaptador preserva fonte,
-licença e atribuição, mas não declara aprovação jurídica.
+Pendente:
+- build APK assinado;
+- instalação sobre 0.9.3;
+- smoke físico Android;
+- validação da animação dos GIFs;
+- revisão jurídica dos termos de mídia do ExerciseDB.
