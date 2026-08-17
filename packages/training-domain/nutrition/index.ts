@@ -37,6 +37,24 @@ export interface NutritionMealRepository { create(input: NutritionMealInput): Pr
 export interface NutritionSummaryRepository { findByDate(localDate: string): Promise<DailyNutritionSummary | null>; listBetweenDates(startDate: string, endDate: string): Promise<DailyNutritionSummary[]>; upsert(summary: DailyNutritionSummaryInput): Promise<DailyNutritionSummary> }
 export interface NutritionMaintenanceRepository { aggregateDay(localDate: string): Promise<DailyNutritionSummary | null>; closePendingDays(today: string): Promise<void>; purgeExpiredMealDetails(today: string, retentionDays?: number): Promise<number>; run(today: string): Promise<void> }
 
+const localDateKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+
+export function validateNutritionDate(localDate: string, now = new Date()): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(localDate)) throw new Error('A data da refeição é inválida.')
+  const [year, month, day] = localDate.split('-').map(Number)
+  const parsed = new Date(year!, month! - 1, day!)
+  if (parsed.getFullYear() !== year || parsed.getMonth() !== month! - 1 || parsed.getDate() !== day) throw new Error('A data da refeição é inválida.')
+  if (localDate > localDateKey(now)) throw new Error('Não é possível registrar refeições em uma data futura.')
+  return localDate
+}
+
+export function validateNutritionMealInput(input: NutritionMealInput, now = new Date()): NutritionMealInput {
+  validateNutritionDate(input.localDate, now)
+  if (!/^\d{4}-\d{2}-\d{2}T/.test(input.consumedAt) || localDateKey(new Date(input.consumedAt)) !== input.localDate) throw new Error('O horário da refeição não corresponde à data informada.')
+  if (Number.isNaN(new Date(input.consumedAt).getTime())) throw new Error('O horário da refeição é inválido.')
+  return { ...input, items: input.items.map(validateNutritionItem) }
+}
+
 export class NutritionDataError extends Error {
   constructor(message: string, public readonly cause?: unknown) { super(message); this.name = 'NutritionDataError' }
 }

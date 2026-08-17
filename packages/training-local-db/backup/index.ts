@@ -2,6 +2,7 @@ import {
   DomainError,
   LOCAL_PREFERENCES_KEY,
   resolveDisplayName,
+  localDateKey,
   validateNutritionGoals,
   MICRONUTRIENT_CODES,
   type BackupRepository,
@@ -242,6 +243,7 @@ export function validateBackup(candidate: unknown): asserts candidate is Trainin
   const sessionExerciseIds = ids(backup.sessionExercises!, 'sessionExercises')
   ids(backup.setLogs!, 'setLogs')
   const nutritionMealIds = ids(backup.nutritionMeals ?? [], 'nutritionMeals')
+  ids(backup.nutritionMealItems ?? [], 'nutritionMealItems')
   ids(backup.nutritionDailySummaries ?? [], 'nutritionDailySummaries')
   requireReferences(backup.media!, 'exercise_definition_id', exerciseIds)
   requireReferences(backup.trainingPlanDays!, 'training_plan_id', planIds)
@@ -413,13 +415,16 @@ function assertNutritionRows(backup: Partial<TrainingBackup>) {
   const items = (backup.nutritionMealItems ?? []) as Record<string, unknown>[]
   const summaries = (backup.nutritionDailySummaries ?? []) as Record<string, unknown>[]
   const dates = new Set<string>()
-  for (const row of meals) if (!isDateKey(row.local_date) || !isIsoTimestamp(row.consumed_at) || !isIsoTimestamp(row.created_at) || !isIsoTimestamp(row.updated_at)) throw invalidBackup('data inválida em nutrição')
+  for (const row of meals) if (!isDateKey(row.local_date) || !isIsoTimestamp(row.consumed_at) || localDateKey(new Date(String(row.consumed_at))) !== row.local_date || !isIsoTimestamp(row.created_at) || !isIsoTimestamp(row.updated_at)) throw invalidBackup('data inválida em nutrição')
   for (const row of items) {
-    if (typeof row.name !== 'string' || !row.name.trim() || typeof row.portion_description !== 'string' || !isIsoTimestamp(row.created_at) || !isIsoTimestamp(row.updated_at)) throw invalidBackup('item nutricional inválido')
+    if (typeof row.name !== 'string' || !row.name.trim() || typeof row.portion_description !== 'string' || !isIsoTimestamp(row.created_at) || !isIsoTimestamp(row.updated_at) || !Number.isInteger(row.sort_order) || Number(row.sort_order) < 0) throw invalidBackup('item nutricional inválido')
     if (row.confidence != null && (typeof row.confidence !== 'number' || !Number.isFinite(row.confidence) || row.confidence < 0 || row.confidence > 1)) throw invalidBackup('confidence inválida')
     if (typeof row.micronutrients_json !== 'string') throw invalidBackup('micronutrientes inválidos')
     validateMicronutrients(row.micronutrients_json)
   }
+  assertUniqueOrder(items, 'meal_id', 'sort_order')
+  const purgedDates = new Set(summaries.filter((row) => row.details_purged_at != null).map((row) => String(row.local_date)))
+  if (items.some((row) => purgedDates.has(String(meals.find((meal) => meal.id === row.meal_id)?.local_date)))) throw invalidBackup('detalhes presentes após expurgo')
   for (const row of summaries) {
     if (!isDateKey(row.local_date) || dates.has(String(row.local_date)) || !isIsoTimestamp(row.closed_at) || !isIsoTimestamp(row.updated_at)) throw invalidBackup('resumo nutricional inválido')
     dates.add(String(row.local_date))
@@ -463,7 +468,7 @@ function assertFiniteNumbers(backup: Partial<TrainingBackup>) {
     'overall_rpe', 'planned_sets', 'planned_min_reps', 'planned_max_reps',
     'reps', 'load', 'duration_seconds', 'distance', 'rpe', 'width', 'height',
     'active_slot', 'active', 'archived', 'rest_day', 'optional', 'completed',
-    'manually_added', 'unilateral', 'timed', 'is_main', 'estimated_grams', 'calories_kcal', 'protein_grams', 'carbohydrates_grams', 'fat_grams', 'fiber_grams', 'meal_count', 'item_count', 'finalized', 'goal_calories_kcal', 'goal_protein_grams', 'goal_carbohydrates_grams', 'goal_fat_grams', 'goal_fiber_grams',
+    'manually_added', 'unilateral', 'timed', 'is_main', 'estimated_grams', 'calories_kcal', 'protein_grams', 'carbohydrates_grams', 'fat_grams', 'fiber_grams', 'confidence', 'meal_count', 'item_count', 'finalized', 'goal_calories_kcal', 'goal_protein_grams', 'goal_carbohydrates_grams', 'goal_fat_grams', 'goal_fiber_grams',
   ])
   const nonNegative = new Set([
     'sort_order', 'set_number', 'sets', 'min_reps', 'max_reps', 'planned_load',

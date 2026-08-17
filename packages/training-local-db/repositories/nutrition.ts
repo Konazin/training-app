@@ -1,6 +1,7 @@
 import {
   aggregateNutritionDay, localDateKey, normalizeMicronutrients, validateNutritionGoals, validateNutritionItem,
   NutritionDataError,
+  validateNutritionDate, validateNutritionMealInput,
   type DailyNutritionSummary, type DailyNutritionSummaryInput, type NutritionGoals, type NutritionMeal, type NutritionMealInput,
   type NutritionMealItem, type NutritionMealRepository, type NutritionSummaryRepository, type NutritionMaintenanceRepository,
 } from '@training/training-domain'
@@ -41,14 +42,22 @@ function summaryFromRow(row: Record<string, unknown>): DailyNutritionSummary {
 }
 async function findSummary(database: SqlDatabase, date: string) { const row = await database.first<Record<string, unknown>>('SELECT * FROM nutrition_daily_summaries WHERE local_date=?', date); return row ? summaryFromRow(row) : null }
 async function upsertSummary(database: SqlDatabase, input: DailyNutritionSummaryInput): Promise<DailyNutritionSummary> {
+  const existing = await findSummary(database, input.localDate)
+  if (existing?.finalized) return existing
   const now = new Date().toISOString()
   await database.run('INSERT INTO nutrition_daily_summaries(local_date,total_calories_kcal,total_protein_grams,total_carbohydrates_grams,total_fat_grams,total_fiber_grams,total_micronutrients_json,meal_count,item_count,goal_calories_kcal,goal_protein_grams,goal_carbohydrates_grams,goal_fat_grams,goal_fiber_grams,closed_at,finalized,details_purged_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(local_date) DO UPDATE SET total_calories_kcal=excluded.total_calories_kcal,total_protein_grams=excluded.total_protein_grams,total_carbohydrates_grams=excluded.total_carbohydrates_grams,total_fat_grams=excluded.total_fat_grams,total_fiber_grams=excluded.total_fiber_grams, total_micronutrients_json=excluded.total_micronutrients_json,meal_count=excluded.meal_count,item_count=excluded.item_count,goal_calories_kcal=excluded.goal_calories_kcal,goal_protein_grams=excluded.goal_protein_grams,goal_carbohydrates_grams=excluded.goal_carbohydrates_grams,goal_fat_grams=excluded.goal_fat_grams,goal_fiber_grams=excluded.goal_fiber_grams,closed_at=excluded.closed_at,finalized=excluded.finalized,details_purged_at=excluded.details_purged_at,updated_at=excluded.updated_at', input.localDate, input.totalCaloriesKcal, input.totalProteinGrams, input.totalCarbohydratesGrams, input.totalFatGrams, input.totalFiberGrams, JSON.stringify(input.totalMicronutrients), input.mealCount, input.itemCount, input.goalCaloriesKcal, input.goalProteinGrams, input.goalCarbohydratesGrams, input.goalFatGrams, input.goalFiberGrams, input.closedAt, Number(input.finalized), input.detailsPurgedAt, now)
   return (await findSummary(database, input.localDate))!
 }
 async function currentGoals(database: SqlDatabase) { const row = await database.first<{ value_json: string }>('SELECT value_json FROM app_settings WHERE key=?', NUTRITION_GOALS_KEY); return goals(parse(row?.value_json, {}, 'metas nutricionais')) }
 
-async function aggregateInTransaction(database: SqlDatabase, date: string, now: Date): Promise<DailyNutritionSummary | null> {
+async function aggregateInTransaction(database: SqlDatabase, date: string, now: Date, finalize = false): Promise<DailyNutritionSummary | null> {
   const existing = await findSummary(database, date)
+  if (existing?.finalized) return existing
+  if (date >= localDateKey(now)) {
+    if (!existing) return null
+    await database.run('DELETE FROM nutrition_daily_summaries WHERE local_date=?', date)
+    return null
+  }
   const meals = await loadMeals(database, 'local_date=?', date)
   if (!meals.length) {
     if (existing?.finalized) return existing
@@ -59,7 +68,7 @@ async function aggregateInTransaction(database: SqlDatabase, date: string, now: 
     ? { caloriesKcal: existing.goalCaloriesKcal, proteinGrams: existing.goalProteinGrams, carbohydratesGrams: existing.goalCarbohydratesGrams, fatGrams: existing.goalFatGrams, fiberGrams: existing.goalFiberGrams }
     : await currentGoals(database)
   const aggregate = aggregateNutritionDay(meals, activeGoals, now)
-  return upsertSummary(database, { ...aggregate!, finalized: existing?.finalized ?? false, detailsPurgedAt: existing?.detailsPurgedAt ?? null })
+  return upsertSummary(database, { ...aggregate!, finalized: finalize, detailsPurgedAt: existing?.detailsPurgedAt ?? null })
 }
 
 export function nutritionRepositories(database: SqlDatabase) {
@@ -67,9 +76,9 @@ export function nutritionRepositories(database: SqlDatabase) {
   const serial = <T>(operation: () => Promise<T>) => { const result = queue.then(operation, operation); queue = result.then(() => undefined, () => undefined); return result }
   const aggregateDay = (date: string) => serial(() => database.transaction((tx) => aggregateInTransaction(tx, date, new Date())))
   const meals: NutritionMealRepository = {
-    create: (input) => serial(() => database.transaction(async (tx) => { const now = new Date().toISOString(); const id = (await tx.run('INSERT INTO nutrition_meals(local_date,consumed_at,meal_type,title,notes,source,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)', input.localDate, input.consumedAt, input.mealType, input.title.trim(), input.notes.trim(), input.source, now, now)).lastInsertRowId; await insertItems(tx, id, input, now); await aggregateInTransaction(tx, input.localDate, new Date()); return (await loadMeals(tx, 'id=?', id))[0]! })),
-    update: (id, input) => serial(() => database.transaction(async (tx) => { const old = await tx.first<{ local_date: string }>('SELECT local_date FROM nutrition_meals WHERE id=?', id); if (!old) throw new Error('Refeição não encontrada.'); const closed = await tx.first<{ finalized: number }>('SELECT finalized FROM nutrition_daily_summaries WHERE local_date=?', old.local_date); if (closed?.finalized === 1) throw new Error('Este dia já foi agregado e não pode ser editado.'); const now = new Date().toISOString(); await tx.run('UPDATE nutrition_meals SET local_date=?,consumed_at=?,meal_type=?,title=?,notes=?,source=?,updated_at=? WHERE id=?', input.localDate, input.consumedAt, input.mealType, input.title.trim(), input.notes.trim(), input.source, now, id); await tx.run('DELETE FROM nutrition_meal_items WHERE meal_id=?', id); await insertItems(tx, id, input, now); await aggregateInTransaction(tx, old.local_date, new Date()); if (old.local_date !== input.localDate) await aggregateInTransaction(tx, input.localDate, new Date()); return (await loadMeals(tx, 'id=?', id))[0]! })),
-    delete: (id) => serial(() => database.transaction(async (tx) => { const row = await tx.first<{ local_date: string }>('SELECT local_date FROM nutrition_meals WHERE id=?', id); if (!row) return; const closed = await tx.first<{ finalized: number }>('SELECT finalized FROM nutrition_daily_summaries WHERE local_date=?', row.local_date); if (closed?.finalized === 1) throw new Error('Este dia já foi agregado e não pode ser editado.'); await tx.run('DELETE FROM nutrition_meals WHERE id=?', id); await aggregateInTransaction(tx, row.local_date, new Date()) })),
+    create: (input) => serial(() => database.transaction(async (tx) => { validateNutritionMealInput(input); await assertOpen(tx, input.localDate); const now = new Date().toISOString(); const id = (await tx.run('INSERT INTO nutrition_meals(local_date,consumed_at,meal_type,title,notes,source,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)', input.localDate, input.consumedAt, input.mealType, input.title.trim(), input.notes.trim(), input.source, now, now)).lastInsertRowId; await insertItems(tx, id, input, now); await aggregateInTransaction(tx, input.localDate, new Date()); return (await loadMeals(tx, 'id=?', id))[0]! })),
+    update: (id, input) => serial(() => database.transaction(async (tx) => { validateNutritionMealInput(input); const old = await tx.first<{ local_date: string }>('SELECT local_date FROM nutrition_meals WHERE id=?', id); if (!old) throw new Error('Refeição não encontrada.'); await assertOpen(tx, old.local_date); await assertOpen(tx, input.localDate); const now = new Date().toISOString(); await tx.run('UPDATE nutrition_meals SET local_date=?,consumed_at=?,meal_type=?,title=?,notes=?,source=?,updated_at=? WHERE id=?', input.localDate, input.consumedAt, input.mealType, input.title.trim(), input.notes.trim(), input.source, now, id); await tx.run('DELETE FROM nutrition_meal_items WHERE meal_id=?', id); await insertItems(tx, id, input, now); await aggregateInTransaction(tx, old.local_date, new Date()); if (old.local_date !== input.localDate) await aggregateInTransaction(tx, input.localDate, new Date()); return (await loadMeals(tx, 'id=?', id))[0]! })),
+    delete: (id) => serial(() => database.transaction(async (tx) => { const row = await tx.first<{ local_date: string }>('SELECT local_date FROM nutrition_meals WHERE id=?', id); if (!row) return; await assertOpen(tx, row.local_date); await tx.run('DELETE FROM nutrition_meals WHERE id=?', id); await aggregateInTransaction(tx, row.local_date, new Date()) })),
     findById: (id) => serial(async () => (await loadMeals(database, 'id=?', id))[0] ?? null),
     listByDate: (date) => serial(() => loadMeals(database, 'local_date=?', date)),
     listBetweenDates: (start, end) => serial(() => loadMeals(database, 'local_date BETWEEN ? AND ?', start, end)),
@@ -79,10 +88,10 @@ export function nutritionRepositories(database: SqlDatabase) {
     listBetweenDates: (start, end) => serial(async () => (await database.all<Record<string, unknown>>('SELECT * FROM nutrition_daily_summaries WHERE local_date BETWEEN ? AND ? ORDER BY local_date DESC', start, end)).map(summaryFromRow)),
     upsert: (input) => serial(() => database.transaction((tx) => upsertSummary(tx, input))),
   }
-  const closePendingDays = (tx: SqlDatabase, today: string) => tx.all<{ local_date: string }>('SELECT DISTINCT local_date FROM nutrition_meals WHERE local_date < ?', today).then(async (rows) => { for (const row of rows) await aggregateInTransaction(tx, row.local_date, new Date(`${today}T12:00:00`)) })
+  const closePendingDays = (tx: SqlDatabase, today: string) => tx.all<{ local_date: string }>('SELECT DISTINCT local_date FROM nutrition_meals WHERE local_date < ?', today).then(async (rows) => { for (const row of rows) await aggregateInTransaction(tx, row.local_date, new Date(`${today}T12:00:00`), true) })
   const purge = async (tx: SqlDatabase, today: string, retentionDays: number) => {
     const threshold = new Date(`${today}T12:00:00`); threshold.setDate(threshold.getDate() - retentionDays); const cutoff = localDateKey(threshold); const dates = await tx.all<{ local_date: string }>('SELECT DISTINCT local_date FROM nutrition_meals WHERE local_date < ?', cutoff); let removed = 0
-    for (const row of dates) { const summary = await aggregateInTransaction(tx, row.local_date, new Date(`${today}T12:00:00`)); if (!summary || summary.finalized) continue; const result = await tx.run('DELETE FROM nutrition_meals WHERE local_date=?', row.local_date); removed += result.changes; await tx.run('UPDATE nutrition_daily_summaries SET finalized=1, details_purged_at=?, updated_at=? WHERE local_date=?', new Date().toISOString(), new Date().toISOString(), row.local_date) }
+    for (const row of dates) { const summary = await findSummary(tx, row.local_date); if (!summary?.finalized) continue; const result = await tx.run('DELETE FROM nutrition_meals WHERE local_date=?', row.local_date); removed += result.changes; if (result.changes) await tx.run('UPDATE nutrition_daily_summaries SET details_purged_at=?, updated_at=? WHERE local_date=?', new Date().toISOString(), new Date().toISOString(), row.local_date) }
     return removed
   }
   const maintenance: NutritionMaintenanceRepository = { aggregateDay, closePendingDays: (today) => serial(() => database.transaction((tx) => closePendingDays(tx, today))), purgeExpiredMealDetails: (today, retentionDays = 7) => serial(() => database.transaction((tx) => purge(tx, today, retentionDays))), run: (today) => serial(() => database.transaction(async (tx) => { await closePendingDays(tx, today); await purge(tx, today, 7) })) }
@@ -92,4 +101,10 @@ export function nutritionRepositories(database: SqlDatabase) {
 async function insertItems(database: SqlDatabase, mealId: number, input: NutritionMealInput, now: string) {
   if (!input.items.length) throw new Error('A refeição precisa de pelo menos um alimento.')
   for (const [sortOrder, item] of input.items.map(validateNutritionItem).entries()) await database.run('INSERT INTO nutrition_meal_items(meal_id,name,portion_description,estimated_grams,calories_kcal,protein_grams,carbohydrates_grams,fat_grams,fiber_grams,micronutrients_json,confidence,data_source,sort_order,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', mealId, item.name, item.portionDescription, item.estimatedGrams, item.caloriesKcal, item.proteinGrams, item.carbohydratesGrams, item.fatGrams, item.fiberGrams, JSON.stringify(item.micronutrients), item.confidence, item.dataSource, sortOrder, now, now)
+}
+
+async function assertOpen(database: SqlDatabase, date: string) {
+  validateNutritionDate(date)
+  const summary = await database.first<{ finalized: number }>('SELECT finalized FROM nutrition_daily_summaries WHERE local_date=?', date)
+  if (summary?.finalized === 1) throw new Error('Este dia já foi fechado e não pode ser editado.')
 }
