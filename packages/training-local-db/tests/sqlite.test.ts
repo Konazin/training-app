@@ -248,7 +248,7 @@ describe('SQLite local schema', () => {
       .toThrow('prototype')
     const nutrition = {
       ...backup,
-      nutritionMeals: [{ id: 30, local_date: '2026-07-29', consumed_at: '2026-07-29T12:00:00.000Z', created_at: '2026-07-29T12:00:00.000Z', updated_at: '2026-07-29T12:00:00.000Z', meal_type: 'LUNCH', source: 'MANUAL' }],
+      nutritionMeals: [{ id: 30, local_date: '2026-07-29', consumed_at: '2026-07-30T02:30:00.000Z', created_at: '2026-07-29T12:00:00.000Z', updated_at: '2026-07-29T12:00:00.000Z', meal_type: 'LUNCH', source: 'MANUAL' }],
       nutritionMealItems: [{ id: 31, meal_id: 30, name: 'Arroz', portion_description: '', sort_order: 0, estimated_grams: 100, calories_kcal: 10, protein_grams: 2, carbohydrates_grams: 3, fat_grams: 1, fiber_grams: 0, micronutrients_json: '{}', confidence: null, data_source: 'MANUAL', created_at: '2026-07-29T12:00:00.000Z', updated_at: '2026-07-29T12:00:00.000Z' }],
       nutritionDailySummaries: [{ id: 32, local_date: '2026-07-29', total_calories_kcal: 10, total_protein_grams: 2, total_carbohydrates_grams: 3, total_fat_grams: 1, total_fiber_grams: 0, total_micronutrients_json: '{}', meal_count: 1, item_count: 1, goal_calories_kcal: 100, goal_protein_grams: null, goal_carbohydrates_grams: null, goal_fat_grams: null, goal_fiber_grams: null, closed_at: '2026-07-30T00:00:00.000Z', finalized: 1, details_purged_at: null, updated_at: '2026-07-30T00:00:00.000Z' }],
     } as TrainingBackup

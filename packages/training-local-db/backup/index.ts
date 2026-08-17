@@ -2,7 +2,6 @@ import {
   DomainError,
   LOCAL_PREFERENCES_KEY,
   resolveDisplayName,
-  localDateKey,
   validateNutritionGoals,
   MICRONUTRIENT_CODES,
   type BackupRepository,
@@ -415,7 +414,7 @@ function assertNutritionRows(backup: Partial<TrainingBackup>) {
   const items = (backup.nutritionMealItems ?? []) as Record<string, unknown>[]
   const summaries = (backup.nutritionDailySummaries ?? []) as Record<string, unknown>[]
   const dates = new Set<string>()
-  for (const row of meals) if (!isDateKey(row.local_date) || !isIsoTimestamp(row.consumed_at) || localDateKey(new Date(String(row.consumed_at))) !== row.local_date || !isIsoTimestamp(row.created_at) || !isIsoTimestamp(row.updated_at)) throw invalidBackup('data inválida em nutrição')
+  for (const row of meals) if (!isDateKey(row.local_date) || !isIsoTimestamp(row.consumed_at) || !isIsoTimestamp(row.created_at) || !isIsoTimestamp(row.updated_at)) throw invalidBackup('data inválida em nutrição')
   for (const row of items) {
     if (typeof row.name !== 'string' || !row.name.trim() || typeof row.portion_description !== 'string' || !isIsoTimestamp(row.created_at) || !isIsoTimestamp(row.updated_at) || !Number.isInteger(row.sort_order) || Number(row.sort_order) < 0) throw invalidBackup('item nutricional inválido')
     if (row.confidence != null && (typeof row.confidence !== 'number' || !Number.isFinite(row.confidence) || row.confidence < 0 || row.confidence > 1)) throw invalidBackup('confidence inválida')
