@@ -105,6 +105,7 @@ async function insertItems(database: SqlDatabase, mealId: number, input: Nutriti
 
 async function assertOpen(database: SqlDatabase, date: string) {
   validateNutritionDate(date)
+  if (date !== localDateKey(new Date())) throw new Error('Somente o dia atual está aberto para edição.')
   const summary = await database.first<{ finalized: number }>('SELECT finalized FROM nutrition_daily_summaries WHERE local_date=?', date)
   if (summary?.finalized === 1) throw new Error('Este dia já foi fechado e não pode ser editado.')
 }

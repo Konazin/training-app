@@ -424,12 +424,16 @@ function assertNutritionRows(backup: Partial<TrainingBackup>) {
   }
   assertUniqueOrder(items, 'meal_id', 'sort_order')
   const purgedDates = new Set(summaries.filter((row) => row.details_purged_at != null).map((row) => String(row.local_date)))
+  if (meals.some((row) => purgedDates.has(String(row.local_date)))) throw invalidBackup('refeições presentes após expurgo')
   if (items.some((row) => purgedDates.has(String(meals.find((meal) => meal.id === row.meal_id)?.local_date)))) throw invalidBackup('detalhes presentes após expurgo')
   for (const row of summaries) {
     if (!isDateKey(row.local_date) || dates.has(String(row.local_date)) || !isIsoTimestamp(row.closed_at) || !isIsoTimestamp(row.updated_at)) throw invalidBackup('resumo nutricional inválido')
     dates.add(String(row.local_date))
     if (![row.finalized].every((value) => value === undefined || value === 0 || value === 1)) throw invalidBackup('estado do resumo inválido')
-    if (row.details_purged_at != null && !isIsoTimestamp(row.details_purged_at)) throw invalidBackup('data de expurgo inválida')
+    if (row.details_purged_at != null && (!isIsoTimestamp(row.details_purged_at) || row.finalized !== 1)) throw invalidBackup('data de expurgo inválida')
+    if (!Number.isInteger(row.meal_count) || Number(row.meal_count) < 0 || !Number.isInteger(row.item_count) || Number(row.item_count) < 0) throw invalidBackup('contagem nutricional inválida')
+    const goal = (key: string) => { const value = row[key]; return value == null ? null : value as number }
+    validateNutritionGoals({ caloriesKcal: goal('goal_calories_kcal'), proteinGrams: goal('goal_protein_grams'), carbohydratesGrams: goal('goal_carbohydrates_grams'), fatGrams: goal('goal_fat_grams'), fiberGrams: goal('goal_fiber_grams') })
     if (typeof row.total_micronutrients_json !== 'string') throw invalidBackup('micronutrientes do resumo inválidos')
     validateMicronutrients(row.total_micronutrients_json)
   }
@@ -468,14 +472,14 @@ function assertFiniteNumbers(backup: Partial<TrainingBackup>) {
     'overall_rpe', 'planned_sets', 'planned_min_reps', 'planned_max_reps',
     'reps', 'load', 'duration_seconds', 'distance', 'rpe', 'width', 'height',
     'active_slot', 'active', 'archived', 'rest_day', 'optional', 'completed',
-    'manually_added', 'unilateral', 'timed', 'is_main', 'estimated_grams', 'calories_kcal', 'protein_grams', 'carbohydrates_grams', 'fat_grams', 'fiber_grams', 'confidence', 'meal_count', 'item_count', 'finalized', 'goal_calories_kcal', 'goal_protein_grams', 'goal_carbohydrates_grams', 'goal_fat_grams', 'goal_fiber_grams',
+    'manually_added', 'unilateral', 'timed', 'is_main', 'estimated_grams', 'calories_kcal', 'protein_grams', 'carbohydrates_grams', 'fat_grams', 'fiber_grams', 'total_calories_kcal', 'total_protein_grams', 'total_carbohydrates_grams', 'total_fat_grams', 'total_fiber_grams', 'confidence', 'meal_count', 'item_count', 'finalized', 'goal_calories_kcal', 'goal_protein_grams', 'goal_carbohydrates_grams', 'goal_fat_grams', 'goal_fiber_grams',
   ])
   const nonNegative = new Set([
     'sort_order', 'set_number', 'sets', 'min_reps', 'max_reps', 'planned_load',
     'planned_duration_seconds', 'planned_distance', 'rest_seconds',
     'estimated_duration_minutes', 'paused_duration_seconds', 'total_duration_seconds',
     'planned_sets', 'planned_min_reps', 'planned_max_reps', 'reps', 'load',
-    'duration_seconds', 'distance', 'width', 'height',
+    'duration_seconds', 'distance', 'width', 'height', 'estimated_grams', 'calories_kcal', 'protein_grams', 'carbohydrates_grams', 'fat_grams', 'fiber_grams', 'total_calories_kcal', 'total_protein_grams', 'total_carbohydrates_grams', 'total_fat_grams', 'total_fiber_grams', 'meal_count', 'item_count',
   ])
   for (const rows of collections) {
     for (const row of rows as Record<string, unknown>[]) {

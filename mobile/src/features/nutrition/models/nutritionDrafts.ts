@@ -11,7 +11,12 @@ export function mealToDraft(meal: NutritionMeal): NutritionMealDraft { return { 
 export function draftToInput(draft: NutritionMealDraft): NutritionMealInput {
   return { localDate: draft.localDate, consumedAt: combineLocalDateAndTime(draft.localDate, draft.time), mealType: draft.mealType, title: draft.title, notes: draft.notes, source: 'MANUAL', items: draft.items.map((item, sortOrder) => ({ name: item.name, portionDescription: item.portionDescription, estimatedGrams: numberOrNull(item.estimatedGrams), caloriesKcal: requiredNumber(item.caloriesKcal, 'calorias'), proteinGrams: requiredNumber(item.proteinGrams, 'proteína'), carbohydratesGrams: requiredNumber(item.carbohydratesGrams, 'carboidratos'), fatGrams: requiredNumber(item.fatGrams, 'gordura'), fiberGrams: requiredNumber(item.fiberGrams, 'fibra'), micronutrients: Object.fromEntries(Object.entries(item.micronutrients).filter(([, value]) => value.trim()).map(([key, value]) => [key, numberOrNull(value)])) as MicronutrientTotals, confidence: null, dataSource: 'MANUAL', sortOrder })) }
 }
-export function combineLocalDateAndTime(date: string, time: string): string { const [hours, minutes] = time.split(':').map(Number); const result = new Date(`${date}T12:00:00`); result.setHours(hours || 0, minutes || 0, 0, 0); return result.toISOString() }
+export function combineLocalDateAndTime(date: string, time: string): string {
+  if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)) throw new Error('Informe um horário válido no formato HH:MM.')
+  const result = new Date(`${date}T${time}:00`)
+  if (Number.isNaN(result.getTime())) throw new Error('A data da refeição é inválida.')
+  return result.toISOString()
+}
 const numberOrNull = (value: string) => value.trim() === '' ? null : Number(value.replace(',', '.'))
 const requiredNumber = (value: string, label: string) => { const result = numberOrNull(value); if (result === null || !Number.isFinite(result)) throw new Error(`Informe um valor válido para ${label}.`); return result }
 const text = (value: number | null | undefined) => value == null ? '' : String(value)

@@ -37,7 +37,8 @@ export function NutritionScreen({ repositories, maintenanceError, onRetryMainten
 }
 
 function MealForm({ initial, onCancel, onSave }: { initial: NutritionMealDraft; onCancel: () => void; onSave: (draft: NutritionMealDraft) => Promise<void> }) {
-  const { colors } = useTheme(); const styles = createStyles(colors); const [meal, setMeal] = useState(initial); const [busy, setBusy] = useState(false); const busyRef = useRef(false); const [error, setError] = useState(''); const [dirty, setDirty] = useState(false); const [showMicronutrients, setShowMicronutrients] = useState(false)
+  const { colors } = useTheme(); const styles = createStyles(colors); const [meal, setMealState] = useState(initial); const [busy, setBusy] = useState(false); const busyRef = useRef(false); const [error, setError] = useState(''); const [dirty, setDirty] = useState(false); const [showMicronutrients, setShowMicronutrients] = useState(false)
+  const setMeal = (next: Parameters<typeof setMealState>[0]) => { setDirty(true); setMealState(next) }
   const updateItem = (index: number, field: keyof NutritionMealDraft['items'][number], value: string) => { setDirty(true); setMeal((current) => ({ ...current, items: current.items.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item) })) }
   const cancel = () => { if (!dirty) return onCancel(); Alert.alert('Descartar alterações?', 'O rascunho não será salvo.', [{ text: 'Continuar editando', style: 'cancel' }, { text: 'Descartar', style: 'destructive', onPress: onCancel }]) }
   const submit = async () => { if (busyRef.current) return; busyRef.current = true; setError(''); setBusy(true); try { await onSave(meal) } catch (cause) { setError(cause instanceof Error ? cause.message : 'Não foi possível salvar a refeição.') } finally { busyRef.current = false; setBusy(false) } }
