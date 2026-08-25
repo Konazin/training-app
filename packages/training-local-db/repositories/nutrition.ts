@@ -41,9 +41,9 @@ function summaryFromRow(row: Record<string, unknown>): DailyNutritionSummary {
   return { id: Number(row.id), localDate: String(row.local_date), totalCaloriesKcal: Number(row.total_calories_kcal), totalProteinGrams: Number(row.total_protein_grams), totalCarbohydratesGrams: Number(row.total_carbohydrates_grams), totalFatGrams: Number(row.total_fat_grams), totalFiberGrams: Number(row.total_fiber_grams), totalMicronutrients: parse(row.total_micronutrients_json, {}, `micronutrientes do resumo ${row.local_date}`), mealCount: Number(row.meal_count), itemCount: Number(row.item_count), goalCaloriesKcal: row.goal_calories_kcal == null ? null : Number(row.goal_calories_kcal), goalProteinGrams: row.goal_protein_grams == null ? null : Number(row.goal_protein_grams), goalCarbohydratesGrams: row.goal_carbohydrates_grams == null ? null : Number(row.goal_carbohydrates_grams), goalFatGrams: row.goal_fat_grams == null ? null : Number(row.goal_fat_grams), goalFiberGrams: row.goal_fiber_grams == null ? null : Number(row.goal_fiber_grams), closedAt: String(row.closed_at), finalized: row.finalized === 1, detailsPurgedAt: row.details_purged_at == null ? null : String(row.details_purged_at), updatedAt: String(row.updated_at) }
 }
 async function findSummary(database: SqlDatabase, date: string) { const row = await database.first<Record<string, unknown>>('SELECT * FROM nutrition_daily_summaries WHERE local_date=?', date); return row ? summaryFromRow(row) : null }
-async function upsertSummary(database: SqlDatabase, input: DailyNutritionSummaryInput): Promise<DailyNutritionSummary> {
+async function upsertSummary(database: SqlDatabase, input: DailyNutritionSummaryInput, replaceFinalized = false): Promise<DailyNutritionSummary> {
   const existing = await findSummary(database, input.localDate)
-  if (existing?.finalized) return existing
+  if (existing?.finalized && !replaceFinalized) return existing
   const now = new Date().toISOString()
   await database.run('INSERT INTO nutrition_daily_summaries(local_date,total_calories_kcal,total_protein_grams,total_carbohydrates_grams,total_fat_grams,total_fiber_grams,total_micronutrients_json,meal_count,item_count,goal_calories_kcal,goal_protein_grams,goal_carbohydrates_grams,goal_fat_grams,goal_fiber_grams,closed_at,finalized,details_purged_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(local_date) DO UPDATE SET total_calories_kcal=excluded.total_calories_kcal,total_protein_grams=excluded.total_protein_grams,total_carbohydrates_grams=excluded.total_carbohydrates_grams,total_fat_grams=excluded.total_fat_grams,total_fiber_grams=excluded.total_fiber_grams, total_micronutrients_json=excluded.total_micronutrients_json,meal_count=excluded.meal_count,item_count=excluded.item_count,goal_calories_kcal=excluded.goal_calories_kcal,goal_protein_grams=excluded.goal_protein_grams,goal_carbohydrates_grams=excluded.goal_carbohydrates_grams,goal_fat_grams=excluded.goal_fat_grams,goal_fiber_grams=excluded.goal_fiber_grams,closed_at=excluded.closed_at,finalized=excluded.finalized,details_purged_at=excluded.details_purged_at,updated_at=excluded.updated_at', input.localDate, input.totalCaloriesKcal, input.totalProteinGrams, input.totalCarbohydratesGrams, input.totalFatGrams, input.totalFiberGrams, JSON.stringify(input.totalMicronutrients), input.mealCount, input.itemCount, input.goalCaloriesKcal, input.goalProteinGrams, input.goalCarbohydratesGrams, input.goalFatGrams, input.goalFiberGrams, input.closedAt, Number(input.finalized), input.detailsPurgedAt, now)
   return (await findSummary(database, input.localDate))!
@@ -52,7 +52,6 @@ async function currentGoals(database: SqlDatabase) { const row = await database.
 
 async function aggregateInTransaction(database: SqlDatabase, date: string, now: Date, finalize = false): Promise<DailyNutritionSummary | null> {
   const existing = await findSummary(database, date)
-  if (existing?.finalized) return existing
   if (date >= localDateKey(now)) {
     if (!existing) return null
     await database.run('DELETE FROM nutrition_daily_summaries WHERE local_date=?', date)
@@ -60,7 +59,18 @@ async function aggregateInTransaction(database: SqlDatabase, date: string, now: 
   }
   const meals = await loadMeals(database, 'local_date=?', date)
   if (!meals.length) {
-    if (existing?.finalized) return existing
+    if (existing?.finalized) return upsertSummary(database, {
+      ...existing,
+      totalCaloriesKcal: 0,
+      totalProteinGrams: 0,
+      totalCarbohydratesGrams: 0,
+      totalFatGrams: 0,
+      totalFiberGrams: 0,
+      totalMicronutrients: {},
+      mealCount: 0,
+      itemCount: 0,
+      updatedAt: now.toISOString(),
+    }, true)
     await database.run('DELETE FROM nutrition_daily_summaries WHERE local_date=?', date)
     return null
   }
@@ -68,7 +78,11 @@ async function aggregateInTransaction(database: SqlDatabase, date: string, now: 
     ? { caloriesKcal: existing.goalCaloriesKcal, proteinGrams: existing.goalProteinGrams, carbohydratesGrams: existing.goalCarbohydratesGrams, fatGrams: existing.goalFatGrams, fiberGrams: existing.goalFiberGrams }
     : await currentGoals(database)
   const aggregate = aggregateNutritionDay(meals, activeGoals, now)
-  return upsertSummary(database, { ...aggregate!, finalized: finalize, detailsPurgedAt: existing?.detailsPurgedAt ?? null })
+  return upsertSummary(database, {
+    ...aggregate!,
+    finalized: finalize || existing?.finalized === true || date < localDateKey(now),
+    detailsPurgedAt: existing?.detailsPurgedAt ?? null,
+  }, existing?.finalized === true)
 }
 
 export function nutritionRepositories(database: SqlDatabase) {
@@ -105,7 +119,6 @@ async function insertItems(database: SqlDatabase, mealId: number, input: Nutriti
 
 async function assertOpen(database: SqlDatabase, date: string) {
   validateNutritionDate(date)
-  if (date !== localDateKey(new Date())) throw new Error('Somente o dia atual está aberto para edição.')
-  const summary = await database.first<{ finalized: number }>('SELECT finalized FROM nutrition_daily_summaries WHERE local_date=?', date)
-  if (summary?.finalized === 1) throw new Error('Este dia já foi fechado e não pode ser editado.')
+  const summary = await database.first<{ details_purged_at: string | null }>('SELECT details_purged_at FROM nutrition_daily_summaries WHERE local_date=?', date)
+  if (summary?.details_purged_at) throw new Error('Os detalhes deste dia já foram removidos e não podem ser editados.')
 }

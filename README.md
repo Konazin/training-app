@@ -27,7 +27,7 @@ com repositories `expo-sqlite`, sem exigir servidor, VPS, IP, conta ou internet.
 - escolher entre quatro temas, aparência do sistema e níveis de movimento;
 - usar alto contraste no treino e controlar feedback tátil;
 - mover fichas para uma lixeira local com retenção de sete dias;
-- exportar, validar e restaurar backups com `schemaVersion: 2`;
+- exportar, validar e restaurar backups com `schemaVersion: 3` (e ler os schemas 1 e 2);
 - receber avisos locais dispensáveis e onboarding offline em instalações novas.
 
 O SQLite `training.db` é a fonte de verdade para treino e biblioteca.
@@ -106,9 +106,9 @@ Os cinco backups automáticos mais recentes ficam visíveis em **Mais**, com
 restauração, compartilhamento e exclusão. **Apagar todos os dados** preserva os
 metadados técnicos e continua vazio ao reabrir.
 
-Backups v2 podem incluir preferências visuais, favoritos, recentes e aliases do
-usuário em campos opcionais; arquivos antigos continuam aceitos. Eles não
-contêm tokens, chaves, arquivos de mídia, cache ou estado do player.
+Backups v3 incluem refeições, itens, resumos nutricionais, metas e o estado de
+retenção. Arquivos v1 e v2 continuam aceitos; nenhum deles contém tokens, chaves,
+arquivos de mídia, cache ou estado do player.
 Veja [backup e restauração](docs/BACKUP_AND_RESTORE.md).
 
 ## Editor, templates e duplicação

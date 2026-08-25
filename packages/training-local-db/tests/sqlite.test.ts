@@ -31,7 +31,7 @@ afterEach(() => {
 })
 
 describe('SQLite local schema', () => {
-  it('agrega e remove o resumo editável ao apagar a última refeição e finaliza o histórico no purge', async () => {
+  it('mantém históricos editáveis até o purge e preserva o resumo finalizado', async () => {
     const database = betterDatabase(newDatabase())
     await runMigrations(database)
     const repositories = createLocalRepositories(database)
@@ -41,17 +41,19 @@ describe('SQLite local schema', () => {
     expect(await repositories.nutritionSummaries.findByDate(today)).toBeNull()
     await repositories.nutritionMeals.delete(meal.id)
     expect(await repositories.nutritionSummaries.findByDate(today)).toBeNull()
-    const historicalMeal = await repositories.nutritionMeals.create(input(today))
-    await database.run('UPDATE nutrition_meals SET local_date=?, consumed_at=? WHERE id=?', yesterday, `${yesterday}T12:00:00.000Z`, historicalMeal.id)
-    await expect(repositories.nutritionMeals.create(input(yesterday))).rejects.toThrow()
-    await expect(repositories.nutritionMeals.update(historicalMeal.id, input(yesterday))).rejects.toThrow()
-    await expect(repositories.nutritionMeals.delete(historicalMeal.id)).rejects.toThrow()
-    await database.run('UPDATE nutrition_meals SET local_date=?, consumed_at=? WHERE id=?', expired, `${expired}T12:00:00.000Z`, historicalMeal.id)
+    const historicalMeal = await repositories.nutritionMeals.create(input(yesterday))
+    expect((await repositories.nutritionSummaries.findByDate(yesterday))?.finalized).toBe(true)
+    await repositories.nutritionMeals.update(historicalMeal.id, { ...input(yesterday), items: [{ ...input(yesterday).items[0]!, caloriesKcal: 20 }] })
+    expect((await repositories.nutritionSummaries.findByDate(yesterday))?.totalCaloriesKcal).toBe(20)
+    await repositories.nutritionMeals.delete(historicalMeal.id)
+    expect(await repositories.nutritionSummaries.findByDate(yesterday)).toMatchObject({ finalized: true, mealCount: 0, totalCaloriesKcal: 0 })
+    await repositories.nutritionMeals.create(input(expired))
     await repositories.nutritionMaintenance.run(today)
     const historical = await repositories.nutritionSummaries.findByDate(expired)
     expect(historical?.finalized).toBe(true)
     expect(historical?.detailsPurgedAt).toBeTruthy()
     expect(await repositories.nutritionMeals.listByDate(expired)).toEqual([])
+    await expect(repositories.nutritionMeals.create(input(expired))).rejects.toThrow('detalhes')
     await repositories.backup.reset()
     expect(await repositories.nutritionSummaries.findByDate('2026-07-27')).toBeNull()
     await database.close()
@@ -253,6 +255,7 @@ describe('SQLite local schema', () => {
       nutritionDailySummaries: [{ id: 32, local_date: '2026-07-29', total_calories_kcal: 10, total_protein_grams: 2, total_carbohydrates_grams: 3, total_fat_grams: 1, total_fiber_grams: 0, total_micronutrients_json: '{}', meal_count: 1, item_count: 1, goal_calories_kcal: 100, goal_protein_grams: null, goal_carbohydrates_grams: null, goal_fat_grams: null, goal_fiber_grams: null, closed_at: '2026-07-30T00:00:00.000Z', finalized: 1, details_purged_at: null, updated_at: '2026-07-30T00:00:00.000Z' }],
     } as TrainingBackup
     expect(() => validateBackup(nutrition)).not.toThrow()
+    expect(() => validateBackup({ ...nutrition, schemaVersion: 3, nutritionMeals: undefined })).toThrow('nutricional ausente')
     for (const field of ['calories_kcal', 'protein_grams', 'total_calories_kcal', 'estimated_grams', 'goal_calories_kcal']) {
       const target = field.startsWith('total_') || field.startsWith('goal_') ? 'nutritionDailySummaries' : 'nutritionMealItems'
       expect(() => validateBackup({ ...nutrition, [target]: [{ ...(nutrition[target] as Record<string, unknown>[])[0], [field]: -1 }] } as TrainingBackup)).toThrow()

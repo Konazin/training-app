@@ -188,6 +188,11 @@ export function validateBackup(candidate: unknown): asserts candidate is Trainin
   if (backup.schemaVersion !== 1 && backup.schemaVersion !== 2 && backup.schemaVersion !== 3) {
     throw invalidBackup('versão não suportada')
   }
+  if (backup.schemaVersion === 3 && (
+    backup.nutritionMeals === undefined
+    || backup.nutritionMealItems === undefined
+    || backup.nutritionDailySummaries === undefined
+  )) throw invalidBackup('coleção nutricional ausente no schema 3')
   if ('app_metadata' in candidate || 'appMetadata' in candidate) {
     throw invalidBackup('app_metadata não pode ser importado')
   }

@@ -12,6 +12,9 @@ export const MICRONUTRIENT_METADATA: Record<MicronutrientCode, { name: string; u
 export type NutritionMealType = 'BREAKFAST' | 'MORNING_SNACK' | 'LUNCH' | 'AFTERNOON_SNACK' | 'DINNER' | 'SUPPER' | 'OTHER'
 export type NutritionMealSource = 'MANUAL' | 'CAMERA' | 'GALLERY' | 'BARCODE' | 'SAVED_MEAL'
 export type NutritionDataSource = 'MANUAL' | 'LOCAL_DATABASE' | 'USDA' | 'OPEN_FOOD_FACTS' | 'AI_ESTIMATE'
+const NUTRITION_MEAL_TYPES: NutritionMealType[] = ['BREAKFAST', 'MORNING_SNACK', 'LUNCH', 'AFTERNOON_SNACK', 'DINNER', 'SUPPER', 'OTHER']
+const NUTRITION_MEAL_SOURCES: NutritionMealSource[] = ['MANUAL', 'CAMERA', 'GALLERY', 'BARCODE', 'SAVED_MEAL']
+const NUTRITION_DATA_SOURCES: NutritionDataSource[] = ['MANUAL', 'LOCAL_DATABASE', 'USDA', 'OPEN_FOOD_FACTS', 'AI_ESTIMATE']
 
 export interface NutritionMealItem {
   id: number; mealId: number; name: string; portionDescription: string; estimatedGrams: number | null
@@ -50,8 +53,14 @@ export function validateNutritionDate(localDate: string, now = new Date()): stri
 
 export function validateNutritionMealInput(input: NutritionMealInput, now = new Date()): NutritionMealInput {
   validateNutritionDate(input.localDate, now)
-  if (!/^\d{4}-\d{2}-\d{2}T/.test(input.consumedAt) || localDateKey(new Date(input.consumedAt)) !== input.localDate) throw new Error('O horário da refeição não corresponde à data informada.')
-  if (Number.isNaN(new Date(input.consumedAt).getTime())) throw new Error('O horário da refeição é inválido.')
+  if (typeof input.consumedAt !== 'string' || !/^\d{4}-\d{2}-\d{2}T/.test(input.consumedAt)) throw new Error('O horário da refeição é inválido.')
+  const consumedAt = new Date(input.consumedAt)
+  if (Number.isNaN(consumedAt.getTime())) throw new Error('O horário da refeição é inválido.')
+  if (localDateKey(consumedAt) !== input.localDate) throw new Error('O horário da refeição não corresponde à data informada.')
+  if (!NUTRITION_MEAL_TYPES.includes(input.mealType)) throw new Error('O tipo da refeição é inválido.')
+  if (!NUTRITION_MEAL_SOURCES.includes(input.source)) throw new Error('A origem da refeição é inválida.')
+  if (typeof input.title !== 'string' || typeof input.notes !== 'string') throw new Error('Os dados da refeição são inválidos.')
+  if (!Array.isArray(input.items) || !input.items.length) throw new Error('A refeição precisa de pelo menos um alimento.')
   return { ...input, items: input.items.map(validateNutritionItem) }
 }
 
@@ -83,15 +92,22 @@ const finiteNonNegative = (value: unknown, label: string) => {
   return value
 }
 export function validateNutritionItem(input: NutritionMealItemInput): NutritionMealItemInput {
-  if (!input.name.trim()) throw new Error('Informe o nome do alimento.')
+  if (!input || typeof input !== 'object' || typeof input.name !== 'string' || !input.name.trim()) throw new Error('Informe o nome do alimento.')
+  if (typeof input.portionDescription !== 'string') throw new Error('A porção do alimento é inválida.')
+  if (!Number.isInteger(input.sortOrder) || input.sortOrder < 0) throw new Error('A ordem do alimento é inválida.')
+  if (!NUTRITION_DATA_SOURCES.includes(input.dataSource)) throw new Error('A origem dos dados do alimento é inválida.')
   for (const field of NUTRIENT_FIELDS) finiteNonNegative(input[field], field)
   if (input.estimatedGrams !== null) finiteNonNegative(input.estimatedGrams, 'Peso')
   if (input.confidence !== null && (typeof input.confidence !== 'number' || !Number.isFinite(input.confidence) || input.confidence < 0 || input.confidence > 1)) throw new Error('A confiança deve ficar entre 0 e 1.')
   return { ...input, name: input.name.trim(), portionDescription: input.portionDescription.trim(), micronutrients: normalizeMicronutrients(input.micronutrients) }
 }
 export function normalizeMicronutrients(value: MicronutrientTotals): MicronutrientTotals {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Os micronutrientes são inválidos.')
   const result: MicronutrientTotals = {}
-  for (const code of MICRONUTRIENT_CODES) if (value[code] !== undefined) result[code] = finiteNonNegative(value[code], code)
+  for (const [code, amount] of Object.entries(value)) {
+    if (!MICRONUTRIENT_CODES.includes(code as MicronutrientCode)) throw new Error(`Micronutriente inválido: ${code}.`)
+    result[code as MicronutrientCode] = finiteNonNegative(amount, code)
+  }
   return result
 }
 export function aggregateNutritionDay(meals: NutritionMeal[], goals: NutritionGoals, now = new Date()): DailyNutritionSummaryInput | null {
