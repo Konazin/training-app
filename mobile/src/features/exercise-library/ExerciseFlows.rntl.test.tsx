@@ -20,10 +20,15 @@ jest.mock('@react-navigation/native', () => ({
 jest.mock('../../theme', () => ({
   shared: {
     pagePadding: 20,
-    spacing: { sm: 8, lg: 16 },
+    radii: new Proxy({}, { get: () => 8 }),
+    shadow: new Proxy({}, { get: () => ({}) }),
+    spacing: new Proxy({}, { get: () => 8 }),
     touchTarget: { minimum: 48 },
   },
-  useTheme: () => ({ colors: new Proxy({}, { get: () => '#000000' }) }),
+  useTheme: () => ({
+    colors: new Proxy({}, { get: () => '#000000' }),
+    motion: { duration: 0, translate: false },
+  }),
 }))
 jest.mock('../../theme/typography', () => ({
   typography: { body: {}, bodySmall: {}, caption: {}, label: {}, title: {} },
@@ -51,7 +56,7 @@ describe('seleção e detalhe renderizados', () => {
       onSelect,
     }))
 
-    const action = screen.getByLabelText('Adicionar Supino')
+    const action = screen.getByLabelText('Selecionar Supino, Peito, Barra')
     fireEvent.press(action)
     fireEvent.press(action)
     expect(onSelect).toHaveBeenCalledTimes(1)

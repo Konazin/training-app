@@ -12,11 +12,16 @@ vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Pressable: 'Pressable',
   RefreshControl: 'RefreshControl',
-  StyleSheet: { create: <T,>(styles: T) => styles },
+  StyleSheet: { create: <T,>(styles: T) => styles, hairlineWidth: 1 },
   Text: 'Text',
   View: 'View',
 }))
 vi.mock('../theme', () => ({
+  shared: {
+    radii: new Proxy({}, { get: () => 8 }),
+    spacing: new Proxy({}, { get: () => 8 }),
+    touchTarget: { minimum: 44 },
+  },
   useTheme: () => ({ colors: new Proxy({}, { get: () => '#000' }) }),
 }))
 vi.mock('../components/Screen', () => ({ ScreenScrollView: 'ScreenScrollView' }))
@@ -208,7 +213,7 @@ describe('Home semanal', () => {
 })
 
 describe('Histórico e progresso', () => {
-  it('mostra seis métricas, quatro estados, duração, volume opcional, warning e refresh', async () => {
+  it('hierarquiza três métricas, resume dados secundários e mostra quatro estados, duração, warning e refresh', async () => {
     const activePlan = plan()
     const sessions = (['COMPLETED', 'ABANDONED', 'IN_PROGRESS', 'PAUSED'] as const)
       .map((status, index) => completedSession(activePlan, index + 1, status))
@@ -230,22 +235,23 @@ describe('Histórico e progresso', () => {
       onRefresh,
     })
     const content = text(view)
-    for (const label of ['SESSÕES', 'ESTA SEMANA', 'CONCLUSÃO', 'EXERCÍCIOS', 'MINUTOS', 'VOLUME']) {
+    for (const label of ['SESSÕES', 'ESTA SEMANA', 'CONCLUSÃO']) {
       expect(content).toContain(label)
     }
-    for (const label of ['Concluída', 'Não concluída', 'Em andamento', 'Pausada']) {
+    expect(content).toMatch(/2\s*min\s*·\s*250\s*kg de volume\s*·\s*1\s*exercícios/)
+    for (const label of ['Concluído', 'Não concluído', 'Em andamento', 'Pausado']) {
       expect(content).toContain(label)
     }
     expect(content).toContain('2 min 5 s')
-    expect(content.match(/250 kg/g)).toHaveLength(2)
+    expect(content).toContain('250 kg')
     expect(content).toContain('Atualização parcial.')
     act(() => view.root.findByType('ScreenScrollView' as never).props.refreshControl.props.onRefresh())
     expect(onRefresh).toHaveBeenCalledOnce()
     unmount(view)
   })
 
-  it('mantém estado vazio e formatação curta', async () => {
-    const view = await render(HistoryScreen, {
+  it('mantém estados de carregamento e vazio e formatação curta', async () => {
+    const props = {
       sessions: [],
       progress: {
         completedSessions: 0,
@@ -257,13 +263,18 @@ describe('Histórico e progresso', () => {
       },
       loading: true,
       onRefresh: vi.fn(),
-    })
-    expect(text(view)).toContain('Nenhuma sessão registrada')
+    }
+    const view = await render(HistoryScreen, props)
+    expect(text(view)).toContain('Carregando sessões…')
     expect(view.root.findByType('ScreenScrollView' as never).props.refreshControl.props.refreshing)
       .toBe(true)
     expect(formatDuration(45)).toBe('45 s')
     expect(formatDuration(120)).toBe('2 min')
     unmount(view)
+
+    const emptyView = await render(HistoryScreen, { ...props, loading: false })
+    expect(text(emptyView)).toContain('Nenhuma sessão registrada')
+    unmount(emptyView)
   })
 })
 
