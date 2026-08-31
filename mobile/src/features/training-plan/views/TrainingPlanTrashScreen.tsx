@@ -261,7 +261,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   emptyButtonText: { color: colors.danger, fontWeight: '800' },
   empty: { alignItems: 'center', flex: 1, justifyContent: 'center', minHeight: 280 },
   emptyTitle: { color: colors.textPrimary, fontSize: 17, fontWeight: '800' },
-  modalBackdrop: { alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.58)', flex: 1, justifyContent: 'center', padding: 24 },
+  modalBackdrop: { alignItems: 'center', backgroundColor: colors.overlay, flex: 1, justifyContent: 'center', padding: 24 },
   modal: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 20, borderWidth: 1, maxWidth: 420, padding: 20, width: '100%' },
   modalTitle: { color: colors.textPrimary, fontSize: 20, fontWeight: '800', marginBottom: 6 },
   input: { marginTop: 16 },

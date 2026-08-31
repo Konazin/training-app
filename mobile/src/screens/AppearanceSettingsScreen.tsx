@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 import { useNavigation } from '@react-navigation/native'
 import { ScreenScrollView } from '../components/Screen'
 import { ScreenHeader } from '../components/ScreenHeader'
@@ -76,7 +77,7 @@ export function AppearanceSettingsScreen() {
             onPress={() => navigation.goBack()}
             style={styles.back}
           >
-            <Text style={styles.backText}>←</Text>
+            <Ionicons accessibilityElementsHidden color={colors.textPrimary} name="arrow-back" size={22} />
           </Pressable>
         )}
       />
@@ -245,5 +246,4 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   restoreText: { ...typography.label, color: colors.textPrimary, fontWeight: '800' },
   pressed: { opacity: 0.72 },
   back: { alignItems: 'center', justifyContent: 'center', minHeight: shared.touchTarget.minimum, minWidth: shared.touchTarget.minimum },
-  backText: { color: colors.textPrimary, fontSize: 24, fontWeight: '700' },
 })
