@@ -47,13 +47,44 @@ describe('SQLite local schema', () => {
     expect((await repositories.nutritionSummaries.findByDate(yesterday))?.totalCaloriesKcal).toBe(20)
     await repositories.nutritionMeals.delete(historicalMeal.id)
     expect(await repositories.nutritionSummaries.findByDate(yesterday)).toMatchObject({ finalized: true, mealCount: 0, totalCaloriesKcal: 0 })
-    await repositories.nutritionMeals.create(input(expired))
+    const expiredInput = input(expired)
+    const expiredCreatedAt = new Date().toISOString()
+    const expiredMeal = await database.run(
+      'INSERT INTO nutrition_meals(local_date,consumed_at,meal_type,title,notes,source,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)',
+      expiredInput.localDate,
+      expiredInput.consumedAt,
+      expiredInput.mealType,
+      expiredInput.title,
+      expiredInput.notes,
+      expiredInput.source,
+      expiredCreatedAt,
+      expiredCreatedAt,
+    )
+    const expiredItem = expiredInput.items[0]!
+    await database.run(
+      'INSERT INTO nutrition_meal_items(meal_id,name,portion_description,estimated_grams,calories_kcal,protein_grams,carbohydrates_grams,fat_grams,fiber_grams,micronutrients_json,confidence,data_source,sort_order,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      expiredMeal.lastInsertRowId,
+      expiredItem.name,
+      expiredItem.portionDescription,
+      expiredItem.estimatedGrams,
+      expiredItem.caloriesKcal,
+      expiredItem.proteinGrams,
+      expiredItem.carbohydratesGrams,
+      expiredItem.fatGrams,
+      expiredItem.fiberGrams,
+      JSON.stringify(expiredItem.micronutrients),
+      expiredItem.confidence,
+      expiredItem.dataSource,
+      expiredItem.sortOrder,
+      expiredCreatedAt,
+      expiredCreatedAt,
+    )
     await repositories.nutritionMaintenance.run(today)
     const historical = await repositories.nutritionSummaries.findByDate(expired)
     expect(historical?.finalized).toBe(true)
     expect(historical?.detailsPurgedAt).toBeTruthy()
     expect(await repositories.nutritionMeals.listByDate(expired)).toEqual([])
-    await expect(repositories.nutritionMeals.create(input(expired))).rejects.toThrow('detalhes')
+    await expect(repositories.nutritionMeals.create(expiredInput)).rejects.toThrow('detalhes')
     await repositories.backup.reset()
     expect(await repositories.nutritionSummaries.findByDate('2026-07-27')).toBeNull()
     await database.close()
