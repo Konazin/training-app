@@ -175,9 +175,10 @@ export function TrainingPlanEditorScreen({
           eyebrow={plan ? 'Editar ficha' : 'Nova ficha'}
           title={plan ? plan.name : 'Montar ficha'}
           description="Dados gerais e estrutura da programação semanal."
+          variant="standard"
         />
 
-        <Section title="DADOS DA FICHA" styles={styles}>
+        <Section title="DADOS BÁSICOS" styles={styles}>
           <FormField
             error={fieldErrors.name}
             label="Nome"
@@ -193,6 +194,9 @@ export function TrainingPlanEditorScreen({
             onChangeText={(value) => updateValue('description', value)}
             value={description}
           />
+        </Section>
+
+        <Section title="CLASSIFICAÇÃO" styles={styles}>
           <OptionPickerField
             error={fieldErrors.category}
             label="Categoria"
@@ -412,12 +416,12 @@ function initialEditor(plan?: TrainingPlan) {
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  section: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 20, borderWidth: 1, gap: 12, marginBottom: 14, padding: 16 },
-  sectionTitle: { color: colors.textSecondary, fontSize: 12, fontWeight: '900', letterSpacing: 1.2 },
-  templateName: { color: colors.textPrimary, fontSize: 15, fontWeight: '900' },
+  section: { gap: 12, marginBottom: 22 },
+  sectionTitle: { color: colors.textSecondary, fontSize: 12, fontWeight: '700', letterSpacing: 1.2 },
+  templateName: { color: colors.textPrimary, fontSize: 15, fontWeight: '700' },
   error: { color: colors.danger, fontSize: 14, lineHeight: 20, marginBottom: 10 },
   hint: { color: colors.textSecondary, fontSize: 13, lineHeight: 19, marginTop: 4, textAlign: 'center' },
-  dangerSection: { borderColor: colors.danger, marginTop: 14 },
+  dangerSection: { borderTopColor: colors.border, borderTopWidth: StyleSheet.hairlineWidth, marginTop: 14, paddingTop: 20 },
   dangerButton: { alignItems: 'center', borderColor: colors.danger, borderRadius: 14, borderWidth: 1, justifyContent: 'center', minHeight: shared.touchTarget.minimum },
   dangerText: { color: colors.danger, fontSize: 14, fontWeight: '800' },
 })
