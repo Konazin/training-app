@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import type { ExerciseDefinition } from '@training/training-domain'
 import type { RootStackParamList } from '../../navigation/types'
@@ -66,7 +67,8 @@ export function ExerciseDetailScreen({
     <ScreenScrollView contentContainerStyle={styles.content}>
       <View style={styles.topActions}>
         <Pressable accessibilityLabel="Voltar" accessibilityRole="button" onPress={() => navigation.goBack()} style={styles.action}>
-          <Text style={styles.actionText}>← Voltar</Text>
+          <Ionicons accessibilityElementsHidden color={colors.textPrimary} name="arrow-back" size={20} />
+          <Text style={styles.actionText}>Voltar</Text>
         </Pressable>
         <Pressable
           accessibilityLabel={exercise.favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
@@ -75,7 +77,8 @@ export function ExerciseDetailScreen({
           onPress={() => void onFavorite(exercise.id, !exercise.favorite)}
           style={styles.action}
         >
-          <Text style={styles.favorite}>{exercise.favorite ? '★ Favorito' : '☆ Favoritar'}</Text>
+          <Ionicons accessibilityElementsHidden color={colors.primary} name={exercise.favorite ? 'star' : 'star-outline'} size={20} />
+          <Text style={styles.favorite}>{exercise.favorite ? 'Favorito' : 'Favoritar'}</Text>
         </Pressable>
       </View>
       <Text style={styles.eyebrow}>{source.toUpperCase()}</Text>
