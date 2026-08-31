@@ -76,12 +76,14 @@ describe('inteligência local renderizada na sessão', () => {
     })
     expect(actions.onApplySuggestion).toHaveBeenCalledTimes(1)
 
+    fireEvent.press(screen.getByText('Notas do exercício'))
     fireEvent.changeText(screen.getByLabelText('Anotações do exercício Supino'), 'Execução estável')
     await act(async () => {
       fireEvent.press(screen.getAllByText('Salvar anotação')[0]!)
     })
     expect(actions.onUpdateExerciseNotes).toHaveBeenCalledWith(1, 'Execução estável')
 
+    fireEvent.press(screen.getByText('RPE e notas'))
     fireEvent.changeText(screen.getByLabelText('Observação da série'), 'Cadência controlada')
     fireEvent.press(screen.getByText('Salvar'))
     expect(actions.onUpdateSet).toHaveBeenCalledWith(

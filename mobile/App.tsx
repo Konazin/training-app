@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, AppState } from 'react-native'
+import { Alert, AppState, View } from 'react-native'
 import {
   DefaultTheme,
   NavigationContainer,
@@ -564,21 +564,21 @@ function MainTabs({
   return (
     <Tabs.Navigator screenOptions={({ route }) => ({
       headerShown: false,
-      tabBarActiveBackgroundColor: colors.surfaceSecondary,
+      tabBarActiveBackgroundColor: 'transparent',
       tabBarActiveTintColor: colors.primary,
       tabBarInactiveTintColor: colors.textSecondary,
       tabBarLabel: labels[route.name],
-      tabBarIcon: ({ color, focused }) => <Ionicons color={color} name={focused ? icons[route.name].replace('-outline', '') as keyof typeof Ionicons.glyphMap : icons[route.name]} size={24} />,
-      tabBarItemStyle: { borderRadius: 14, marginHorizontal: 3, minHeight: 56 },
+      tabBarIcon: ({ color, focused }) => <View style={{ alignItems: 'center', backgroundColor: focused ? colors.surfaceSecondary : 'transparent', borderRadius: 18, height: 32, justifyContent: 'center', width: 56 }}><Ionicons color={color} name={focused ? icons[route.name].replace('-outline', '') as keyof typeof Ionicons.glyphMap : icons[route.name]} size={22} /></View>,
+      tabBarItemStyle: { borderRadius: 18, marginHorizontal: 1, minHeight: 56 },
       tabBarStyle: {
         backgroundColor: colors.tabBar,
         borderTopColor: colors.border,
-        height: 64 + insets.bottom,
-        paddingBottom: insets.bottom + 4,
-        paddingHorizontal: 6,
-        paddingTop: 4,
+        height: 72 + insets.bottom,
+        paddingBottom: insets.bottom + 6,
+        paddingHorizontal: 4,
+        paddingTop: 6,
       },
-      tabBarLabelStyle: { fontSize: 12, fontWeight: '700', lineHeight: 16 },
+      tabBarLabelStyle: { fontSize: 12, fontWeight: '600', lineHeight: 16 },
     })}>
       <Tabs.Screen name="Today">
         {({ navigation: tabNavigation }) => (

@@ -219,6 +219,7 @@ export function WorkoutSessionScreen(props: Props) {
             {session.status === 'PAUSED' ? 'SESSÃO PAUSADA' : 'SESSÃO EM ANDAMENTO'}
           </Text>
           <Text style={styles.title}>{session.workoutName}</Text>
+          <Text style={styles.headerMeta}>{session.completedSets} / {session.totalPlannedSets} séries{session.totalDurationSeconds > 0 ? ` · ${Math.round(session.totalDurationSeconds / 60)} min` : ''}</Text>
         </View>
         <TouchableOpacity
           accessibilityRole="button"
@@ -239,7 +240,7 @@ export function WorkoutSessionScreen(props: Props) {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.metrics}>
+      <View style={styles.sessionStats} accessibilityRole="progressbar" accessibilityLabel="Progresso da sessão" accessibilityValue={{ min: 0, max: session.totalPlannedSets, now: session.completedSets, text: `${session.completedSets} de ${session.totalPlannedSets} séries` }}>
         <View
           accessible
           accessibilityLabel="Progresso da sessão"
@@ -249,16 +250,12 @@ export function WorkoutSessionScreen(props: Props) {
             now: session.completedSets,
             text: `${session.completedSets} de ${session.totalPlannedSets} séries`,
           }}
-          style={styles.metric}
+          style={styles.compactMetric}
         >
-          <Text style={styles.metricLabel}>PROGRESSO</Text>
-          <Text style={styles.metricValue}>
-            {session.totalPlannedSets
-              ? Math.round(session.completedSets / session.totalPlannedSets * 100)
-              : 0}%
-          </Text>
+          <Text style={styles.metricLabel}>SÉRIES</Text>
+          <Text style={styles.metricValue}>{session.completedSets} / {session.totalPlannedSets}</Text>
         </View>
-        <View accessible accessibilityLabel={`Volume registrado: ${session.totalVolume} quilogramas`} style={styles.metric}>
+        <View accessible accessibilityLabel={`Volume registrado: ${session.totalVolume} quilogramas`} style={styles.compactMetric}>
           <Text style={styles.metricLabel}>VOLUME</Text>
           <Text style={styles.metricValue}>{session.totalVolume}kg</Text>
         </View>
@@ -436,6 +433,11 @@ export function WorkoutSessionScreen(props: Props) {
             ))}
           </View>
 
+          <View accessibilityLabel="Colunas do registro de séries" style={styles.setColumns}>
+            <Text style={styles.setColumnLabel}>SÉRIE</Text>
+            <Text style={styles.setColumnLabel}>{exercise.category === 'CARDIO' || exercise.timed ? 'TEMPO' : 'REPS / KG'}</Text>
+            <Text style={styles.setColumnLabel}>CHECK</Text>
+          </View>
           {exercise.sets.map((set) => (
             <SetEditor
               key={set.id}
@@ -572,10 +574,14 @@ function ExerciseNotesEditor({
   const styles = createStyles(colors, preferences.workoutHighContrast)
   const [notes, setNotes] = useState(exercise.userNotes)
   const [saved, setSaved] = useState(false)
+  const [open, setOpen] = useState(false)
   useEffect(() => setNotes(exercise.userNotes), [exercise.userNotes])
   return (
     <View style={styles.exerciseNotes}>
-      <Text style={styles.referenceTitle}>Anotações do exercício</Text>
+      <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen((value) => !value)} style={styles.utilityAction}>
+        <Text style={styles.utilityActionText}>{open ? 'Ocultar notas do exercício' : 'Notas do exercício'}</Text>
+      </TouchableOpacity>
+      {open && <>
       <ThemedTextInput
         accessibilityLabel={`Anotações do exercício ${exercise.name}`}
         value={notes}
@@ -594,6 +600,7 @@ function ExerciseNotesEditor({
         onPress={() => void (async () => setSaved(await onSave(notes)))()}
       />
       {saved && <Text accessibilityLiveRegion="polite" style={styles.saved}>Anotação salva.</Text>}
+      </>}
     </View>
   )
 }
@@ -647,6 +654,7 @@ function SetEditor({
   const [distance, setDistance] = useState(String(set.distance))
   const [rpe, setRpe] = useState(set.rpe == null ? '' : String(set.rpe))
   const [notes, setNotes] = useState(set.notes)
+  const [detailsOpen, setDetailsOpen] = useState(false)
   const cardio = exercise.category === 'CARDIO'
   const timed = cardio || exercise.timed
 
@@ -683,22 +691,25 @@ function SetEditor({
       <View style={styles.fields}>
         {!timed && (
           <>
-            <SetField label="REPS" value={reps} onChange={setReps} />
-            <SetField label="CARGA KG" value={load} onChange={setLoad} decimal />
+            <SetField label="REPS" value={reps} onChange={setReps} compact />
+            <SetField label="CARGA KG" value={load} onChange={setLoad} decimal compact />
           </>
         )}
         {timed && <SetField label="DURAÇÃO S" value={duration} onChange={setDuration} />}
         {cardio && <SetField label="DISTÂNCIA KM" value={distance} onChange={setDistance} decimal />}
-        <SetField label="RPE" value={rpe} onChange={setRpe} decimal />
+        {detailsOpen && <SetField label="RPE" value={rpe} onChange={setRpe} decimal />}
       </View>
-      <ThemedTextInput
+      <TouchableOpacity accessibilityRole="button" onPress={() => setDetailsOpen((value) => !value)} style={styles.utilityAction}>
+        <Text style={styles.utilityActionText}>{detailsOpen ? 'Menos detalhes' : 'RPE e notas'}</Text>
+      </TouchableOpacity>
+      {detailsOpen && <ThemedTextInput
         accessibilityLabel="Observação da série"
         value={notes}
         onChangeText={setNotes}
         placeholder="Observação opcional"
         maxLength={500}
         style={styles.setNotes}
-      />
+      />}
       {!!error && <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text>}
       <View style={styles.setActions}>
         <TouchableOpacity
@@ -711,8 +722,9 @@ function SetEditor({
           <Text style={styles.saveSetText}>{busy ? 'Salvando…' : 'Salvar'}</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityState={{ disabled: busy, selected: set.completed }}
+          accessibilityRole="checkbox"
+          accessibilityLabel={`Concluir série ${set.setNumber}`}
+          accessibilityState={{ disabled: busy, checked: set.completed }}
           disabled={busy}
           style={[styles.check, set.completed && styles.checked]}
           onPress={() => void toggle()}
@@ -731,24 +743,26 @@ function SetField({
   value,
   onChange,
   decimal = false,
+  compact = false,
 }: {
   label: string
   value: string
   onChange: (value: string) => void
   decimal?: boolean
+  compact?: boolean
 }) {
   const { colors, preferences } = useTheme()
   const styles = createStyles(colors, preferences.workoutHighContrast)
   return (
-    <View style={styles.field}>
-      <Text style={styles.setLabel}>{label}</Text>
+    <View style={[styles.field, compact && styles.compactField]}>
+      {!compact && <Text style={styles.setLabel}>{label}</Text>}
       <ThemedTextInput
         accessibilityLabel={label}
         value={value}
         onChangeText={onChange}
         keyboardType={decimal ? 'decimal-pad' : 'number-pad'}
         selectTextOnFocus
-        style={styles.setInput}
+        style={[styles.setInput, compact && styles.compactSetInput]}
       />
     </View>
   )
@@ -790,17 +804,20 @@ const createStyles = (colors: ThemeColors, highContrast = false) => {
   const danger = workout?.danger ?? colors.danger
   const borderWidth = highContrast ? 2 : 1
   return StyleSheet.create({
-  sessionHeader: { alignItems: 'center', backgroundColor: highContrast ? surface : undefined, borderColor: highContrast ? border : undefined, borderRadius: 18, borderWidth: highContrast ? 2 : 0, flexDirection: 'row', gap: 12, marginBottom: 12, padding: 12 },
+  sessionHeader: { alignItems: 'center', backgroundColor: highContrast ? surface : undefined, borderColor: highContrast ? border : undefined, borderBottomColor: border, borderBottomWidth: highContrast ? 2 : 1, flexDirection: 'row', gap: 12, marginBottom: 12, paddingBottom: 14, paddingHorizontal: 4 },
   pausedHeader: { backgroundColor: surface, borderColor: colors.warning, borderWidth: 2 },
   eyebrow: { color: secondaryText, fontSize: 12, fontWeight: '800', letterSpacing: 1.5, marginTop: 10 },
-  title: { color: text, fontSize: 30, fontWeight: '700', letterSpacing: -1, lineHeight: 37, marginTop: 7 },
-  metrics: { flexDirection: 'row', gap: 12, marginBottom: 12 },
+  title: { color: text, fontSize: 26, fontWeight: '700', letterSpacing: -0.6, lineHeight: 32, marginTop: 4 },
+  headerMeta: { color: secondaryText, fontSize: 14, fontVariant: ['tabular-nums'], lineHeight: 20, marginTop: 3 },
+  metrics: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  sessionStats: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  compactMetric: { backgroundColor: highContrast ? surface : colors.surfaceSecondary, borderRadius: 14, flex: 1, padding: 12 },
   metric: { backgroundColor: surface, borderColor: border, borderRadius: 18, borderWidth, flex: 1, padding: 16 },
   metricLabel: { color: secondaryText, fontSize: 12 },
   metricValue: { color: text, fontSize: 24, fontWeight: '800', lineHeight: 30, marginTop: 6 },
   timer: { alignItems: 'center', backgroundColor: workout?.timer ?? colors.textPrimary, borderColor: highContrast ? border : undefined, borderRadius: 22, borderWidth: highContrast ? 2 : 0, flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', marginBottom: 12, padding: 18 },
   timerLabel: { color: workout?.timerText ?? colors.background, fontSize: 14, fontWeight: '800' },
-  timerValue: { color: workout?.timerText ?? colors.background, fontSize: 36, fontWeight: '700', lineHeight: 43, marginTop: 3 },
+  timerValue: { color: workout?.timerText ?? colors.background, fontSize: 36, fontVariant: ['tabular-nums'], fontWeight: '700', lineHeight: 43, marginTop: 3 },
   timerActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   timerAction: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 },
   timerActionText: { color: workout?.timerText ?? colors.background },
@@ -814,13 +831,17 @@ const createStyles = (colors: ThemeColors, highContrast = false) => {
   textAction: { justifyContent: 'center', minHeight: 48 },
   skip: { color: secondaryText, fontSize: 14, fontWeight: '700', padding: 8 },
   setEditor: { backgroundColor: highContrast ? background : undefined, borderTopColor: border, borderTopWidth: borderWidth, gap: 12, padding: 16 },
+  setColumns: { alignItems: 'center', borderTopColor: border, borderTopWidth: borderWidth, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12 },
+  setColumnLabel: { color: secondaryText, fontSize: 11, fontWeight: '700', letterSpacing: 0.6 },
   setTitle: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   setNumber: { color: secondaryText, fontSize: 14, fontWeight: '800' },
   removeSet: { color: danger, fontSize: 14, fontWeight: '700' },
   fields: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   field: { flexGrow: 1, minWidth: 108 },
+  compactField: { minWidth: 76 },
   setLabel: { color: secondaryText, fontSize: 12, marginBottom: 4 },
   setInput: { backgroundColor: highContrast ? surface : colors.surfaceSecondary, borderColor: border, borderRadius: 11, borderWidth, color: text, fontSize: 18, fontWeight: '700', minHeight: 56, paddingHorizontal: 12 },
+  compactSetInput: { minHeight: 48, paddingHorizontal: 8 },
   setNotes: { backgroundColor: highContrast ? surface : colors.surfaceSecondary, borderColor: border, borderRadius: 11, borderWidth, color: text, fontSize: 16, minHeight: 56, paddingHorizontal: 12 },
   setActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   saveSet: { alignItems: 'center', borderColor: border, borderRadius: 12, borderWidth, flex: 1, justifyContent: 'center', minHeight: 52, minWidth: 100 },
@@ -839,6 +860,8 @@ const createStyles = (colors: ThemeColors, highContrast = false) => {
   inlineActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 5 },
   smallAction: { alignItems: 'center', borderColor: border, borderRadius: 11, borderWidth, justifyContent: 'center', minHeight: 48, paddingHorizontal: 12 },
   smallActionText: { color: text, fontSize: 13, fontWeight: '800' },
+  utilityAction: { alignSelf: 'flex-start', justifyContent: 'center', minHeight: 48, paddingHorizontal: 4 },
+  utilityActionText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
   substitution: { color: colors.primary, fontSize: 13, fontWeight: '800', marginTop: 4 },
   substitutionPanel: { borderTopColor: border, borderTopWidth: borderWidth, gap: 8, padding: 16 },
   substitutionOption: { borderColor: border, borderRadius: 12, borderWidth, minHeight: 56, padding: 12 },
