@@ -1,5 +1,5 @@
 import {
-  aggregateNutritionDay, localDateKey, normalizeMicronutrients, validateNutritionGoals, validateNutritionItem,
+  aggregateNutritionDay, isNutritionDateEditable, localDateKey, normalizeMicronutrients, validateNutritionGoals, validateNutritionItem,
   NutritionDataError,
   validateNutritionDate, validateNutritionMealInput,
   type DailyNutritionSummary, type DailyNutritionSummaryInput, type NutritionGoals, type NutritionMeal, type NutritionMealInput,
@@ -120,5 +120,5 @@ async function insertItems(database: SqlDatabase, mealId: number, input: Nutriti
 async function assertOpen(database: SqlDatabase, date: string) {
   validateNutritionDate(date)
   const summary = await database.first<{ details_purged_at: string | null }>('SELECT details_purged_at FROM nutrition_daily_summaries WHERE local_date=?', date)
-  if (summary?.details_purged_at) throw new Error('Os detalhes deste dia já foram removidos e não podem ser editados.')
+  if (!isNutritionDateEditable(date, summary?.details_purged_at)) throw new Error(summary?.details_purged_at ? 'Os detalhes deste dia já foram removidos e não podem ser editados.' : 'Este dia está fora do período de edição de sete dias.')
 }

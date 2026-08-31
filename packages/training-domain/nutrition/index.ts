@@ -51,6 +51,17 @@ export function validateNutritionDate(localDate: string, now = new Date()): stri
   return localDate
 }
 
+export function isNutritionDateEditable(
+  localDate: string,
+  detailsPurgedAt: string | null | undefined,
+  now = new Date(),
+) {
+  try { validateNutritionDate(localDate, now) } catch { return false }
+  const firstEditable = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  firstEditable.setDate(firstEditable.getDate() - 7)
+  return localDate >= localDateKey(firstEditable) && !detailsPurgedAt
+}
+
 export function validateNutritionMealInput(input: NutritionMealInput, now = new Date()): NutritionMealInput {
   validateNutritionDate(input.localDate, now)
   if (typeof input.consumedAt !== 'string' || !/^\d{4}-\d{2}-\d{2}T/.test(input.consumedAt)) throw new Error('O horário da refeição é inválido.')
