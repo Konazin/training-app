@@ -39,6 +39,13 @@ export interface FoodSearchQuery {
   pageSize?: number
 }
 
+/** A future parser may create this draft, but it never selects or persists a food. */
+export interface FoodQueryDraft {
+  query: string
+  quantity: number | null
+  unit: FoodUnit | null
+}
+
 export interface FoodSearchResult {
   items: CanonicalFood[]
   page: number
