@@ -42,6 +42,7 @@ import { MoreScreen } from './src/screens/MoreScreen'
 import { NutritionScreen } from './src/features/nutrition/NutritionScreen'
 import { NutritionGoalsScreen } from './src/features/nutrition/NutritionGoalsScreen'
 import { AppearanceSettingsScreen } from './src/screens/AppearanceSettingsScreen'
+import { UserProfileScreen } from './src/screens/UserProfileScreen'
 import { IntegrationsScreen } from './src/screens/IntegrationsScreen'
 import { WgerIntegrationScreen } from './src/features/wger/WgerIntegrationScreen'
 import { ThemeProvider, useTheme } from './src/theme'
@@ -300,6 +301,9 @@ function LocalApp({
               <Stack.Screen name="AppearanceSettings" component={AppearanceSettingsScreen} />
               <Stack.Screen name="NutritionGoals">
                 {() => <NutritionGoalsScreen repositories={repositories} />}
+              </Stack.Screen>
+              <Stack.Screen name="UserProfile">
+                {() => <UserProfileScreen repositories={repositories} />}
               </Stack.Screen>
               <Stack.Screen name="TrainingPlanEditor">
                 {() => (
@@ -650,6 +654,7 @@ function MainTabs({
             busy={backup.busy}
             onAppearance={() => navigation.navigate('AppearanceSettings')}
             onNutrition={() => navigation.navigate('NutritionGoals')}
+            onUserProfile={() => navigation.navigate('UserProfile')}
             onLibrary={() => navigation.navigate('Library')}
             onTrash={() => navigation.navigate('TrainingPlanTrash')}
             trashCount={trash.count}

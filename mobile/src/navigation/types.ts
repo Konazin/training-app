@@ -17,6 +17,7 @@ export type RootStackParamList = {
   WgerIntegration: { providerId: ExerciseProviderId }
   AppearanceSettings: undefined
   NutritionGoals: undefined
+  UserProfile: undefined
   Session: undefined
   ArchivedTrainingPlans: undefined
   TrainingPlanTrash: undefined

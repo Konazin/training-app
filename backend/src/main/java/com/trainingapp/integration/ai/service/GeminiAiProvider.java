@@ -44,10 +44,11 @@ public class GeminiAiProvider {
             part.put("inlineData", Map.of("mimeType", image.path("mimeType").asText(), "data", image.path("base64").asText()));
             ObjectNode withoutImage = ((ObjectNode) request).deepCopy();
             withoutImage.remove("image");
-            return Map.of("systemInstruction", Map.of("parts", List.of(Map.of("text", AiPrompts.forTask(task)))), "contents", List.of(Map.of("role", "user", "parts", List.of(part, Map.of("text", safeJson(withoutImage))))), "generationConfig", Map.of("responseMimeType", "application/json", "responseJsonSchema", AiPrompts.schemaFor(task)));
+            return Map.of("systemInstruction", Map.of("parts", List.of(Map.of("text", AiPrompts.forTask(task)))), "contents", List.of(Map.of("role", "user", "parts", List.of(part, Map.of("text", safeJson(withoutImage))))), "generationConfig", generationConfig(task));
         }
-        return Map.of("systemInstruction", Map.of("parts", List.of(Map.of("text", AiPrompts.forTask(task)))), "contents", List.of(Map.of("role", "user", "parts", List.of(Map.of("text", safeJson(request))))), "generationConfig", Map.of("responseMimeType", "application/json", "responseJsonSchema", AiPrompts.schemaFor(task)));
+        return Map.of("systemInstruction", Map.of("parts", List.of(Map.of("text", AiPrompts.forTask(task)))), "contents", List.of(Map.of("role", "user", "parts", List.of(Map.of("text", safeJson(request))))), "generationConfig", generationConfig(task));
     }
+    private Map<String, Object> generationConfig(String task) { return Map.of("responseMimeType", "application/json", "responseJsonSchema", AiPrompts.schemaFor(task), "thinkingConfig", Map.of("thinkingLevel", properties.thinkingLevelFor(task))); }
     private JsonNode output(JsonNode response) {
         JsonNode text = response.path("candidates").path(0).path("content").path("parts").path(0).path("text");
         if (!text.isTextual() || text.asText().isBlank()) throw new AiGatewayException(AiGatewayException.Code.INVALID_RESPONSE, "A IA retornou uma resposta vazia.");

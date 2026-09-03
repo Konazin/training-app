@@ -31,7 +31,7 @@ describe('AI draft boundary', () => {
   })
 
   it('rejects exercise IDs not present in the deterministic candidate list', () => {
-    const context = buildTrainingPlanningContext({ profile: { ...EMPTY_USER_PROFILE, goal: 'MUSCLE_GAIN', physicalLimitations: [{ bodyArea: 'ombro', side: 'LEFT', type: 'PROFESSIONAL_RESTRICTION', triggeringMovements: ['overhead press'], professionalRestriction: 'Evitar overhead press.', notes: null }] }, experience: 'intermediário', availableDays: ['SEG', 'TER', 'QUI', 'SEX'], durationMinutes: 60, equipment: ['barra'], preferences: ['supino'], candidateExercises: [{ id: 'bench-press', name: 'Supino', muscles: ['peitoral'], equipment: ['barra'] }] })
+    const context = buildTrainingPlanningContext({ profile: { ...EMPTY_USER_PROFILE, goal: 'MUSCLE_GAIN', trainingExperience: 'INTERMEDIATE', trainingDays: ['SEG', 'TER', 'QUI', 'SEX'], sessionDurationMinutes: 60, availableEquipment: ['barra'], trainingPreferences: ['supino'], physicalLimitations: [{ bodyArea: 'ombro', side: 'LEFT', type: 'PROFESSIONAL_RESTRICTION', triggeringMovements: ['overhead press'], professionalRestriction: 'Evitar overhead press.', notes: null }] }, candidateExercises: [{ id: 'bench-press', name: 'Supino', muscles: ['peitoral'], equipment: ['barra'] }] })
     expect(context.physicalLimitations[0]?.professionalRestriction).toBe('Evitar overhead press.')
     expect(() => validateTrainingPlanDraft({ days: [{ name: 'A', exercises: [{ exerciseId: 'overhead-press', sets: 3, repetitions: '8-10', restSeconds: 90, notes: null }] }], incompatibilities: [] }, ['bench-press'])).toThrow('fora do catálogo')
   })

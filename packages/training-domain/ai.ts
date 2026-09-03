@@ -62,9 +62,9 @@ export function buildMealVisionContext(profile: UserProfile, userHint?: string):
 export function buildDietPlanningContext(profile: UserProfile, goals: NutritionGoals): DietPlanningContext {
   return { ...dietaryContext(profile), locale: 'pt-BR', goals, mealsPerDay: profile.mealsPerDay, weeklyFoodBudget: profile.weeklyFoodBudget, cookingTimeMinutes: profile.cookingTimeMinutes, cookingSkill: profile.cookingSkill, practicalDifficulties: profile.practicalDifficulties }
 }
-export function buildTrainingPlanningContext(input: Omit<TrainingPlanningContext, 'locale' | 'goal' | 'physicalLimitations'> & { profile: UserProfile }): TrainingPlanningContext {
+export function buildTrainingPlanningContext(input: Omit<TrainingPlanningContext, 'locale' | 'goal' | 'physicalLimitations' | 'experience' | 'availableDays' | 'durationMinutes' | 'equipment' | 'preferences'> & { profile: UserProfile }): TrainingPlanningContext {
   if (input.candidateExercises.length > 100) throw new Error('Envie no máximo 100 exercícios candidatos para IA.')
-  return { locale: 'pt-BR', goal: input.profile.goal, physicalLimitations: input.profile.physicalLimitations, experience: input.experience, availableDays: input.availableDays, durationMinutes: input.durationMinutes, equipment: input.equipment, preferences: input.preferences, candidateExercises: input.candidateExercises }
+  return { locale: 'pt-BR', goal: input.profile.goal, physicalLimitations: input.profile.physicalLimitations, experience: input.profile.trainingExperience, availableDays: input.profile.trainingDays, durationMinutes: input.profile.sessionDurationMinutes, equipment: input.profile.availableEquipment, preferences: [...input.profile.trainingPreferences, ...input.profile.avoidedExercises.map((value) => `Evitar: ${value}`)], candidateExercises: input.candidateExercises }
 }
 export function buildTrainingAdjustmentContext(input: Omit<TrainingAdjustmentContext, 'goal' | 'physicalLimitations'> & { profile: UserProfile }): TrainingAdjustmentContext {
   return { ...input, goal: input.profile.goal, physicalLimitations: input.profile.physicalLimitations }

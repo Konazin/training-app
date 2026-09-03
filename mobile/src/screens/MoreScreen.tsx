@@ -17,6 +17,7 @@ export function MoreScreen({
   onIntegrations,
   onAppearance,
   onNutrition,
+  onUserProfile,
   onLibrary,
   onTrash,
   trashCount,
@@ -35,6 +36,7 @@ export function MoreScreen({
   onIntegrations: () => void
   onAppearance: () => void
   onNutrition?: () => void
+  onUserProfile?: () => void
   onLibrary: () => void
   onTrash: () => void
   trashCount: number
@@ -100,6 +102,7 @@ export function MoreScreen({
         disabled={busy}
       />
       <Text style={styles.section}>CONTEÚDO</Text>
+      <MenuItem label="Perfil e limitações" detail="Contexto usado pelos planejadores de IA" onPress={onUserProfile ?? (() => undefined)} disabled={busy || !onUserProfile} />
       <MenuItem label="Metas nutricionais" detail="Configurar metas locais" onPress={onNutrition ?? (() => undefined)} disabled={busy || !onNutrition} />
       <MenuItem label="Biblioteca de exercícios" detail="Criar e editar" onPress={onLibrary} disabled={busy} />
       <MenuItem

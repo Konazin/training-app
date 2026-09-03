@@ -28,6 +28,10 @@ jest.mock('../../theme', () => ({
   useTheme: () => ({ colors: new Proxy({}, { get: () => '#000000' }) }),
 }))
 jest.mock('../../theme/typography', () => ({ typography: new Proxy({}, { get: () => ({}) }) }))
+jest.mock('./AiMealAssistant', () => {
+  const React = require('react'); const { Text } = require('react-native')
+  return { AiMealAssistant: () => React.createElement(Text, null, 'IA opcional') }
+})
 
 import { NutritionScreen } from './NutritionScreen'
 
@@ -38,14 +42,15 @@ const meal: NutritionMeal = {
 }
 
 describe('NutritionScreen', () => {
-  it('oferece o formulário manual, metas e entradas de imagem indisponíveis sem permissões', async () => {
+  it('oferece o formulário manual, metas e entradas opcionais de IA', async () => {
     const onConfigureGoals = jest.fn()
     await renderAsync(createElement(NutritionScreen, { repositories: repositories([meal], null), onConfigureGoals }))
     expect(screen.getAllByText('Almoço')).not.toHaveLength(0)
-    fireEvent.press(screen.getByLabelText('Câmera'))
-    expect(screen.getByText(/análise por imagem será adicionada/)).toBeTruthy()
     fireEvent.press(screen.getByText('Configurar metas'))
     expect(onConfigureGoals).toHaveBeenCalledTimes(1)
+    fireEvent.press(screen.getByText('Foto com IA'))
+    expect(screen.getByText('Refeição por foto')).toBeTruthy()
+    fireEvent.press(screen.getByText('Cancelar'))
     fireEvent.press(screen.getAllByText('Registrar refeição')[0]!)
     expect(screen.getByText('Nova refeição')).toBeTruthy()
   })

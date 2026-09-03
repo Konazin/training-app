@@ -31,6 +31,12 @@ export interface UserProfile {
   cookingTimeMinutes: number | null
   cookingSkill: (typeof COOKING_SKILLS)[number] | null
   practicalDifficulties: PracticalNutritionDifficulty[]
+  trainingExperience: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | null
+  trainingDays: string[]
+  sessionDurationMinutes: number | null
+  availableEquipment: string[]
+  trainingPreferences: string[]
+  avoidedExercises: string[]
   additionalNotes: string | null
   physicalLimitations: PhysicalLimitation[]
 }
@@ -40,7 +46,8 @@ export const EMPTY_USER_PROFILE: UserProfile = Object.freeze({
   heightCm: null, weightKg: null, goal: null, mealsPerDay: null,
   foodPreferences: [], avoidedFoods: [], allergies: [], dietaryRestrictions: [],
   weeklyFoodBudget: null, cookingTimeMinutes: null, cookingSkill: null,
-  practicalDifficulties: [], additionalNotes: null, physicalLimitations: [],
+  practicalDifficulties: [], trainingExperience: null, trainingDays: [], sessionDurationMinutes: null,
+  availableEquipment: [], trainingPreferences: [], avoidedExercises: [], additionalNotes: null, physicalLimitations: [],
 })
 
 export interface UserProfileRepository { get(): Promise<UserProfile>; save(profile: UserProfile): Promise<UserProfile> }
@@ -57,6 +64,7 @@ export function validateUserProfile(value: UserProfile): UserProfile {
   }
   if (value.goal !== null && !GOALS.includes(value.goal)) throw new Error('Objetivo inválido.')
   if (value.cookingSkill !== null && !COOKING_SKILLS.includes(value.cookingSkill)) throw new Error('Habilidade culinária inválida.')
+  if (value.trainingExperience !== null && !COOKING_SKILLS.includes(value.trainingExperience)) throw new Error('Experiência de treino inválida.')
   if (!Array.isArray(value.practicalDifficulties) || value.practicalDifficulties.some((item) => !DIFFICULTIES.includes(item))) throw new Error('Dificuldades práticas inválidas.')
   if (!Array.isArray(value.physicalLimitations) || value.physicalLimitations.length > 20) throw new Error('Limitações físicas inválidas.')
   const limitations = value.physicalLimitations.map((item) => {
@@ -67,5 +75,5 @@ export function validateUserProfile(value: UserProfile): UserProfile {
   })
   if (value.mealsPerDay !== null && (!Number.isInteger(value.mealsPerDay) || value.mealsPerDay < 1 || value.mealsPerDay > 12)) throw new Error('Número de refeições é inválido.')
   if (value.additionalNotes !== null && typeof value.additionalNotes !== 'string') throw new Error('Notas adicionais inválidas.')
-  return { ...value, heightCm: numeric(value.heightCm, 'Altura', 50, 300), weightKg: numeric(value.weightKg, 'Peso', 10, 500), weeklyFoodBudget: numeric(value.weeklyFoodBudget, 'Orçamento', 0, 100_000), cookingTimeMinutes: numeric(value.cookingTimeMinutes, 'Tempo de preparo', 0, 1_440), foodPreferences: labels(value.foodPreferences, 'Preferências'), avoidedFoods: labels(value.avoidedFoods, 'Alimentos evitados'), allergies: labels(value.allergies, 'Alergias'), dietaryRestrictions: labels(value.dietaryRestrictions, 'Restrições'), practicalDifficulties: [...new Set(value.practicalDifficulties)], additionalNotes: value.additionalNotes?.trim() || null, physicalLimitations: limitations }
+  return { ...value, heightCm: numeric(value.heightCm, 'Altura', 50, 300), weightKg: numeric(value.weightKg, 'Peso', 10, 500), weeklyFoodBudget: numeric(value.weeklyFoodBudget, 'Orçamento', 0, 100_000), cookingTimeMinutes: numeric(value.cookingTimeMinutes, 'Tempo de preparo', 0, 1_440), sessionDurationMinutes: numeric(value.sessionDurationMinutes, 'Duração da sessão', 1, 1_440), foodPreferences: labels(value.foodPreferences, 'Preferências'), avoidedFoods: labels(value.avoidedFoods, 'Alimentos evitados'), allergies: labels(value.allergies, 'Alergias'), dietaryRestrictions: labels(value.dietaryRestrictions, 'Restrições'), availableEquipment: labels(value.availableEquipment, 'Equipamentos'), trainingPreferences: labels(value.trainingPreferences, 'Preferências de treino'), avoidedExercises: labels(value.avoidedExercises, 'Exercícios evitados'), trainingDays: labels(value.trainingDays, 'Dias de treino'), practicalDifficulties: [...new Set(value.practicalDifficulties)], additionalNotes: value.additionalNotes?.trim() || null, physicalLimitations: limitations }
 }
