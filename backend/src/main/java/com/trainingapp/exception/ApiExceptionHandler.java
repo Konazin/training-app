@@ -6,6 +6,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import com.trainingapp.integration.ai.service.AiGatewayException;
 
 import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
@@ -13,6 +14,19 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+    @ExceptionHandler(AiGatewayException.class)
+    public ResponseEntity<ApiError> handleAi(AiGatewayException exception) {
+        HttpStatus status = switch (exception.code()) {
+            case UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE;
+            case TIMEOUT -> HttpStatus.GATEWAY_TIMEOUT;
+            case RATE_LIMITED, QUOTA_EXHAUSTED -> HttpStatus.TOO_MANY_REQUESTS;
+            case UNAUTHORIZED -> HttpStatus.BAD_GATEWAY;
+            case INVALID_RESPONSE, INVALID_IMAGE -> HttpStatus.UNPROCESSABLE_ENTITY;
+            case UPSTREAM_FAILURE -> HttpStatus.BAD_GATEWAY;
+        };
+        return ResponseEntity.status(status).body(new ApiError(status.value(), exception.getMessage(), Map.of("code", exception.code().name()), OffsetDateTime.now()));
+    }
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiError> handleNotFound(ResourceNotFoundException exception) {

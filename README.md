@@ -185,11 +185,19 @@ exigir internet. Veja [uso da integração](docs/WGER_INTEGRATION.md) e
 O app padrão não realiza rede no bootstrap nem para operações principais. O
 Wger é consultado somente na tela da integração; mídia remota só carrega quando
 necessária e vídeos exigem ação explícita. IA, Health Connect e backup remoto
-continuam fora do runtime padrão.
+continuam opcionais e não participam do bootstrap.
 
 O backend Java, PostgreSQL, Docker e a interface web são opcionais e não fazem
 parte do runtime do app padrão. Consulte [servidor opcional](docs/OPTIONAL_SERVER.md).
 O app Umamusume permanece separado e ainda usa esse backend.
+
+## Inteligência artificial opcional
+
+O recurso opcional usa um único modelo no gateway: `gemini-3.8-flash`. Ele pode interpretar uma refeição por texto, analisar uma fotografia como rascunho/estimativa, propor refeições e propor um treino. Não há chatbot genérico nem persistência automática: alimentos passam pelo catálogo e cálculo determinístico, e exercícios retornados precisam pertencer à lista de candidatos permitidos.
+
+Para habilitar, configure no backend `GEMINI_API_KEY` e, se necessário, `GEMINI_MODEL=gemini-3.8-flash`; crie a chave em [Google AI Studio](https://aistudio.google.com/apikey). A chave nunca deve aparecer em Expo, APK, SQLite, AsyncStorage, fixtures ou repositório. O aplicativo continua funcional sem IA ou sem gateway configurado, com registro manual disponível.
+
+Resultados são drafts e estimativas que exigem revisão e confirmação. Uma foto de comida não produz valores nutricionais exatos automaticamente. Segundo a documentação atual do Google, conteúdo enviado através do Free Tier da Gemini API pode ser utilizado pelo Google para melhorar seus produtos. Consulte os termos atuais antes de habilitar o recurso. Consulte também [a documentação técnica da integração](docs/GEMINI_AI.md).
 
 ## Validação
 
