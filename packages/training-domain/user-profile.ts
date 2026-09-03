@@ -1,3 +1,5 @@
+import { WEEKDAYS, type Weekday } from './model'
+
 export type UserGoal = 'WEIGHT_LOSS' | 'MAINTENANCE' | 'MUSCLE_GAIN' | 'PERFORMANCE' | 'GENERAL_HEALTH'
 export type PhysicalLimitationType = 'PAIN_OR_DISCOMFORT' | 'MOBILITY_LIMITATION' | 'PROFESSIONAL_RESTRICTION' | 'OTHER'
 export type LimitationSide = 'LEFT' | 'RIGHT' | 'BOTH'
@@ -32,7 +34,7 @@ export interface UserProfile {
   cookingSkill: (typeof COOKING_SKILLS)[number] | null
   practicalDifficulties: PracticalNutritionDifficulty[]
   trainingExperience: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | null
-  trainingDays: string[]
+  trainingDays: Weekday[]
   sessionDurationMinutes: number | null
   availableEquipment: string[]
   trainingPreferences: string[]
@@ -75,5 +77,25 @@ export function validateUserProfile(value: UserProfile): UserProfile {
   })
   if (value.mealsPerDay !== null && (!Number.isInteger(value.mealsPerDay) || value.mealsPerDay < 1 || value.mealsPerDay > 12)) throw new Error('Número de refeições é inválido.')
   if (value.additionalNotes !== null && typeof value.additionalNotes !== 'string') throw new Error('Notas adicionais inválidas.')
-  return { ...value, heightCm: numeric(value.heightCm, 'Altura', 50, 300), weightKg: numeric(value.weightKg, 'Peso', 10, 500), weeklyFoodBudget: numeric(value.weeklyFoodBudget, 'Orçamento', 0, 100_000), cookingTimeMinutes: numeric(value.cookingTimeMinutes, 'Tempo de preparo', 0, 1_440), sessionDurationMinutes: numeric(value.sessionDurationMinutes, 'Duração da sessão', 1, 1_440), foodPreferences: labels(value.foodPreferences, 'Preferências'), avoidedFoods: labels(value.avoidedFoods, 'Alimentos evitados'), allergies: labels(value.allergies, 'Alergias'), dietaryRestrictions: labels(value.dietaryRestrictions, 'Restrições'), availableEquipment: labels(value.availableEquipment, 'Equipamentos'), trainingPreferences: labels(value.trainingPreferences, 'Preferências de treino'), avoidedExercises: labels(value.avoidedExercises, 'Exercícios evitados'), trainingDays: labels(value.trainingDays, 'Dias de treino'), practicalDifficulties: [...new Set(value.practicalDifficulties)], additionalNotes: value.additionalNotes?.trim() || null, physicalLimitations: limitations }
+  const trainingDays = normalizeTrainingDays(value.trainingDays)
+  return { ...value, heightCm: numeric(value.heightCm, 'Altura', 50, 300), weightKg: numeric(value.weightKg, 'Peso', 10, 500), weeklyFoodBudget: numeric(value.weeklyFoodBudget, 'Orçamento', 0, 100_000), cookingTimeMinutes: numeric(value.cookingTimeMinutes, 'Tempo de preparo', 0, 1_440), sessionDurationMinutes: numeric(value.sessionDurationMinutes, 'Duração da sessão', 1, 1_440), foodPreferences: labels(value.foodPreferences, 'Preferências'), avoidedFoods: labels(value.avoidedFoods, 'Alimentos evitados'), allergies: labels(value.allergies, 'Alergias'), dietaryRestrictions: labels(value.dietaryRestrictions, 'Restrições'), availableEquipment: labels(value.availableEquipment, 'Equipamentos'), trainingPreferences: labels(value.trainingPreferences, 'Preferências de treino'), avoidedExercises: labels(value.avoidedExercises, 'Exercícios evitados'), trainingDays, practicalDifficulties: [...new Set(value.practicalDifficulties)], additionalNotes: value.additionalNotes?.trim() || null, physicalLimitations: limitations }
+}
+
+const weekdayAliases: Record<string, Weekday> = {
+  monday: 'MONDAY', segunda: 'MONDAY', seg: 'MONDAY',
+  tuesday: 'TUESDAY', terça: 'TUESDAY', ter: 'TUESDAY',
+  wednesday: 'WEDNESDAY', quarta: 'WEDNESDAY', qua: 'WEDNESDAY',
+  thursday: 'THURSDAY', quinta: 'THURSDAY', qui: 'THURSDAY',
+  friday: 'FRIDAY', sexta: 'FRIDAY', sex: 'FRIDAY',
+  saturday: 'SATURDAY', sábado: 'SATURDAY', sab: 'SATURDAY', sáb: 'SATURDAY',
+  sunday: 'SUNDAY', domingo: 'SUNDAY', dom: 'SUNDAY',
+}
+
+function normalizeTrainingDays(input: unknown): Weekday[] {
+  if (typeof input === 'string' && !input.trim()) return []
+  const values = typeof input === 'string' ? input.split(/[\s,;]+/) : Array.isArray(input) ? input.flatMap((item) => typeof item === 'string' ? item.split(/[\s,;]+/) : [item]) : null
+  if (!values || values.length > 30 || values.some((item) => typeof item !== 'string' || !item.trim())) throw new Error('Dias de treino são inválidos.')
+  const selected = new Set(values.map((item) => weekdayAliases[item.trim().toLocaleLowerCase('pt-BR')] ?? item.trim().toUpperCase() as Weekday))
+  if ([...selected].some((item) => !WEEKDAYS.includes(item as Weekday))) throw new Error('Dias de treino são inválidos.')
+  return WEEKDAYS.filter((weekday) => selected.has(weekday))
 }
