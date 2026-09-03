@@ -29,7 +29,9 @@ public class GeminiAiProvider {
                     .header("x-goog-api-key", properties.apiKey())
                     .body(geminiRequest(task, request)).retrieve().onStatus(HttpStatusCode::isError, (req, res) -> { throw upstream(res.getStatusCode().value()); }).body(JsonNode.class);
             JsonNode output = output(response);
-            return AiPayloadValidator.validate(task, output, properties.maxImageBytes());
+            JsonNode validated = AiPayloadValidator.validate(task, output, properties.maxImageBytes());
+            if ("training-plan".equals(task)) AiPayloadValidator.validateTrainingIds(validated, request.path("context").path("candidateExercises"));
+            return validated;
         } catch (AiGatewayException exception) { throw exception;
         } catch (RestClientResponseException exception) { throw upstream(exception.getStatusCode().value());
         } catch (Exception exception) { throw new AiGatewayException(AiGatewayException.Code.UPSTREAM_FAILURE, "Falha temporária ao consultar a IA."); }

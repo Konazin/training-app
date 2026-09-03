@@ -15,8 +15,9 @@ class AiPayloadValidatorTest {
     }
 
     @Test
-    void rejectsTrainingExerciseOutsideClientSideCandidateBoundaryLater() throws Exception {
-        assertDoesNotThrow(() -> AiPayloadValidator.validate("training-plan", json.readTree("{\"days\":[{\"name\":\"A\",\"exercises\":[{\"exerciseId\":\"candidate-only\",\"sets\":3,\"repetitions\":\"8-10\",\"restSeconds\":90}]}],\"incompatibilities\":[]}"), 1024));
+    void rejectsTrainingExerciseOutsideCandidateBoundary() throws Exception {
+        var draft = json.readTree("{\"days\":[{\"name\":\"A\",\"exercises\":[{\"exerciseId\":\"outside\",\"sets\":3,\"repetitions\":\"8-10\",\"restSeconds\":90}]}],\"incompatibilities\":[]}");
+        assertThrows(AiGatewayException.class, () -> AiPayloadValidator.validateTrainingIds(draft, json.readTree("[{\"id\":\"candidate-only\"}]")));
     }
 
     @Test

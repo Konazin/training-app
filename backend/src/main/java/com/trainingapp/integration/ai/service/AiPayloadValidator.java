@@ -24,6 +24,13 @@ final class AiPayloadValidator {
         if (!request.isObject() || !request.has("context")) throw new IllegalArgumentException("Contexto de IA obrigatório.");
         if ("meal-parse".equals(task) && (!request.path("text").isTextual() || request.path("text").asText().isBlank() || request.path("text").asText().length() > 1_000)) throw new IllegalArgumentException("Texto da refeição inválido.");
         if ("meal-vision".equals(task)) image(request.path("image"), maxImageBytes);
+        if ("training-plan".equals(task) && (!request.path("context").path("candidateExercises").isArray() || request.path("context").path("candidateExercises").isEmpty())) throw new IllegalArgumentException("Candidatos de exercício obrigatórios.");
+    }
+
+    static void validateTrainingIds(JsonNode value, JsonNode candidates) {
+        Set<String> allowed = new HashSet<>();
+        for (JsonNode candidate : candidates) if (candidate.path("id").isTextual()) allowed.add(candidate.path("id").asText());
+        for (JsonNode day : value.path("days")) for (JsonNode exercise : day.path("exercises")) if (!allowed.contains(exercise.path("exerciseId").asText())) throw invalid("A IA retornou um exercício fora do catálogo permitido.");
     }
 
     private static void foods(JsonNode items, boolean vision) {
