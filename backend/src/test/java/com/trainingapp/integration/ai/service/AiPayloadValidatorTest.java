@@ -5,6 +5,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class AiPayloadValidatorTest {
     private final JsonMapper json = JsonMapper.builder().build();
@@ -24,5 +25,7 @@ class AiPayloadValidatorTest {
     void rejectsInvalidVisionConfidenceAndImageSize() throws Exception {
         assertThrows(AiGatewayException.class, () -> AiPayloadValidator.validate("meal-vision", json.readTree("{\"items\":[{\"query\":\"frango\",\"quantity\":160,\"unit\":\"g\",\"confidence\":2,\"estimated\":true}],\"uncertainties\":[]}"), 1024));
         assertThrows(AiGatewayException.class, () -> AiPayloadValidator.validateRequest("meal-vision", json.readTree("{\"context\":{},\"image\":{\"mimeType\":\"image/jpeg\",\"base64\":\"aaaaaaaaaaaaaaaa\"}}"), 2));
+        var malformed = assertThrows(AiGatewayException.class, () -> AiPayloadValidator.validateRequest("meal-vision", json.readTree("{\"context\":{},\"image\":{\"mimeType\":\"image/jpeg\",\"base64\":\"data:image/jpeg;base64,aGVsbG8=\"}}"), 1024));
+        assertEquals(AiGatewayException.Code.IMAGE_REJECTED, malformed.code());
     }
 }
