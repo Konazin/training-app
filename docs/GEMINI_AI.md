@@ -19,7 +19,9 @@ GEMINI_MODEL=gemini-3.8-flash
 
 Opcionalmente, o build mobile pode apontar para o gateway com `EXPO_PUBLIC_AI_GATEWAY_URL`; isso é apenas uma URL pública e nunca uma chave. Não use `EXPO_PUBLIC_GEMINI_API_KEY`, AsyncStorage, SQLite, fixtures ou código cliente para armazenar a chave. Sem URL ou sem chave no servidor, o app devolve um erro explícito e o registro manual continua funcionando.
 
-O gateway limita imagens a 5 MiB por padrão e aceita JPEG, PNG e WebP. Ele trata indisponibilidade, timeout, limites de uso, autenticação recusada, falhas upstream, resposta vazia/JSON inválido e imagem inválida. Não faça retry ilimitado: no máximo um ciclo explícito de ajuste de dieta deve ocorrer fora do provider.
+O gateway limita imagens a 5 MiB por padrão e aceita JPEG, PNG e WebP. Antes do envio, o app reduz a maior dimensão para 1600 px, mantém a proporção, converte para JPEG com qualidade 0,78 e remove EXIF; não faz upscale. O gateway valida os bytes decodificados, não apenas o tamanho do texto Base64. Ele trata indisponibilidade, timeout, limites de uso, autenticação recusada, falhas upstream, resposta vazia/JSON inválido e imagem inválida. Não faça retry ilimitado: no máximo um ciclo explícito de ajuste de dieta deve ocorrer fora do provider.
+
+Os timeouts são separados por perfil: `meal-parse` usa 20 s no mobile e o timeout geral do Gemini (20 s por padrão) no backend; `meal-vision` usa 90 s nos dois lados. Esses valores são baseline operacional e devem ser confirmados pelo smoke real antes de liberar a funcionalidade.
 
 ## Privacidade e Free Tier
 

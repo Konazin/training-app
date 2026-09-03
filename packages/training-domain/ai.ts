@@ -19,7 +19,7 @@ export interface AiProvider {
 }
 
 export type AiTask = 'meal-parse' | 'meal-vision' | 'diet-plan' | 'training-plan'
-export type AiErrorCode = 'UNAVAILABLE' | 'TIMEOUT' | 'RATE_LIMITED' | 'QUOTA_EXHAUSTED' | 'UNAUTHORIZED' | 'UPSTREAM_FAILURE' | 'INVALID_RESPONSE' | 'INVALID_IMAGE'
+export type AiErrorCode = 'UNAVAILABLE' | 'TIMEOUT' | 'NETWORK_ERROR' | 'RATE_LIMITED' | 'QUOTA_EXHAUSTED' | 'UNAUTHORIZED' | 'PROVIDER_ERROR' | 'INVALID_RESPONSE' | 'SCHEMA_ERROR' | 'IMAGE_REJECTED'
 export class AiProviderError extends Error {
   constructor(public readonly code: AiErrorCode, message: string) { super(message); this.name = 'AiProviderError' }
 }
@@ -77,7 +77,7 @@ export function validateMealParseDraft(value: unknown): MealParseDraft {
 }
 export function validateFoodImageDraft(value: unknown): FoodImageDraft {
   const input = object(value)
-  if (!Array.isArray(input.items) || input.items.length > 20 || !Array.isArray(input.uncertainties) || input.uncertainties.length > 10) throw invalid('Resposta visual inválida.')
+  if (!Array.isArray(input.items) || input.items.length === 0 || input.items.length > 20 || !Array.isArray(input.uncertainties) || input.uncertainties.length > 10) throw invalid('Resposta visual inválida.')
   return { items: input.items.map((item) => {
     const parsed = validateFoodQuery(item)
     const raw = object(item)

@@ -8,6 +8,7 @@ public record GeminiProperties(
         String model,
         String apiBaseUrl,
         int requestTimeoutSeconds,
+        int mealVisionTimeoutSeconds,
         int maxImageBytes,
         String mealParseThinkingLevel,
         String mealVisionThinkingLevel,

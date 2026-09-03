@@ -2,6 +2,7 @@ package com.trainingapp.integration.ai.service;
 
 import tools.jackson.databind.JsonNode;
 
+import java.util.Base64;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -65,11 +66,14 @@ final class AiPayloadValidator {
         }
     }
     private static void image(JsonNode image, int maxBytes) {
-        if (!image.isObject() || !Set.of("image/jpeg", "image/png", "image/webp").contains(image.path("mimeType").asText()) || !image.path("base64").isTextual() || image.path("base64").asText().isBlank()) throw new AiGatewayException(AiGatewayException.Code.INVALID_IMAGE, "Imagem inválida.");
-        int approximateBytes = image.path("base64").asText().length() * 3 / 4;
-        if (approximateBytes > maxBytes) throw new AiGatewayException(AiGatewayException.Code.INVALID_IMAGE, "Imagem maior que o limite permitido.");
+        if (!image.isObject() || !Set.of("image/jpeg", "image/png", "image/webp").contains(image.path("mimeType").asText()) || !image.path("base64").isTextual() || image.path("base64").asText().isBlank() || image.path("base64").asText().startsWith("data:")) throw new AiGatewayException(AiGatewayException.Code.IMAGE_REJECTED, "Imagem inválida.");
+        try {
+            if (Base64.getDecoder().decode(image.path("base64").asText()).length > maxBytes) throw new AiGatewayException(AiGatewayException.Code.IMAGE_REJECTED, "Imagem maior que o limite permitido.");
+        } catch (IllegalArgumentException exception) {
+            throw new AiGatewayException(AiGatewayException.Code.IMAGE_REJECTED, "Imagem inválida.");
+        }
     }
     private static void strings(JsonNode values, int maxItems, int maxLength) { if (!values.isArray() || values.size() > maxItems) throw invalid("Lista textual inválida."); for (JsonNode value : values) string(value, maxLength); }
     private static void string(JsonNode value, int max) { if (!value.isTextual() || value.asText().isBlank() || value.asText().length() > max) throw invalid("Texto inválido."); }
-    private static AiGatewayException invalid(String message) { return new AiGatewayException(AiGatewayException.Code.INVALID_RESPONSE, message); }
+    private static AiGatewayException invalid(String message) { return new AiGatewayException(AiGatewayException.Code.SCHEMA_ERROR, message); }
 }

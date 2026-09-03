@@ -23,6 +23,15 @@ public class GeminiConfig {
         var timeout = Duration.ofSeconds(Math.max(1, properties.requestTimeoutSeconds()));
         factory.setConnectTimeout(timeout);
         factory.setReadTimeout(timeout);
-        return new GeminiAiProvider(RestClient.builder().baseUrl(properties.apiBaseUrl()).requestFactory(factory).build(), properties, objectMapper);
+        var visionFactory = new SimpleClientHttpRequestFactory();
+        var visionTimeout = Duration.ofSeconds(Math.max(1, properties.mealVisionTimeoutSeconds()));
+        visionFactory.setConnectTimeout(visionTimeout);
+        visionFactory.setReadTimeout(visionTimeout);
+        return new GeminiAiProvider(
+                RestClient.builder().baseUrl(properties.apiBaseUrl()).requestFactory(factory).build(),
+                RestClient.builder().baseUrl(properties.apiBaseUrl()).requestFactory(visionFactory).build(),
+                properties,
+                objectMapper
+        );
     }
 }

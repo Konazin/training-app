@@ -22,8 +22,8 @@ public class ApiExceptionHandler {
             case TIMEOUT -> HttpStatus.GATEWAY_TIMEOUT;
             case RATE_LIMITED, QUOTA_EXHAUSTED -> HttpStatus.TOO_MANY_REQUESTS;
             case UNAUTHORIZED -> HttpStatus.BAD_GATEWAY;
-            case INVALID_RESPONSE, INVALID_IMAGE -> HttpStatus.UNPROCESSABLE_ENTITY;
-            case UPSTREAM_FAILURE -> HttpStatus.BAD_GATEWAY;
+            case INVALID_RESPONSE, SCHEMA_ERROR, IMAGE_REJECTED -> HttpStatus.UNPROCESSABLE_ENTITY;
+            case NETWORK_ERROR, PROVIDER_ERROR -> HttpStatus.BAD_GATEWAY;
         };
         return ResponseEntity.status(status).body(new ApiError(status.value(), exception.getMessage(), Map.of("code", exception.code().name()), OffsetDateTime.now()));
     }
