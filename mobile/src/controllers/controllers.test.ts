@@ -673,14 +673,18 @@ describe('controllers locais', () => {
 
     let oldRequest!: Promise<boolean>
     let newRequest!: Promise<boolean>
+    act(() => hook.current.setQuery((current) => ({ ...current, text: 'bench' })))
+    oldRequest = hook.current.search(1)
+    act(() => hook.current.setQuery((current) => ({ ...current, text: 'squat' })))
+    newRequest = hook.current.search(1)
     await act(async () => {
-      oldRequest = hook.current.search(1)
-      newRequest = hook.current.search(2)
-      second.resolve(page(candidateB, 2))
+      second.resolve(page(candidateB, 1))
       await newRequest
       first.resolve(page(candidateA, 1))
       await oldRequest
     })
+    expect(provider.search).toHaveBeenNthCalledWith(1, expect.objectContaining({ text: 'bench' }), expect.any(AbortSignal))
+    expect(provider.search).toHaveBeenNthCalledWith(2, expect.objectContaining({ text: 'squat' }), expect.any(AbortSignal))
     expect(hook.current.items.map((item) => item.name)).toEqual(['Atual'])
     act(() => hook.current.toggle(candidateB))
     expect(hook.current.selected.size).toBe(1)
