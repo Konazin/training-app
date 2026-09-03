@@ -141,7 +141,7 @@ export function ExerciseLibraryScreen({
           starterPackBusy={starterPackBusy}
           starterPackMessage={starterPackMessage}
           onCreate={() => setEditing('new')}
-          onSearchWger={() => navigation.navigate('WgerIntegration')}
+          onSearchWger={() => navigation.navigate('WgerIntegration', { providerId: 'WGER' })}
           onContinue={() => navigation.goBack()}
         />
       : <Text accessibilityLiveRegion="polite" style={styles.empty}>{emptyMessage}</Text>

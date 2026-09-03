@@ -1,4 +1,5 @@
 import type { NavigatorScreenParams } from '@react-navigation/native'
+import type { ExerciseProviderId } from '@training/training-domain'
 
 export type MainTabParamList = {
   Today: undefined
@@ -13,7 +14,7 @@ export type RootStackParamList = {
   Library: undefined
   ExerciseDetail: { exerciseId: number }
   Integrations: undefined
-  WgerIntegration: undefined
+  WgerIntegration: { providerId: ExerciseProviderId }
   AppearanceSettings: undefined
   NutritionGoals: undefined
   Session: undefined

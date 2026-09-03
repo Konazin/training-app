@@ -288,11 +288,12 @@ function LocalApp({
               </Stack.Screen>
               <Stack.Screen name="Integrations" component={IntegrationsScreen} />
               <Stack.Screen name="WgerIntegration">
-                {() => (
+                {({ route }) => (
                   <WgerIntegrationScreen
                     imports={repositories.externalExerciseImport}
                     exercises={repositories.exercises}
                     onImported={controller.refresh}
+                    providerId={route.params.providerId}
                   />
                 )}
               </Stack.Screen>
@@ -458,7 +459,7 @@ function LocalApp({
         onSkip={onboarding.skip}
         onComplete={onboarding.complete}
         onOpenWger={() => {
-          if (navigationRef.isReady()) navigationRef.navigate('WgerIntegration')
+          if (navigationRef.isReady()) navigationRef.navigate('WgerIntegration', { providerId: 'WGER' })
         }}
         onOpenLibrary={() => {
           if (navigationRef.isReady()) navigationRef.navigate('Library')

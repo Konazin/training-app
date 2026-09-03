@@ -5,6 +5,15 @@ const LICENSE = 'ExerciseDB/AscendAPI hosted catalog'
 
 export interface ExerciseDbClientOptions { baseUrl?: string; timeoutMs?: number; fetch?: typeof fetch }
 
+export type ExerciseDbErrorCode = 'ABORTED' | 'TIMEOUT' | 'HTTP' | 'OFFLINE' | 'INVALID_SCHEMA'
+
+export class ExerciseDbError extends Error {
+  constructor(readonly code: ExerciseDbErrorCode, message: string) {
+    super(message)
+    this.name = 'ExerciseDbError'
+  }
+}
+
 export class ExerciseDbClient implements ExternalExerciseCatalogProvider {
   readonly descriptor = { id: 'EXERCISEDB' as const, name: 'ExerciseDB' }
   private readonly options: Required<ExerciseDbClientOptions>
@@ -20,8 +29,11 @@ export class ExerciseDbClient implements ExternalExerciseCatalogProvider {
     const body = await this.request(url, signal)
     const rows = Array.isArray(body) ? body : object(body) && Array.isArray(body.data) ? body.data : null
     if (!rows || !rows.every((item) => object(item))) throw new Error('ExerciseDB retornou schema inválido')
-    const items = rows.map((item) => mapExerciseDb(item)).filter((item): item is ExternalExerciseCandidate => item !== null)
-    return { items, page: query.page, pageSize, total: object(body) && typeof body.total === 'number' ? body.total : items.length, hasNext: items.length === pageSize, hasPrevious: query.page > 1 }
+    const items = rows.map((item) => mapExerciseDb(item))
+      .filter((item): item is ExternalExerciseCandidate => item !== null)
+      .filter((item) => !query.onlyWithImage || item.media.some((media) => media.type === 'IMAGE'))
+      .filter((item) => !query.onlyWithVideo || item.media.some((media) => media.type === 'VIDEO'))
+    return { items, page: query.page, pageSize, total: object(body) && typeof body.total === 'number' ? body.total : items.length, hasNext: rows.length === pageSize, hasPrevious: query.page > 1 }
   }
   async findByExternalId(externalId: string, language = 'en', signal?: AbortSignal) {
     if (!/^[A-Za-z0-9_-]+$/.test(externalId)) return null
@@ -29,18 +41,19 @@ export class ExerciseDbClient implements ExternalExerciseCatalogProvider {
     return mapExerciseDb(object(body) ? body : null, language)
   }
   private async request(url: URL, signal?: AbortSignal) {
-    if (signal?.aborted) throw new Error('ExerciseDB consulta cancelada')
+    if (signal?.aborted) throw new ExerciseDbError('ABORTED', 'ExerciseDB consulta cancelada')
     const controller = new AbortController(); const abort = () => controller.abort(signal?.reason); signal?.addEventListener('abort', abort, { once: true })
     const timer = setTimeout(() => controller.abort('timeout'), this.options.timeoutMs)
     try {
       const response = await this.options.fetch(url.toString(), { headers: { Accept: 'application/json' }, signal: controller.signal })
-      if (!response.ok) throw new Error(`ExerciseDB HTTP ${response.status}`)
+      if (!response.ok) throw new ExerciseDbError('HTTP', `ExerciseDB HTTP ${response.status}`)
       const body: unknown = await response.json()
       return body
     } catch (error) {
-      if (signal?.aborted) throw new Error('ExerciseDB consulta cancelada')
-      if (controller.signal.aborted) throw new Error('ExerciseDB timeout')
-      throw error instanceof Error ? error : new Error('ExerciseDB offline')
+      if (error instanceof ExerciseDbError) throw error
+      if (signal?.aborted) throw new ExerciseDbError('ABORTED', 'ExerciseDB consulta cancelada')
+      if (controller.signal.aborted) throw new ExerciseDbError('TIMEOUT', 'ExerciseDB timeout')
+      throw new ExerciseDbError('OFFLINE', 'ExerciseDB indisponível. Verifique sua conexão e tente novamente.')
     } finally { clearTimeout(timer); signal?.removeEventListener('abort', abort) }
   }
 }

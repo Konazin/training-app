@@ -28,7 +28,7 @@ export function IntegrationsScreen() {
           disabled={provider.supportState !== 'SUPPORTED'}
           onPress={() => {
             if (provider.integrationRoute === 'WGER_CATALOG' || provider.integrationRoute === 'EXERCISEDB_CATALOG') {
-              navigation.navigate('WgerIntegration')
+              navigation.navigate('WgerIntegration', { providerId: provider.id })
             }
           }}
           style={({ pressed }) => [styles.card, pressed && styles.pressed]}
