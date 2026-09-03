@@ -5,7 +5,7 @@ const LICENSE = 'ExerciseDB/AscendAPI hosted catalog'
 
 export interface ExerciseDbClientOptions { baseUrl?: string; timeoutMs?: number; fetch?: typeof fetch }
 
-export type ExerciseDbErrorCode = 'ABORTED' | 'TIMEOUT' | 'HTTP' | 'OFFLINE' | 'INVALID_SCHEMA'
+export type ExerciseDbErrorCode = 'ABORTED' | 'TIMEOUT' | 'HTTP' | 'OFFLINE' | 'INVALID_SCHEMA' | 'UNSUPPORTED_QUERY' | 'PAGE_NOT_AVAILABLE'
 
 export class ExerciseDbError extends Error {
   constructor(readonly code: ExerciseDbErrorCode, message: string) {
@@ -17,28 +17,47 @@ export class ExerciseDbError extends Error {
 export class ExerciseDbClient implements ExternalExerciseCatalogProvider {
   readonly descriptor = { id: 'EXERCISEDB' as const, name: 'ExerciseDB' }
   private readonly options: Required<ExerciseDbClientOptions>
+  private readonly cursors = new Map<string, Map<number, { after?: string; before?: string }>>()
   constructor(options: ExerciseDbClientOptions = {}) {
     this.options = { baseUrl: options.baseUrl ?? BASE_URL, timeoutMs: options.timeoutMs ?? 15_000, fetch: options.fetch ?? fetch }
     if (!this.options.baseUrl.startsWith('https://')) throw new Error('ExerciseDB exige HTTPS')
   }
   async search(query: ExternalExerciseCatalogQuery, signal?: AbortSignal): Promise<ExternalExerciseCatalogPage> {
+    if (query.text.trim()) throw new ExerciseDbError('UNSUPPORTED_QUERY', 'A API gratuita do ExerciseDB não oferece busca por nome. Use o catálogo Wger para pesquisar exercícios.')
     const pageSize = Math.min(Math.max(query.pageSize || 20, 1), 50)
     const url = new URL(`${this.options.baseUrl}/exercises`)
-    url.searchParams.set('limit', String(pageSize)); url.searchParams.set('offset', String((query.page - 1) * pageSize))
-    if (query.text.trim()) url.searchParams.set('search', query.text.trim())
+    const key = cursorKey(query, pageSize)
+    const cursor = this.cursors.get(key)?.get(query.page)
+    if (query.page > 1 && !cursor) throw new ExerciseDbError('PAGE_NOT_AVAILABLE', 'Abra as páginas do ExerciseDB em sequência; esta página ainda não possui cursor.')
+    url.searchParams.set('limit', String(pageSize))
+    if (cursor?.after) url.searchParams.set('after', cursor.after)
+    if (cursor?.before) url.searchParams.set('before', cursor.before)
     const body = await this.request(url, signal)
     const rows = Array.isArray(body) ? body : object(body) && Array.isArray(body.data) ? body.data : null
     if (!rows || !rows.every((item) => object(item))) throw new Error('ExerciseDB retornou schema inválido')
+    const meta = object(body) && object(body.meta) ? body.meta : null
+    const pageCursors = this.cursors.get(key) ?? new Map<number, { after?: string; before?: string }>()
+    if (typeof meta?.nextCursor === 'string') pageCursors.set(query.page + 1, { after: meta.nextCursor })
+    if (typeof meta?.previousCursor === 'string' && query.page > 1) pageCursors.set(query.page - 1, { before: meta.previousCursor })
+    this.cursors.set(key, pageCursors)
     const items = rows.map((item) => mapExerciseDb(item))
       .filter((item): item is ExternalExerciseCandidate => item !== null)
       .filter((item) => !query.onlyWithImage || item.media.some((media) => media.type === 'IMAGE'))
       .filter((item) => !query.onlyWithVideo || item.media.some((media) => media.type === 'VIDEO'))
-    return { items, page: query.page, pageSize, total: object(body) && typeof body.total === 'number' ? body.total : items.length, hasNext: rows.length === pageSize, hasPrevious: query.page > 1 }
+    return {
+      items,
+      page: query.page,
+      pageSize,
+      total: typeof meta?.total === 'number' ? meta.total : object(body) && typeof body.total === 'number' ? body.total : items.length,
+      hasNext: typeof meta?.hasNextPage === 'boolean' ? meta.hasNextPage : rows.length === pageSize,
+      hasPrevious: typeof meta?.hasPreviousPage === 'boolean' ? meta.hasPreviousPage : query.page > 1,
+      nextCursor: typeof meta?.nextCursor === 'string' ? meta.nextCursor : undefined,
+    }
   }
   async findByExternalId(externalId: string, language = 'en', signal?: AbortSignal) {
     if (!/^[A-Za-z0-9_-]+$/.test(externalId)) return null
     const body = await this.request(new URL(`${this.options.baseUrl}/exercises/${encodeURIComponent(externalId)}`), signal)
-    return mapExerciseDb(object(body) ? body : null, language)
+    return mapExerciseDb(object(body) && object(body.data) ? body.data : object(body) ? body : null, language)
   }
   private async request(url: URL, signal?: AbortSignal) {
     if (signal?.aborted) throw new ExerciseDbError('ABORTED', 'ExerciseDB consulta cancelada')
@@ -76,3 +95,4 @@ function firstUrl(value: Record<string, unknown>) { return Object.values(value).
 function secure(value: string) { return value.startsWith('https://') }
 function object(value: unknown): value is Record<string, any> { return !!value && typeof value === 'object' && !Array.isArray(value) }
 function category(value: string[]): ExerciseCategory { const name = value.join(' ').toLowerCase(); return name.includes('cardio') ? 'CARDIO' : name.includes('stretch') ? 'STRETCHING' : 'STRENGTH' }
+function cursorKey(_query: ExternalExerciseCatalogQuery, pageSize: number) { return JSON.stringify({ pageSize }) }

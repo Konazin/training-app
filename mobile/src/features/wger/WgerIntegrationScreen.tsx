@@ -49,6 +49,7 @@ export function WgerIntegrationScreen({
   const controller = useWgerIntegrationController(imports, exercises, onImported, providerId)
   const providerName = providerId === 'EXERCISEDB' ? 'ExerciseDB' : 'Wger'
   const isWger = providerId === 'WGER'
+  const isExerciseDb = providerId === 'EXERCISEDB'
   const busy = controller.phase === 'loading' || controller.phase === 'importing'
   const [consented, setConsented] = useState(false)
   const [languageModal, setLanguageModal] = useState(false)
@@ -78,7 +79,7 @@ export function WgerIntegrationScreen({
         {consented && (
           <View style={styles.searchArea}>
             <Text style={styles.section}>BUSCA</Text>
-            <ThemedTextInput
+            {isExerciseDb ? <Text style={styles.noticeText}>A versão gratuita do ExerciseDB não oferece busca por nome. Navegue pelo catálogo ou use Wger para pesquisar exercícios.</Text> : <ThemedTextInput
               accessibilityLabel="Buscar exercícios"
               placeholder="Nome do exercício"
               returnKeyType="search"
@@ -86,7 +87,7 @@ export function WgerIntegrationScreen({
               onChangeText={(text) => controller.setQuery((current) => ({ ...current, page: 1, text }))}
               onSubmitEditing={() => void controller.search(1)}
               style={styles.search}
-            />
+            />}
             {isWger && <>
             <Text style={styles.label}>Idioma do Wger</Text>
             <Pressable
@@ -123,7 +124,7 @@ export function WgerIntegrationScreen({
               />
             </View>
             <PrimaryButton
-              label={controller.phase === 'loading' ? 'Consultando catálogo…' : 'Buscar exercícios'}
+              label={controller.phase === 'loading' ? 'Consultando catálogo…' : isExerciseDb ? 'Carregar catálogo ExerciseDB' : 'Buscar exercícios'}
               loading={controller.phase === 'loading'}
               onPress={() => void controller.search(1)}
             />
