@@ -4,6 +4,8 @@ export const MICRONUTRIENT_CODES = [
   'vitamin_b1_mg', 'vitamin_b2_mg', 'vitamin_b3_mg', 'vitamin_b6_mg', 'vitamin_b9_mcg', 'vitamin_b12_mcg',
 ] as const
 
+export * from './food-catalog'
+
 export type MicronutrientCode = typeof MICRONUTRIENT_CODES[number]
 export type MicronutrientTotals = Partial<Record<MicronutrientCode, number>>
 export const MICRONUTRIENT_METADATA: Record<MicronutrientCode, { name: string; unit: string; category: 'mineral' | 'vitamin'; order: number }> = {
