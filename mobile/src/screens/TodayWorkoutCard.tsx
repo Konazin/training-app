@@ -70,7 +70,7 @@ export function TodayWorkoutCard({
       {!!references.length && day.status === 'READY' && (
         <View style={styles.references}>
           <Text style={styles.referenceTitle}>Referência anterior</Text>
-          {references.map((reference) => (
+          {references.slice(0, 1).map((reference) => (
             <Text key={reference.exerciseDefinitionId} style={styles.reference}>
               {reference.exerciseName}: {formatLoad(reference.load)} kg
             </Text>
@@ -150,11 +150,11 @@ function formatLoad(load: number) {
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  card: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 22, borderWidth: 1, marginBottom: 16, padding: 20 },
-  eyebrow: { ...typography.caption, color: colors.textSecondary, fontWeight: '800', letterSpacing: 1.4 },
-  title: { color: colors.textPrimary, fontSize: 25, fontWeight: '900', lineHeight: 32, marginTop: 14 },
+  card: { backgroundColor: colors.surfaceSecondary, borderRadius: 26, marginBottom: 18, padding: 20 },
+  eyebrow: { ...typography.caption, color: colors.primary, fontWeight: '700', letterSpacing: 1.1 },
+  title: { color: colors.textPrimary, fontSize: 30, fontWeight: '700', lineHeight: 36, marginTop: 12 },
   plan: { ...typography.bodySmall, color: colors.textSecondary, marginTop: 4 },
-  status: { ...typography.body, color: colors.textPrimary, fontWeight: '700', marginTop: 18 },
+  status: { ...typography.body, color: colors.textPrimary, fontWeight: '600', marginTop: 16 },
   meta: { ...typography.bodySmall, color: colors.textSecondary, marginTop: 6 },
   list: { gap: 5, marginTop: 10 },
   listItem: { ...typography.bodySmall, color: colors.textSecondary },
@@ -162,6 +162,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   referenceTitle: { ...typography.caption, color: colors.textSecondary, fontWeight: '800', textTransform: 'uppercase' },
   reference: { ...typography.bodySmall, color: colors.textPrimary },
   action: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: colors.primary, borderRadius: 14, justifyContent: 'center', marginTop: 20, minHeight: 48, paddingHorizontal: 18 },
-  actionText: { ...typography.label, color: colors.onPrimary, fontWeight: '900' },
+  actionText: { ...typography.label, color: colors.onPrimary, fontWeight: '700' },
   pressed: { opacity: 0.72 },
 })

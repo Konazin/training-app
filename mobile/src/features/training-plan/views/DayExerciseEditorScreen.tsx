@@ -1,230 +1,48 @@
 import { useState } from 'react'
-import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
+import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
+import { BottomSheet } from '../../../components/ui/BottomSheet'
 import { FormField } from '../../../components/FormField'
 import { PrimaryButton } from '../../../components/PrimaryButton'
 import { Screen, ScreenScrollView } from '../../../components/Screen'
 import { ScreenHeader } from '../../../components/ScreenHeader'
-import { SelectableChip } from '../../../components/SelectableChip'
+import { SectionHeader } from '../../../components/ui/SectionHeader'
 import type { RootStackParamList } from '../../../navigation/types'
 import { useUnsavedChangesGuard } from '../../../navigation/useUnsavedChangesGuard'
 import type { ExerciseDefinition } from '../../../models/training'
-import type {
-  DayExerciseConfigInput,
-  DayExerciseInput,
-  SetType,
-  TrainingPlan,
-} from '../model/trainingPlan'
+import type { DayExerciseConfigInput, DayExerciseInput, SetType, TrainingPlan } from '../model/trainingPlan'
 import { shared, type ThemeColors, useTheme } from '../../../theme'
 import { ExercisePicker } from './ExercisePicker'
 
-const setTypes: SetType[] = [
-  'NORMAL',
-  'WARM_UP',
-  'DROP_SET',
-  'BI_SET',
-  'CIRCUIT',
-  'TO_FAILURE',
-  'CONTROLLED_TEMPO',
-]
+const setTypes: Array<{ value: SetType; label: string }> = [{ value: 'NORMAL', label: 'Normal' }, { value: 'WARM_UP', label: 'Aquecimento' }, { value: 'DROP_SET', label: 'Drop set' }, { value: 'BI_SET', label: 'Bi-set' }, { value: 'CIRCUIT', label: 'Circuito' }, { value: 'TO_FAILURE', label: 'Até a falha' }, { value: 'CONTROLLED_TEMPO', label: 'Tempo controlado' }]
 
-export function DayExerciseEditorScreen({
-  plans,
-  library,
-  busyKeys,
-  errors,
-  onCreate,
-  onUpdate,
-}: {
-  plans: TrainingPlan[]
-  library: ExerciseDefinition[]
-  busyKeys: Set<string>
-  errors: Record<string, string>
-  onCreate: (planId: number, dayId: number, input: DayExerciseInput) => Promise<boolean>
-  onUpdate: (
-    planId: number,
-    dayId: number,
-    exerciseId: number,
-    input: DayExerciseConfigInput,
-  ) => Promise<boolean>
-}) {
-  const route = useRoute<RouteProp<RootStackParamList, 'DayExerciseEditor'>>()
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>()
-  const plan = plans.find((item) => item.id === route.params.planId)
-  const day = plan?.days.find((item) => item.id === route.params.dayId)
-  const configured = day?.exercises.find((item) => item.id === route.params.exerciseId)
-  const definition = configured?.exercise
-    ?? library.find((item) => item.id === route.params.exerciseDefinitionId)
-  const { colors } = useTheme()
-  const styles = createStyles(colors)
-  const [sets, setSets] = useState(String(configured?.sets ?? 3))
-  const [minReps, setMinReps] = useState(String(configured?.minReps ?? 8))
-  const [maxReps, setMaxReps] = useState(String(configured?.maxReps ?? 12))
-  const [load, setLoad] = useState(String(configured?.plannedLoad ?? 0))
-  const [duration, setDuration] = useState(String(configured?.plannedDurationSeconds ?? 60))
-  const [distance, setDistance] = useState(String(configured?.plannedDistance ?? 0))
-  const [rest, setRest] = useState(String(configured?.restSeconds ?? 60))
-  const [rpe, setRpe] = useState(configured?.plannedRpe == null ? '' : String(configured.plannedRpe))
-  const [setType, setSetType] = useState<SetType>(configured?.setType ?? 'NORMAL')
-  const [notes, setNotes] = useState(configured?.notes ?? '')
-  const [alternativeId, setAlternativeId] = useState<number | null>(
-    configured?.alternativeExerciseId ?? null,
-  )
-  const [showAlternativePicker, setShowAlternativePicker] = useState(false)
-  const [formError, setFormError] = useState('')
-  const strength = definition?.category === 'STRENGTH' || definition?.category === 'HYPERTROPHY'
-  const cardio = definition?.category === 'CARDIO'
-  const durationBased = cardio
-    || definition?.timed
-    || definition?.category === 'MOBILITY'
-    || definition?.category === 'STRETCHING'
-  const form: DayExerciseConfigInput = {
-    sets: number(sets),
-    minReps: strength ? number(minReps) : 0,
-    maxReps: strength ? number(maxReps) : 0,
-    plannedLoad: strength ? number(load) : 0,
-    plannedDurationSeconds: durationBased ? number(duration) : null,
-    plannedDistance: cardio ? number(distance) : 0,
-    restSeconds: number(rest),
-    plannedRpe: rpe ? number(rpe) : null,
-    setType,
-    notes,
-    alternativeExerciseId: alternativeId,
-  }
+export function DayExerciseEditorScreen({ plans, library, busyKeys, errors, onCreate, onUpdate }: { plans: TrainingPlan[]; library: ExerciseDefinition[]; busyKeys: Set<string>; errors: Record<string, string>; onCreate: (planId: number, dayId: number, input: DayExerciseInput) => Promise<boolean>; onUpdate: (planId: number, dayId: number, exerciseId: number, input: DayExerciseConfigInput) => Promise<boolean> }) {
+  const route = useRoute<RouteProp<RootStackParamList, 'DayExerciseEditor'>>(); const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>(); const plan = plans.find((item) => item.id === route.params.planId); const day = plan?.days.find((item) => item.id === route.params.dayId); const configured = day?.exercises.find((item) => item.id === route.params.exerciseId); const definition = configured?.exercise ?? library.find((item) => item.id === route.params.exerciseDefinitionId); const { colors } = useTheme(); const styles = createStyles(colors)
+  const [sets, setSets] = useState(String(configured?.sets ?? 3)); const [minReps, setMinReps] = useState(String(configured?.minReps ?? 8)); const [maxReps, setMaxReps] = useState(String(configured?.maxReps ?? 12)); const [load, setLoad] = useState(String(configured?.plannedLoad ?? 0)); const [duration, setDuration] = useState(String(configured?.plannedDurationSeconds ?? 60)); const [distance, setDistance] = useState(String(configured?.plannedDistance ?? 0)); const [rest, setRest] = useState(String(configured?.restSeconds ?? 60)); const [rpe, setRpe] = useState(configured?.plannedRpe == null ? '' : String(configured.plannedRpe)); const [setType, setSetType] = useState<SetType>(configured?.setType ?? 'NORMAL'); const [notes, setNotes] = useState(configured?.notes ?? ''); const [alternativeId, setAlternativeId] = useState<number | null>(configured?.alternativeExerciseId ?? null); const [showAlternativePicker, setShowAlternativePicker] = useState(false); const [showSetTypes, setShowSetTypes] = useState(false); const [moreOpen, setMoreOpen] = useState(false); const [formError, setFormError] = useState('')
+  const strength = definition?.category === 'STRENGTH' || definition?.category === 'HYPERTROPHY'; const cardio = definition?.category === 'CARDIO'; const durationBased = cardio || definition?.timed || definition?.category === 'MOBILITY' || definition?.category === 'STRETCHING'
+  const form: DayExerciseConfigInput = { sets: number(sets), minReps: strength ? number(minReps) : 0, maxReps: strength ? number(maxReps) : 0, plannedLoad: strength ? number(load) : 0, plannedDurationSeconds: durationBased ? number(duration) : null, plannedDistance: cardio ? number(distance) : 0, restSeconds: number(rest), plannedRpe: rpe ? number(rpe) : null, setType, notes, alternativeExerciseId: alternativeId }
   const { commit } = useUnsavedChangesGuard(form)
-
-  if (!plan || !day || !definition) {
-    return <Screen><View style={styles.empty}><Text style={styles.title}>Exercício não encontrado</Text></View></Screen>
-  }
-
-  const planId = plan.id
-  const dayId = day.id
-  const definitionId = definition.id
-  const key = configured ? `exercise:update:${configured.id}` : `day:exercise:add:${day.id}`
-
-  async function save() {
-    if (form.sets < 1 || form.maxReps < form.minReps) {
-      setFormError('Use ao menos uma série e mantenha a repetição máxima acima da mínima.')
-      return
-    }
-    setFormError('')
-    const success = configured
-      ? await onUpdate(planId, dayId, configured.id, form)
-      : await onCreate(planId, dayId, { ...form, exerciseDefinitionId: definitionId })
-    if (success) commit(form, navigation.goBack)
-  }
-
-  return (
-    <ScreenScrollView>
-      <ScreenHeader
-        eyebrow={configured ? 'Editar exercício do dia' : 'Configurar antes de adicionar'}
-        title={definition.name}
-        description={`${definition.primaryMuscleGroup} · ${definition.category}`}
-      />
-      <View style={styles.form}>
-        <FormField label="Séries" value={sets} onChangeText={setSets} keyboardType="number-pad" />
-        {strength && (
-          <>
-            <View style={styles.row}>
-              <View style={styles.half}>
-                <FormField label="Repetições mínimas" value={minReps} onChangeText={setMinReps} keyboardType="number-pad" />
-              </View>
-              <View style={styles.half}>
-                <FormField label="Repetições máximas" value={maxReps} onChangeText={setMaxReps} keyboardType="number-pad" />
-              </View>
-            </View>
-            <FormField label="Carga planejada (kg)" value={load} onChangeText={setLoad} keyboardType="decimal-pad" />
-          </>
-        )}
-        {durationBased && (
-          <FormField label="Duração planejada (seg)" value={duration} onChangeText={setDuration} keyboardType="number-pad" />
-        )}
-        {cardio && (
-          <FormField label="Distância planejada (km)" value={distance} onChangeText={setDistance} keyboardType="decimal-pad" />
-        )}
-        <FormField label="Descanso (seg)" value={rest} onChangeText={setRest} keyboardType="number-pad" />
-        <FormField label="RPE planejado (1–10)" value={rpe} onChangeText={setRpe} keyboardType="decimal-pad" />
-        <FormField label="Observações" value={notes} onChangeText={setNotes} multiline />
-
-        <Text style={styles.label}>TIPO DE SÉRIE</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chips}>
-          {setTypes.map((item) => (
-            <SelectableChip
-              key={item}
-              label={item}
-              selected={setType === item}
-              onPress={() => setSetType(item)}
-            />
-          ))}
-        </ScrollView>
-
-        <Text style={styles.label}>EXERCÍCIO ALTERNATIVO</Text>
-        <View style={styles.alternativeRow}>
-          <TouchableOpacity accessibilityRole="button" style={styles.alternative} onPress={() => setShowAlternativePicker(true)}>
-            <Text style={styles.alternativeText}>
-              {library.find((item) => item.id === alternativeId)?.name ?? 'Nenhum'}
-            </Text>
-          </TouchableOpacity>
-          {alternativeId != null && (
-            <TouchableOpacity accessibilityRole="button" onPress={() => setAlternativeId(null)} style={styles.clearButton}>
-              <Text style={styles.clear}>Limpar</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-        {!!(formError || errors[key]) && <Text style={styles.error}>{formError || errors[key]}</Text>}
-        <PrimaryButton
-          label={configured ? 'Salvar configuração' : 'Adicionar ao dia'}
-          loading={busyKeys.has(key)}
-          onPress={() => void save()}
-        />
-      </View>
-      <Modal
-        animationType="slide"
-        visible={showAlternativePicker}
-        onRequestClose={() => setShowAlternativePicker(false)}
-      >
-        <View accessibilityViewIsModal style={[styles.modal, { backgroundColor: colors.background }]}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Exercício alternativo</Text>
-            <TouchableOpacity accessibilityRole="button" onPress={() => setShowAlternativePicker(false)} style={styles.clearButton}>
-              <Text style={styles.clear}>Fechar</Text>
-            </TouchableOpacity>
-          </View>
-          <ExercisePicker
-            exercises={library}
-            excludedId={definition.id}
-            onSelect={(exercise) => {
-              setAlternativeId(exercise.id)
-              setShowAlternativePicker(false)
-            }}
-          />
-        </View>
-      </Modal>
-    </ScreenScrollView>
-  )
+  if (!plan || !day || !definition) return <Screen><View style={styles.empty}><Text style={styles.title}>Exercício não encontrado</Text></View></Screen>
+  const planId = plan.id; const dayId = day.id; const definitionId = definition.id; const key = configured ? `exercise:update:${configured.id}` : `day:exercise:add:${dayId}`; const alternative = library.find((item) => item.id === alternativeId); const typeLabel = setTypes.find((item) => item.value === setType)?.label ?? setType
+  async function save() { if (form.sets < 1 || (strength && form.maxReps < form.minReps)) { setFormError(strength ? 'Use ao menos uma série e mantenha a repetição máxima acima da mínima.' : 'Use ao menos uma série.'); return } setFormError(''); const success = configured ? await onUpdate(planId, dayId, configured.id, form) : await onCreate(planId, dayId, { ...form, exerciseDefinitionId: definitionId }); if (success) commit(form, navigation.goBack) }
+  return <ScreenScrollView>
+    <ScreenHeader eyebrow={configured ? 'Editar exercício' : 'Adicionar ao treino'} title={definition.name} description={[definition.primaryMuscleGroup, definition.equipment].filter(Boolean).join(' · ')} variant="standard" />
+    <FormSection title={strength ? 'SÉRIES E REPETIÇÕES' : 'SÉRIES'}><FormField label={`Séries de ${definition.name}`} value={sets} onChangeText={setSets} keyboardType="number-pad" />{strength && <View style={styles.inlineFields}><View style={styles.half}><FormField label="Repetições mínimas" value={minReps} onChangeText={setMinReps} keyboardType="number-pad" /></View><View style={styles.half}><FormField label="Repetições máximas" value={maxReps} onChangeText={setMaxReps} keyboardType="number-pad" /></View></View>}</FormSection>
+    {strength && <FormSection title="CARGA"><FormField label="Carga planejada (kg)" value={load} onChangeText={setLoad} keyboardType="decimal-pad" /></FormSection>}
+    {durationBased && <FormSection title="DURAÇÃO"><FormField label="Duração planejada (seg)" value={duration} onChangeText={setDuration} keyboardType="number-pad" /></FormSection>}
+    {cardio && <FormSection title="DISTÂNCIA"><FormField label="Distância planejada (km)" value={distance} onChangeText={setDistance} keyboardType="decimal-pad" /></FormSection>}
+    <FormSection title="DESCANSO"><FormField label="Descanso (seg)" value={rest} onChangeText={setRest} keyboardType="number-pad" /></FormSection>
+    <FormSection title="TIPO DE SÉRIE"><PickerRow label="Tipo de série" value={typeLabel} onPress={() => setShowSetTypes(true)} /></FormSection>
+    <View style={styles.more}><TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: moreOpen }} accessibilityLabel="Mais opções" onPress={() => setMoreOpen((value) => !value)} style={styles.moreAction}><Text style={styles.moreText}>Mais opções</Text></TouchableOpacity>{moreOpen && <><FormField label="RPE planejado (1–10)" value={rpe} onChangeText={setRpe} keyboardType="decimal-pad" /><PickerRow label="Exercício alternativo" value={alternative?.name ?? 'Nenhum'} onPress={() => setShowAlternativePicker(true)} />{alternativeId != null && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Limpar exercício alternativo" onPress={() => setAlternativeId(null)} style={styles.tertiaryAction}><Text style={styles.tertiaryText}>Remover alternativa</Text></TouchableOpacity>}<FormField label="Observações" value={notes} onChangeText={setNotes} multiline /></>}</View>
+    {!!(formError || errors[key]) && <Text accessibilityLiveRegion="polite" style={styles.error}>{formError || errors[key]}</Text>}
+    <PrimaryButton label={configured ? 'Salvar exercício' : 'Adicionar ao treino'} loading={busyKeys.has(key)} onPress={() => void save()} />
+    <BottomSheet visible={showSetTypes} title="Tipo de série" description="Escolha como estas séries serão executadas." onClose={() => setShowSetTypes(false)}><View style={styles.sheetOptions}>{setTypes.map((item) => <Pressable key={item.value} accessibilityRole="radio" accessibilityLabel={item.label} accessibilityState={{ checked: setType === item.value }} onPress={() => { setSetType(item.value); setShowSetTypes(false) }} style={styles.sheetOption}><Text style={styles.sheetLabel}>{item.label}</Text><Text style={styles.selected}>{setType === item.value ? 'Selecionado' : ''}</Text></Pressable>)}</View></BottomSheet>
+    <Modal animationType="slide" visible={showAlternativePicker} onRequestClose={() => setShowAlternativePicker(false)}><View accessibilityViewIsModal style={[styles.modal, { backgroundColor: colors.background }]}><View style={styles.modalHeader}><Text accessibilityRole="header" style={styles.modalTitle}>Exercício alternativo</Text><TouchableOpacity accessibilityRole="button" accessibilityLabel="Fechar seletor" onPress={() => setShowAlternativePicker(false)} style={styles.closeAction}><Text style={styles.tertiaryText}>Fechar</Text></TouchableOpacity></View><ExercisePicker exercises={library} excludedId={definition.id} onSelect={(exercise) => { setAlternativeId(exercise.id); setShowAlternativePicker(false) }} /></View></Modal>
+  </ScreenScrollView>
 }
-
-function number(value: string) {
-  const parsed = Number(value.replace(',', '.'))
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0
-}
-
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  form: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 20, borderWidth: 1, padding: 16 },
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  half: { flex: 1, minWidth: 130 },
-  label: { color: colors.textSecondary, fontSize: 14, fontWeight: '800', letterSpacing: 0.6, marginBottom: 7, marginTop: 5 },
-  chips: { marginBottom: 14 },
-  alternativeRow: { alignItems: 'center', flexDirection: 'row', gap: 9, marginBottom: 14 },
-  alternative: { backgroundColor: colors.surfaceSecondary, borderRadius: 12, flex: 1, minHeight: 48, justifyContent: 'center', paddingHorizontal: 12 },
-  alternativeText: { color: colors.textPrimary, fontSize: 14, fontWeight: '700' },
-  clear: { color: colors.primary, fontSize: 14, fontWeight: '800' },
-  clearButton: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 },
-  modal: { flex: 1, paddingTop: 45 },
-  modalHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: shared.pagePadding, paddingVertical: 12 },
-  modalTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
-  error: { color: colors.danger, fontSize: 14, lineHeight: 20, marginBottom: 9 },
-  empty: { alignItems: 'center', flex: 1, justifyContent: 'center' },
-  title: { color: colors.ink, fontSize: 18, fontWeight: '800' },
-})
+function FormSection({ title, children }: { title: string; children: React.ReactNode }) { return <View><SectionHeader title={title} />{children}</View> }
+function PickerRow({ label, value, onPress }: { label: string; value: string; onPress: () => void }) { const { colors } = useTheme(); const styles = createStyles(colors); return <TouchableOpacity accessibilityRole="button" accessibilityLabel={`${label}, ${value}`} onPress={onPress} style={styles.pickerRow}><View><Text style={styles.pickerLabel}>{label}</Text><Text style={styles.pickerValue}>{value}</Text></View><Ionicons accessibilityElementsHidden color={colors.textSecondary} name="chevron-forward" size={20} /></TouchableOpacity> }
+function number(value: string) { const parsed = Number(value.replace(',', '.')); return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0 }
+const createStyles = (colors: ThemeColors) => StyleSheet.create({ inlineFields: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 }, half: { flex: 1, minWidth: 140 }, more: { borderTopColor: colors.border, borderTopWidth: StyleSheet.hairlineWidth, marginTop: 12 }, moreAction: { alignItems: 'center', justifyContent: 'center', minHeight: 52 }, moreText: { color: colors.primary, fontSize: 14, fontWeight: '700' }, pickerRow: { alignItems: 'center', borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', justifyContent: 'space-between', minHeight: 64, paddingVertical: 8 }, pickerLabel: { color: colors.textPrimary, fontSize: 16, fontWeight: '600' }, pickerValue: { color: colors.textSecondary, fontSize: 14, marginTop: 3 }, tertiaryAction: { alignSelf: 'flex-start', justifyContent: 'center', minHeight: 48 }, tertiaryText: { color: colors.primary, fontSize: 14, fontWeight: '700' }, error: { color: colors.danger, fontSize: 14, lineHeight: 20, marginBottom: 12, marginTop: 12 }, sheetOptions: { gap: 4 }, sheetOption: { alignItems: 'center', borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', minHeight: 52 }, sheetLabel: { color: colors.textPrimary, flex: 1, fontSize: 16 }, selected: { color: colors.primary, fontSize: 13, fontWeight: '700' }, modal: { flex: 1, paddingTop: 42 }, modalHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: shared.pagePadding, paddingVertical: 12 }, modalTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: '700' }, closeAction: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 }, empty: { alignItems: 'center', flex: 1, justifyContent: 'center' }, title: { color: colors.textPrimary, fontSize: 18, fontWeight: '700' } })

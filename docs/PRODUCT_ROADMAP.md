@@ -8,6 +8,14 @@
 6. **Providers, inteligência local e release candidate — Marco 6 BLOQUEADO PARA TESTES**
 7. **Catálogo multiprovider e redesign visual — Marco 0.10.0 NO-GO**
 
+## Fase 1 — Modo Nutrição local
+
+- refeições manuais com múltiplos alimentos, metas locais e resumos diários;
+- dias anteriores finalizados preservam a fotografia das metas e permanecem editáveis até o expurgo;
+- retenção de sete dias locais: somente dias estritamente anteriores a `hoje - 7` podem perder detalhes;
+- backup schema 3, compatível com schemas 1 e 2; sem servidor, sincronização, câmera, IA ou banco externo;
+- `CODE COMPLETE`; `AUTOMATED VALIDATION NOT PASSED` (gates Expo apontam versões de patch defasadas e regressão Hermes); `PHYSICAL ANDROID SMOKE PENDING`; `PRODUCTION NO-GO`.
+
 ## Marco 0.10.0 — em validação
 
 - ExerciseDB/AscendAPI como busca manual primária e Wger como fallback;

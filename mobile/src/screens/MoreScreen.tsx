@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 import { ScreenScrollView } from '../components/Screen'
 import { ScreenHeader } from '../components/ScreenHeader'
 import { shared, type ThemeColors, useTheme } from '../theme'
@@ -15,6 +16,8 @@ export function MoreScreen({
   busy,
   onIntegrations,
   onAppearance,
+  onNutrition,
+  onUserProfile,
   onLibrary,
   onTrash,
   trashCount,
@@ -32,6 +35,8 @@ export function MoreScreen({
   busy: boolean
   onIntegrations: () => void
   onAppearance: () => void
+  onNutrition?: () => void
+  onUserProfile?: () => void
   onLibrary: () => void
   onTrash: () => void
   trashCount: number
@@ -97,6 +102,8 @@ export function MoreScreen({
         disabled={busy}
       />
       <Text style={styles.section}>CONTEÚDO</Text>
+      <MenuItem label="Perfil e limitações" detail="Contexto usado pelos planejadores de IA" onPress={onUserProfile ?? (() => undefined)} disabled={busy || !onUserProfile} />
+      <MenuItem label="Metas nutricionais" detail="Configurar metas locais" onPress={onNutrition ?? (() => undefined)} disabled={busy || !onNutrition} />
       <MenuItem label="Biblioteca de exercícios" detail="Criar e editar" onPress={onLibrary} disabled={busy} />
       <MenuItem
         label="Lixeira de fichas"
@@ -114,7 +121,7 @@ export function MoreScreen({
         disabled={busy}
       />
       <Text style={styles.section}>BACKUP</Text>
-      <MenuItem label="Exportar backup" detail="Schema 2 · arquivo identificado por data" onPress={onExport} disabled={busy} />
+      <MenuItem label="Exportar backup" detail="Schema 3 · arquivo identificado por data" onPress={onExport} disabled={busy} />
       <MenuItem label="Importar backup" detail="Validar e restaurar" onPress={onImport} disabled={busy} />
       <Text style={styles.section}>BACKUPS AUTOMÁTICOS</Text>
       {!automaticBackups.length && <Text style={styles.note}>Nenhum backup automático criado.</Text>}
@@ -231,7 +238,7 @@ function MenuItem({
             <Text style={styles.badgeText}>{trashBadgeText(badge ?? 0)}</Text>
           </View>
         )}
-        <Text style={styles.arrow}>→</Text>
+        <Ionicons accessibilityElementsHidden color={colors.textSecondary} name="chevron-forward" size={20} />
       </View>
     </Pressable>
   )
@@ -239,13 +246,12 @@ function MenuItem({
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   section: { ...typography.caption, color: colors.textSecondary, fontWeight: '800', letterSpacing: 1.5, marginBottom: 8, marginTop: 20 },
-  item: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 17, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8, minHeight: 68, paddingHorizontal: 16, paddingVertical: 10 },
+  item: { alignItems: 'center', backgroundColor: colors.surface, borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', justifyContent: 'space-between', minHeight: 68, paddingHorizontal: 16, paddingVertical: 10 },
   itemCopy: { flex: 1, minWidth: 0 },
   disabled: { opacity: 0.55 },
   label: { ...typography.body, color: colors.textPrimary, flexShrink: 1, fontWeight: '800' },
   detail: { ...typography.caption, color: colors.textSecondary, flexShrink: 1, marginTop: 4 },
   danger: { color: colors.danger },
-  arrow: { color: colors.gray500, fontSize: 17 },
   trailing: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   badge: { alignItems: 'center', backgroundColor: colors.danger, borderRadius: 12, justifyContent: 'center', minHeight: 24, minWidth: 24, paddingHorizontal: 7 },
   badgeText: { color: colors.onPrimary, fontSize: 12, fontWeight: '900' },

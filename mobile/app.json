@@ -39,7 +39,8 @@
           "style": "dark"
         }
       ],
-      "expo-font"
+      "expo-font",
+      ["expo-image-picker", { "photosPermission": "Permita acesso às fotos para analisar uma refeição.", "cameraPermission": "Permita acesso à câmera para analisar uma refeição." }]
     ],
     "extra": {
       "eas": {

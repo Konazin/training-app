@@ -93,7 +93,7 @@ describe('biblioteca renderizada', () => {
     expect(screen.getByText('Importar pacote recomendado')).toBeTruthy()
     expect(mockNavigation.navigate).not.toHaveBeenCalled()
     fireEvent.press(screen.getByText('Explorar catálogo externo'))
-    expect(mockNavigation.navigate).toHaveBeenCalledWith('WgerIntegration')
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('WgerIntegration', { providerId: 'WGER' })
     fireEvent.press(screen.getByText('Continuar sem exercícios'))
     expect(mockNavigation.goBack).toHaveBeenCalledTimes(1)
   })

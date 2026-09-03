@@ -5,176 +5,31 @@ import { ScreenHeader } from '../../../components/ScreenHeader'
 import { ScreenScrollView } from '../../../components/Screen'
 import type { RootStackParamList } from '../../../navigation/types'
 import type { TrainingPlan } from '../model/trainingPlan'
-import { shared, type ThemeColors, useTheme } from '../../../theme'
+import { type ThemeColors, useTheme } from '../../../theme'
 
-const weekday = {
-  MONDAY: 'SEG',
-  TUESDAY: 'TER',
-  WEDNESDAY: 'QUA',
-  THURSDAY: 'QUI',
-  FRIDAY: 'SEX',
-  SATURDAY: 'SÁB',
-  SUNDAY: 'DOM',
-} as const
+const weekday = { MONDAY: 'SEG', TUESDAY: 'TER', WEDNESDAY: 'QUA', THURSDAY: 'QUI', FRIDAY: 'SEX', SATURDAY: 'SÁB', SUNDAY: 'DOM' } as const
 
-export function TrainingPlanView({
-  plans,
-  selectedPlan,
-  loading,
-  onSelect,
-  onStart,
-}: {
-  plans: TrainingPlan[]
-  selectedPlan: TrainingPlan | undefined
-  loading: boolean
-  onSelect: (id: number) => void
-  onStart: (planId: number, dayId: number) => Promise<boolean>
-}) {
-  const { colors } = useTheme()
-  const styles = createStyles(colors)
+export function TrainingPlanView({ plans, selectedPlan, loading, onSelect }: { plans: TrainingPlan[]; selectedPlan: TrainingPlan | undefined; loading: boolean; onSelect: (id: number) => void; onStart: (planId: number, dayId: number) => Promise<boolean> }) {
+  const { colors } = useTheme(); const styles = createStyles(colors)
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>()
-  const visiblePlans = plans.filter((plan) => !plan.archived)
-
-  return (
-    <ScreenScrollView includeBottomInset={false} showsVerticalScrollIndicator={false}>
-      <ScreenHeader
-        eyebrow="Planejamento semanal"
-        title={'Sua ficha\nde treino'}
-        description="Escolha uma ficha e configure cada dia separadamente."
-        action={(
-          <TouchableOpacity
-            accessibilityLabel="Criar ficha"
-            accessibilityRole="button"
-            style={styles.headerButton}
-            onPress={() => navigation.navigate('TrainingPlanEditor')}
-          >
-            <Text style={styles.headerButtonText}>＋</Text>
-          </TouchableOpacity>
-        )}
-      />
-      <TouchableOpacity
-        accessibilityRole="button"
-        style={styles.archivedLink}
-        onPress={() => navigation.navigate('ArchivedTrainingPlans')}
-      >
-        <Text style={styles.archivedLinkText}>Ver fichas arquivadas</Text>
-      </TouchableOpacity>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.planScroll}>
-        {visiblePlans.map((plan) => (
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityState={{ selected: selectedPlan?.id === plan.id }}
-            key={plan.id}
-            style={[styles.planChip, selectedPlan?.id === plan.id && styles.planChipActive]}
-            onPress={() => onSelect(plan.id)}
-          >
-            <Text style={[styles.planName, selectedPlan?.id === plan.id && styles.inverse]}>
-              {plan.name}
-            </Text>
-            <Text style={[styles.planMeta, selectedPlan?.id === plan.id && styles.inverse]}>
-              {selectedPlan?.id === plan.id ? '✓ ' : ''}{plan.active ? 'ativa' : plan.category}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {!selectedPlan ? (
-        <View style={styles.empty}>
-          <Text style={styles.emptyTitle}>{loading ? 'Carregando fichas…' : 'Nenhuma ficha disponível'}</Text>
-          {!loading && (
-            <TouchableOpacity accessibilityRole="button" style={styles.primary} onPress={() => navigation.navigate('TrainingPlanEditor')}>
-              <Text style={styles.primaryText}>Criar ficha</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      ) : (
-        <>
-          <View style={styles.planHeader}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.eyebrow}>{selectedPlan.category} · {selectedPlan.difficulty}</Text>
-              <Text style={styles.title}>{selectedPlan.name}</Text>
-              {!!selectedPlan.description && <Text style={styles.description}>{selectedPlan.description}</Text>}
-            </View>
-            <TouchableOpacity
-              accessibilityRole="button"
-              style={styles.secondary}
-              onPress={() => navigation.navigate('TrainingPlanEditor', { planId: selectedPlan.id })}
-            >
-              <Text style={styles.secondaryText}>Editar</Text>
-            </TouchableOpacity>
-          </View>
-
-          {selectedPlan.days.map((day) => (
-            <View key={day.id} style={styles.dayCard}>
-              <TouchableOpacity
-                accessibilityRole="button"
-                style={styles.dayBody}
-                onPress={() => navigation.navigate('TrainingPlanDay', {
-                  planId: selectedPlan.id,
-                  dayId: day.id,
-                })}
-              >
-                <View style={[styles.dayBadge, day.restDay && styles.restBadge]}>
-                  <Text style={styles.dayBadgeText}>{weekday[day.weekday]}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.dayTitle}>
-                    {day.restDay ? 'Dia de descanso' : day.title || 'Treino a configurar'}
-                  </Text>
-                  <Text style={styles.dayMeta}>
-                    {day.restDay
-                      ? `${day.restActivities.length} atividades opcionais`
-                      : `${day.exercises.length} exercícios · ${day.estimatedDurationMinutes} min`}
-                  </Text>
-                </View>
-                <Text style={styles.arrow}>→</Text>
-              </TouchableOpacity>
-              {!day.restDay && day.exercises.length > 0 && (
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  style={styles.start}
-                  onPress={() => void onStart(selectedPlan.id, day.id)}
-                >
-                  <Text style={styles.startText}>Iniciar</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          ))}
-        </>
-      )}
-    </ScreenScrollView>
-  )
+  const visiblePlans = plans.filter((plan) => !plan.archived && plan.deletedAt === null)
+  const trainingDays = selectedPlan?.days.filter((day) => !day.restDay).length ?? 0
+  const restDays = selectedPlan?.days.filter((day) => day.restDay).length ?? 0
+  return <ScreenScrollView includeBottomInset={false} showsVerticalScrollIndicator={false}>
+    <ScreenHeader eyebrow="Planejamento" title="Ficha" description="Organize sua semana de treino." variant="standard" action={<TouchableOpacity accessibilityLabel="Criar ficha" accessibilityRole="button" style={styles.headerAction} onPress={() => navigation.navigate('TrainingPlanEditor')}><Text style={styles.headerActionText}>Nova</Text></TouchableOpacity>} />
+    {visiblePlans.length > 1 && <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.planSelector}>{visiblePlans.map((plan) => <TouchableOpacity key={plan.id} accessibilityLabel={`${plan.name}${plan.active ? ', ficha ativa' : ''}`} accessibilityRole="button" accessibilityState={{ selected: selectedPlan?.id === plan.id }} onPress={() => onSelect(plan.id)} style={[styles.planOption, selectedPlan?.id === plan.id && styles.planOptionSelected]}><Text numberOfLines={1} style={[styles.planOptionName, selectedPlan?.id === plan.id && styles.planOptionSelectedText]}>{plan.name}</Text><Text style={[styles.planOptionMeta, selectedPlan?.id === plan.id && styles.planOptionSelectedText]}>{plan.active ? 'Ativa' : plan.category}</Text></TouchableOpacity>)}</ScrollView>}
+    {!selectedPlan ? <View style={styles.empty}><Text style={styles.emptyTitle}>{loading ? 'Carregando fichas…' : 'Nenhuma ficha disponível'}</Text>{!loading && <TouchableOpacity accessibilityRole="button" style={styles.primary} onPress={() => navigation.navigate('TrainingPlanEditor')}><Text style={styles.primaryText}>Criar ficha</Text></TouchableOpacity>}</View> : <>
+      <View style={styles.summary}><View style={styles.summaryCopy}><Text style={styles.summaryTitle}>{selectedPlan.name}</Text><Text style={styles.summaryMeta}>{selectedPlan.category} · {selectedPlan.difficulty}</Text><Text style={styles.summaryMeta}>{trainingDays} {trainingDays === 1 ? 'dia de treino' : 'dias de treino'} · {restDays} {restDays === 1 ? 'descanso' : 'descansos'}</Text>{!!selectedPlan.description && <Text numberOfLines={2} style={styles.description}>{selectedPlan.description}</Text>}</View><View><Text style={[styles.activeLabel, !selectedPlan.active && styles.inactiveLabel]}>{selectedPlan.active ? 'ATIVA' : 'SALVA'}</Text><TouchableOpacity accessibilityLabel={`Editar ficha ${selectedPlan.name}`} accessibilityRole="button" onPress={() => navigation.navigate('TrainingPlanEditor', { planId: selectedPlan.id })} style={styles.editAction}><Text style={styles.editActionText}>Editar</Text></TouchableOpacity></View></View>
+      <Text accessibilityRole="header" style={styles.sectionTitle}>SEMANA</Text>
+      <View style={styles.weekList}>{selectedPlan.days.map((day, index) => <TouchableOpacity key={day.id} accessibilityLabel={`${weekday[day.weekday]}, ${day.restDay ? 'descanso' : day.title || 'treino a configurar'}, ${day.restDay ? `${day.restActivities.length} atividades` : `${day.exercises.length} exercícios e ${day.estimatedDurationMinutes} minutos`}`} accessibilityRole="button" onPress={() => navigation.navigate('TrainingPlanDay', { planId: selectedPlan.id, dayId: day.id })} style={[styles.dayRow, index > 0 && styles.dayDivider, day.restDay && styles.restRow]}><Text style={[styles.weekday, day.restDay && styles.restWeekday]}>{weekday[day.weekday]}</Text><View style={styles.dayCopy}><Text style={styles.dayTitle}>{day.restDay ? 'Descanso' : day.title || 'Treino a configurar'}</Text><Text style={styles.dayMeta}>{day.restDay ? day.restActivities.length ? `${day.restActivities.length} atividades de recuperação` : 'Sem atividades programadas' : `${day.exercises.length} exercícios · ${day.estimatedDurationMinutes} min`}</Text></View></TouchableOpacity>)}</View>
+      <TouchableOpacity accessibilityLabel="Ver fichas arquivadas" accessibilityRole="button" onPress={() => navigation.navigate('ArchivedTrainingPlans')} style={styles.archiveAction}><Text style={styles.archiveActionText}>Gerenciar fichas arquivadas</Text></TouchableOpacity>
+    </>}
+  </ScreenScrollView>
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  headerButton: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 15, height: 48, justifyContent: 'center', width: 48 },
-  headerButtonText: { color: colors.onPrimary, fontSize: 20 },
-  archivedLink: { alignSelf: 'flex-start', justifyContent: 'center', marginBottom: 12, minHeight: 48 },
-  archivedLinkText: { color: colors.gray500, fontSize: 12, fontWeight: '700' },
-  planScroll: { marginBottom: 14 },
-  planChip: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, justifyContent: 'center', marginRight: 8, minHeight: 64, minWidth: 145, padding: 12 },
-  planChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  planName: { color: colors.ink, fontSize: 15, fontWeight: '800' },
-  planMeta: { color: colors.textSecondary, fontSize: 14, marginTop: 5 },
-  inverse: { color: colors.onPrimary },
-  planHeader: { alignItems: 'flex-start', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 21, borderWidth: 1, flexDirection: 'row', gap: 12, marginBottom: 10, padding: 16 },
-  eyebrow: { color: colors.textSecondary, fontSize: 12, fontWeight: '800', textTransform: 'uppercase' },
-  title: { color: colors.ink, fontSize: 21, fontWeight: '800', marginTop: 5 },
-  description: { color: colors.gray500, fontSize: 14, lineHeight: 20, marginTop: 6 },
-  secondary: { alignItems: 'center', borderColor: colors.border, borderRadius: 13, borderWidth: 1, justifyContent: 'center', minHeight: 48, paddingHorizontal: 12 },
-  secondaryText: { color: colors.ink, fontSize: 12, fontWeight: '800' },
-  dayCard: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 18, borderWidth: 1, marginBottom: 8, overflow: 'hidden' },
-  dayBody: { alignItems: 'center', flexDirection: 'row', gap: 12, minHeight: 72, padding: 12 },
-  dayBadge: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 13, height: 48, justifyContent: 'center', width: 48 },
-  restBadge: { backgroundColor: colors.gray500 },
-  dayBadgeText: { color: colors.onPrimary, fontSize: 12, fontWeight: '800' },
-  dayTitle: { color: colors.ink, fontSize: 16, fontWeight: '800', lineHeight: 22 },
-  dayMeta: { color: colors.gray500, fontSize: 14, lineHeight: 20, marginTop: 4 },
-  arrow: { color: colors.gray400, fontSize: 17 },
-  start: { alignItems: 'center', borderTopColor: colors.border, borderTopWidth: 1, justifyContent: 'center', minHeight: 48 },
-  startText: { color: colors.primary, fontSize: 14, fontWeight: '800' },
-  empty: { alignItems: 'center', minHeight: 280, justifyContent: 'center' },
-  emptyTitle: { color: colors.ink, fontSize: 16, fontWeight: '700', marginBottom: 15 },
-  primary: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 14, justifyContent: 'center', minHeight: 48, paddingHorizontal: 18 },
-  primaryText: { color: colors.onPrimary, fontSize: 14, fontWeight: '800' },
+  headerAction: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 14, justifyContent: 'center', minHeight: 48, paddingHorizontal: 14 }, headerActionText: { color: colors.onPrimary, fontSize: 14, fontWeight: '700' }, planSelector: { gap: 8, paddingBottom: 16 }, planOption: { backgroundColor: colors.surfaceSecondary, borderRadius: 14, justifyContent: 'center', minHeight: 56, minWidth: 132, paddingHorizontal: 12 }, planOptionSelected: { backgroundColor: colors.primary }, planOptionName: { color: colors.textPrimary, fontSize: 14, fontWeight: '700', maxWidth: 178 }, planOptionMeta: { color: colors.textSecondary, fontSize: 12, marginTop: 2 }, planOptionSelectedText: { color: colors.onPrimary },
+  summary: { alignItems: 'flex-start', backgroundColor: colors.surfaceSecondary, borderRadius: 22, flexDirection: 'row', gap: 12, marginBottom: 20, padding: 18 }, summaryCopy: { flex: 1, minWidth: 0 }, summaryTitle: { color: colors.textPrimary, fontSize: 22, fontWeight: '700', lineHeight: 28 }, summaryMeta: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, marginTop: 3 }, description: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, marginTop: 8 }, activeLabel: { color: colors.primary, fontSize: 12, fontWeight: '700', letterSpacing: 1 }, inactiveLabel: { color: colors.textSecondary }, editAction: { alignItems: 'flex-end', justifyContent: 'center', minHeight: 48 }, editActionText: { color: colors.primary, fontSize: 14, fontWeight: '700' },
+  sectionTitle: { color: colors.textSecondary, fontSize: 12, fontWeight: '700', letterSpacing: 1.1, marginBottom: 8 }, weekList: { backgroundColor: colors.surface, borderRadius: 20, marginBottom: 12, overflow: 'hidden' }, dayRow: { alignItems: 'center', flexDirection: 'row', gap: 12, minHeight: 72, paddingHorizontal: 16, paddingVertical: 8 }, dayDivider: { borderTopColor: colors.border, borderTopWidth: StyleSheet.hairlineWidth }, restRow: { backgroundColor: colors.surfaceSecondary }, weekday: { color: colors.primary, fontSize: 12, fontWeight: '700', width: 34 }, restWeekday: { color: colors.textSecondary }, dayCopy: { flex: 1, minWidth: 0 }, dayTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '700', lineHeight: 22 }, dayMeta: { color: colors.textSecondary, fontSize: 13, lineHeight: 19, marginTop: 2 }, archiveAction: { alignItems: 'flex-start', justifyContent: 'center', minHeight: 48, paddingHorizontal: 4 }, archiveActionText: { color: colors.textSecondary, fontSize: 13, fontWeight: '700' },
+  empty: { alignItems: 'center', minHeight: 260, justifyContent: 'center' }, emptyTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '700', marginBottom: 16 }, primary: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 14, justifyContent: 'center', minHeight: 48, paddingHorizontal: 18 }, primaryText: { color: colors.onPrimary, fontSize: 14, fontWeight: '700' },
 })

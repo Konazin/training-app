@@ -2,6 +2,8 @@ import {
   DomainError,
   LOCAL_PREFERENCES_KEY,
   resolveDisplayName,
+  validateNutritionGoals,
+  MICRONUTRIENT_CODES,
   type BackupRepository,
   type TrainingBackup,
 } from '@training/training-domain'
@@ -74,7 +76,7 @@ const TABLES = {
   exercise_recent_usage: ['exercise_id', 'last_used_at', 'use_count'],
   nutrition_meals: ['id', 'local_date', 'consumed_at', 'meal_type', 'title', 'notes', 'source', 'created_at', 'updated_at'],
   nutrition_meal_items: ['id', 'meal_id', 'name', 'portion_description', 'estimated_grams', 'calories_kcal', 'protein_grams', 'carbohydrates_grams', 'fat_grams', 'fiber_grams', 'micronutrients_json', 'confidence', 'data_source', 'sort_order', 'created_at', 'updated_at'],
-  nutrition_daily_summaries: ['id', 'local_date', 'total_calories_kcal', 'total_protein_grams', 'total_carbohydrates_grams', 'total_fat_grams', 'total_fiber_grams', 'total_micronutrients_json', 'meal_count', 'item_count', 'goal_calories_kcal', 'goal_protein_grams', 'goal_carbohydrates_grams', 'goal_fat_grams', 'goal_fiber_grams', 'closed_at', 'updated_at'],
+  nutrition_daily_summaries: ['id', 'local_date', 'total_calories_kcal', 'total_protein_grams', 'total_carbohydrates_grams', 'total_fat_grams', 'total_fiber_grams', 'total_micronutrients_json', 'meal_count', 'item_count', 'goal_calories_kcal', 'goal_protein_grams', 'goal_carbohydrates_grams', 'goal_fat_grams', 'goal_fiber_grams', 'closed_at', 'finalized', 'details_purged_at', 'updated_at'],
 } as const
 
 export function createBackupRepository(database: SqlDatabase): BackupRepository {
@@ -99,7 +101,7 @@ export function createBackupRepository(database: SqlDatabase): BackupRepository 
         await insertRows(transaction, 'app_settings', normalizeLocalPreferenceRows(backup.settings))
         await insertRows(transaction, 'nutrition_meals', backup.nutritionMeals ?? [])
         await insertRows(transaction, 'nutrition_meal_items', backup.nutritionMealItems ?? [])
-        await insertRows(transaction, 'nutrition_daily_summaries', backup.nutritionDailySummaries ?? [])
+        await insertRows(transaction, 'nutrition_daily_summaries', (backup.nutritionDailySummaries ?? []).map((row) => ({ finalized: 0, details_purged_at: null, ...(row as object) })))
         await transaction.run(`
           DELETE FROM training_plans
           WHERE deleted_at IS NOT NULL AND julianday(purge_at) <= julianday(?)
@@ -186,6 +188,11 @@ export function validateBackup(candidate: unknown): asserts candidate is Trainin
   if (backup.schemaVersion !== 1 && backup.schemaVersion !== 2 && backup.schemaVersion !== 3) {
     throw invalidBackup('versão não suportada')
   }
+  if (backup.schemaVersion === 3 && (
+    backup.nutritionMeals === undefined
+    || backup.nutritionMealItems === undefined
+    || backup.nutritionDailySummaries === undefined
+  )) throw invalidBackup('coleção nutricional ausente no schema 3')
   if ('app_metadata' in candidate || 'appMetadata' in candidate) {
     throw invalidBackup('app_metadata não pode ser importado')
   }
@@ -240,6 +247,7 @@ export function validateBackup(candidate: unknown): asserts candidate is Trainin
   const sessionExerciseIds = ids(backup.sessionExercises!, 'sessionExercises')
   ids(backup.setLogs!, 'setLogs')
   const nutritionMealIds = ids(backup.nutritionMeals ?? [], 'nutritionMeals')
+  ids(backup.nutritionMealItems ?? [], 'nutritionMealItems')
   ids(backup.nutritionDailySummaries ?? [], 'nutritionDailySummaries')
   requireReferences(backup.media!, 'exercise_definition_id', exerciseIds)
   requireReferences(backup.trainingPlanDays!, 'training_plan_id', planIds)
@@ -254,6 +262,7 @@ export function validateBackup(candidate: unknown): asserts candidate is Trainin
   requireReferences(backup.exerciseRecentUsage ?? [], 'exercise_id', exerciseIds)
 
   assertEnums(backup)
+  assertNutritionRows(backup)
   assertFiniteNumbers(backup)
   assertDates(backup)
   assertUniqueOrder(backup.trainingPlanDays!, 'training_plan_id', 'sort_order')
@@ -400,6 +409,50 @@ function assertEnums(backup: Partial<TrainingBackup>) {
   enumRows(backup.sessions!, 'status', ['IN_PROGRESS', 'PAUSED', 'COMPLETED', 'ABANDONED'])
   enumRows(backup.sessionExercises!, 'status', ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'SKIPPED'])
   enumRows(backup.sessionExercises!, 'set_type', ['NORMAL', 'WARM_UP', 'DROP_SET', 'BI_SET', 'CIRCUIT', 'TO_FAILURE', 'CONTROLLED_TEMPO'])
+  enumRows(backup.nutritionMeals ?? [], 'meal_type', ['BREAKFAST', 'MORNING_SNACK', 'LUNCH', 'AFTERNOON_SNACK', 'DINNER', 'SUPPER', 'OTHER'])
+  enumRows(backup.nutritionMeals ?? [], 'source', ['MANUAL', 'CAMERA', 'GALLERY', 'BARCODE', 'SAVED_MEAL'])
+  enumRows(backup.nutritionMealItems ?? [], 'data_source', ['MANUAL', 'LOCAL_DATABASE', 'USDA', 'OPEN_FOOD_FACTS', 'AI_ESTIMATE'])
+}
+
+function assertNutritionRows(backup: Partial<TrainingBackup>) {
+  const meals = (backup.nutritionMeals ?? []) as Record<string, unknown>[]
+  const items = (backup.nutritionMealItems ?? []) as Record<string, unknown>[]
+  const summaries = (backup.nutritionDailySummaries ?? []) as Record<string, unknown>[]
+  const dates = new Set<string>()
+  for (const row of meals) if (!isDateKey(row.local_date) || !isIsoTimestamp(row.consumed_at) || !isIsoTimestamp(row.created_at) || !isIsoTimestamp(row.updated_at)) throw invalidBackup('data inválida em nutrição')
+  for (const row of items) {
+    if (typeof row.name !== 'string' || !row.name.trim() || typeof row.portion_description !== 'string' || !isIsoTimestamp(row.created_at) || !isIsoTimestamp(row.updated_at) || !Number.isInteger(row.sort_order) || Number(row.sort_order) < 0) throw invalidBackup('item nutricional inválido')
+    if (row.confidence != null && (typeof row.confidence !== 'number' || !Number.isFinite(row.confidence) || row.confidence < 0 || row.confidence > 1)) throw invalidBackup('confidence inválida')
+    if (typeof row.micronutrients_json !== 'string') throw invalidBackup('micronutrientes inválidos')
+    validateMicronutrients(row.micronutrients_json)
+  }
+  assertUniqueOrder(items, 'meal_id', 'sort_order')
+  const purgedDates = new Set(summaries.filter((row) => row.details_purged_at != null).map((row) => String(row.local_date)))
+  if (meals.some((row) => purgedDates.has(String(row.local_date)))) throw invalidBackup('refeições presentes após expurgo')
+  if (items.some((row) => purgedDates.has(String(meals.find((meal) => meal.id === row.meal_id)?.local_date)))) throw invalidBackup('detalhes presentes após expurgo')
+  for (const row of summaries) {
+    if (!isDateKey(row.local_date) || dates.has(String(row.local_date)) || !isIsoTimestamp(row.closed_at) || !isIsoTimestamp(row.updated_at)) throw invalidBackup('resumo nutricional inválido')
+    dates.add(String(row.local_date))
+    if (![row.finalized].every((value) => value === undefined || value === 0 || value === 1)) throw invalidBackup('estado do resumo inválido')
+    if (row.details_purged_at != null && (!isIsoTimestamp(row.details_purged_at) || row.finalized !== 1)) throw invalidBackup('data de expurgo inválida')
+    if (!Number.isInteger(row.meal_count) || Number(row.meal_count) < 0 || !Number.isInteger(row.item_count) || Number(row.item_count) < 0) throw invalidBackup('contagem nutricional inválida')
+    const goal = (key: string) => { const value = row[key]; return value == null ? null : value as number }
+    validateNutritionGoals({ caloriesKcal: goal('goal_calories_kcal'), proteinGrams: goal('goal_protein_grams'), carbohydratesGrams: goal('goal_carbohydrates_grams'), fatGrams: goal('goal_fat_grams'), fiberGrams: goal('goal_fiber_grams') })
+    if (typeof row.total_micronutrients_json !== 'string') throw invalidBackup('micronutrientes do resumo inválidos')
+    validateMicronutrients(row.total_micronutrients_json)
+  }
+  const setting = (backup.settings ?? []).find((row) => value(row, 'key') === 'nutrition.goals')
+  if (setting) {
+    try { const data = JSON.parse(String(value(setting, 'value_json'))); validateNutritionGoals({ caloriesKcal: data.caloriesKcal ?? null, proteinGrams: data.proteinGrams ?? null, carbohydratesGrams: data.carbohydratesGrams ?? null, fatGrams: data.fatGrams ?? null, fiberGrams: data.fiberGrams ?? null }) } catch { throw invalidBackup('metas nutricionais inválidas') }
+  }
+}
+
+function validateMicronutrients(value: unknown) {
+  if (typeof value !== 'string') throw invalidBackup('JSON de micronutrientes inválido')
+  let parsed: unknown
+  try { parsed = JSON.parse(value) } catch { throw invalidBackup('JSON de micronutrientes inválido') }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw invalidBackup('JSON de micronutrientes inválido')
+  for (const [code, amount] of Object.entries(parsed)) if (!MICRONUTRIENT_CODES.includes(code as typeof MICRONUTRIENT_CODES[number]) || typeof amount !== 'number' || !Number.isFinite(amount) || amount < 0) throw invalidBackup('micronutriente inválido')
 }
 
 function enumRows(rows: unknown[], field: string, allowed: string[]) {
@@ -412,7 +465,7 @@ function assertFiniteNumbers(backup: Partial<TrainingBackup>) {
   const collections = [
     backup.exercises!, backup.media!, backup.trainingPlans!, backup.trainingPlanDays!,
     backup.trainingDayExercises!, backup.restActivities!, backup.sessions!,
-    backup.sessionExercises!, backup.setLogs!,
+    backup.sessionExercises!, backup.setLogs!, backup.nutritionMeals ?? [], backup.nutritionMealItems ?? [], backup.nutritionDailySummaries ?? [],
   ]
   const numericFields = new Set([
     'id', 'exercise_definition_id', 'training_plan_id', 'training_plan_day_id',
@@ -423,14 +476,14 @@ function assertFiniteNumbers(backup: Partial<TrainingBackup>) {
     'overall_rpe', 'planned_sets', 'planned_min_reps', 'planned_max_reps',
     'reps', 'load', 'duration_seconds', 'distance', 'rpe', 'width', 'height',
     'active_slot', 'active', 'archived', 'rest_day', 'optional', 'completed',
-    'manually_added', 'unilateral', 'timed', 'is_main',
+    'manually_added', 'unilateral', 'timed', 'is_main', 'estimated_grams', 'calories_kcal', 'protein_grams', 'carbohydrates_grams', 'fat_grams', 'fiber_grams', 'total_calories_kcal', 'total_protein_grams', 'total_carbohydrates_grams', 'total_fat_grams', 'total_fiber_grams', 'confidence', 'meal_count', 'item_count', 'finalized', 'goal_calories_kcal', 'goal_protein_grams', 'goal_carbohydrates_grams', 'goal_fat_grams', 'goal_fiber_grams',
   ])
   const nonNegative = new Set([
     'sort_order', 'set_number', 'sets', 'min_reps', 'max_reps', 'planned_load',
     'planned_duration_seconds', 'planned_distance', 'rest_seconds',
     'estimated_duration_minutes', 'paused_duration_seconds', 'total_duration_seconds',
     'planned_sets', 'planned_min_reps', 'planned_max_reps', 'reps', 'load',
-    'duration_seconds', 'distance', 'width', 'height',
+    'duration_seconds', 'distance', 'width', 'height', 'estimated_grams', 'calories_kcal', 'protein_grams', 'carbohydrates_grams', 'fat_grams', 'fiber_grams', 'total_calories_kcal', 'total_protein_grams', 'total_carbohydrates_grams', 'total_fat_grams', 'total_fiber_grams', 'meal_count', 'item_count',
   ])
   for (const rows of collections) {
     for (const row of rows as Record<string, unknown>[]) {
@@ -451,11 +504,11 @@ function assertFiniteNumbers(backup: Partial<TrainingBackup>) {
 function assertDates(backup: Partial<TrainingBackup>) {
   const timestampFields = [
     'created_at', 'updated_at', 'downloaded_at', 'started_at', 'completed_at',
-    'paused_at', 'deleted_at', 'purge_at',
+    'paused_at', 'deleted_at', 'purge_at', 'consumed_at', 'closed_at', 'details_purged_at',
   ]
   const dateFields = ['start_date', 'end_date', 'scheduled_date']
   const rows = [
-    ...backup.exercises!, ...backup.media!, ...backup.trainingPlans!, ...backup.sessions!,
+    ...backup.exercises!, ...backup.media!, ...backup.trainingPlans!, ...backup.sessions!, ...(backup.nutritionMeals ?? []), ...(backup.nutritionMealItems ?? []), ...(backup.nutritionDailySummaries ?? []),
   ] as Record<string, unknown>[]
   for (const row of rows) {
     for (const field of timestampFields) {

@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   ExerciseLibraryRepository,
+  ExerciseProviderId,
   ExternalExerciseCandidate,
+  ExternalExerciseCatalogProvider,
   ExternalExerciseCatalogQuery,
   ExternalExerciseImportRepository,
 } from '@training/training-domain'
 import { exerciseIdentity } from '@training/training-domain'
 import { WgerExerciseCatalogProvider, WgerHttpError, type WgerLanguageOption } from '@training/training-wger'
-import { ExerciseDbClient } from '@training/training-exercisedb'
+import { ExerciseDbClient, ExerciseDbError } from '@training/training-exercisedb'
 import type { ToastKind } from '../../components/Toast'
 
 export const DEFAULT_WGER_QUERY: ExternalExerciseCatalogQuery = {
@@ -23,14 +25,27 @@ export const DEFAULT_WGER_QUERY: ExternalExerciseCatalogQuery = {
   onlyWithVideo: false,
 }
 
+export type CatalogProviders = {
+  EXERCISEDB: ExerciseDbClient
+  WGER: WgerExerciseCatalogProvider
+}
+
+export function createCatalogProviders(): CatalogProviders {
+  return {
+    EXERCISEDB: new ExerciseDbClient(),
+    WGER: new WgerExerciseCatalogProvider(),
+  }
+}
+
 export function useWgerIntegrationController(
   imports: ExternalExerciseImportRepository,
   exercises: ExerciseLibraryRepository,
   onImported: () => Promise<unknown>,
-  providerOverride?: WgerExerciseCatalogProvider | ExerciseDbClient,
+  providerId: ExerciseProviderId,
+  providerOverrides?: CatalogProviders,
 ) {
-  const provider = useRef(providerOverride ?? new ExerciseDbClient()).current
-  const fallback = useRef(new WgerExerciseCatalogProvider()).current
+  const providers = useRef(providerOverrides ?? createCatalogProviders()).current
+  const provider: ExternalExerciseCatalogProvider = providers[providerId]
   const [query, setQuery] = useState(DEFAULT_WGER_QUERY)
   const [items, setItems] = useState<ExternalExerciseCandidate[]>([])
   const [selected, setSelected] = useState<Map<string, ExternalExerciseCandidate>>(new Map())
@@ -65,6 +80,23 @@ export function useWgerIntegrationController(
     }
   }, [loadImportedCount])
 
+  useEffect(() => {
+    requestId.current += 1
+    abort.current?.abort()
+    setQuery(DEFAULT_WGER_QUERY)
+    setItems([])
+    setSelected(new Map())
+    setExisting(new Set())
+    setPreview(null)
+    setTotal(0)
+    setHasNext(false)
+    setHasPrevious(false)
+    setLanguages([])
+    setLanguagesFailed(false)
+    setMessage({ text: '', kind: 'info' })
+    setPhase('ready')
+  }, [providerId])
+
   const search = useCallback(async (page = 1) => {
     abort.current?.abort()
     const controller = new AbortController()
@@ -76,13 +108,7 @@ export function useWgerIntegrationController(
     setPhase('loading')
     setMessage({ text: '', kind: 'info' })
     try {
-      let result
-      try { result = await provider.search(requestQuery, controller.signal) }
-      catch (error) {
-        if (provider.descriptor?.id !== 'EXERCISEDB') throw error
-        setMessage({ text: 'ExerciseDB indisponível; tentando Wger…', kind: 'warning' })
-        result = await fallback.search(requestQuery, controller.signal)
-      }
+      const result = await provider.search(requestQuery, controller.signal)
       if (requestId.current !== currentRequest) return false
       const previewExisting = await imports.previewExisting(result.items)
       if (requestId.current !== currentRequest) return false
@@ -95,21 +121,22 @@ export function useWgerIntegrationController(
       if (!result.items.length) setMessage({ text: 'Nenhum exercício encontrado nesta página.', kind: 'warning' })
       return true
     } catch (error) {
-      if (error instanceof WgerHttpError && error.code === 'ABORTED') return false
+      if (isAbortedError(error)) return false
       if (requestId.current !== currentRequest) return false
-      const offline = error instanceof WgerHttpError && error.code === 'OFFLINE'
+      const offline = isOfflineError(error)
       setPhase(offline ? 'offline' : 'error')
       setMessage({ text: messageFrom(error), kind: 'error' })
       return false
     }
-  }, [fallback, imports, provider, query])
+  }, [imports, provider, query])
 
   const loadLanguages = useCallback(async () => {
+    if (providerId !== 'WGER') return []
     if (languages.length) return languages
     if (!languageRequest.current) {
       setLanguagesFailed(false)
       setLanguagesLoading(true)
-      languageRequest.current = fallback.getLanguages().then((result) => {
+      languageRequest.current = providers.WGER.getLanguages().then((result) => {
         setLanguages(result)
         setLanguagesFailed(false)
         return result
@@ -122,7 +149,7 @@ export function useWgerIntegrationController(
       })
     }
     return languageRequest.current
-  }, [fallback, languages])
+  }, [languages, providerId, providers])
 
   const toggle = useCallback((candidate: ExternalExerciseCandidate) => {
     setSelected((current) => {
@@ -188,7 +215,8 @@ export function useWgerIntegrationController(
       const groups = new Map<string, typeof local>()
       for (const item of local) groups.set(item.source, [...(groups.get(item.source) ?? []), item])
       for (const [sourceId, group] of groups) {
-        const source = sourceId === 'WGER' ? fallback : provider
+        const source = providers[sourceId as ExerciseProviderId]
+        if (!source) continue
         for (const item of group) {
           if (!item.externalId) continue
           try {
@@ -198,7 +226,7 @@ export function useWgerIntegrationController(
             else warnings.push(`${item.name}: não encontrado; cópia local mantida.`)
           } catch (error) {
             if (controller.signal.aborted) return false
-            if (error instanceof WgerHttpError && error.code === 'ABORTED') return false
+            if (isAbortedError(error)) return false
             warnings.push(`${item.name}: fonte indisponível; cópia local mantida.`)
           }
         }
@@ -213,13 +241,13 @@ export function useWgerIntegrationController(
       })
       return true
     } catch (error) {
-      if (error instanceof WgerHttpError && error.code === 'ABORTED') return false
-      const offline = error instanceof WgerHttpError && error.code === 'OFFLINE'
+      if (isAbortedError(error)) return false
+      const offline = isOfflineError(error)
       setPhase(offline ? 'offline' : 'error')
       setMessage({ text: messageFrom(error), kind: 'error' })
       return false
     }
-  }, [exercises, imports, loadImportedCount, onImported, provider])
+  }, [exercises, imports, loadImportedCount, onImported, providers])
 
   return {
     query,
@@ -238,6 +266,7 @@ export function useWgerIntegrationController(
     languages,
     languagesLoading,
     languagesFailed,
+    providerId,
     loadLanguages,
     search,
     toggle,
@@ -251,7 +280,15 @@ export function useWgerIntegrationController(
 }
 
 function messageFrom(error: unknown) {
-  return error instanceof Error ? error.message : 'Falha inesperada na integração Wger.'
+  return error instanceof Error ? error.message : 'Falha inesperada na integração de catálogo.'
+}
+
+function isAbortedError(error: unknown) {
+  return (error instanceof WgerHttpError || error instanceof ExerciseDbError) && error.code === 'ABORTED'
+}
+
+function isOfflineError(error: unknown) {
+  return (error instanceof WgerHttpError || error instanceof ExerciseDbError) && error.code === 'OFFLINE'
 }
 
 export function deviceLocale() {

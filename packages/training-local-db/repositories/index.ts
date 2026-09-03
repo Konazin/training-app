@@ -69,6 +69,7 @@ import {
 } from '../database/installation'
 import { syncBundledCatalog, type BundledCatalog, type CatalogSyncResult } from '../database/catalog'
 import { nutritionRepositories } from './nutrition'
+import { createUserProfileRepository } from './profile'
 
 export interface LocalRepositories {
   exercises: ExerciseLibraryRepository
@@ -81,6 +82,7 @@ export interface LocalRepositories {
   dashboard: DashboardRepository
   settings: SettingsRepository
   preferences: LocalPreferencesRepository
+  userProfile: import('@training/training-domain').UserProfileRepository
   backup: BackupRepository
   metadata: AppMetadataRepository
   maintenance: {
@@ -115,6 +117,7 @@ export function createLocalRepositories(database: SqlDatabase): LocalRepositorie
     },
     settings,
     preferences: createLocalPreferencesRepository(settings),
+    userProfile: createUserProfileRepository(settings),
     backup: createBackupRepository(database),
     metadata: createAppMetadataRepository(database),
     maintenance: {

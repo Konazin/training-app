@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
-import { Alert, AppState } from 'react-native'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Alert, AppState, View } from 'react-native'
 import {
   DefaultTheme,
   NavigationContainer,
@@ -40,7 +40,9 @@ import { HomeScreen } from './src/screens/HomeScreen'
 import { HistoryScreen } from './src/screens/HistoryScreen'
 import { MoreScreen } from './src/screens/MoreScreen'
 import { NutritionScreen } from './src/features/nutrition/NutritionScreen'
+import { NutritionGoalsScreen } from './src/features/nutrition/NutritionGoalsScreen'
 import { AppearanceSettingsScreen } from './src/screens/AppearanceSettingsScreen'
+import { UserProfileScreen } from './src/screens/UserProfileScreen'
 import { IntegrationsScreen } from './src/screens/IntegrationsScreen'
 import { WgerIntegrationScreen } from './src/features/wger/WgerIntegrationScreen'
 import { ThemeProvider, useTheme } from './src/theme'
@@ -122,12 +124,13 @@ function LocalApp({
     savedPreferences,
   } = useTheme()
   const controller = useTrainingController(repositories.exercises, repositories.dashboard)
+  const [nutritionMaintenanceError, setNutritionMaintenanceError] = useState<string | null>(null)
   const maintenanceRun = useRef<Promise<void> | null>(null)
   const runNutritionMaintenance = useCallback(() => {
-    if (!maintenanceRun.current) maintenanceRun.current = repositories.nutritionMaintenance.run(localDateKey(new Date())).catch(() => undefined).finally(() => { maintenanceRun.current = null })
+    if (!maintenanceRun.current) maintenanceRun.current = repositories.nutritionMaintenance.run(localDateKey(new Date())).then(() => setNutritionMaintenanceError(null)).catch((error) => { setNutritionMaintenanceError(error instanceof Error ? error.message : 'A manutenção da nutrição falhou.') }).finally(() => { maintenanceRun.current = null })
     return maintenanceRun.current
   }, [repositories])
-  useEffect(() => { const subscription = AppState.addEventListener('change', (state) => { if (state === 'active') void runNutritionMaintenance() }); return () => subscription.remove() }, [runNutritionMaintenance])
+  useEffect(() => { void runNutritionMaintenance(); const subscription = AppState.addEventListener('change', (state) => { if (state === 'active') void runNutritionMaintenance() }); return () => subscription.remove() }, [runNutritionMaintenance])
   const trainingPlan = useTrainingPlanController(repositories.plans, controller.refresh)
   const workoutSession = useWorkoutSessionController(repositories.sessions, controller.refresh)
   const onboarding = useOnboarding(repositories.metadata)
@@ -235,6 +238,8 @@ function LocalApp({
                 {({ navigation }) => (
                   <MainTabs
                     repositories={repositories}
+                    nutritionMaintenanceError={nutritionMaintenanceError}
+                    onRetryNutritionMaintenance={runNutritionMaintenance}
                     navigation={navigation}
                     controller={controller}
                     trainingPlan={trainingPlan}
@@ -284,15 +289,22 @@ function LocalApp({
               </Stack.Screen>
               <Stack.Screen name="Integrations" component={IntegrationsScreen} />
               <Stack.Screen name="WgerIntegration">
-                {() => (
+                {({ route }) => (
                   <WgerIntegrationScreen
                     imports={repositories.externalExerciseImport}
                     exercises={repositories.exercises}
                     onImported={controller.refresh}
+                    providerId={route.params.providerId}
                   />
                 )}
               </Stack.Screen>
               <Stack.Screen name="AppearanceSettings" component={AppearanceSettingsScreen} />
+              <Stack.Screen name="NutritionGoals">
+                {() => <NutritionGoalsScreen repositories={repositories} />}
+              </Stack.Screen>
+              <Stack.Screen name="UserProfile">
+                {() => <UserProfileScreen repositories={repositories} />}
+              </Stack.Screen>
               <Stack.Screen name="TrainingPlanEditor">
                 {() => (
                   <TrainingPlanEditorScreen
@@ -451,7 +463,7 @@ function LocalApp({
         onSkip={onboarding.skip}
         onComplete={onboarding.complete}
         onOpenWger={() => {
-          if (navigationRef.isReady()) navigationRef.navigate('WgerIntegration')
+          if (navigationRef.isReady()) navigationRef.navigate('WgerIntegration', { providerId: 'WGER' })
         }}
         onOpenLibrary={() => {
           if (navigationRef.isReady()) navigationRef.navigate('Library')
@@ -490,6 +502,8 @@ function starterPackMessage(state: ReturnType<typeof useStarterPackImportControl
 
 function MainTabs({
   repositories,
+  nutritionMaintenanceError,
+  onRetryNutritionMaintenance,
   navigation,
   controller,
   trainingPlan,
@@ -501,6 +515,8 @@ function MainTabs({
   onOnboarding,
 }: {
   repositories: LocalRepositories
+  nutritionMaintenanceError: string | null
+  onRetryNutritionMaintenance: () => Promise<void>
   navigation: NativeStackNavigationProp<RootStackParamList>
   controller: ReturnType<typeof useTrainingController>
   trainingPlan: ReturnType<typeof useTrainingPlanController>
@@ -553,21 +569,21 @@ function MainTabs({
   return (
     <Tabs.Navigator screenOptions={({ route }) => ({
       headerShown: false,
-      tabBarActiveBackgroundColor: colors.surfaceSecondary,
+      tabBarActiveBackgroundColor: 'transparent',
       tabBarActiveTintColor: colors.primary,
       tabBarInactiveTintColor: colors.textSecondary,
       tabBarLabel: labels[route.name],
-      tabBarIcon: ({ color, focused }) => <Ionicons color={color} name={focused ? icons[route.name].replace('-outline', '') as keyof typeof Ionicons.glyphMap : icons[route.name]} size={24} />,
-      tabBarItemStyle: { borderRadius: 14, marginHorizontal: 3, minHeight: 56 },
+      tabBarIcon: ({ color, focused }) => <View style={{ alignItems: 'center', backgroundColor: focused ? colors.surfaceSecondary : 'transparent', borderRadius: 18, height: 32, justifyContent: 'center', width: 56 }}><Ionicons color={color} name={focused ? icons[route.name].replace('-outline', '') as keyof typeof Ionicons.glyphMap : icons[route.name]} size={22} /></View>,
+      tabBarItemStyle: { borderRadius: 18, marginHorizontal: 1, minHeight: 56 },
       tabBarStyle: {
         backgroundColor: colors.tabBar,
         borderTopColor: colors.border,
-        height: 64 + insets.bottom,
-        paddingBottom: insets.bottom + 4,
-        paddingHorizontal: 6,
-        paddingTop: 4,
+        height: 72 + insets.bottom,
+        paddingBottom: insets.bottom + 6,
+        paddingHorizontal: 4,
+        paddingTop: 6,
       },
-      tabBarLabelStyle: { fontSize: 12, fontWeight: '700', lineHeight: 16 },
+      tabBarLabelStyle: { fontSize: 12, fontWeight: '600', lineHeight: 16 },
     })}>
       <Tabs.Screen name="Today">
         {({ navigation: tabNavigation }) => (
@@ -630,13 +646,15 @@ function MainTabs({
         )}
       </Tabs.Screen>
       <Tabs.Screen name="Nutrition">
-        {() => <NutritionScreen repositories={repositories} />}
+        {() => <NutritionScreen repositories={repositories} maintenanceError={nutritionMaintenanceError} onRetryMaintenance={onRetryNutritionMaintenance} onConfigureGoals={() => navigation.navigate('NutritionGoals')} />}
       </Tabs.Screen>
       <Tabs.Screen name="More">
         {() => (
           <MoreScreen
             busy={backup.busy}
             onAppearance={() => navigation.navigate('AppearanceSettings')}
+            onNutrition={() => navigation.navigate('NutritionGoals')}
+            onUserProfile={() => navigation.navigate('UserProfile')}
             onLibrary={() => navigation.navigate('Library')}
             onTrash={() => navigation.navigate('TrainingPlanTrash')}
             trashCount={trash.count}

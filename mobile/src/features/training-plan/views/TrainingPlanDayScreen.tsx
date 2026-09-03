@@ -6,326 +6,37 @@ import { FormField } from '../../../components/FormField'
 import { PrimaryButton } from '../../../components/PrimaryButton'
 import { Screen, ScreenScrollView } from '../../../components/Screen'
 import { ScreenHeader } from '../../../components/ScreenHeader'
+import { SectionHeader } from '../../../components/ui/SectionHeader'
 import type { RootStackParamList } from '../../../navigation/types'
 import { useUnsavedChangesGuard } from '../../../navigation/useUnsavedChangesGuard'
 import type { TrainingPlan } from '../model/trainingPlan'
-import { shared, type ThemeColors, useTheme } from '../../../theme'
-import { reorderControlColors } from '../../../theme/uiContracts'
+import { type ThemeColors, useTheme } from '../../../theme'
 
-const labels = {
-  MONDAY: 'Segunda-feira',
-  TUESDAY: 'Terça-feira',
-  WEDNESDAY: 'Quarta-feira',
-  THURSDAY: 'Quinta-feira',
-  FRIDAY: 'Sexta-feira',
-  SATURDAY: 'Sábado',
-  SUNDAY: 'Domingo',
-} as const
+const labels = { MONDAY: 'Segunda-feira', TUESDAY: 'Terça-feira', WEDNESDAY: 'Quarta-feira', THURSDAY: 'Quinta-feira', FRIDAY: 'Sexta-feira', SATURDAY: 'Sábado', SUNDAY: 'Domingo' } as const
 
-export function TrainingPlanDayScreen({
-  plans,
-  busyKeys,
-  errors,
-  onUpdateDay,
-  onRemoveExercise,
-  onReorderExercises,
-  onRemoveActivity,
-  onReorderActivities,
-  onStart,
-}: {
-  plans: TrainingPlan[]
-  busyKeys: Set<string>
-  errors: Record<string, string>
-  onUpdateDay: (planId: number, dayId: number, input: {
-    title: string
-    description: string
-    restDay: boolean
-    estimatedDurationMinutes: number
-    notes: string
-  }) => Promise<boolean>
-  onRemoveExercise: (planId: number, dayId: number, exerciseId: number) => Promise<boolean>
-  onReorderExercises: (planId: number, dayId: number, ids: number[]) => Promise<boolean>
-  onRemoveActivity: (planId: number, dayId: number, activityId: number) => Promise<boolean>
-  onReorderActivities: (planId: number, dayId: number, ids: number[]) => Promise<boolean>
-  onStart: (planId: number, dayId: number) => Promise<boolean>
-}) {
-  const route = useRoute<RouteProp<RootStackParamList, 'TrainingPlanDay'>>()
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>()
-  const plan = plans.find((item) => item.id === route.params.planId)
-  const day = plan?.days.find((item) => item.id === route.params.dayId)
-  const { colors } = useTheme()
-  const styles = createStyles(colors)
-  const [title, setTitle] = useState(day?.title ?? '')
-  const [description, setDescription] = useState(day?.description ?? '')
-  const [duration, setDuration] = useState(String(day?.estimatedDurationMinutes ?? 0))
-  const [notes, setNotes] = useState(day?.notes ?? '')
-  const [restDay, setRestDay] = useState(day?.restDay ?? false)
-  const form = {
-    title,
-    description,
-    restDay,
-    estimatedDurationMinutes: Number(duration) || 0,
-    notes,
-  }
-  const { dirty, commit } = useUnsavedChangesGuard(form)
-
-  if (!plan || !day) {
-    return <Screen><View style={styles.empty}><Text style={styles.title}>Dia não encontrado</Text></View></Screen>
-  }
-
-  const planId = plan.id
-  const dayId = day.id
-  const exercises = day.exercises
-  const restActivities = day.restActivities
-  const dayKey = `day:update:${day.id}`
-
-  async function moveExercise(index: number, delta: number) {
-    const ids = exercises.map((item) => item.id)
-    const target = index + delta
-    if (target < 0 || target >= ids.length) return
-    ;[ids[index], ids[target]] = [ids[target]!, ids[index]!]
-    await onReorderExercises(planId, dayId, ids)
-  }
-
-  async function moveActivity(index: number, delta: number) {
-    const ids = restActivities.map((item) => item.id)
-    const target = index + delta
-    if (target < 0 || target >= ids.length) return
-    ;[ids[index], ids[target]] = [ids[target]!, ids[index]!]
-    await onReorderActivities(planId, dayId, ids)
-  }
-
-  async function save() {
-    if (await onUpdateDay(planId, dayId, form)) commit(form)
-  }
-
-  return (
-    <ScreenScrollView>
-      <ScreenHeader
-        eyebrow={plan.name}
-        title={labels[day.weekday]}
-        description="Configuração deste dia da ficha."
-      />
-      <View style={styles.form}>
-        <FormField label="Título" value={title} onChangeText={setTitle} />
-        <FormField label="Descrição" value={description} onChangeText={setDescription} multiline />
-        <FormField
-          label="Duração estimada (min)"
-          value={duration}
-          onChangeText={setDuration}
-          keyboardType="number-pad"
-        />
-        <FormField label="Observações" value={notes} onChangeText={setNotes} multiline />
-        <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{ checked: restDay }} style={styles.checkboxRow} onPress={() => setRestDay((current) => !current)}>
-          <View style={[styles.checkbox, restDay && styles.checkboxActive]}>
-            <Text style={styles.checkboxText}>{restDay ? '✓' : ''}</Text>
-          </View>
-          <Text style={styles.checkboxLabel}>Marcar como dia de descanso</Text>
-        </TouchableOpacity>
-        {!!errors[dayKey] && <Text style={styles.error}>{errors[dayKey]}</Text>}
-        <PrimaryButton
-          label="Salvar dia"
-          loading={busyKeys.has(dayKey)}
-          onPress={() => void save()}
-        />
-      </View>
-
-      {restDay ? (
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Atividades opcionais</Text>
-            <TouchableOpacity
-              accessibilityLabel="Adicionar atividade"
-              accessibilityRole="button"
-              style={styles.add}
-              onPress={() => navigation.navigate('RestActivityEditor', {
-                planId: plan.id,
-                dayId: day.id,
-              })}
-            >
-              <Text style={styles.addText}>＋</Text>
-            </TouchableOpacity>
-          </View>
-          {restActivities.map((activity, index) => (
-            <View key={activity.id} style={styles.item}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.itemTitle}>{activity.name}</Text>
-                <Text style={styles.meta}>{activity.category} · {activity.estimatedDurationMinutes} min</Text>
-              </View>
-              <OrderButtons
-                up={index > 0}
-                down={index < restActivities.length - 1}
-                busy={busyKeys.has(`day:activity:reorder:${dayId}`)}
-                onUp={() => void moveActivity(index, -1)}
-                onDown={() => void moveActivity(index, 1)}
-              />
-              <TouchableOpacity accessibilityRole="button" style={styles.itemAction}
-                onPress={() => navigation.navigate('RestActivityEditor', {
-                  planId: plan.id,
-                  dayId: day.id,
-                  activityId: activity.id,
-                })}
-              >
-                <Text style={styles.link}>Editar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity accessibilityLabel={`Remover ${activity.name}`} accessibilityRole="button" style={styles.itemAction}
-                disabled={busyKeys.has(`activity:remove:${activity.id}`)}
-                onPress={() => Alert.alert(
-                  'Remover atividade?',
-                  `“${activity.name}” será removida e esta ação não poderá ser desfeita.`,
-                  [
-                    { text: 'Cancelar', style: 'cancel' },
-                    {
-                      text: 'Remover',
-                      style: 'destructive',
-                      onPress: () => void onRemoveActivity(planId, dayId, activity.id),
-                    },
-                  ],
-                )}
-              >
-                <Text style={styles.remove}>×</Text>
-              </TouchableOpacity>
-              {!!errors[`activity:remove:${activity.id}`] && (
-                <Text style={styles.rowError}>{errors[`activity:remove:${activity.id}`]}</Text>
-              )}
-            </View>
-          ))}
-          {!!errors[`day:activity:reorder:${dayId}`] && (
-            <Text style={styles.error}>{errors[`day:activity:reorder:${dayId}`]}</Text>
-          )}
-        </View>
-      ) : (
-        <>
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Exercícios configurados</Text>
-            {exercises.map((exercise, index) => (
-              <View key={exercise.id} style={styles.item}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.itemTitle}>{exercise.exercise.name}</Text>
-                  <Text style={styles.meta}>
-                    {exercise.sets} séries · {exercise.minReps}–{exercise.maxReps} reps
-                  </Text>
-                </View>
-                <OrderButtons
-                  up={index > 0}
-                  down={index < exercises.length - 1}
-                  busy={busyKeys.has(`day:exercise:reorder:${dayId}`)}
-                  onUp={() => void moveExercise(index, -1)}
-                  onDown={() => void moveExercise(index, 1)}
-                />
-                <TouchableOpacity accessibilityRole="button" style={styles.itemAction}
-                  onPress={() => navigation.navigate('DayExerciseEditor', {
-                    planId: plan.id,
-                    dayId: day.id,
-                    exerciseId: exercise.id,
-                  })}
-                >
-                  <Text style={styles.link}>Editar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity accessibilityLabel={`Remover ${exercise.exercise.name}`} accessibilityRole="button" style={styles.itemAction}
-                  disabled={busyKeys.has(`exercise:remove:${exercise.id}`)}
-                  onPress={() => Alert.alert(
-                    'Remover exercício?',
-                    exercise.exercise.name,
-                    [
-                      { text: 'Cancelar', style: 'cancel' },
-                      {
-                        text: 'Remover',
-                        style: 'destructive',
-                        onPress: () => void onRemoveExercise(plan.id, day.id, exercise.id),
-                      },
-                    ],
-                  )}
-                >
-                  <Text style={styles.remove}>×</Text>
-                </TouchableOpacity>
-                {!!errors[`exercise:remove:${exercise.id}`] && (
-                  <Text style={styles.rowError}>{errors[`exercise:remove:${exercise.id}`]}</Text>
-                )}
-              </View>
-            ))}
-            {!!errors[`day:exercise:reorder:${dayId}`] && (
-              <Text style={styles.error}>{errors[`day:exercise:reorder:${dayId}`]}</Text>
-            )}
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Adicionar da biblioteca</Text>
-            <TouchableOpacity
-              accessibilityRole="button"
-              style={styles.libraryItem}
-              onPress={() => navigation.navigate('ExercisePicker', { planId, dayId })}
-            >
-              <Text style={styles.itemTitle}>Buscar exercício</Text>
-              <Text style={styles.link}>Abrir biblioteca →</Text>
-            </TouchableOpacity>
-          </View>
-          {!!exercises.length && !day.restDay && !dirty && (
-            <TouchableOpacity
-              accessibilityRole="button"
-              style={styles.start}
-              onPress={() => void onStart(plan.id, day.id)}
-            >
-              <Text style={styles.startText}>Iniciar este treino</Text>
-            </TouchableOpacity>
-          )}
-          {!!exercises.length && !day.restDay && dirty && (
-            <Text style={styles.saveHint}>Salve as alterações antes de iniciar o treino.</Text>
-          )}
-        </>
-      )}
-    </ScreenScrollView>
-  )
+export function TrainingPlanDayScreen({ plans, busyKeys, errors, onUpdateDay, onRemoveExercise, onReorderExercises, onRemoveActivity, onReorderActivities, onStart }: { plans: TrainingPlan[]; busyKeys: Set<string>; errors: Record<string, string>; onUpdateDay: (planId: number, dayId: number, input: { title: string; description: string; restDay: boolean; estimatedDurationMinutes: number; notes: string }) => Promise<boolean>; onRemoveExercise: (planId: number, dayId: number, exerciseId: number) => Promise<boolean>; onReorderExercises: (planId: number, dayId: number, ids: number[]) => Promise<boolean>; onRemoveActivity: (planId: number, dayId: number, activityId: number) => Promise<boolean>; onReorderActivities: (planId: number, dayId: number, ids: number[]) => Promise<boolean>; onStart: (planId: number, dayId: number) => Promise<boolean> }) {
+  const route = useRoute<RouteProp<RootStackParamList, 'TrainingPlanDay'>>(); const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>(); const plan = plans.find((item) => item.id === route.params.planId); const day = plan?.days.find((item) => item.id === route.params.dayId); const { colors } = useTheme(); const styles = createStyles(colors)
+  const [title, setTitle] = useState(day?.title ?? ''); const [description, setDescription] = useState(day?.description ?? ''); const [duration, setDuration] = useState(String(day?.estimatedDurationMinutes ?? 0)); const [notes, setNotes] = useState(day?.notes ?? ''); const [restDay, setRestDay] = useState(day?.restDay ?? false); const [detailsOpen, setDetailsOpen] = useState(false); const [reorderMode, setReorderMode] = useState(false)
+  const form = { title, description, restDay, estimatedDurationMinutes: Number(duration) || 0, notes }; const { dirty, commit } = useUnsavedChangesGuard(form)
+  if (!plan || !day) return <Screen><View style={styles.empty}><Text style={styles.emptyTitle}>Dia não encontrado</Text></View></Screen>
+  const planId = plan.id; const dayId = day.id; const exercises = day.exercises; const activities = day.restActivities; const dayKey = `day:update:${day.id}`
+  const save = async () => { if (await onUpdateDay(planId, dayId, form)) { commit(form); setDetailsOpen(false) } }
+  const move = async (ids: number[], index: number, delta: number, onReorder: (next: number[]) => Promise<boolean>) => { const target = index + delta; if (target < 0 || target >= ids.length) return; [ids[index], ids[target]] = [ids[target]!, ids[index]!]; await onReorder(ids) }
+  const action = restDay ? (activities.length ? null : { label: 'Adicionar atividade', onPress: () => navigation.navigate('RestActivityEditor', { planId, dayId }) }) : exercises.length ? { label: 'Iniciar treino', onPress: () => void onStart(planId, dayId) } : { label: 'Adicionar exercício', onPress: () => navigation.navigate('ExercisePicker', { planId, dayId }) }
+  const summary = restDay ? `${activities.length} ${activities.length === 1 ? 'atividade' : 'atividades'}` : `${exercises.length} exercícios · ${exercises.reduce((sum, item) => sum + item.sets, 0)} séries · ${day.estimatedDurationMinutes} min`
+  const toggleOrder = <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: reorderMode }} onPress={() => setReorderMode((value) => !value)} style={styles.reorderAction}><Text style={styles.reorderActionText}>{reorderMode ? 'Concluir ordem' : 'Reorganizar'}</Text></TouchableOpacity>
+  return <ScreenScrollView>
+    <ScreenHeader eyebrow={labels[day.weekday]} title={restDay ? 'Descanso' : day.title || 'Treino'} description={summary} variant="standard" action={<TouchableOpacity accessibilityRole="button" accessibilityLabel="Editar detalhes do dia" accessibilityState={{ expanded: detailsOpen }} onPress={() => setDetailsOpen((value) => !value)} style={styles.headerAction}><Text style={styles.headerActionText}>Detalhes</Text></TouchableOpacity>} />
+    {action && <PrimaryButton label={action.label} disabled={action.label === 'Iniciar treino' && dirty} onPress={action.onPress} />}
+    {dirty && !detailsOpen && <Text style={styles.saveHint}>Salve os detalhes antes de iniciar o treino.</Text>}
+    {detailsOpen && <View style={styles.details}><Text style={styles.detailsTitle}>DETALHES DO DIA</Text><FormField label="Título" value={title} onChangeText={setTitle} /><FormField label="Descrição" value={description} onChangeText={setDescription} multiline /><FormField label="Duração estimada (min)" value={duration} onChangeText={setDuration} keyboardType="number-pad" /><FormField label="Observações" value={notes} onChangeText={setNotes} multiline /><TouchableOpacity accessibilityRole="checkbox" accessibilityState={{ checked: restDay }} style={styles.checkboxRow} onPress={() => setRestDay((value) => !value)}><View style={[styles.checkbox, restDay && styles.checkboxActive]}><Text style={styles.checkboxText}>{restDay ? '✓' : ''}</Text></View><Text style={styles.checkboxLabel}>Marcar como dia de descanso</Text></TouchableOpacity>{!!errors[dayKey] && <Text accessibilityLiveRegion="polite" style={styles.error}>{errors[dayKey]}</Text>}<PrimaryButton label="Salvar detalhes" loading={busyKeys.has(dayKey)} onPress={() => void save()} /></View>}
+    {restDay ? <ActivityList activities={activities} dayId={dayId} planId={planId} errors={errors} busyKeys={busyKeys} reorderMode={reorderMode} navigation={navigation} onReorder={onReorderActivities} onRemove={onRemoveActivity} onAdd={() => navigation.navigate('RestActivityEditor', { planId, dayId })} header={toggleOrder} move={move} /> : <ExerciseList exercises={exercises} dayId={dayId} planId={planId} errors={errors} busyKeys={busyKeys} reorderMode={reorderMode} navigation={navigation} onReorder={onReorderExercises} onRemove={onRemoveExercise} onAdd={() => navigation.navigate('ExercisePicker', { planId, dayId })} header={toggleOrder} move={move} />}
+  </ScreenScrollView>
 }
 
-function OrderButtons({
-  up,
-  down,
-  busy,
-  onUp,
-  onDown,
-}: {
-  up: boolean
-  down: boolean
-  busy: boolean
-  onUp: () => void
-  onDown: () => void
-}) {
-  const { colors } = useTheme()
-  const upColors = reorderControlColors(colors, up && !busy)
-  const downColors = reorderControlColors(colors, down && !busy)
-  return (
-    <View style={{ flexDirection: 'row' }}>
-      <TouchableOpacity accessibilityLabel="Mover para cima" accessibilityRole="button" disabled={!up || busy} onPress={onUp} style={{ alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 }}><Text style={upColors}>↑</Text></TouchableOpacity>
-      <TouchableOpacity accessibilityLabel="Mover para baixo" accessibilityRole="button" disabled={!down || busy} onPress={onDown} style={{ alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 }}><Text style={downColors}>↓</Text></TouchableOpacity>
-    </View>
-  )
-}
-
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  form: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 20, borderWidth: 1, marginBottom: 12, padding: 16 },
-  checkboxRow: { alignItems: 'center', flexDirection: 'row', gap: 12, marginBottom: 14, minHeight: 48 },
-  checkbox: { alignItems: 'center', borderColor: colors.border, borderRadius: 6, borderWidth: 1, height: 28, justifyContent: 'center', width: 28 },
-  checkboxActive: { backgroundColor: colors.primary },
-  checkboxText: { color: colors.onPrimary, fontSize: 12, fontWeight: '800' },
-  checkboxLabel: { color: colors.textPrimary, fontSize: 14, fontWeight: '700' },
-  section: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 20, borderWidth: 1, marginBottom: 12, padding: 16 },
-  sectionHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  sectionTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: '800', lineHeight: 24, marginBottom: 10 },
-  add: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 12, height: 48, justifyContent: 'center', width: 48 },
-  addText: { color: colors.onPrimary, fontSize: 17 },
-  item: { alignItems: 'center', borderTopColor: colors.border, borderTopWidth: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 6, minHeight: 72 },
-  libraryItem: { alignItems: 'center', borderTopColor: colors.border, borderTopWidth: 1, flexDirection: 'row', minHeight: 64 },
-  itemTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '800', lineHeight: 22 },
-  meta: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, marginTop: 4 },
-  itemAction: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 },
-  link: { color: colors.primary, fontSize: 14, fontWeight: '800' },
-  remove: { color: colors.danger, fontSize: 20 },
-  rowError: { color: colors.danger, fontSize: 12, lineHeight: 16, width: '100%' },
-  error: { color: colors.danger, fontSize: 14, lineHeight: 20, marginBottom: 8 },
-  start: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 16, minHeight: 56, justifyContent: 'center' },
-  startText: { color: colors.onPrimary, fontSize: 16, fontWeight: '800' },
-  saveHint: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, textAlign: 'center' },
-  empty: { alignItems: 'center', flex: 1, justifyContent: 'center' },
-  title: { color: colors.ink, fontSize: 18, fontWeight: '800' },
-})
+type ListProps<T extends { id: number }> = { dayId: number; planId: number; errors: Record<string, string>; busyKeys: Set<string>; reorderMode: boolean; navigation: NativeStackNavigationProp<RootStackParamList>; onReorder: (planId: number, dayId: number, ids: number[]) => Promise<boolean>; onRemove: (planId: number, dayId: number, id: number) => Promise<boolean>; onAdd: () => void; header: React.ReactNode; move: (ids: number[], index: number, delta: number, reorder: (ids: number[]) => Promise<boolean>) => Promise<void>; exercises?: T[] }
+function ExerciseList({ exercises, dayId, planId, errors, busyKeys, reorderMode, navigation, onReorder, onRemove, onAdd, header, move }: ListProps<TrainingPlan['days'][number]['exercises'][number]> & { exercises: TrainingPlan['days'][number]['exercises'] }) { const { colors } = useTheme(); const styles = createStyles(colors); const reorderKey = `day:exercise:reorder:${dayId}`; return <View style={styles.group}><SectionHeader title="EXERCÍCIOS" action={header} />{!!errors[reorderKey] && <Text accessibilityLiveRegion="polite" style={styles.sectionError}>{errors[reorderKey]}</Text>}{exercises.map((exercise, index) => <View key={exercise.id} style={[styles.row, index > 0 && styles.divider]}><TouchableOpacity accessibilityRole="button" accessibilityLabel={`${exercise.exercise.name}, ${exercise.sets} séries de ${exercise.minReps} a ${exercise.maxReps} repetições`} onPress={() => navigation.navigate('DayExerciseEditor', { planId, dayId, exerciseId: exercise.id })} style={styles.rowMain}><Text style={styles.rowIndex}>{index + 1}</Text><View style={styles.rowCopy}><Text style={styles.rowTitle}>{exercise.exercise.name}</Text><Text style={styles.meta}>{exercise.sets} × {exercise.minReps}–{exercise.maxReps} · {exercise.restSeconds} s</Text></View></TouchableOpacity>{reorderMode && <RowManagement name={exercise.exercise.name} index={index} total={exercises.length} reorderBusy={busyKeys.has(reorderKey)} removeBusy={busyKeys.has(`exercise:remove:${exercise.id}`)} onUp={() => void move(exercises.map((item) => item.id), index, -1, (ids) => onReorder(planId, dayId, ids))} onDown={() => void move(exercises.map((item) => item.id), index, 1, (ids) => onReorder(planId, dayId, ids))} onRemove={() => Alert.alert('Remover exercício?', exercise.exercise.name, [{ text: 'Cancelar', style: 'cancel' }, { text: 'Remover', style: 'destructive', onPress: () => void onRemove(planId, dayId, exercise.id) }])} />}{!!errors[`exercise:remove:${exercise.id}`] && <Text accessibilityLiveRegion="polite" style={styles.rowError}>{errors[`exercise:remove:${exercise.id}`]}</Text>}</View>)}{!exercises.length && <Text style={styles.emptyCopy}>Adicione exercícios para montar este treino.</Text>}{exercises.length > 0 && <AddAction label="Adicionar exercício" onPress={onAdd} />}</View> }
+function ActivityList({ activities, dayId, planId, errors, busyKeys, reorderMode, navigation, onReorder, onRemove, onAdd, header, move }: Omit<ListProps<TrainingPlan['days'][number]['restActivities'][number]>, 'exercises'> & { activities: TrainingPlan['days'][number]['restActivities'] }) { const { colors } = useTheme(); const styles = createStyles(colors); const reorderKey = `day:activity:reorder:${dayId}`; return <View style={styles.group}><SectionHeader title="ATIVIDADES DE RECUPERAÇÃO" action={header} />{!!errors[reorderKey] && <Text accessibilityLiveRegion="polite" style={styles.sectionError}>{errors[reorderKey]}</Text>}{activities.map((activity, index) => <View key={activity.id} style={[styles.row, index > 0 && styles.divider]}><TouchableOpacity accessibilityRole="button" accessibilityLabel={`${activity.name}, ${activity.category}, ${activity.estimatedDurationMinutes} minutos`} onPress={() => navigation.navigate('RestActivityEditor', { planId, dayId, activityId: activity.id })} style={styles.rowMain}><View style={styles.rowCopy}><Text style={styles.rowTitle}>{activity.name}</Text><Text style={styles.meta}>{activity.category} · {activity.estimatedDurationMinutes} min</Text></View></TouchableOpacity>{reorderMode && <RowManagement name={activity.name} index={index} total={activities.length} reorderBusy={busyKeys.has(reorderKey)} removeBusy={busyKeys.has(`activity:remove:${activity.id}`)} onUp={() => void move(activities.map((item) => item.id), index, -1, (ids) => onReorder(planId, dayId, ids))} onDown={() => void move(activities.map((item) => item.id), index, 1, (ids) => onReorder(planId, dayId, ids))} onRemove={() => Alert.alert('Remover atividade?', activity.name, [{ text: 'Cancelar', style: 'cancel' }, { text: 'Remover', style: 'destructive', onPress: () => void onRemove(planId, dayId, activity.id) }])} />}{!!errors[`activity:remove:${activity.id}`] && <Text accessibilityLiveRegion="polite" style={styles.rowError}>{errors[`activity:remove:${activity.id}`]}</Text>}</View>)}{!activities.length && <Text style={styles.emptyCopy}>Nenhuma atividade de recuperação programada.</Text>}{activities.length > 0 && <AddAction label="Adicionar atividade" onPress={onAdd} />}</View> }
+function AddAction({ label, onPress }: { label: string; onPress: () => void }) { const { colors } = useTheme(); const styles = createStyles(colors); return <TouchableOpacity accessibilityLabel={label} accessibilityRole="button" onPress={onPress} style={styles.addAction}><Text style={styles.addActionText}>{label}</Text></TouchableOpacity> }
+function RowManagement({ name, index, total, reorderBusy, removeBusy, onUp, onDown, onRemove }: { name: string; index: number; total: number; reorderBusy: boolean; removeBusy: boolean; onUp: () => void; onDown: () => void; onRemove: () => void }) { const { colors } = useTheme(); const styles = createStyles(colors); return <View style={styles.rowManagement}><TouchableOpacity accessibilityLabel={`Mover ${name} para cima`} accessibilityRole="button" accessibilityState={{ disabled: index === 0 || reorderBusy }} disabled={index === 0 || reorderBusy} onPress={onUp} style={styles.manageAction}><Text style={styles.manageText}>Acima</Text></TouchableOpacity><TouchableOpacity accessibilityLabel={`Mover ${name} para baixo`} accessibilityRole="button" accessibilityState={{ disabled: index === total - 1 || reorderBusy }} disabled={index === total - 1 || reorderBusy} onPress={onDown} style={styles.manageAction}><Text style={styles.manageText}>Abaixo</Text></TouchableOpacity><TouchableOpacity accessibilityLabel={`Remover ${name}`} accessibilityRole="button" accessibilityState={{ disabled: removeBusy, busy: removeBusy }} disabled={removeBusy} onPress={onRemove} style={styles.manageAction}><Text style={styles.removeText}>{removeBusy ? 'Removendo…' : 'Remover'}</Text></TouchableOpacity></View> }
+const createStyles = (colors: ThemeColors) => StyleSheet.create({ headerAction: { alignItems: 'center', justifyContent: 'center', minHeight: 48, paddingHorizontal: 4 }, headerActionText: { color: colors.primary, fontSize: 13, fontWeight: '700' }, details: { backgroundColor: colors.surfaceSecondary, borderRadius: 20, gap: 12, marginTop: 14, padding: 16 }, detailsTitle: { color: colors.textSecondary, fontSize: 12, fontWeight: '700', letterSpacing: 1.1 }, checkboxRow: { alignItems: 'center', flexDirection: 'row', gap: 12, minHeight: 48 }, checkbox: { alignItems: 'center', borderColor: colors.border, borderRadius: 6, borderWidth: 1, height: 28, justifyContent: 'center', width: 28 }, checkboxActive: { backgroundColor: colors.primary, borderColor: colors.primary }, checkboxText: { color: colors.onPrimary, fontSize: 14, fontWeight: '700' }, checkboxLabel: { color: colors.textPrimary, flex: 1, fontSize: 14, fontWeight: '600' }, group: { backgroundColor: colors.surface, borderRadius: 20, marginTop: 18, overflow: 'hidden', paddingTop: 4 }, row: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', minHeight: 72, paddingHorizontal: 16 }, divider: { borderTopColor: colors.border, borderTopWidth: StyleSheet.hairlineWidth }, rowMain: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 12, minHeight: 64, minWidth: 0 }, rowIndex: { color: colors.primary, fontSize: 14, fontWeight: '700', width: 20 }, rowCopy: { flex: 1, minWidth: 0 }, rowTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '700', lineHeight: 22 }, meta: { color: colors.textSecondary, fontSize: 13, lineHeight: 19, marginTop: 2 }, reorderAction: { alignItems: 'center', justifyContent: 'center', minHeight: 48, paddingHorizontal: 4 }, reorderActionText: { color: colors.primary, fontSize: 13, fontWeight: '700' }, rowManagement: { flexBasis: '100%', flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 10 }, manageAction: { justifyContent: 'center', minHeight: 48, paddingHorizontal: 4 }, manageText: { color: colors.primary, fontSize: 13, fontWeight: '700' }, removeText: { color: colors.danger, fontSize: 13, fontWeight: '700' }, addAction: { alignItems: 'flex-start', borderTopColor: colors.border, borderTopWidth: StyleSheet.hairlineWidth, justifyContent: 'center', minHeight: 56, paddingHorizontal: 16 }, addActionText: { color: colors.primary, fontSize: 14, fontWeight: '700' }, emptyCopy: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, paddingHorizontal: 16, paddingVertical: 12 }, sectionError: { color: colors.danger, fontSize: 13, lineHeight: 19, paddingBottom: 8, paddingHorizontal: 16 }, rowError: { color: colors.danger, flexBasis: '100%', fontSize: 13, lineHeight: 19, paddingBottom: 10 }, saveHint: { color: colors.textSecondary, fontSize: 13, lineHeight: 19, marginTop: 10, textAlign: 'center' }, error: { color: colors.danger, fontSize: 14, lineHeight: 20 }, empty: { alignItems: 'center', flex: 1, justifyContent: 'center' }, emptyTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: '700' } })

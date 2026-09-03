@@ -68,7 +68,7 @@ export function ArchivedTrainingPlansScreen({
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   content: { paddingHorizontal: shared.pagePadding, paddingBottom: 45 },
   emptyContent: { flexGrow: 1 },
-  card: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 17, borderWidth: 1, flexDirection: 'row', gap: 12, marginBottom: 8, minHeight: 76, padding: 16 },
+  card: { alignItems: 'center', backgroundColor: colors.surface, borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: 12, minHeight: 76, padding: 16 },
   name: { color: colors.textPrimary, fontSize: 16, fontWeight: '800', lineHeight: 22 },
   meta: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, marginTop: 5 },
   restore: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 12, justifyContent: 'center', minHeight: 48, paddingHorizontal: 12 },

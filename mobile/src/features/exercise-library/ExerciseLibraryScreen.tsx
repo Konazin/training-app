@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
@@ -140,7 +141,7 @@ export function ExerciseLibraryScreen({
           starterPackBusy={starterPackBusy}
           starterPackMessage={starterPackMessage}
           onCreate={() => setEditing('new')}
-          onSearchWger={() => navigation.navigate('WgerIntegration')}
+          onSearchWger={() => navigation.navigate('WgerIntegration', { providerId: 'WGER' })}
           onContinue={() => navigation.goBack()}
         />
       : <Text accessibilityLiveRegion="polite" style={styles.empty}>{emptyMessage}</Text>
@@ -181,7 +182,7 @@ export function ExerciseLibraryScreen({
         style={styles.fab}
         onPress={() => setEditing('new')}
       >
-        <Text style={styles.fabText}>＋</Text>
+        <Ionicons accessibilityElementsHidden color={colors.onPrimary} name="add" size={24} />
       </TouchableOpacity>
       <ExerciseForm
         exercise={editing === 'new' ? null : editing}
@@ -378,7 +379,7 @@ function ExerciseCard({
           <Text style={styles.meta}>{exercise.primaryMuscleGroup} · {exercise.equipment}</Text>
           <Text style={styles.source}>{sourceLabel(exercise.source)} · {exerciseMediaLabel(exercise)}</Text>
         </View>
-        <Text style={styles.arrow}>›</Text>
+        <Ionicons accessibilityElementsHidden color={colors.textSecondary} name="chevron-forward" size={20} />
       </Pressable>
       <Pressable
         accessibilityLabel={exercise.favorite ? `Remover ${exercise.name} dos favoritos` : `Favoritar ${exercise.name}`}
@@ -387,7 +388,7 @@ function ExerciseCard({
         onPress={onFavorite}
         style={styles.favorite}
       >
-        <Text style={styles.favoriteText}>{exercise.favorite ? '★' : '☆'}</Text>
+        <Ionicons color={colors.primary} name={exercise.favorite ? 'star' : 'star-outline'} size={22} />
       </Pressable>
       {!!onEdit && (
         <TouchableOpacity accessibilityLabel={`Editar ${exercise.name}`} accessibilityRole="button" onPress={onEdit} style={styles.editButton}>
@@ -446,7 +447,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   content: { paddingHorizontal: shared.pagePadding, paddingBottom: 72 },
   search: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, color: colors.textPrimary, fontSize: 16, marginBottom: 10, minHeight: 56, paddingHorizontal: 16 },
   filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
-  card: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 19, borderWidth: 1, flexDirection: 'row', marginBottom: 9, minHeight: 76, overflow: 'hidden' },
+  card: { alignItems: 'center', backgroundColor: colors.surface, borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', minHeight: 76, overflow: 'hidden' },
   cardMain: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 12, minHeight: 76, padding: 12 },
   icon: { backgroundColor: colors.gray200, borderRadius: 14, height: 52, width: 52 },
   cardBody: { flex: 1 },
@@ -456,8 +457,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   edit: { color: colors.primary, fontSize: 12, fontWeight: '800', padding: 8 },
   editButton: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 },
   favorite: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 },
-  favoriteText: { color: colors.primary, fontSize: 24 },
-  arrow: { color: colors.gray400, fontSize: 25 },
   empty: { color: colors.gray500, padding: 30, textAlign: 'center' },
   emptyCard: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 20, borderWidth: 1, gap: 12, marginVertical: 16, padding: 18 },
   emptyTitle: { color: colors.textPrimary, fontSize: 22, fontWeight: '900' },

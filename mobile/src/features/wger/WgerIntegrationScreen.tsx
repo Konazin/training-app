@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import type {
   ExerciseCategory,
   ExerciseLibraryRepository,
+  ExerciseProviderId,
   ExternalExerciseCandidate,
   ExternalExerciseImportRepository,
 } from '@training/training-domain'
@@ -36,14 +37,19 @@ export function WgerIntegrationScreen({
   imports,
   exercises,
   onImported,
+  providerId,
 }: {
   imports: ExternalExerciseImportRepository
   exercises: ExerciseLibraryRepository
   onImported: () => Promise<unknown>
+  providerId: ExerciseProviderId
 }) {
   const { colors } = useTheme()
   const styles = createStyles(colors)
-  const controller = useWgerIntegrationController(imports, exercises, onImported)
+  const controller = useWgerIntegrationController(imports, exercises, onImported, providerId)
+  const providerName = providerId === 'EXERCISEDB' ? 'ExerciseDB' : 'Wger'
+  const isWger = providerId === 'WGER'
+  const isExerciseDb = providerId === 'EXERCISEDB'
   const busy = controller.phase === 'loading' || controller.phase === 'importing'
   const [consented, setConsented] = useState(false)
   const [languageModal, setLanguageModal] = useState(false)
@@ -55,14 +61,14 @@ export function WgerIntegrationScreen({
       <View style={styles.header}>
         <ScreenHeader
           eyebrow="Integração opcional"
-          title="Catálogo de exercícios"
-          description="ExerciseDB é consultado primeiro; Wger complementa quando necessário. A cópia escolhida fica no aparelho."
+          title={`Catálogo ${providerName}`}
+          description={`Consulte somente o catálogo ${providerName}. A cópia escolhida fica no aparelho.`}
         />
 
         {!consented && <View style={styles.notice}>
           <Text style={styles.noticeTitle}>Você controla cada consulta</Text>
           <Text style={styles.noticeText}>
-            O app faz apenas requisições GET ao ExerciseDB e ao Wger. Nenhuma ficha, sessão, série, nota ou identificador local é enviado.
+            O app faz apenas requisições GET ao ${providerName}. Nenhuma ficha, sessão, série, nota ou identificador local é enviado.
           </Text>
           <Text style={styles.noticeText}>
             Exercícios escolhidos ficam no SQLite. Imagens e vídeos remotos podem precisar de internet e cada item mantém autoria e licença.
@@ -73,15 +79,16 @@ export function WgerIntegrationScreen({
         {consented && (
           <View style={styles.searchArea}>
             <Text style={styles.section}>BUSCA</Text>
-            <ThemedTextInput
+            {isExerciseDb ? <Text style={styles.noticeText}>A versão gratuita do ExerciseDB não oferece busca por nome. Navegue pelo catálogo ou use Wger para pesquisar exercícios.</Text> : <ThemedTextInput
               accessibilityLabel="Buscar exercícios"
               placeholder="Nome do exercício"
               returnKeyType="search"
               value={controller.query.text}
-              onChangeText={(text) => controller.setQuery((current) => ({ ...current, text }))}
+              onChangeText={(text) => controller.setQuery((current) => ({ ...current, page: 1, text }))}
               onSubmitEditing={() => void controller.search(1)}
               style={styles.search}
-            />
+            />}
+            {isWger && <>
             <Text style={styles.label}>Idioma do Wger</Text>
             <Pressable
               accessibilityRole="button"
@@ -92,6 +99,7 @@ export function WgerIntegrationScreen({
               <Text style={styles.languageName}>{selectedLanguage}</Text>
               <Text style={styles.languageCode}>{controller.query.language === 'auto' ? 'auto' : controller.query.language}</Text>
             </Pressable>
+            </>}
             <Text style={styles.label}>Resultados por página</Text>
             <View style={styles.chips}>
               {[10, 20, 50].map((pageSize) => (
@@ -99,7 +107,7 @@ export function WgerIntegrationScreen({
                   key={pageSize}
                   label={String(pageSize)}
                   selected={controller.query.pageSize === pageSize}
-                  onPress={() => controller.setQuery((current) => ({ ...current, pageSize }))}
+                  onPress={() => controller.setQuery((current) => ({ ...current, page: 1, pageSize }))}
                 />
               ))}
             </View>
@@ -107,16 +115,16 @@ export function WgerIntegrationScreen({
               <SelectableChip
                 label="Somente com imagem"
                 selected={controller.query.onlyWithImage}
-                onPress={() => controller.setQuery((current) => ({ ...current, onlyWithImage: !current.onlyWithImage }))}
+                onPress={() => controller.setQuery((current) => ({ ...current, page: 1, onlyWithImage: !current.onlyWithImage }))}
               />
               <SelectableChip
                 label="Somente com vídeo"
                 selected={controller.query.onlyWithVideo}
-                onPress={() => controller.setQuery((current) => ({ ...current, onlyWithVideo: !current.onlyWithVideo }))}
+                onPress={() => controller.setQuery((current) => ({ ...current, page: 1, onlyWithVideo: !current.onlyWithVideo }))}
               />
             </View>
             <PrimaryButton
-              label={controller.phase === 'loading' ? 'Consultando catálogo…' : 'Buscar exercícios'}
+              label={controller.phase === 'loading' ? 'Consultando catálogo…' : isExerciseDb ? 'Carregar catálogo ExerciseDB' : 'Buscar exercícios'}
               loading={controller.phase === 'loading'}
               onPress={() => void controller.search(1)}
             />
@@ -199,19 +207,19 @@ export function WgerIntegrationScreen({
         onClose={() => controller.setPreview(null)}
         onSave={controller.savePreview}
       />
-      <LanguageModal
+      {isWger && <LanguageModal
         languages={controller.languages}
         loading={controller.languagesLoading}
         failed={controller.languagesFailed}
         selected={controller.query.language}
         onSelect={(language) => {
-          controller.setQuery((current) => ({ ...current, language }))
+          controller.setQuery((current) => ({ ...current, page: 1, language }))
           setLanguageModal(false)
         }}
         onRetry={() => void controller.loadLanguages()}
         visible={languageModal}
         onClose={() => setLanguageModal(false)}
-      />
+      />}
       <Toast message={controller.message.text} kind={controller.message.kind} />
     </Screen>
   )

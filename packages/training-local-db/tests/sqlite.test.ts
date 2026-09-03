@@ -5,6 +5,7 @@ import Database from 'better-sqlite3'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   BUNDLED_EXERCISES,
+  localDateKey,
   TRAINING_PLAN_TEMPLATES,
   WEEKDAYS,
   WGER_STARTER_PACK,
@@ -30,6 +31,64 @@ afterEach(() => {
 })
 
 describe('SQLite local schema', () => {
+  it('mantém históricos editáveis até o purge e preserva o resumo finalizado', async () => {
+    const database = betterDatabase(newDatabase())
+    await runMigrations(database)
+    const repositories = createLocalRepositories(database)
+    const todayDate = new Date(); const today = localDateKey(todayDate); const yesterdayDate = new Date(todayDate); yesterdayDate.setDate(yesterdayDate.getDate() - 1); const yesterday = localDateKey(yesterdayDate); const expiredDate = new Date(todayDate); expiredDate.setDate(expiredDate.getDate() - 8); const expired = localDateKey(expiredDate)
+    const input = (date: string) => ({ localDate: date, consumedAt: `${date}T12:00:00.000Z`, mealType: 'LUNCH' as const, title: 'Almoço', notes: '', source: 'MANUAL' as const, items: [{ name: 'Arroz', portionDescription: 'porção', estimatedGrams: 100, caloriesKcal: 10, proteinGrams: 2, carbohydratesGrams: 3, fatGrams: 1, fiberGrams: 0, micronutrients: { vitamin_c_mg: 1 }, confidence: null, dataSource: 'MANUAL' as const, sortOrder: 0 }] })
+    const meal = await repositories.nutritionMeals.create(input(today))
+    expect(await repositories.nutritionSummaries.findByDate(today)).toBeNull()
+    await repositories.nutritionMeals.delete(meal.id)
+    expect(await repositories.nutritionSummaries.findByDate(today)).toBeNull()
+    const historicalMeal = await repositories.nutritionMeals.create(input(yesterday))
+    expect((await repositories.nutritionSummaries.findByDate(yesterday))?.finalized).toBe(true)
+    await repositories.nutritionMeals.update(historicalMeal.id, { ...input(yesterday), items: [{ ...input(yesterday).items[0]!, caloriesKcal: 20 }] })
+    expect((await repositories.nutritionSummaries.findByDate(yesterday))?.totalCaloriesKcal).toBe(20)
+    await repositories.nutritionMeals.delete(historicalMeal.id)
+    expect(await repositories.nutritionSummaries.findByDate(yesterday)).toMatchObject({ finalized: true, mealCount: 0, totalCaloriesKcal: 0 })
+    const expiredInput = input(expired)
+    const expiredCreatedAt = new Date().toISOString()
+    const expiredMeal = await database.run(
+      'INSERT INTO nutrition_meals(local_date,consumed_at,meal_type,title,notes,source,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)',
+      expiredInput.localDate,
+      expiredInput.consumedAt,
+      expiredInput.mealType,
+      expiredInput.title,
+      expiredInput.notes,
+      expiredInput.source,
+      expiredCreatedAt,
+      expiredCreatedAt,
+    )
+    const expiredItem = expiredInput.items[0]!
+    await database.run(
+      'INSERT INTO nutrition_meal_items(meal_id,name,portion_description,estimated_grams,calories_kcal,protein_grams,carbohydrates_grams,fat_grams,fiber_grams,micronutrients_json,confidence,data_source,sort_order,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      expiredMeal.lastInsertRowId,
+      expiredItem.name,
+      expiredItem.portionDescription,
+      expiredItem.estimatedGrams,
+      expiredItem.caloriesKcal,
+      expiredItem.proteinGrams,
+      expiredItem.carbohydratesGrams,
+      expiredItem.fatGrams,
+      expiredItem.fiberGrams,
+      JSON.stringify(expiredItem.micronutrients),
+      expiredItem.confidence,
+      expiredItem.dataSource,
+      expiredItem.sortOrder,
+      expiredCreatedAt,
+      expiredCreatedAt,
+    )
+    await repositories.nutritionMaintenance.run(today)
+    const historical = await repositories.nutritionSummaries.findByDate(expired)
+    expect(historical?.finalized).toBe(true)
+    expect(historical?.detailsPurgedAt).toBeTruthy()
+    expect(await repositories.nutritionMeals.listByDate(expired)).toEqual([])
+    await expect(repositories.nutritionMeals.create(expiredInput)).rejects.toThrow('detalhes')
+    await repositories.backup.reset()
+    expect(await repositories.nutritionSummaries.findByDate('2026-07-27')).toBeNull()
+    await database.close()
+  })
   it('cria banco vazio, reaplica provider com segurança e garante constraints', async () => {
     const path = newDatabase()
     const database = betterDatabase(path)
@@ -145,7 +204,7 @@ describe('SQLite local schema', () => {
       expect((await database.all<{ value: number }>(`SELECT ${idColumn} AS value FROM ${table} ORDER BY ${idColumn}`)).map((row) => row.value)).toEqual(before.get(table)!.ids)
     }
     expect(await database.all('PRAGMA foreign_key_check')).toEqual([])
-    expect(await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM schema_migrations')).toEqual({ count: 10 })
+    expect(await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM schema_migrations')).toEqual({ count: 11 })
     for (const index of ['exercise_definition_search', 'exercise_media_owner', 'exercise_media_source_external', 'exercise_definition_external_lookup']) {
       expect(await database.first(`SELECT name FROM sqlite_master WHERE type = 'index' AND name = ?`, index)).toBeTruthy()
     }
@@ -220,6 +279,20 @@ describe('SQLite local schema', () => {
     })).toThrow('número')
     expect(() => validateBackup(Object.assign(Object.create({ inherited: true }), backup)))
       .toThrow('prototype')
+    const nutrition = {
+      ...backup,
+      nutritionMeals: [{ id: 30, local_date: '2026-07-29', consumed_at: '2026-07-30T02:30:00.000Z', created_at: '2026-07-29T12:00:00.000Z', updated_at: '2026-07-29T12:00:00.000Z', meal_type: 'LUNCH', source: 'MANUAL' }],
+      nutritionMealItems: [{ id: 31, meal_id: 30, name: 'Arroz', portion_description: '', sort_order: 0, estimated_grams: 100, calories_kcal: 10, protein_grams: 2, carbohydrates_grams: 3, fat_grams: 1, fiber_grams: 0, micronutrients_json: '{}', confidence: null, data_source: 'MANUAL', created_at: '2026-07-29T12:00:00.000Z', updated_at: '2026-07-29T12:00:00.000Z' }],
+      nutritionDailySummaries: [{ id: 32, local_date: '2026-07-29', total_calories_kcal: 10, total_protein_grams: 2, total_carbohydrates_grams: 3, total_fat_grams: 1, total_fiber_grams: 0, total_micronutrients_json: '{}', meal_count: 1, item_count: 1, goal_calories_kcal: 100, goal_protein_grams: null, goal_carbohydrates_grams: null, goal_fat_grams: null, goal_fiber_grams: null, closed_at: '2026-07-30T00:00:00.000Z', finalized: 1, details_purged_at: null, updated_at: '2026-07-30T00:00:00.000Z' }],
+    } as TrainingBackup
+    expect(() => validateBackup(nutrition)).not.toThrow()
+    expect(() => validateBackup({ ...nutrition, schemaVersion: 3, nutritionMeals: undefined })).toThrow('nutricional ausente')
+    for (const field of ['calories_kcal', 'protein_grams', 'total_calories_kcal', 'estimated_grams', 'goal_calories_kcal']) {
+      const target = field.startsWith('total_') || field.startsWith('goal_') ? 'nutritionDailySummaries' : 'nutritionMealItems'
+      expect(() => validateBackup({ ...nutrition, [target]: [{ ...(nutrition[target] as Record<string, unknown>[])[0], [field]: -1 }] } as TrainingBackup)).toThrow()
+    }
+    const summary = (nutrition.nutritionDailySummaries![0] as unknown) as Record<string, unknown>
+    expect(() => validateBackup({ ...nutrition, nutritionDailySummaries: [{ ...summary, finalized: 0, details_purged_at: '2026-07-30T00:00:00.000Z' }] } as TrainingBackup)).toThrow()
   })
 
   it('inicia vazio, marca onboarding e continua vazio após apagar dados', async () => {
@@ -1069,6 +1142,18 @@ describe('SQLite local schema', () => {
     expect((await repositories.externalExerciseImport.importSelected([wger, exercisedb])).created).toBe(2)
     expect(await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM exercise_definitions WHERE external_id = ?', '983'))
       .toEqual({ count: 2 })
+    const reloadedRepositories = createLocalRepositories(database)
+    const exerciseDbId = (await reloadedRepositories.exercises.list({ source: 'EXERCISEDB' }))[0]!.id
+    const plan = await reloadedRepositories.plans.createWithDays({
+      plan: { name: 'Importados', description: '', category: 'Teste', difficulty: 'Livre' },
+      days: WEEKDAYS.map((weekday) => ({ weekday, title: weekday, description: '', restDay: false, estimatedDurationMinutes: 30, notes: '' })),
+    })
+    await reloadedRepositories.plans.addExercise(plan.id, plan.days[0]!.id, {
+      exerciseDefinitionId: exerciseDbId, sets: 3, minReps: 8, maxReps: 12, plannedLoad: null,
+      plannedDurationSeconds: null, plannedDistance: null, restSeconds: 60, plannedRpe: null,
+      setType: 'NORMAL', notes: '', alternativeExerciseId: null,
+    })
+    expect((await reloadedRepositories.plans.getById(plan.id)).days[0]!.exercises[0]!.exercise.id).toBe(exerciseDbId)
     await database.close()
   })
 
@@ -1327,7 +1412,7 @@ describe('SQLite local schema', () => {
       'SELECT exercise_definition_id FROM training_day_exercises',
     )).toEqual({ exercise_definition_id: exercise.lastInsertRowId })
     expect(await database.first('SELECT COUNT(*) AS count FROM schema_migrations'))
-      .toEqual({ count: 10 })
+      .toEqual({ count: 11 })
     await database.close()
   })
 

@@ -1,6 +1,7 @@
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 import { ScreenScrollView } from '../components/Screen'
 import { ScreenHeader } from '../components/ScreenHeader'
 import type { RootStackParamList } from '../navigation/types'
@@ -27,7 +28,7 @@ export function IntegrationsScreen() {
           disabled={provider.supportState !== 'SUPPORTED'}
           onPress={() => {
             if (provider.integrationRoute === 'WGER_CATALOG' || provider.integrationRoute === 'EXERCISEDB_CATALOG') {
-              navigation.navigate('WgerIntegration')
+              navigation.navigate('WgerIntegration', { providerId: provider.id })
             }
           }}
           style={({ pressed }) => [styles.card, pressed && styles.pressed]}
@@ -38,7 +39,7 @@ export function IntegrationsScreen() {
             <Text style={styles.detail}>Busca exercícios públicos e salva uma cópia no aparelho.</Text>
             <Text style={styles.status}>Manual · Requer internet · Sem sincronização automática</Text>
           </View>
-          <Text style={styles.arrow}>→</Text>
+          <Ionicons accessibilityElementsHidden color={colors.textSecondary} name="chevron-forward" size={20} />
         </Pressable>
       ))}
     </ScreenScrollView>
@@ -70,6 +71,5 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   title: { ...typography.body, color: colors.textPrimary, fontWeight: '800' },
   detail: { ...typography.bodySmall, color: colors.textSecondary, marginTop: 5 },
   status: { ...typography.caption, color: colors.textSecondary, fontWeight: '700', marginTop: 7 },
-  arrow: { color: colors.textSecondary, fontSize: 18 },
   pressed: { opacity: 0.72 },
 })
