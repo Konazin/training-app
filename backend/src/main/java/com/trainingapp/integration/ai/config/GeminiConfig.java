@@ -9,6 +9,7 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Set;
 
 @Configuration
@@ -17,7 +18,7 @@ public class GeminiConfig {
     @Bean
     GeminiAiProvider geminiAiProvider(GeminiProperties properties, JsonMapper objectMapper) {
         if (properties.model() == null || properties.model().isBlank()) throw new IllegalStateException("GEMINI_MODEL é obrigatório.");
-        for (String level : Set.of(properties.mealParseThinkingLevel(), properties.mealVisionThinkingLevel(), properties.dietPlanThinkingLevel(), properties.trainingPlanThinkingLevel())) if (!Set.of("low", "medium", "high").contains(level)) throw new IllegalStateException("Thinking level Gemini inválido.");
+        for (String level : List.of(properties.mealParseThinkingLevel(), properties.mealVisionThinkingLevel(), properties.dietPlanThinkingLevel(), properties.trainingPlanThinkingLevel())) if (!Set.of("low", "medium", "high").contains(level)) throw new IllegalStateException("Thinking level Gemini inválido.");
         var factory = new SimpleClientHttpRequestFactory();
         var timeout = Duration.ofSeconds(Math.max(1, properties.requestTimeoutSeconds()));
         factory.setConnectTimeout(timeout);
