@@ -64,11 +64,13 @@ describe('avisos e provider renderizados', () => {
     expect(onOnboarding).toHaveBeenCalledTimes(1)
   })
 
-  it('declara Wger como consulta manual e só navega por ação explícita', async () => {
+  it('encaminha cada catálogo manual ao provedor selecionado', async () => {
     await renderAsync(createElement(IntegrationsScreen))
     expect(screen.getAllByText('Manual · Requer internet · Sem sincronização automática')).toHaveLength(2)
     expect(mockNavigation.navigate).not.toHaveBeenCalled()
+    fireEvent.press(screen.getByText('Catálogo ExerciseDB'))
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('WgerIntegration', { providerId: 'EXERCISEDB' })
     fireEvent.press(screen.getByText('Catálogo Wger'))
-    expect(mockNavigation.navigate).toHaveBeenCalledWith('WgerIntegration')
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('WgerIntegration', { providerId: 'WGER' })
   })
 })

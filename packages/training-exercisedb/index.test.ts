@@ -20,4 +20,21 @@ describe('ExerciseDB provider', () => {
     await expect(new ExerciseDbClient({ fetch: async (_url, init) => new Promise<Response>((_, reject) => init?.signal?.addEventListener('abort', () => reject(new Error('aborted')))) }).search(query, controller.signal)).rejects.toThrow('cancelada')
     await expect(new ExerciseDbClient({ timeoutMs: 1, fetch: async (_url, init) => new Promise<Response>((_, reject) => init?.signal?.addEventListener('abort', () => reject(new Error('aborted')))) }).search(query)).rejects.toThrow('timeout')
   })
+
+  it('consulta páginas distintas e aplica filtros locais de mídia', async () => {
+    const noMedia = { ...row, exerciseId: 'no-media', gifUrl: undefined }
+    const second = { ...row, exerciseId: 'page-two', name: 'second page' }
+    const fetcher = vi.fn(async (url: RequestInfo | URL) => response(String(url).includes('offset=1') ? [second] : [noMedia]))
+    const client = new ExerciseDbClient({ fetch: fetcher as unknown as typeof fetch })
+
+    const first = await client.search({ ...query, onlyWithImage: true })
+    const pageTwo = await client.search({ ...query, page: 2 })
+
+    expect(first.items).toEqual([])
+    expect(pageTwo.items.map((item) => item.externalId)).toEqual(['page-two'])
+    expect(fetcher.mock.calls.map(([url]) => url)).toEqual([
+      expect.stringContaining('offset=0'),
+      expect.stringContaining('offset=1'),
+    ])
+  })
 })

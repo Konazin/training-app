@@ -40,6 +40,7 @@ describe('barra fixa do catálogo', () => {
         imports: {} as never,
         exercises: {} as never,
         onImported: jest.fn(async () => {}),
+        providerId: 'WGER',
       }))
     })
     const list = renderer.root.find((node) => node.type === FlatList && node.props.data.length === 50)

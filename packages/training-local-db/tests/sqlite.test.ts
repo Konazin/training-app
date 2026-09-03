@@ -1142,6 +1142,17 @@ describe('SQLite local schema', () => {
     expect((await repositories.externalExerciseImport.importSelected([wger, exercisedb])).created).toBe(2)
     expect(await database.first<{ count: number }>('SELECT COUNT(*) AS count FROM exercise_definitions WHERE external_id = ?', '983'))
       .toEqual({ count: 2 })
+    const exerciseDbId = (await repositories.exercises.list({ source: 'EXERCISEDB' }))[0]!.id
+    const plan = await repositories.plans.createWithDays({
+      plan: { name: 'Importados', description: '', category: 'Teste', difficulty: 'Livre' },
+      days: WEEKDAYS.map((weekday) => ({ weekday, title: weekday, description: '', restDay: false, estimatedDurationMinutes: 30, notes: '' })),
+    })
+    await repositories.plans.addExercise(plan.id, plan.days[0]!.id, {
+      exerciseDefinitionId: exerciseDbId, sets: 3, minReps: 8, maxReps: 12, plannedLoad: null,
+      plannedDurationSeconds: null, plannedDistance: null, restSeconds: 60, plannedRpe: null,
+      setType: 'NORMAL', notes: '', alternativeExerciseId: null,
+    })
+    expect((await repositories.plans.getById(plan.id)).days[0]!.exercises[0]!.exercise.id).toBe(exerciseDbId)
     await database.close()
   })
 
