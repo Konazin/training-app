@@ -29,9 +29,11 @@ export class AiGatewayClient implements AiProvider {
   generateTrainingPlan(input: Parameters<AiProvider['generateTrainingPlan']>[0]): Promise<TrainingPlanDraft> { return this.call('training-plan', input, (draft) => validateTrainingPlanDraft(draft, input.context.candidateExercises.map((exercise) => exercise.id))) }
   async getStatus(): Promise<AiGatewayStatus> {
     if (!this.baseUrl) return { available: false, provider: 'gemini', model: 'gemini-3.8-flash', capabilities: [] }
-    const response = await this.withTimeout('status', (signal) => this.request(`${this.baseUrl}/api/ai/status`, { headers: { accept: 'application/json' }, signal }))
+    const { response, value } = await this.withTimeout('status', async (signal) => {
+      const response = await this.request(`${this.baseUrl}/api/ai/status`, { headers: { accept: 'application/json' }, signal })
+      return { response, value: response.ok ? await response.json() as Partial<AiGatewayStatus> : {} }
+    })
     if (!response.ok) return { available: false, provider: 'gemini', model: 'gemini-3.8-flash', capabilities: [] }
-    const value = await response.json() as Partial<AiGatewayStatus>
     return { available: value.available === true, provider: 'gemini', model: typeof value.model === 'string' ? value.model : 'gemini-3.8-flash', capabilities: Array.isArray(value.capabilities) ? value.capabilities.filter(isCapability) : [] }
   }
 
@@ -40,9 +42,13 @@ export class AiGatewayClient implements AiProvider {
     if (!this.baseUrl) { const error = new AiProviderError('UNAVAILABLE', 'IA opcional não configurada neste aplicativo. O registro manual continua disponível.'); devLogEnd(task, started, 0, error); throw error }
     let status = 0
     try {
-      const response = await this.withTimeout(task, (signal) => this.request(`${this.baseUrl}/api/ai/${task}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload), signal }))
+      const { response, body } = await this.withTimeout(task, async (signal) => {
+        const response = await this.request(`${this.baseUrl}/api/ai/${task}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload), signal })
+        let body: GatewayResponse
+        try { body = await response.json() as GatewayResponse } catch (error) { if (signal.aborted) throw error; body = {} }
+        return { response, body }
+      })
       status = response.status
-      const body = await response.json().catch(() => ({})) as GatewayResponse
       if (!response.ok) { const code = errorCode(response.status, body.fields?.code); throw new AiProviderError(code, errorMessage(code, task)) }
       try { const result = validate(body.draft); devLogEnd(task, started, status); return result } catch { throw new AiProviderError(task === 'meal-vision' ? 'SCHEMA_ERROR' : 'INVALID_RESPONSE', errorMessage(task === 'meal-vision' ? 'SCHEMA_ERROR' : 'INVALID_RESPONSE', task)) }
     } catch (error) {
@@ -52,8 +58,9 @@ export class AiGatewayClient implements AiProvider {
     }
   }
   private async withTimeout<T>(task: AiTask | 'status', work: (signal: AbortSignal) => Promise<T>): Promise<T> {
-    const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), this.timeoutMs ?? (task === 'status' ? 20_000 : AI_TIMEOUTS_MS[task]))
-    try { return await work(controller.signal) } catch (error) { if (controller.signal.aborted) throw new AiProviderError('TIMEOUT', errorMessage('TIMEOUT', task)); throw error } finally { clearTimeout(timeout) }
+    const controller = new AbortController(); let timeout: ReturnType<typeof setTimeout>
+    const deadline = new Promise<never>((_, reject) => { timeout = setTimeout(() => { controller.abort(); reject(new AiProviderError('TIMEOUT', errorMessage('TIMEOUT', task))) }, this.timeoutMs ?? (task === 'status' ? 20_000 : AI_TIMEOUTS_MS[task])) })
+    try { return await Promise.race([work(controller.signal), deadline]) } catch (error) { if (controller.signal.aborted) throw new AiProviderError('TIMEOUT', errorMessage('TIMEOUT', task)); throw error } finally { clearTimeout(timeout!) }
   }
 }
 

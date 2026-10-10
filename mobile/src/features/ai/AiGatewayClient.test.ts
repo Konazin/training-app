@@ -35,4 +35,22 @@ describe('AiGatewayClient', () => {
     const network = vi.fn(async () => { throw new TypeError('offline') })
     await expect(new AiGatewayClient('https://gateway.example', network).analyzeMealImage({ image: { base64: 'aGVsbG8=', mimeType: 'image/jpeg' }, context: { locale: 'pt-BR', foodPreferences: [], avoidedFoods: [], allergies: [], dietaryRestrictions: [], userHint: null } })).rejects.toMatchObject({ code: 'NETWORK_ERROR', message: 'Não foi possível acessar o serviço de IA.' })
   })
+
+  it('times out task body parsing without swallowing the timeout as an empty body', async () => {
+    const request = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => ({
+      ok: true,
+      status: 200,
+      json: () => new Promise((_, reject) => init?.signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true })),
+    }) as unknown as Response)
+    await expect(new AiGatewayClient('https://gateway.example', request, 1).parseMeal({ text: '2 ovos', context: { locale: 'pt-BR', foodPreferences: [], avoidedFoods: [], allergies: [], dietaryRestrictions: [] } })).rejects.toMatchObject({ code: 'TIMEOUT' })
+  })
+
+  it('times out status body parsing', async () => {
+    const request = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => ({
+      ok: true,
+      status: 200,
+      json: () => new Promise((_, reject) => init?.signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true })),
+    }) as unknown as Response)
+    await expect(new AiGatewayClient('https://gateway.example', request, 1).getStatus()).rejects.toMatchObject({ code: 'TIMEOUT' })
+  })
 })
