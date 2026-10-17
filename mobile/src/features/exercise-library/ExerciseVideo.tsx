@@ -4,6 +4,7 @@ import { VideoView, useVideoPlayer } from 'expo-video'
 import { useEvent } from 'expo'
 import { useIsFocused } from '@react-navigation/native'
 import { useTheme } from '../../theme'
+import { fontFamilies } from '../../theme/typography'
 import { videoPresentation } from './libraryState'
 
 export function ExerciseVideo({ url, posterUrl, onRetry }: {
@@ -46,19 +47,19 @@ export function ExerciseVideo({ url, posterUrl, onRetry }: {
         </Text>
       </View>}
       {presentation.startsWith('error') && <Pressable accessibilityRole="button" onPress={onRetry}>
-          <Text style={[styles.retry, { color: colors.primary }]}>Recarregar vídeo</Text>
+          <Text style={[styles.retry, { color: colors.tx }]}>Recarregar vídeo</Text>
         </Pressable>}
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  video: { aspectRatio: 16 / 9, borderRadius: 18, overflow: 'hidden', width: '100%' },
-  retry: { fontSize: 12, fontWeight: '700', paddingVertical: 12, textAlign: 'center' },
+  video: { aspectRatio: 16 / 9, borderRadius: 8, overflow: 'hidden', width: '100%' },
+  retry: { fontFamily: fontFamilies.text, fontSize: 12, fontWeight: '500', paddingVertical: 12, textAlign: 'center', textDecorationLine: 'underline' },
   poster: { height: '100%', opacity: 0.5, position: 'absolute', width: '100%' },
 })
 
 const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
-  failure: { alignItems: 'center', aspectRatio: 16 / 9, backgroundColor: colors.nearBlack, borderColor: colors.border, borderRadius: 18, borderWidth: 1, justifyContent: 'center', overflow: 'hidden' },
-  failureText: { color: colors.white, fontSize: 12, padding: 20, textAlign: 'center' },
+  failure: { alignItems: 'center', aspectRatio: 16 / 9, backgroundColor: colors.bg, borderColor: colors.bd, borderRadius: 8, borderWidth: 1, justifyContent: 'center', overflow: 'hidden' },
+  failureText: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 12, padding: 20, textAlign: 'center' },
 })

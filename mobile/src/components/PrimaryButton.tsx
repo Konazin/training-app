@@ -9,11 +9,12 @@ interface Props {
   loading?: boolean
   secondary?: boolean
   disabled?: boolean
+  highContrast?: boolean
 }
 
-export function PrimaryButton({ label, accessibilityLabel, onPress, loading, secondary, disabled = false }: Props) {
+export function PrimaryButton({ label, accessibilityLabel, onPress, loading, secondary, disabled = false, highContrast = false }: Props) {
   const { colors } = useTheme()
-  const styles = createStyles(colors)
+  const styles = createStyles(colors, highContrast)
   return (
     <Pressable
       accessibilityRole="button"
@@ -24,45 +25,45 @@ export function PrimaryButton({ label, accessibilityLabel, onPress, loading, sec
       style={({ pressed }) => [
         styles.button,
         secondary && styles.secondary,
-        pressed && styles.pressed,
+        pressed && (secondary ? styles.secondaryPressed : styles.primaryPressed),
         (disabled || loading) && styles.disabled,
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={secondary ? colors.textPrimary : colors.onPrimary} />
+        <ActivityIndicator color={secondary ? colors.tx : highContrast ? colors.workout.timerText : colors.on} />
       ) : (
-        <Text style={[styles.label, secondary && styles.secondaryLabel]}>{label}</Text>
+        <Text style={[styles.label, secondary && styles.secondaryLabel, (disabled || loading) && styles.disabledLabel]}>{label}</Text>
       )}
     </Pressable>
   )
 }
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
+const createStyles = (colors: ThemeColors, highContrast: boolean) => StyleSheet.create({
   button: {
     alignItems: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: shared.radii?.sm ?? 14,
+    backgroundColor: highContrast ? colors.workout.timer : colors.ac,
+    borderRadius: shared.radii.md,
     justifyContent: 'center',
-    minHeight: shared.control?.primaryHeight ?? 54,
+    minHeight: shared.control.primaryHeight,
     paddingHorizontal: 18,
   },
   secondary: {
-    backgroundColor: colors.card,
-    borderColor: colors.border,
+    backgroundColor: 'transparent',
+    borderColor: highContrast ? colors.workout.border : colors.mu,
     borderWidth: 1,
+    minHeight: shared.control.compactHeight,
   },
   label: {
-    color: colors.onPrimary,
-    ...typography.label,
-    fontWeight: '700',
+    color: highContrast ? colors.workout.timerText : colors.on,
+    ...typography.titleSmall,
   },
   secondaryLabel: {
-    color: colors.ink,
+    color: highContrast ? colors.workout.text : colors.tx,
+    ...typography.bodySmall,
+    fontWeight: '500',
   },
-  pressed: {
-    opacity: 0.75,
-  },
-  disabled: {
-    opacity: 0.45,
-  },
+  primaryPressed: { backgroundColor: highContrast ? colors.workout.textSecondary : colors.primaryPressed },
+  secondaryPressed: { backgroundColor: colors.pressed },
+  disabled: { backgroundColor: highContrast ? colors.workout.pending : colors.s2, borderColor: highContrast ? colors.workout.border : colors.mu },
+  disabledLabel: { color: highContrast ? colors.workout.textSecondary : colors.t2 },
 })

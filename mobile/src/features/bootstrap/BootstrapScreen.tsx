@@ -1,6 +1,7 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native'
 import { Screen } from '../../components/Screen'
 import { useTheme } from '../../theme'
+import { fontFamilies } from '../../theme/typography'
 
 export function BootstrapScreen({ state, message, onRetry, migrationName, onExportDiagnostic }: {
   state: string
@@ -13,6 +14,7 @@ export function BootstrapScreen({ state, message, onRetry, migrationName, onExpo
   return (
     <Screen style={styles.screen}>
       <Text style={[styles.mark, { color: colors.ink }]}>TRAINING</Text>
+      {state !== 'error' && <ActivityIndicator accessibilityLabel="Preparando os dados locais" color={colors.tx} />}
       <Text style={[styles.title, { color: colors.ink }]}>
         {state === 'migrating_data'
           ? 'Atualizando seus dados…'
@@ -28,8 +30,8 @@ export function BootstrapScreen({ state, message, onRetry, migrationName, onExpo
         <Text style={[styles.address, { color: colors.gray500 }]}>
           Seus dados não serão apagados automaticamente.
         </Text>
-        <Pressable accessibilityRole="button" onPress={onRetry} style={[styles.button, { backgroundColor: colors.primary }]}>
-          <Text style={{ color: colors.onPrimary, fontWeight: '800' }}>Tentar novamente</Text>
+        <Pressable accessibilityRole="button" onPress={onRetry} style={({ pressed }) => [styles.button, { backgroundColor: colors.ac }, pressed && styles.pressed]}>
+          <Text style={{ color: colors.on, fontFamily: fontFamilies.text, fontWeight: '500' }}>Tentar novamente</Text>
         </Pressable>
         {!!onExportDiagnostic && (
           <Pressable accessibilityRole="button" onPress={onExportDiagnostic}>
@@ -43,10 +45,11 @@ export function BootstrapScreen({ state, message, onRetry, migrationName, onExpo
 
 const styles = StyleSheet.create({
   screen: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28 },
-  mark: { fontSize: 12, fontWeight: '900', letterSpacing: 3, marginBottom: 18 },
-  title: { fontSize: 24, fontWeight: '800', textAlign: 'center' },
-  message: { lineHeight: 20, marginTop: 12, textAlign: 'center' },
-  address: { fontSize: 12, marginTop: 8, textAlign: 'center' },
-  button: { alignItems: 'center', borderRadius: 14, justifyContent: 'center', marginTop: 22, minHeight: 48, paddingHorizontal: 22 },
-  diagnostic: { fontSize: 14, fontWeight: '700' },
+  mark: { fontFamily: fontFamilies.data, fontSize: 11, marginBottom: 18 },
+  title: { fontFamily: fontFamilies.text, fontSize: 24, fontWeight: '500', textAlign: 'center' },
+  message: { fontFamily: fontFamilies.text, lineHeight: 20, marginTop: 12, textAlign: 'center' },
+  address: { fontFamily: fontFamilies.data, fontSize: 11, marginTop: 8, textAlign: 'center' },
+  button: { alignItems: 'center', borderRadius: 12, justifyContent: 'center', marginTop: 22, minHeight: 56, paddingHorizontal: 22 },
+  diagnostic: { fontFamily: fontFamilies.text, fontSize: 14, fontWeight: '500' },
+  pressed: { opacity: 0.75 },
 })

@@ -1,47 +1,47 @@
 import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
+import { ArrowLeft, Check } from 'lucide-react-native'
 import { ScreenScrollView } from '../components/Screen'
 import { ScreenHeader } from '../components/ScreenHeader'
-import { SelectableChip } from '../components/SelectableChip'
 import { PrimaryButton } from '../components/PrimaryButton'
+import { BottomActionBar } from '../components/ui/BottomActionBar'
+import { SegmentedControl } from '../components/ui/SegmentedControl'
 import { MotionView } from '../components/MotionView'
 import {
-  appearancePreferenceIds,
-  motionPreferenceIds,
   shared,
   themePresetIds,
-  type AppearancePreference,
-  type MotionPreference,
   type ThemeColors,
   type ThemePreset,
+  resolvePalette,
   useTheme,
 } from '../theme'
 import { triggerHaptic } from '../theme/haptics'
 import { typography } from '../theme/typography'
 
 const presetLabels: Record<ThemePreset, string> = {
-  DARK_BLUE: 'Azul-noturno',
+  DARK_BLUE: 'Azul midnight',
   MONOCHROME: 'Monocromático',
-  DRACULA: 'Violeta',
+  DRACULA: 'Violeta midnight',
   WHITE_BLUE: 'Branco e azul',
 }
-const appearanceLabels: Record<AppearancePreference, string> = {
-  SYSTEM: 'Usar configuração do sistema',
-  LIGHT: 'Claro',
-  DARK: 'Escuro',
-}
-const motionLabels: Record<MotionPreference, string> = {
-  SYSTEM: 'Usar configuração do sistema',
-  FULL: 'Completo',
-  REDUCED: 'Reduzido',
-  OFF: 'Desativado',
-}
+const appearanceOptions = [
+  { value: 'SYSTEM', label: 'Sistema', accessibilityLabel: 'Usar configuração do sistema' },
+  { value: 'LIGHT', label: 'Claro' },
+  { value: 'DARK', label: 'Escuro' },
+] as const
+const motionOptions = [
+  { value: 'SYSTEM', label: 'Sistema', accessibilityLabel: 'Usar configuração do sistema' },
+  { value: 'FULL', label: 'Completo' },
+  { value: 'REDUCED', label: 'Reduzido' },
+  { value: 'OFF', label: 'Desativado' },
+] as const
 
 export function AppearanceSettingsScreen() {
   const navigation = useNavigation()
   const {
     colors,
+    isDark,
     preferences,
     updatePreview,
     savePreferences,
@@ -63,8 +63,8 @@ export function AppearanceSettingsScreen() {
       : 'Não foi possível salvar as preferências.')
   }
 
-  return (
-    <ScreenScrollView>
+  return (<>
+    <ScreenScrollView contentContainerStyle={styles.scrollContent}>
       <ScreenHeader
         eyebrow="Preferências locais"
         title="Aparência e acessibilidade"
@@ -76,42 +76,47 @@ export function AppearanceSettingsScreen() {
             onPress={() => navigation.goBack()}
             style={styles.back}
           >
-            <Text style={styles.backText}>←</Text>
+            <ArrowLeft color={colors.tx} size={20} strokeWidth={1.7} />
           </Pressable>
         )}
       />
 
+      <MotionView style={styles.preview}>
+        <Text style={styles.previewEyebrow}>Prévia ao vivo</Text>
+        <Text style={styles.previewTitle}>Força e mobilidade</Text>
+        <Text style={styles.previewCopy}>3 exercícios · estado descrito com texto</Text>
+        <View style={styles.previewButton}><Text style={styles.previewButtonText}>Começar treino</Text></View>
+      </MotionView>
+
       <PreferenceSection title="Tema">
         {themePresetIds.map((preset) => (
-          <SelectableChip
+          <ThemePresetRow
             key={preset}
+            preset={preset}
             label={presetLabels[preset]}
             selected={preferences.themePreset === preset}
             onPress={() => selectPreset(preset)}
+            dark={isDark}
           />
         ))}
       </PreferenceSection>
 
       <PreferenceSection title="Aparência">
-        {appearancePreferenceIds.map((appearance) => (
-          <SelectableChip
-            key={appearance}
-            label={appearanceLabels[appearance]}
-            selected={preferences.appearance === appearance}
-            onPress={() => updatePreview({ appearance })}
-          />
-        ))}
+        <SegmentedControl
+          label="Aparência"
+          options={appearanceOptions}
+          value={preferences.appearance}
+          onChange={(appearance) => updatePreview({ appearance })}
+        />
       </PreferenceSection>
 
       <PreferenceSection title="Movimento">
-        {motionPreferenceIds.map((motion) => (
-          <SelectableChip
-            key={motion}
-            label={motionLabels[motion]}
-            selected={preferences.motion === motion}
-            onPress={() => updatePreview({ motion })}
-          />
-        ))}
+        <SegmentedControl
+          label="Movimento"
+          options={motionOptions}
+          value={preferences.motion}
+          onChange={(motion) => updatePreview({ motion })}
+        />
       </PreferenceSection>
 
       <ToggleRow
@@ -125,20 +130,11 @@ export function AppearanceSettingsScreen() {
         onPress={() => updatePreview({ hapticsEnabled: !preferences.hapticsEnabled })}
       />
 
-      <Text style={styles.sectionTitle}>PRÉVIA AO VIVO</Text>
-      <MotionView style={styles.preview}>
-        <Text style={styles.previewEyebrow}>TREINO DE HOJE</Text>
-        <Text style={styles.previewTitle}>Força e mobilidade</Text>
-        <Text style={styles.previewCopy}>3 exercícios · estado descrito com texto</Text>
-        <View style={styles.previewButton}><Text style={styles.previewButtonText}>Começar treino</Text></View>
-      </MotionView>
-
       {!!message && (
         <Text accessibilityLiveRegion="polite" style={message.startsWith('Não') ? styles.error : styles.success}>
           {message}
         </Text>
       )}
-      <PrimaryButton label="Salvar preferências" onPress={() => void save()} />
       <Pressable
         accessibilityRole="button"
         onPress={() => {
@@ -150,6 +146,46 @@ export function AppearanceSettingsScreen() {
         <Text style={styles.restoreText}>Restaurar padrões</Text>
       </Pressable>
     </ScreenScrollView>
+    <BottomActionBar>
+      <PrimaryButton label="Salvar preferências" onPress={() => void save()} />
+    </BottomActionBar>
+  </>)
+}
+
+function ThemePresetRow({
+  preset,
+  label,
+  selected,
+  onPress,
+  dark,
+}: {
+  preset: ThemePreset
+  label: string
+  selected: boolean
+  onPress: () => void
+  dark: boolean
+}) {
+  const { colors } = useTheme()
+  const styles = createStyles(colors)
+  const swatch = resolvePalette(preset, dark)
+  return (
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected }}
+      onPress={onPress}
+      style={({ pressed }) => [styles.themeRow, pressed && styles.pressed]}
+    >
+      <View style={styles.swatches} accessibilityElementsHidden>
+        {[swatch.bg, swatch.s1, swatch.ac].map((color, index) => (
+          <View key={index} style={[styles.swatch, { backgroundColor: color }]} />
+        ))}
+      </View>
+      <Text style={[styles.themeLabel, selected && styles.themeLabelSelected]}>{label}</Text>
+      <View style={[styles.selectionMark, selected && styles.selectionMarkSelected]}>
+        {selected && <Check color={colors.on} size={13} strokeWidth={2} />}
+      </View>
+      {selected && <Text style={styles.selectedText}>Selecionado</Text>}
+    </Pressable>
   )
 }
 
@@ -158,8 +194,8 @@ function PreferenceSection({ title, children }: { title: string; children: React
   const styles = createStyles(colors)
   return (
     <View>
-      <Text style={styles.sectionTitle}>{title.toUpperCase()}</Text>
-      <View style={styles.options}>{children}</View>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <View>{children}</View>
     </View>
   )
 }
@@ -184,66 +220,68 @@ function ToggleRow({ label, checked, onPress }: { label: string; checked: boolea
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  scrollContent: { paddingBottom: 160 },
   sectionTitle: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    fontWeight: '800',
-    letterSpacing: 1.4,
+    ...typography.monoLabel,
+    color: colors.t2,
     marginBottom: 8,
-    marginTop: 20,
+    marginTop: 24,
   },
-  options: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  themeRow: { alignItems: 'center', borderBottomColor: colors.bd, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: 8, minHeight: 56 },
+  swatches: { flexDirection: 'row', gap: 3, width: 48 },
+  swatch: { borderColor: colors.bd, borderRadius: 3, borderWidth: StyleSheet.hairlineWidth, height: 14, width: 14 },
+  themeLabel: { ...typography.bodySmall, color: colors.tx, flex: 1 },
+  themeLabelSelected: { fontWeight: '500' },
+  selectionMark: { alignItems: 'center', borderColor: colors.mu, borderRadius: 10, borderWidth: 1, height: 20, justifyContent: 'center', width: 20 },
+  selectionMarkSelected: { backgroundColor: colors.ac, borderColor: colors.ac },
+  selectedText: { ...typography.captionSmall, color: colors.t2 },
   toggleRow: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 16,
-    borderWidth: 1,
+    borderBottomColor: colors.bd,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 12,
-    minHeight: 64,
-    paddingHorizontal: 16,
+    minHeight: 56,
   },
-  toggleLabel: { ...typography.body, color: colors.textPrimary, flex: 1, fontWeight: '700', paddingRight: 12 },
+  toggleLabel: { ...typography.bodySmall, color: colors.tx, flex: 1, paddingRight: 12 },
   switchTrack: {
-    backgroundColor: colors.surfaceSecondary,
-    borderColor: colors.border,
-    borderRadius: 16,
-    borderWidth: 2,
-    height: 32,
+    backgroundColor: colors.s2,
+    borderColor: colors.mu,
+    borderRadius: 12,
+    borderWidth: 1,
+    height: 24,
     justifyContent: 'center',
-    paddingHorizontal: 3,
-    width: 54,
+    paddingHorizontal: 2,
+    width: 42,
   },
-  switchTrackChecked: { backgroundColor: colors.primary, borderColor: colors.primary },
-  switchThumb: { backgroundColor: colors.textSecondary, borderRadius: 11, height: 22, width: 22 },
-  switchThumbChecked: { alignSelf: 'flex-end', backgroundColor: colors.onPrimary },
+  switchTrackChecked: { backgroundColor: colors.ac, borderColor: colors.ac },
+  switchThumb: { backgroundColor: colors.tx, borderRadius: 8, height: 16, width: 16 },
+  switchThumbChecked: { alignSelf: 'flex-end', backgroundColor: colors.on },
   preview: {
-    backgroundColor: colors.card,
-    borderColor: colors.border,
-    borderRadius: 20,
-    borderWidth: 2,
-    marginBottom: 16,
-    padding: 18,
+    backgroundColor: colors.s1,
+    borderColor: colors.bd,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 8,
+    padding: 16,
   },
-  previewEyebrow: { ...typography.caption, color: colors.textSecondary, fontWeight: '800' },
-  previewTitle: { ...typography.title, color: colors.textPrimary, marginTop: 6 },
-  previewCopy: { ...typography.bodySmall, color: colors.textSecondary, marginTop: 5 },
+  previewEyebrow: { ...typography.monoLabel, color: colors.t2 },
+  previewTitle: { ...typography.title, color: colors.tx, marginTop: 6 },
+  previewCopy: { ...typography.bodySmall, color: colors.t2, marginTop: 5 },
   previewButton: {
     alignItems: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: 14,
+    backgroundColor: colors.ac,
+    borderRadius: 12,
     justifyContent: 'center',
-    marginTop: 16,
-    minHeight: shared.touchTarget.minimum,
+    marginTop: 12,
+    minHeight: 48,
   },
-  previewButtonText: { ...typography.label, color: colors.onPrimary, fontWeight: '800' },
-  success: { ...typography.bodySmall, color: colors.success, marginBottom: 12 },
-  error: { ...typography.bodySmall, color: colors.danger, marginBottom: 12 },
-  restore: { alignItems: 'center', justifyContent: 'center', minHeight: shared.touchTarget.minimum, marginTop: 8 },
-  restoreText: { ...typography.label, color: colors.textPrimary, fontWeight: '800' },
+  previewButtonText: { ...typography.label, color: colors.on, fontWeight: '500' },
+  success: { ...typography.bodySmall, color: colors.tx, marginVertical: 12 },
+  error: { ...typography.bodySmall, color: colors.dg, marginVertical: 12 },
+  restore: { alignItems: 'flex-start', justifyContent: 'center', minHeight: shared.touchTarget.minimum, marginTop: 8 },
+  restoreText: { ...typography.bodySmall, color: colors.tx, textDecorationLine: 'underline', textUnderlineOffset: 3 },
   pressed: { opacity: 0.72 },
   back: { alignItems: 'center', justifyContent: 'center', minHeight: shared.touchTarget.minimum, minWidth: shared.touchTarget.minimum },
-  backText: { color: colors.textPrimary, fontSize: 24, fontWeight: '700' },
+  backText: { color: colors.tx, fontSize: 24, fontWeight: '400' },
 })

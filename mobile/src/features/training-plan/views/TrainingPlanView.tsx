@@ -1,20 +1,22 @@
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
+import { Check, ChevronRight, Plus } from 'lucide-react-native'
 import { ScreenHeader } from '../../../components/ScreenHeader'
 import { ScreenScrollView } from '../../../components/Screen'
 import type { RootStackParamList } from '../../../navigation/types'
 import type { TrainingPlan } from '../model/trainingPlan'
-import { shared, type ThemeColors, useTheme } from '../../../theme'
+import { type ThemeColors, useTheme } from '../../../theme'
+import { typography } from '../../../theme/typography'
 
 const weekday = {
-  MONDAY: 'SEG',
-  TUESDAY: 'TER',
-  WEDNESDAY: 'QUA',
-  THURSDAY: 'QUI',
-  FRIDAY: 'SEX',
-  SATURDAY: 'SÁB',
-  SUNDAY: 'DOM',
+  MONDAY: 'seg',
+  TUESDAY: 'ter',
+  WEDNESDAY: 'qua',
+  THURSDAY: 'qui',
+  FRIDAY: 'sex',
+  SATURDAY: 'sáb',
+  SUNDAY: 'dom',
 } as const
 
 export function TrainingPlanView({
@@ -39,8 +41,8 @@ export function TrainingPlanView({
     <ScreenScrollView includeBottomInset={false} showsVerticalScrollIndicator={false}>
       <ScreenHeader
         eyebrow="Planejamento semanal"
-        title={'Sua ficha\nde treino'}
-        description="Escolha uma ficha e configure cada dia separadamente."
+        title="Ficha"
+        description="Escolha uma ficha e organize os dias de treino."
         action={(
           <TouchableOpacity
             accessibilityLabel="Criar ficha"
@@ -48,7 +50,7 @@ export function TrainingPlanView({
             style={styles.headerButton}
             onPress={() => navigation.navigate('TrainingPlanEditor')}
           >
-            <Text style={styles.headerButtonText}>＋</Text>
+            <Plus color={colors.on} size={20} strokeWidth={1.8} />
           </TouchableOpacity>
         )}
       />
@@ -71,9 +73,12 @@ export function TrainingPlanView({
             <Text style={[styles.planName, selectedPlan?.id === plan.id && styles.inverse]}>
               {plan.name}
             </Text>
-            <Text style={[styles.planMeta, selectedPlan?.id === plan.id && styles.inverse]}>
-              {selectedPlan?.id === plan.id ? '✓ ' : ''}{plan.active ? 'ativa' : plan.category}
-            </Text>
+            <View style={styles.planMetaRow}>
+              {selectedPlan?.id === plan.id && <Check color={colors.on} size={13} />}
+              <Text style={[styles.planMeta, selectedPlan?.id === plan.id && styles.inverse]}>
+                {plan.active ? 'Ativa' : selectedPlan?.id === plan.id ? 'Selecionada' : 'Selecionar'}
+              </Text>
+            </View>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -127,7 +132,7 @@ export function TrainingPlanView({
                       : `${day.exercises.length} exercícios · ${day.estimatedDurationMinutes} min`}
                   </Text>
                 </View>
-                <Text style={styles.arrow}>→</Text>
+                <ChevronRight color={colors.mu} size={20} strokeWidth={1.7} />
               </TouchableOpacity>
               {!day.restDay && day.exercises.length > 0 && (
                 <TouchableOpacity
@@ -147,34 +152,33 @@ export function TrainingPlanView({
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  headerButton: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 15, height: 48, justifyContent: 'center', width: 48 },
-  headerButtonText: { color: colors.onPrimary, fontSize: 20 },
+  headerButton: { alignItems: 'center', backgroundColor: colors.ac, borderRadius: 12, height: 48, justifyContent: 'center', width: 48 },
   archivedLink: { alignSelf: 'flex-start', justifyContent: 'center', marginBottom: 12, minHeight: 48 },
-  archivedLinkText: { color: colors.gray500, fontSize: 12, fontWeight: '700' },
-  planScroll: { marginBottom: 14 },
-  planChip: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, justifyContent: 'center', marginRight: 8, minHeight: 64, minWidth: 145, padding: 12 },
-  planChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  planName: { color: colors.ink, fontSize: 15, fontWeight: '800' },
-  planMeta: { color: colors.textSecondary, fontSize: 14, marginTop: 5 },
-  inverse: { color: colors.onPrimary },
-  planHeader: { alignItems: 'flex-start', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 21, borderWidth: 1, flexDirection: 'row', gap: 12, marginBottom: 10, padding: 16 },
-  eyebrow: { color: colors.textSecondary, fontSize: 12, fontWeight: '800', textTransform: 'uppercase' },
-  title: { color: colors.ink, fontSize: 21, fontWeight: '800', marginTop: 5 },
-  description: { color: colors.gray500, fontSize: 14, lineHeight: 20, marginTop: 6 },
-  secondary: { alignItems: 'center', borderColor: colors.border, borderRadius: 13, borderWidth: 1, justifyContent: 'center', minHeight: 48, paddingHorizontal: 12 },
-  secondaryText: { color: colors.ink, fontSize: 12, fontWeight: '800' },
-  dayCard: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 18, borderWidth: 1, marginBottom: 8, overflow: 'hidden' },
-  dayBody: { alignItems: 'center', flexDirection: 'row', gap: 12, minHeight: 72, padding: 12 },
-  dayBadge: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 13, height: 48, justifyContent: 'center', width: 48 },
-  restBadge: { backgroundColor: colors.gray500 },
-  dayBadgeText: { color: colors.onPrimary, fontSize: 12, fontWeight: '800' },
-  dayTitle: { color: colors.ink, fontSize: 16, fontWeight: '800', lineHeight: 22 },
-  dayMeta: { color: colors.gray500, fontSize: 14, lineHeight: 20, marginTop: 4 },
-  arrow: { color: colors.gray400, fontSize: 17 },
-  start: { alignItems: 'center', borderTopColor: colors.border, borderTopWidth: 1, justifyContent: 'center', minHeight: 48 },
-  startText: { color: colors.primary, fontSize: 14, fontWeight: '800' },
-  empty: { alignItems: 'center', minHeight: 280, justifyContent: 'center' },
-  emptyTitle: { color: colors.ink, fontSize: 16, fontWeight: '700', marginBottom: 15 },
-  primary: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 14, justifyContent: 'center', minHeight: 48, paddingHorizontal: 18 },
-  primaryText: { color: colors.onPrimary, fontSize: 14, fontWeight: '800' },
+  archivedLinkText: { ...typography.bodySmall, color: colors.tx, textDecorationLine: 'underline', textUnderlineOffset: 3 },
+  planScroll: { marginBottom: 18 },
+  planChip: { backgroundColor: 'transparent', borderColor: colors.mu, borderRadius: 12, borderWidth: 1, justifyContent: 'center', marginRight: 8, minHeight: 48, minWidth: 145, paddingHorizontal: 12 },
+  planChipActive: { backgroundColor: colors.ac, borderColor: colors.ac },
+  planName: { ...typography.label, color: colors.tx, fontWeight: '500' },
+  planMetaRow: { alignItems: 'center', flexDirection: 'row', gap: 3, marginTop: 2 },
+  planMeta: { ...typography.captionSmall, color: colors.t2 },
+  inverse: { color: colors.on },
+  planHeader: { alignItems: 'flex-start', flexDirection: 'row', gap: 12, marginBottom: 16, paddingVertical: 8 },
+  eyebrow: { ...typography.monoLabel, color: colors.t2 },
+  title: { ...typography.title, color: colors.tx, marginTop: 5 },
+  description: { ...typography.bodySmall, color: colors.t2, marginTop: 6 },
+  secondary: { alignItems: 'center', borderColor: colors.mu, borderRadius: 12, borderWidth: 1, justifyContent: 'center', minHeight: 48, paddingHorizontal: 14 },
+  secondaryText: { ...typography.bodySmall, color: colors.tx },
+  dayCard: { borderBottomColor: colors.bd, borderBottomWidth: 1 },
+  dayBody: { alignItems: 'center', flexDirection: 'row', gap: 12, minHeight: 68 },
+  dayBadge: { alignItems: 'center', height: 36, justifyContent: 'center', width: 38 },
+  restBadge: { borderColor: colors.bd, borderRadius: 12, borderWidth: 1 },
+  dayBadgeText: { ...typography.monoLabel, color: colors.t2 },
+  dayTitle: { ...typography.body, color: colors.tx, fontWeight: '500' },
+  dayMeta: { ...typography.caption, color: colors.t2, marginTop: 2 },
+  start: { alignSelf: 'flex-start', justifyContent: 'center', minHeight: 48, paddingLeft: 50 },
+  startText: { ...typography.bodySmall, color: colors.tx, textDecorationLine: 'underline', textUnderlineOffset: 3 },
+  empty: { alignItems: 'flex-start', minHeight: 280, justifyContent: 'center' },
+  emptyTitle: { ...typography.titleSmall, color: colors.tx, marginBottom: 15 },
+  primary: { alignItems: 'center', backgroundColor: colors.ac, borderRadius: 12, justifyContent: 'center', minHeight: 56, paddingHorizontal: 18 },
+  primaryText: { ...typography.label, color: colors.on, fontWeight: '500' },
 })

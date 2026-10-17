@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { ChevronRight, Heart, Plus } from 'lucide-react-native'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import {
@@ -32,6 +33,7 @@ import { SelectableChip } from '../../components/SelectableChip'
 import { ThemedTextInput } from '../../components/ThemedTextInput'
 import type { RootStackParamList } from '../../navigation/types'
 import { shared, type ThemeColors, useTheme } from '../../theme'
+import { fontFamilies } from '../../theme/typography'
 import { ExercisePlaceholder } from './ExercisePlaceholder'
 import {
   filterExerciseLibrary,
@@ -88,7 +90,7 @@ export function ExerciseLibraryScreen({
   const listHeader = <>
     <ScreenHeader
       eyebrow="Catálogo no aparelho"
-      title={'Biblioteca de\nexercícios'}
+      title="Biblioteca de exercícios"
       description="Crie, edite e use exercícios sem conexão."
     />
     <ThemedTextInput
@@ -109,23 +111,23 @@ export function ExerciseLibraryScreen({
       <FilterChip label="Com mídia" filter={{ kind: 'MEDIA' }} selected={filter} onSelect={setFilter} />
       <FilterChip label="Peso corporal" filter={{ kind: 'BODYWEIGHT' }} selected={filter} onSelect={setFilter} />
     </View>
-    <FilterGroup title="PACOTES">
+    <FilterGroup title="pacotes">
       {EXERCISE_PACKS.map((pack) => (
         <FilterChip key={pack.id} label={pack.name} filter={{ kind: 'PACK', value: pack.id }} selected={filter} onSelect={setFilter} />
       ))}
     </FilterGroup>
-    <FilterGroup title="GRUPO MUSCULAR">
+    <FilterGroup title="grupo muscular">
       {muscles.map((group) => (
         <FilterChip key={group.muscle} label={`${group.muscle} (${group.exercises.length})`} filter={{ kind: 'MUSCLE', value: group.muscle }} selected={filter} onSelect={setFilter} />
       ))}
     </FilterGroup>
-    <FilterGroup title="EQUIPAMENTO">
+    <FilterGroup title="equipamento">
       {equipment.map((value) => <FilterChip key={value} label={value} filter={{ kind: 'EQUIPMENT', value }} selected={filter} onSelect={setFilter} />)}
     </FilterGroup>
-    <FilterGroup title="CATEGORIA">
+    <FilterGroup title="categoria">
       {categories.map((value) => <FilterChip key={value} label={exerciseCategoryLabel(value)} filter={{ kind: 'CATEGORY', value }} selected={filter} onSelect={setFilter} />)}
     </FilterGroup>
-    <FilterGroup title="FONTE">
+    <FilterGroup title="fonte">
       {sources.map((value) => <FilterChip key={value} label={sourceLabel(value)} filter={{ kind: 'SOURCE', value }} selected={filter} onSelect={setFilter} />)}
     </FilterGroup>
   </>
@@ -181,7 +183,7 @@ export function ExerciseLibraryScreen({
         style={styles.fab}
         onPress={() => setEditing('new')}
       >
-        <Text style={styles.fabText}>＋</Text>
+        <Plus color={colors.on} size={22} strokeWidth={1.8} />
       </TouchableOpacity>
       <ExerciseForm
         exercise={editing === 'new' ? null : editing}
@@ -255,7 +257,7 @@ function EmptyLibrary({
           onPress={onCancelStarterPack ?? (() => undefined)}
         />
       )}
-      <Text style={styles.emptyHint}>Pacote atual · {approvedCount} exercícios</Text>
+      <Text style={styles.emptyHint}>pacote atual · {approvedCount} exercícios</Text>
       <Text style={styles.emptyHint}>O pacote recomendado contém exercícios revisados individualmente. A quantidade pode variar conforme a disponibilidade e a qualidade dos dados do provider.</Text>
       {!!starterPackMessage && <Text accessibilityLiveRegion="polite" style={styles.emptyHint}>{starterPackMessage}</Text>}
       <PrimaryButton label="Explorar catálogo externo" onPress={onSearchWger} />
@@ -378,7 +380,7 @@ function ExerciseCard({
           <Text style={styles.meta}>{exercise.primaryMuscleGroup} · {exercise.equipment}</Text>
           <Text style={styles.source}>{sourceLabel(exercise.source)} · {exerciseMediaLabel(exercise)}</Text>
         </View>
-        <Text style={styles.arrow}>›</Text>
+        <ChevronRight color={colors.mu} size={20} strokeWidth={1.7} />
       </Pressable>
       <Pressable
         accessibilityLabel={exercise.favorite ? `Remover ${exercise.name} dos favoritos` : `Favoritar ${exercise.name}`}
@@ -387,7 +389,7 @@ function ExerciseCard({
         onPress={onFavorite}
         style={styles.favorite}
       >
-        <Text style={styles.favoriteText}>{exercise.favorite ? '★' : '☆'}</Text>
+        <Heart color={exercise.favorite ? colors.tx : colors.mu} fill={exercise.favorite ? colors.tx : 'transparent'} size={19} strokeWidth={1.7} />
       </Pressable>
       {!!onEdit && (
         <TouchableOpacity accessibilityLabel={`Editar ${exercise.name}`} accessibilityRole="button" onPress={onEdit} style={styles.editButton}>
@@ -444,42 +446,39 @@ function sourceLabel(source: ExerciseDefinition['source']) {
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   screen: { flex: 1 },
   content: { paddingHorizontal: shared.pagePadding, paddingBottom: 72 },
-  search: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, color: colors.textPrimary, fontSize: 16, marginBottom: 10, minHeight: 56, paddingHorizontal: 16 },
+  search: { backgroundColor: colors.s1, borderColor: colors.mu, borderRadius: 12, borderWidth: 1, color: colors.tx, fontFamily: fontFamilies.text, fontSize: 15, marginBottom: 10, minHeight: 48, paddingHorizontal: 12 },
   filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
-  card: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 19, borderWidth: 1, flexDirection: 'row', marginBottom: 9, minHeight: 76, overflow: 'hidden' },
-  cardMain: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 12, minHeight: 76, padding: 12 },
-  icon: { backgroundColor: colors.gray200, borderRadius: 14, height: 52, width: 52 },
+  card: { alignItems: 'center', borderBottomColor: colors.bd, borderBottomWidth: 1, flexDirection: 'row', minHeight: 76 },
+  cardMain: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 12, minHeight: 76, paddingVertical: 10 },
+  icon: { backgroundColor: colors.s2, borderRadius: 8, height: 48, width: 48 },
   cardBody: { flex: 1 },
-  name: { color: colors.ink, fontSize: 16, fontWeight: '800' },
-  meta: { color: colors.textSecondary, fontSize: 14, marginTop: 4 },
-  source: { color: colors.textSecondary, fontSize: 12, marginTop: 5 },
-  edit: { color: colors.primary, fontSize: 12, fontWeight: '800', padding: 8 },
+  name: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 16, fontWeight: '500' },
+  meta: { color: colors.t2, fontFamily: fontFamilies.text, fontSize: 14, marginTop: 4 },
+  source: { color: colors.mu, fontFamily: fontFamilies.data, fontSize: 11, marginTop: 5 },
+  edit: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 12, fontWeight: '500', padding: 8, textDecorationLine: 'underline', textUnderlineOffset: 2 },
   editButton: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 },
   favorite: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 },
-  favoriteText: { color: colors.primary, fontSize: 24 },
-  arrow: { color: colors.gray400, fontSize: 25 },
-  empty: { color: colors.gray500, padding: 30, textAlign: 'center' },
-  emptyCard: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 20, borderWidth: 1, gap: 12, marginVertical: 16, padding: 18 },
-  emptyTitle: { color: colors.textPrimary, fontSize: 22, fontWeight: '900' },
-  emptyCopy: { color: colors.textSecondary, fontSize: 15, lineHeight: 22 },
-  emptyHint: { color: colors.textSecondary, fontSize: 12, lineHeight: 18 },
+  empty: { color: colors.t2, fontFamily: fontFamilies.text, padding: 30, textAlign: 'center' },
+  emptyCard: { borderLeftColor: colors.bd, borderLeftWidth: 2, gap: 12, marginVertical: 16, padding: 16 },
+  emptyTitle: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 22, fontWeight: '500' },
+  emptyCopy: { color: colors.t2, fontFamily: fontFamilies.text, fontSize: 15, lineHeight: 22 },
+  emptyHint: { color: colors.mu, fontFamily: fontFamilies.text, fontSize: 12, lineHeight: 18 },
   continue: { alignItems: 'center', minHeight: 48, justifyContent: 'center' },
-  continueText: { color: colors.textPrimary, fontSize: 14, fontWeight: '800' },
-  fab: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 19, bottom: 24, height: 56, justifyContent: 'center', position: 'absolute', right: 20, width: 56 },
-  fabText: { color: colors.onPrimary, fontSize: 22 },
+  continueText: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 14, fontWeight: '500', textDecorationLine: 'underline', textUnderlineOffset: 2 },
+  fab: { alignItems: 'center', backgroundColor: colors.ac, borderRadius: 12, bottom: 24, height: 56, justifyContent: 'center', position: 'absolute', right: 20, width: 56 },
   backdrop: { backgroundColor: colors.overlay, flex: 1, justifyContent: 'flex-end' },
-  safeSheet: { backgroundColor: colors.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '92%' },
+  safeSheet: { backgroundColor: colors.s1, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '92%' },
   sheet: { padding: 20, paddingBottom: 30 },
-  sheetTitle: { color: colors.ink, fontSize: 22, fontWeight: '700', marginBottom: 20 },
-  cancel: { color: colors.gray500, fontSize: 12, fontWeight: '700', padding: 15, textAlign: 'center' },
-  archive: { color: colors.danger, fontSize: 12, fontWeight: '700', paddingTop: 18, textAlign: 'center' },
-  error: { color: colors.danger, fontSize: 12, marginBottom: 10 },
+  sheetTitle: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 22, fontWeight: '500', marginBottom: 20 },
+  cancel: { color: colors.t2, fontFamily: fontFamilies.text, fontSize: 12, fontWeight: '500', padding: 15, textAlign: 'center' },
+  archive: { color: colors.dg, fontFamily: fontFamilies.text, fontSize: 12, fontWeight: '500', paddingTop: 18, textAlign: 'center' },
+  error: { color: colors.dg, fontFamily: fontFamilies.text, fontSize: 12, marginBottom: 10 },
   pressed: { opacity: 0.72 },
   filterGroup: { marginBottom: 12 },
-  filterTitle: { color: colors.textSecondary, fontSize: 12, fontWeight: '900', marginBottom: 6 },
-  muscleHeader: { backgroundColor: colors.background, color: colors.textPrimary, fontSize: 18, fontWeight: '900', paddingBottom: 8, paddingTop: 14 },
+  filterTitle: { color: colors.t2, fontFamily: fontFamilies.data, fontSize: 11, fontWeight: '400', marginBottom: 6 },
+  muscleHeader: { backgroundColor: colors.bg, color: colors.tx, fontFamily: fontFamilies.text, fontSize: 18, fontWeight: '500', paddingBottom: 8, paddingTop: 14 },
   filterScroll: { gap: 8, paddingRight: 12 },
-  skeleton: { alignItems: 'center', backgroundColor: colors.surface, borderRadius: 19, flexDirection: 'row', gap: 12, marginBottom: 9, minHeight: 76, padding: 12 },
-  skeletonIcon: { backgroundColor: colors.surfaceSecondary, borderRadius: 14, height: 52, width: 52 },
-  skeletonBody: { backgroundColor: colors.surfaceSecondary, borderRadius: 8, height: 20, width: '60%' },
+  skeleton: { alignItems: 'center', borderBottomColor: colors.bd, borderBottomWidth: 1, flexDirection: 'row', gap: 12, marginBottom: 1, minHeight: 76, paddingVertical: 12 },
+  skeletonIcon: { backgroundColor: colors.s2, borderRadius: 8, height: 48, width: 48 },
+  skeletonBody: { backgroundColor: colors.s2, borderRadius: 4, height: 16, width: '60%' },
 })

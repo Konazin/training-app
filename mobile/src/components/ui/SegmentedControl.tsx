@@ -12,10 +12,10 @@ export function SegmentedControl<T extends string>({ options, value, onChange, l
   })}</View>
 }
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  container: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: shared.radii.md, borderWidth: 1, flexDirection: 'row', gap: shared.spacing.xs, padding: shared.spacing.xs },
+  container: { backgroundColor: colors.s2, borderRadius: shared.radii.md, flexDirection: 'row', gap: shared.spacing.xs, padding: shared.spacing.xs },
   option: { alignItems: 'center', borderRadius: shared.radii.sm, flex: 1, justifyContent: 'center', minHeight: shared.touchTarget.minimum, paddingHorizontal: shared.spacing.sm },
-  selected: { backgroundColor: colors.primary },
-  pressed: { opacity: 0.78 },
-  label: { ...typography.label, color: colors.textSecondary, fontWeight: '700', textAlign: 'center' },
-  selectedLabel: { color: colors.onPrimary },
+  selected: { backgroundColor: colors.ac },
+  pressed: { opacity: 0.84 },
+  label: { ...typography.label, color: colors.t2, fontWeight: '400', textAlign: 'center' },
+  selectedLabel: { color: colors.on },
 })

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
-import { Alert, AppState } from 'react-native'
+import { Alert, AppState, Text, View } from 'react-native'
 import {
   DefaultTheme,
   NavigationContainer,
@@ -9,7 +9,13 @@ import {
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator, type NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import {
+  ChartNoAxesColumnIncreasing,
+  ClipboardList,
+  Ellipsis,
+  House,
+  Utensils,
+} from 'lucide-react-native'
 import { NavigationBar } from 'expo-navigation-bar'
 import { StatusBar } from 'expo-status-bar'
 import { type LocalRepositories } from '@training/training-local-db'
@@ -513,12 +519,12 @@ function MainTabs({
 }) {
   const { colors, preferences } = useTheme()
   const insets = useSafeAreaInsets()
-  const icons: Record<keyof MainTabParamList, keyof typeof Ionicons.glyphMap> = {
-    Today: 'home-outline',
-    Plan: 'clipboard-outline',
-    History: 'time-outline',
-    More: 'ellipsis-horizontal-circle-outline',
-    Nutrition: 'nutrition-outline',
+  const icons = {
+    Today: House,
+    Plan: ClipboardList,
+    History: ChartNoAxesColumnIncreasing,
+    More: Ellipsis,
+    Nutrition: Utensils,
   }
   const labels: Record<keyof MainTabParamList, string> = { Today: 'Hoje', Plan: 'Ficha', History: 'Progresso', Nutrition: 'Nutrição', More: 'Mais' }
   const { clock, refreshClock } = useLocalCalendarClock()
@@ -553,21 +559,36 @@ function MainTabs({
   return (
     <Tabs.Navigator screenOptions={({ route }) => ({
       headerShown: false,
-      tabBarActiveBackgroundColor: colors.surfaceSecondary,
-      tabBarActiveTintColor: colors.primary,
-      tabBarInactiveTintColor: colors.textSecondary,
-      tabBarLabel: labels[route.name],
-      tabBarIcon: ({ color, focused }) => <Ionicons color={color} name={focused ? icons[route.name].replace('-outline', '') as keyof typeof Ionicons.glyphMap : icons[route.name]} size={24} />,
-      tabBarItemStyle: { borderRadius: 14, marginHorizontal: 3, minHeight: 56 },
+      tabBarActiveTintColor: colors.tx,
+      tabBarInactiveTintColor: colors.mu,
+      tabBarLabel: ({ color, focused }) => (
+        <Text numberOfLines={2} style={{
+          color,
+          fontFamily: 'Geist',
+          fontSize: 12,
+          fontWeight: focused ? '600' : '400',
+          lineHeight: 16,
+          textAlign: 'center',
+        }}>{labels[route.name]}</Text>
+      ),
+      tabBarIcon: ({ color, focused }) => {
+        const Icon = icons[route.name]
+        return (
+          <View style={{ alignItems: 'center', gap: 2, width: '100%' }}>
+            <View style={{ backgroundColor: focused ? colors.ac : 'transparent', height: 2, width: 24 }} />
+            <Icon color={color} size={24} strokeWidth={1.5} />
+          </View>
+        )
+      },
+      tabBarItemStyle: { minHeight: 68, paddingBottom: 4, paddingTop: 4 },
       tabBarStyle: {
         backgroundColor: colors.tabBar,
-        borderTopColor: colors.border,
-        height: 64 + insets.bottom,
-        paddingBottom: insets.bottom + 4,
-        paddingHorizontal: 6,
-        paddingTop: 4,
+        borderTopColor: colors.bd,
+        height: 68 + insets.bottom,
+        paddingBottom: insets.bottom,
+        paddingHorizontal: 0,
+        paddingTop: 0,
       },
-      tabBarLabelStyle: { fontSize: 12, fontWeight: '700', lineHeight: 16 },
     })}>
       <Tabs.Screen name="Today">
         {({ navigation: tabNavigation }) => (
@@ -626,6 +647,7 @@ function MainTabs({
             progress={historyProgress}
             onRefresh={refreshAll}
             onDateChange={refreshClock}
+            onOpenPlan={() => navigation.navigate('MainTabs', { screen: 'Plan' })}
           />
         )}
       </Tabs.Screen>
@@ -680,11 +702,13 @@ function RefreshableHistory({
   progress,
   onRefresh,
   onDateChange,
+  onOpenPlan,
 }: {
   sessions: Parameters<typeof HistoryScreen>[0]['sessions']
   progress: Parameters<typeof HistoryScreen>[0]['progress']
   onRefresh: () => Promise<RefreshAllResult>
   onDateChange: () => void
+  onOpenPlan: () => void
 }) {
   const refreshState = useRefreshUi(onRefresh, onDateChange)
   useRefreshOnFocus(onDateChange)
@@ -695,6 +719,7 @@ function RefreshableHistory({
       loading={refreshState.refreshing}
       warning={refreshState.warning}
       onRefresh={() => void refreshState.refresh()}
+      onOpenPlan={onOpenPlan}
     />
   )
 }

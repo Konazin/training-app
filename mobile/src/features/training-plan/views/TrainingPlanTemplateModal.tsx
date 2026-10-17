@@ -15,8 +15,10 @@ import {
   type TrainingPlanTemplate,
   type TrainingPlanTemplateId,
 } from '@training/training-domain'
+import { ChevronRight } from 'lucide-react-native'
 import { PrimaryButton } from '../../../components/PrimaryButton'
 import { shared, type ThemeColors, useTheme } from '../../../theme'
+import { fontFamilies } from '../../../theme/typography'
 import { TrainingPlanWeekPreview } from './TrainingPlanWeekPreview'
 
 export function TrainingPlanTemplateModal({
@@ -85,14 +87,17 @@ export function TrainingPlanTemplateModal({
                 key={template.id}
                 onPress={() => onPreview(template.id)}
                 ref={template.id === TRAINING_PLAN_TEMPLATES[0]!.id ? firstTemplateRef : undefined}
-                style={styles.card}
+                style={({ pressed }) => [styles.card, pressed && styles.pressed]}
               >
-                <Text style={styles.cardTitle}>{template.name}</Text>
-                {template.id === 'BLANK' && <Text style={styles.startBlank}>Começar do zero</Text>}
-                <Text style={styles.description}>{template.summary}</Text>
-                <Text style={styles.meta}>
-                  {template.category || 'Escolha sua categoria'} · {template.difficulty || 'Escolha sua dificuldade'}
-                </Text>
+                <View style={styles.templateCopy}>
+                  <Text style={styles.cardTitle}>{template.name}</Text>
+                  {template.id === 'BLANK' && <Text style={styles.startBlank}>Começar do zero</Text>}
+                  <Text style={styles.description}>{template.summary}</Text>
+                  <Text style={styles.meta}>
+                    {template.category || 'Escolha sua categoria'} · {template.difficulty || 'Escolha sua dificuldade'}
+                  </Text>
+                </View>
+                <ChevronRight color={colors.mu} size={18} strokeWidth={1.5} />
               </Pressable>
             ))
           )}
@@ -117,12 +122,14 @@ export function TrainingPlanTemplateModal({
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   safe: { backgroundColor: colors.background, flex: 1 },
   content: { gap: 10, padding: shared.pagePadding },
-  title: { color: colors.textPrimary, fontSize: 24, fontWeight: '900', marginBottom: 4 },
-  description: { color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
-  meta: { color: colors.textPrimary, fontSize: 13, fontWeight: '800', marginTop: 4 },
-  card: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 17, borderWidth: 1, minHeight: 96, padding: 16 },
-  cardTitle: { color: colors.textPrimary, fontSize: 17, fontWeight: '900' },
-  startBlank: { color: colors.primary, fontSize: 14, fontWeight: '900', marginTop: 4 },
-  info: { backgroundColor: colors.surfaceSecondary, borderRadius: 12, color: colors.textSecondary, fontSize: 14, lineHeight: 20, padding: 12 },
+  title: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 25, fontWeight: '500', marginBottom: 4 },
+  description: { color: colors.t2, fontFamily: fontFamilies.text, fontSize: 14, lineHeight: 20 },
+  meta: { color: colors.mu, fontFamily: fontFamilies.data, fontSize: 11, marginTop: 6 },
+  card: { alignItems: 'center', borderBottomColor: colors.bd, borderBottomWidth: 1, flexDirection: 'row', gap: 14, minHeight: 96, paddingVertical: 14 },
+  templateCopy: { flex: 1, gap: 4 },
+  cardTitle: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 17, fontWeight: '500' },
+  startBlank: { color: colors.ac, fontFamily: fontFamilies.text, fontSize: 13, fontWeight: '500' },
+  info: { borderLeftColor: colors.bd, borderLeftWidth: 2, color: colors.t2, fontFamily: fontFamilies.text, fontSize: 14, lineHeight: 20, padding: 12 },
   actions: { flexDirection: 'row', gap: 10, padding: shared.pagePadding },
+  pressed: { backgroundColor: colors.s2 },
 })

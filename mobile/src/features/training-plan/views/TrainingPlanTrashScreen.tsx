@@ -16,6 +16,7 @@ import { Screen } from '../../../components/Screen'
 import { ScreenHeader } from '../../../components/ScreenHeader'
 import { ThemedTextInput } from '../../../components/ThemedTextInput'
 import { shared, type ThemeColors, useTheme } from '../../../theme'
+import { fontFamilies } from '../../../theme/typography'
 import {
   isEmptyTrashConfirmation,
   type TrashUiResult,
@@ -75,7 +76,7 @@ export function TrainingPlanTrashScreen({
                 accessibilityRole="button"
                 accessibilityState={{ disabled: busy }}
                 disabled={busy}
-                style={styles.emptyButton}
+                style={[styles.emptyButton, busy && styles.disabled]}
                 onPress={() => {
                   setConfirmation('')
                   setConfirmingEmpty(true)
@@ -224,7 +225,7 @@ function TrashCard({
           accessibilityRole="button"
           accessibilityState={{ disabled: busy }}
           disabled={busy}
-          style={styles.restore}
+          style={[styles.restore, busy && styles.disabled]}
           onPress={onRestore}
         >
           <Text style={styles.restoreText}>Restaurar</Text>
@@ -233,7 +234,7 @@ function TrashCard({
           accessibilityRole="button"
           accessibilityState={{ disabled: busy }}
           disabled={busy}
-          style={styles.delete}
+          style={[styles.delete, busy && styles.disabled]}
           onPress={onDelete}
         >
           <Text style={styles.deleteText}>Excluir permanentemente</Text>
@@ -246,30 +247,30 @@ function TrashCard({
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   content: { paddingBottom: 45, paddingHorizontal: shared.pagePadding },
   emptyContent: { flexGrow: 1 },
-  card: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 17, borderWidth: 1, marginBottom: 10, padding: 16 },
-  name: { color: colors.textPrimary, fontSize: 17, fontWeight: '800', lineHeight: 23 },
-  meta: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, marginTop: 4 },
-  status: { color: colors.textSecondary, fontSize: 14, fontWeight: '800', marginTop: 10 },
-  warning: { color: colors.warning },
-  expired: { color: colors.danger },
+  card: { borderBottomColor: colors.bd, borderBottomWidth: 1, marginBottom: 4, paddingVertical: 16 },
+  name: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 17, fontWeight: '500', lineHeight: 23 },
+  meta: { color: colors.t2, fontFamily: fontFamilies.text, fontSize: 14, lineHeight: 20, marginTop: 4 },
+  status: { color: colors.t2, fontFamily: fontFamilies.data, fontSize: 12, marginTop: 10 },
+  warning: { color: colors.t2 },
+  expired: { color: colors.dg },
   actions: { flexDirection: 'row', gap: 8, marginTop: 14 },
-  restore: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 12, flex: 1, justifyContent: 'center', minHeight: 48 },
-  restoreText: { color: colors.onPrimary, fontWeight: '800' },
-  delete: { alignItems: 'center', borderColor: colors.danger, borderRadius: 12, borderWidth: 1, flex: 1, justifyContent: 'center', minHeight: 48 },
-  deleteText: { color: colors.danger, fontWeight: '800' },
-  emptyButton: { alignItems: 'center', borderColor: colors.danger, borderRadius: 14, borderWidth: 1, justifyContent: 'center', marginBottom: 14, minHeight: 48 },
-  emptyButtonText: { color: colors.danger, fontWeight: '800' },
+  restore: { alignItems: 'center', backgroundColor: colors.ac, borderRadius: 12, flex: 1, justifyContent: 'center', minHeight: 48 },
+  restoreText: { color: colors.on, fontFamily: fontFamilies.text, fontWeight: '500' },
+  delete: { alignItems: 'center', borderColor: colors.bd, borderRadius: 12, borderWidth: 1, flex: 1, justifyContent: 'center', minHeight: 48 },
+  deleteText: { color: colors.dg, fontFamily: fontFamilies.text, fontWeight: '500' },
+  emptyButton: { alignItems: 'center', borderColor: colors.dg, borderRadius: 12, borderWidth: 1, justifyContent: 'center', marginBottom: 14, minHeight: 48 },
+  emptyButtonText: { color: colors.dg, fontFamily: fontFamilies.text, fontWeight: '500' },
   empty: { alignItems: 'center', flex: 1, justifyContent: 'center', minHeight: 280 },
-  emptyTitle: { color: colors.textPrimary, fontSize: 17, fontWeight: '800' },
-  modalBackdrop: { alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.58)', flex: 1, justifyContent: 'center', padding: 24 },
-  modal: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 20, borderWidth: 1, maxWidth: 420, padding: 20, width: '100%' },
-  modalTitle: { color: colors.textPrimary, fontSize: 20, fontWeight: '800', marginBottom: 6 },
+  emptyTitle: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 17, fontWeight: '500' },
+  modalBackdrop: { alignItems: 'center', backgroundColor: colors.scrim, flex: 1, justifyContent: 'center', padding: 24 },
+  modal: { backgroundColor: colors.s1, borderRadius: 12, maxWidth: 420, padding: 20, width: '100%' },
+  modalTitle: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 20, fontWeight: '500', marginBottom: 6 },
   input: { marginTop: 16 },
   modalActions: { flexDirection: 'row', gap: 8, marginTop: 16 },
-  secondaryAction: { alignItems: 'center', borderColor: colors.border, borderRadius: 12, borderWidth: 1, flex: 1, justifyContent: 'center', minHeight: 48 },
-  secondaryText: { color: colors.textPrimary, fontWeight: '800' },
-  dangerAction: { alignItems: 'center', backgroundColor: colors.danger, borderRadius: 12, flex: 1, justifyContent: 'center', minHeight: 48 },
-  dangerActionText: { color: colors.onPrimary, fontWeight: '800' },
+  secondaryAction: { alignItems: 'center', borderColor: colors.bd, borderRadius: 12, borderWidth: 1, flex: 1, justifyContent: 'center', minHeight: 48 },
+  secondaryText: { color: colors.tx, fontFamily: fontFamilies.text, fontWeight: '500' },
+  dangerAction: { alignItems: 'center', backgroundColor: colors.dg, borderRadius: 12, flex: 1, justifyContent: 'center', minHeight: 48 },
+  dangerActionText: { color: colors.onDanger, fontFamily: fontFamilies.text, fontWeight: '500' },
   busyLabel: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   disabled: { opacity: 0.5 },
 })

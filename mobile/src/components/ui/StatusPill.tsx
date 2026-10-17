@@ -9,10 +9,8 @@ export function StatusPill({ label, tone = 'neutral' }: { label: string; tone?: 
   return <View style={[styles.pill, { backgroundColor: toneColors.background, borderColor: toneColors.foreground }]}><Text style={[styles.label, { color: toneColors.foreground }]}>{label}</Text></View>
 }
 function resolveTone(colors: ThemeColors, tone: StatusTone) {
-  if (tone === 'primary') return { foreground: colors.primary, background: colors.surfaceSecondary }
-  if (tone === 'success') return { foreground: colors.success, background: colors.successSurface }
-  if (tone === 'warning') return { foreground: colors.warning, background: colors.surfaceSecondary }
-  if (tone === 'danger') return { foreground: colors.danger, background: colors.dangerSurface }
-  return { foreground: colors.textSecondary, background: colors.surface }
+  if (tone === 'danger') return { foreground: colors.dg, background: colors.s1 }
+  if (tone === 'primary') return { foreground: colors.tx, background: colors.s1 }
+  return { foreground: colors.t2, background: 'transparent' }
 }
-const styles = StyleSheet.create({ pill: { alignSelf: 'flex-start', borderRadius: 999, borderWidth: 1, minHeight: 32, justifyContent: 'center', paddingHorizontal: shared.spacing.md }, label: { ...typography.caption, fontWeight: '800' } })
+const styles = StyleSheet.create({ pill: { alignSelf: 'flex-start', borderRadius: shared.radii.sm, borderWidth: 0, minHeight: 28, justifyContent: 'center', paddingHorizontal: shared.spacing.sm }, label: { ...typography.captionSmall } })

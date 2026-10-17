@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native'
+import { ArrowLeft, Heart, Pencil, Play } from 'lucide-react-native'
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import type { ExerciseDefinition } from '@training/training-domain'
 import type { RootStackParamList } from '../../navigation/types'
@@ -7,6 +8,7 @@ import { Screen, ScreenScrollView } from '../../components/Screen'
 import { PrimaryButton } from '../../components/PrimaryButton'
 import { ThemedTextInput } from '../../components/ThemedTextInput'
 import { shared, type ThemeColors, useTheme } from '../../theme'
+import { fontFamilies } from '../../theme/typography'
 import { ExerciseVideo } from './ExerciseVideo'
 import { ExercisePlaceholder } from './ExercisePlaceholder'
 import {
@@ -66,7 +68,8 @@ export function ExerciseDetailScreen({
     <ScreenScrollView contentContainerStyle={styles.content}>
       <View style={styles.topActions}>
         <Pressable accessibilityLabel="Voltar" accessibilityRole="button" onPress={() => navigation.goBack()} style={styles.action}>
-          <Text style={styles.actionText}>← Voltar</Text>
+          <ArrowLeft color={colors.tx} size={17} strokeWidth={1.7} />
+          <Text style={styles.actionText}>Voltar</Text>
         </Pressable>
         <Pressable
           accessibilityLabel={exercise.favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
@@ -75,7 +78,8 @@ export function ExerciseDetailScreen({
           onPress={() => void onFavorite(exercise.id, !exercise.favorite)}
           style={styles.action}
         >
-          <Text style={styles.favorite}>{exercise.favorite ? '★ Favorito' : '☆ Favoritar'}</Text>
+          <Heart color={colors.tx} fill={exercise.favorite ? colors.tx : 'transparent'} size={17} strokeWidth={1.7} />
+          <Text style={styles.favorite}>{exercise.favorite ? 'Favorito' : 'Favoritar'}</Text>
         </Pressable>
       </View>
       <Text style={styles.eyebrow}>{source.toUpperCase()}</Text>
@@ -113,7 +117,7 @@ export function ExerciseDetailScreen({
           onPress={() => setShowVideo(true)}
           style={({ pressed }) => [styles.videoButton, pressed && styles.pressed]}
         >
-          <Text style={styles.videoButtonText}>▶ Reproduzir vídeo</Text>
+          <View style={styles.videoLabel}><Play color={colors.on} size={16} strokeWidth={1.7} /><Text style={styles.videoButtonText}>Reproduzir vídeo</Text></View>
           <Text style={styles.videoHint}>Carregamento somente após sua ação.</Text>
         </Pressable>
       )}
@@ -135,6 +139,7 @@ export function ExerciseDetailScreen({
           <Text style={styles.heading}>Minhas notas</Text>
           {!editingNotes && (
             <Pressable accessibilityRole="button" onPress={() => setEditingNotes(true)} style={styles.action}>
+              <Pencil color={colors.tx} size={15} strokeWidth={1.7} />
               <Text style={styles.actionText}>Editar notas</Text>
             </Pressable>
           )}
@@ -197,32 +202,33 @@ function Info({ label, value }: { label: string; value: string }) {
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  content: { gap: 14 },
+  content: { gap: 14, paddingBottom: 32 },
   center: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: 24 },
   topActions: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  action: { justifyContent: 'center', minHeight: shared.touchTarget.minimum, paddingHorizontal: 4 },
-  actionText: { color: colors.primary, fontSize: 14, fontWeight: '800' },
-  favorite: { color: colors.primary, fontSize: 14, fontWeight: '900' },
-  eyebrow: { color: colors.textSecondary, fontSize: 12, fontWeight: '800', letterSpacing: 2 },
-  title: { color: colors.textPrimary, fontSize: 32, fontWeight: '800' },
-  meta: { color: colors.textSecondary, fontSize: 14, marginBottom: 4 },
-  image: { aspectRatio: 16 / 9, backgroundColor: colors.surfaceSecondary, borderRadius: 18, width: '100%' },
-  heading: { color: colors.textPrimary, fontSize: 16, fontWeight: '800', marginTop: 8 },
-  body: { color: colors.textPrimary, fontSize: 14, lineHeight: 22 },
-  muted: { color: colors.textSecondary, textAlign: 'center' },
-  info: { borderBottomColor: colors.border, borderBottomWidth: 1, paddingBottom: 10 },
-  infoLabel: { color: colors.textSecondary, fontSize: 12, fontWeight: '800' },
-  infoValue: { color: colors.textPrimary, fontSize: 14, marginTop: 3 },
-  notesCard: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 18, borderWidth: 1, padding: 14 },
+  action: { alignItems: 'center', flexDirection: 'row', gap: 6, justifyContent: 'center', minHeight: shared.touchTarget.minimum, paddingHorizontal: 4 },
+  actionText: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 14, fontWeight: '500' },
+  favorite: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 14, fontWeight: '500' },
+  eyebrow: { color: colors.mu, fontFamily: fontFamilies.data, fontSize: 11 },
+  title: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 32, fontWeight: '500' },
+  meta: { color: colors.t2, fontFamily: fontFamilies.text, fontSize: 14, marginBottom: 4 },
+  image: { aspectRatio: 16 / 9, backgroundColor: colors.s2, borderRadius: 8, width: '100%' },
+  heading: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 16, fontWeight: '500', marginTop: 8 },
+  body: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 14, lineHeight: 22 },
+  muted: { color: colors.t2, fontFamily: fontFamilies.text, textAlign: 'center' },
+  info: { borderBottomColor: colors.bd, borderBottomWidth: 1, paddingBottom: 10 },
+  infoLabel: { color: colors.t2, fontFamily: fontFamilies.text, fontSize: 12 },
+  infoValue: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 14, marginTop: 3 },
+  notesCard: { borderBottomColor: colors.bd, borderBottomWidth: 1, paddingBottom: 14 },
   notesHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   notesInput: { minHeight: 110, textAlignVertical: 'top' },
   noteActions: { flexDirection: 'row', gap: 8, justifyContent: 'flex-end', marginTop: 10 },
-  message: { color: colors.success, fontSize: 14 },
-  attribution: { color: colors.textSecondary, fontSize: 12, lineHeight: 17 },
-  link: { color: colors.primary, fontSize: 13, fontWeight: '800', paddingVertical: 4 },
-  videoButton: { backgroundColor: colors.primary, borderRadius: 16, minHeight: 56, padding: 15 },
-  videoButtonText: { color: colors.onPrimary, fontSize: 14, fontWeight: '800' },
-  videoHint: { color: colors.onPrimary, fontSize: 12, marginTop: 5 },
+  message: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 14 },
+  attribution: { color: colors.t2, fontFamily: fontFamilies.text, fontSize: 12, lineHeight: 17 },
+  link: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 13, fontWeight: '500', paddingVertical: 4, textDecorationLine: 'underline' },
+  videoButton: { backgroundColor: colors.ac, borderRadius: 12, minHeight: 56, padding: 15 },
+  videoLabel: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+  videoButtonText: { color: colors.on, fontFamily: fontFamilies.text, fontSize: 14, fontWeight: '500' },
+  videoHint: { color: colors.on, fontFamily: fontFamilies.text, fontSize: 12, marginTop: 5 },
   linkButton: { justifyContent: 'center', minHeight: shared.touchTarget.minimum },
   pressed: { opacity: 0.72 },
 })

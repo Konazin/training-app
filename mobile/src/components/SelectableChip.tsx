@@ -58,5 +58,5 @@ const styles = StyleSheet.create({
   },
   check: { borderBottomWidth: 2, borderRightWidth: 2, height: 12, transform: [{ rotate: '45deg' }], width: 7 },
   disabled: { opacity: 0.5 },
-  label: { ...typography.label, flexShrink: 1, fontWeight: '700' },
+  label: { ...typography.label, flexShrink: 1, fontWeight: '500' },
 })

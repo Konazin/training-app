@@ -82,7 +82,7 @@ export function Onboarding({
                     onOpenLibrary?.()
                     onImportStarterPack?.()
                   })}
-                  style={[styles.choice, (!starterPackEnabled || starterPackBusy) && styles.disabled]}
+                  style={({ pressed }) => [styles.choice, (!starterPackEnabled || starterPackBusy) && styles.disabled, pressed && styles.pressed]}
                 >
                   <Text style={styles.choiceTitle}>Importar pacote recomendado</Text>
                   <Text style={styles.choiceDetail}>Pacote atual · {WGER_STARTER_PACK.length} exercícios</Text>
@@ -91,7 +91,7 @@ export function Onboarding({
                 <Pressable
                   accessibilityRole="button"
                   onPress={() => void onComplete().then(onOpenWger)}
-                  style={styles.choice}
+                  style={({ pressed }) => [styles.choice, pressed && styles.pressed]}
                 >
                   <Text style={styles.choiceTitle}>Explorar catálogo externo</Text>
                   <Text style={styles.choiceDetail}>Requer internet e só consulta após sua ação.</Text>
@@ -99,7 +99,7 @@ export function Onboarding({
                 <Pressable
                   accessibilityRole="button"
                   onPress={() => void onComplete().then(onCreateCustom)}
-                  style={styles.choice}
+                  style={({ pressed }) => [styles.choice, pressed && styles.pressed]}
                 >
                   <Text style={styles.choiceTitle}>Criar exercício personalizado</Text>
                   <Text style={styles.choiceDetail}>Conteúdo escrito e controlado por você.</Text>
@@ -111,14 +111,14 @@ export function Onboarding({
             <Pressable
               accessibilityRole="button"
               onPress={() => void onSkip()}
-              style={styles.secondary}
+              style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}
             >
               <Text style={styles.secondaryText}>Pular</Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
               onPress={() => last ? void onComplete() : setStep((value) => value + 1)}
-              style={styles.primary}
+              style={({ pressed }) => [styles.primary, pressed && styles.pressed]}
             >
               <Text style={styles.primaryText}>{last ? 'Continuar sem exercícios' : 'Próximo'}</Text>
             </Pressable>
@@ -138,9 +138,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     padding: 20,
   },
   sheet: {
-    backgroundColor: colors.background,
-    borderColor: colors.border,
-    borderRadius: 24,
+    backgroundColor: colors.bg,
+    borderColor: colors.bd,
+    borderRadius: 12,
     borderWidth: 1,
     maxHeight: '88%',
     maxWidth: 520,
@@ -150,22 +150,21 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   scroll: { flexShrink: 1 },
   content: { flexGrow: 1, padding: 24 },
-  progress: { ...typography.caption, color: colors.textSecondary, fontWeight: '800', letterSpacing: 1.2 },
-  title: { ...typography.title, color: colors.textPrimary, marginTop: 16 },
-  description: { ...typography.body, color: colors.textSecondary, marginTop: 12 },
+  progress: { ...typography.monoLabel, color: colors.t2 },
+  title: { ...typography.title, color: colors.tx, marginTop: 16 },
+  description: { ...typography.body, color: colors.t2, marginTop: 12 },
   choices: { gap: 10, marginTop: 20 },
   choice: {
-    borderColor: colors.border,
-    borderRadius: 14,
-    borderWidth: 1,
+    borderBottomColor: colors.bd,
+    borderBottomWidth: 1,
     minHeight: 56,
     padding: 12,
   },
   disabled: { opacity: 0.55 },
-  choiceTitle: { ...typography.label, color: colors.textPrimary, fontWeight: '800' },
-  choiceDetail: { ...typography.caption, color: colors.textSecondary, marginTop: 4 },
+  choiceTitle: { ...typography.label, color: colors.tx, fontWeight: '500' },
+  choiceDetail: { ...typography.caption, color: colors.t2, marginTop: 4 },
   actions: {
-    borderTopColor: colors.border,
+    borderTopColor: colors.bd,
     borderTopWidth: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -174,22 +173,23 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   primary: {
     alignItems: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: 14,
+    backgroundColor: colors.ac,
+    borderRadius: 12,
     flexGrow: 1,
     justifyContent: 'center',
-    minHeight: 48,
+    minHeight: 56,
     paddingHorizontal: 18,
   },
-  primaryText: { ...typography.label, color: colors.onPrimary, fontWeight: '800' },
+  primaryText: { ...typography.label, color: colors.on, fontWeight: '500' },
   secondary: {
     alignItems: 'center',
-    borderColor: colors.border,
-    borderRadius: 14,
+    borderColor: colors.mu,
+    borderRadius: 12,
     borderWidth: 1,
     justifyContent: 'center',
     minHeight: 48,
     paddingHorizontal: 18,
   },
-  secondaryText: { ...typography.label, color: colors.textPrimary, fontWeight: '800' },
+  secondaryText: { ...typography.label, color: colors.tx, fontWeight: '500' },
+  pressed: { opacity: 0.75 },
 })

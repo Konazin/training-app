@@ -15,6 +15,7 @@ import {
 import { FormField } from '../../../components/FormField'
 import { OptionPickerField, OptionPickerModal } from '../../../components/OptionPicker'
 import { PrimaryButton } from '../../../components/PrimaryButton'
+import { BottomActionBar } from '../../../components/ui/BottomActionBar'
 import { ScreenHeader } from '../../../components/ScreenHeader'
 import { ScreenScrollView } from '../../../components/Screen'
 import type { RootStackParamList } from '../../../navigation/types'
@@ -33,6 +34,7 @@ import {
 import { TrainingPlanDuplicateModal } from './TrainingPlanDuplicateModal'
 import { TrainingPlanTemplateModal } from './TrainingPlanTemplateModal'
 import { TrainingPlanWeekPreview } from './TrainingPlanWeekPreview'
+import { typography } from '../../../theme/typography'
 
 type EditorDay = TrainingPlanDayCreationInput & {
   exercises?: readonly unknown[]
@@ -170,14 +172,14 @@ export function TrainingPlanEditorScreen({
 
   return (
     <>
-      <ScreenScrollView>
+      <ScreenScrollView contentContainerStyle={{ paddingBottom: 160 }}>
         <ScreenHeader
           eyebrow={plan ? 'Editar ficha' : 'Nova ficha'}
           title={plan ? plan.name : 'Montar ficha'}
           description="Dados gerais e estrutura da programação semanal."
         />
 
-        <Section title="DADOS DA FICHA" styles={styles}>
+        <Section title="dados da ficha" styles={styles}>
           <FormField
             error={fieldErrors.name}
             label="Nome"
@@ -209,7 +211,7 @@ export function TrainingPlanEditorScreen({
           />
         </Section>
 
-        <Section title="ESTRUTURA SEMANAL" styles={styles}>
+        <Section title="estrutura semanal" styles={styles}>
           {!plan && !!templateId && (
             <Text style={styles.templateName}>
               Template: {TRAINING_PLAN_TEMPLATES.find((item) => item.id === templateId)?.name}
@@ -235,11 +237,9 @@ export function TrainingPlanEditorScreen({
         </Section>
 
         {!!errors[key] && <Text style={styles.error}>{errors[key]}</Text>}
-        <PrimaryButton label="Salvar ficha" loading={busyKeys.has(key)} onPress={() => void save()} />
-
         {!!plan && (
           <>
-            <Section title="GESTÃO" styles={styles}>
+            <Section title="gestão" styles={styles}>
               {!plan.active && (
                 <PrimaryButton
                   disabled={dirty}
@@ -276,7 +276,7 @@ export function TrainingPlanEditorScreen({
               />
               {dirty && <Text style={styles.hint}>Salve ou descarte as alterações para usar estas ações.</Text>}
             </Section>
-            <Section title="ZONA DE PERIGO" styles={styles} danger>
+            <Section title="zona de perigo" styles={styles} danger>
               <Pressable
                 accessibilityLabel="Mover ficha para a lixeira"
                 accessibilityRole="button"
@@ -305,6 +305,10 @@ export function TrainingPlanEditorScreen({
           </>
         )}
       </ScreenScrollView>
+
+      <BottomActionBar>
+        <PrimaryButton label="Salvar ficha" loading={busyKeys.has(key)} onPress={() => void save()} />
+      </BottomActionBar>
 
       <OptionPickerModal
         customLabel="Categoria personalizada"
@@ -412,12 +416,12 @@ function initialEditor(plan?: TrainingPlan) {
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  section: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 20, borderWidth: 1, gap: 12, marginBottom: 14, padding: 16 },
-  sectionTitle: { color: colors.textSecondary, fontSize: 12, fontWeight: '900', letterSpacing: 1.2 },
-  templateName: { color: colors.textPrimary, fontSize: 15, fontWeight: '900' },
-  error: { color: colors.danger, fontSize: 14, lineHeight: 20, marginBottom: 10 },
-  hint: { color: colors.textSecondary, fontSize: 13, lineHeight: 19, marginTop: 4, textAlign: 'center' },
-  dangerSection: { borderColor: colors.danger, marginTop: 14 },
-  dangerButton: { alignItems: 'center', borderColor: colors.danger, borderRadius: 14, borderWidth: 1, justifyContent: 'center', minHeight: shared.touchTarget.minimum },
-  dangerText: { color: colors.danger, fontSize: 14, fontWeight: '800' },
+  section: { borderBottomColor: colors.bd, borderBottomWidth: StyleSheet.hairlineWidth, gap: 12, marginBottom: 20, paddingBottom: 20 },
+  sectionTitle: { ...typography.monoLabel, color: colors.t2 },
+  templateName: { ...typography.bodySmall, color: colors.tx },
+  error: { ...typography.bodySmall, color: colors.dg, marginBottom: 10 },
+  hint: { ...typography.caption, color: colors.t2, marginTop: 4 },
+  dangerSection: { borderBottomWidth: 0, marginTop: 20 },
+  dangerButton: { alignItems: 'center', borderColor: colors.dg, borderRadius: 12, borderWidth: 1, justifyContent: 'center', minHeight: shared.touchTarget.minimum },
+  dangerText: { ...typography.bodySmall, color: colors.dg },
 })

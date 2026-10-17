@@ -7,16 +7,17 @@ interface Props {
   title: string
   description?: string
   action?: React.ReactNode
+  titleVariant?: 'display' | 'large'
 }
 
-export function ScreenHeader({ eyebrow, title, description, action }: Props) {
+export function ScreenHeader({ eyebrow, title, description, action, titleVariant = 'large' }: Props) {
   const { colors } = useTheme()
   const styles = createStyles(colors)
   return (
     <View style={styles.container}>
       <View style={styles.copy}>
         <Text style={styles.eyebrow}>{eyebrow}</Text>
-        <Text style={styles.title}>{title}</Text>
+        <Text accessibilityRole="header" style={[styles.title, titleVariant === 'display' && styles.display]}>{title}</Text>
         {!!description && <Text style={styles.description}>{description}</Text>}
       </View>
       {action}
@@ -37,25 +38,19 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingRight: 12,
   },
   eyebrow: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    fontWeight: '800',
-    letterSpacing: 2,
+    ...typography.monoLabel,
+    color: colors.t2,
     marginBottom: 8,
-    textTransform: 'uppercase',
   },
   title: {
-    color: colors.textPrimary,
-    fontSize: 32,
-    fontWeight: '700',
-    letterSpacing: -1.2,
-    lineHeight: 39,
+    ...typography.titleLarge,
+    color: colors.tx,
     flexShrink: 1,
   },
+  display: typography.display,
   description: {
-    color: colors.textSecondary,
-    fontSize: 15,
-    lineHeight: 22,
+    ...typography.bodySmall,
+    color: colors.t2,
     marginTop: 9,
     maxWidth: 310,
   },

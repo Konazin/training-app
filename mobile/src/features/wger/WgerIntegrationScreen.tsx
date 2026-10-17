@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Check, ChevronRight, X } from 'lucide-react-native'
 import type {
   ExerciseCategory,
   ExerciseLibraryRepository,
@@ -29,7 +30,7 @@ import { SelectableChip } from '../../components/SelectableChip'
 import { ThemedTextInput } from '../../components/ThemedTextInput'
 import { Toast } from '../../components/Toast'
 import { shared, type ThemeColors, useTheme } from '../../theme'
-import { typography } from '../../theme/typography'
+import { fontFamilies, typography } from '../../theme/typography'
 import { useWgerIntegrationController } from './useWgerIntegrationController'
 
 export function WgerIntegrationScreen({
@@ -72,7 +73,7 @@ export function WgerIntegrationScreen({
 
         {consented && (
           <View style={styles.searchArea}>
-            <Text style={styles.section}>BUSCA</Text>
+            <Text style={styles.section}>busca</Text>
             <ThemedTextInput
               accessibilityLabel="Buscar exercícios"
               placeholder="Nome do exercício"
@@ -150,7 +151,7 @@ export function WgerIntegrationScreen({
         ListHeaderComponent={controller.items.length ? (
           <View style={styles.resultsHeader}>
             <View>
-              <Text style={styles.section}>RESULTADOS</Text>
+              <Text style={styles.section}>resultados</Text>
               <Text style={styles.resultCount}>Página {controller.query.page} · {controller.total} no catálogo</Text>
             </View>
             <SmallButton label="Selecionar página" onPress={controller.selectPage} />
@@ -243,7 +244,7 @@ function ResultCard({
         onPress={onToggle}
         style={[styles.checkbox, selected && styles.checkboxSelected]}
       >
-        <Text style={styles.checkboxText}>{selected ? '✓' : ''}</Text>
+        {selected && <Check color={colors.on} size={16} strokeWidth={2} />}
       </Pressable>
       <Pressable accessibilityRole="button" onPress={onPreview} style={styles.cardCopy}>
         <Text style={styles.cardName}>{item.name}</Text>
@@ -256,7 +257,7 @@ function ResultCard({
           {existing && <Text style={styles.badgeImported}>Já importado</Text>}
         </View>
       </Pressable>
-      <Text style={styles.arrow}>›</Text>
+      <ChevronRight color={colors.mu} size={20} strokeWidth={1.7} />
     </View>
   )
 }
@@ -293,7 +294,7 @@ function LanguageModal({
         <View style={styles.modalHeader}>
           <Text style={styles.modalTitle}>Idioma do Wger</Text>
           <Pressable accessibilityRole="button" accessibilityLabel="Fechar idiomas" onPress={onClose} style={styles.closeButton}>
-            <Text style={styles.closeText}>×</Text>
+            <X color={colors.tx} size={20} strokeWidth={1.7} />
           </Pressable>
         </View>
         <ThemedTextInput
@@ -321,6 +322,7 @@ function LanguageModal({
             >
               <Text style={styles.languageName}>{item.name}</Text>
               <Text style={styles.languageCode}>{item.code}</Text>
+              {selected === item.code && <Check color={colors.tx} size={16} strokeWidth={2} />}
             </Pressable>
           )}
           ListEmptyComponent={<Text style={styles.empty}>Nenhum idioma encontrado.</Text>}
@@ -357,7 +359,7 @@ function CandidateModal({
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Pré-visualização</Text>
             <Pressable accessibilityRole="button" accessibilityLabel="Fechar pré-visualização" onPress={onClose} style={styles.closeButton}>
-              <Text style={styles.closeText}>×</Text>
+              <X color={colors.tx} size={20} strokeWidth={1.7} />
             </Pressable>
           </View>
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
@@ -401,7 +403,7 @@ function LinkButton({ label, url }: { label: string; url: string | null }) {
   if (!url) return null
   return (
     <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(url)} style={stylesStatic.linkButton}>
-      <Text style={{ color: colors.primary, fontWeight: '800' }}>{label}</Text>
+      <Text style={{ color: colors.tx, fontFamily: fontFamilies.text, fontWeight: '500' }}>{label}</Text>
     </Pressable>
   )
 }
@@ -414,9 +416,9 @@ function SmallButton({ label, onPress, disabled = false }: { label: string; onPr
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
-      style={[stylesStatic.smallButton, { borderColor: colors.border, backgroundColor: colors.surface }, disabled && stylesStatic.disabled]}
+      style={[stylesStatic.smallButton, { borderColor: colors.mu, backgroundColor: colors.bg }, disabled && stylesStatic.disabled]}
     >
-      <Text style={{ color: colors.textPrimary, fontWeight: '800' }}>{label}</Text>
+      <Text style={{ color: colors.tx, fontFamily: fontFamilies.text, fontWeight: '500' }}>{label}</Text>
     </Pressable>
   )
 }
@@ -433,56 +435,53 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   searchArea: { gap: 8 },
   listContent: { flexGrow: 1, paddingBottom: 12, paddingHorizontal: shared.screen.horizontalPadding, paddingTop: 8 },
   list: { flex: 1, minHeight: 120 },
-  itemSeparator: { height: 8 },
-  empty: { ...typography.bodySmall, color: colors.textSecondary, padding: 20, textAlign: 'center' },
-  notice: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 20, borderWidth: 1, gap: 10, padding: 18 },
-  noticeTitle: { ...typography.titleSmall, color: colors.textPrimary },
-  noticeText: { ...typography.bodySmall, color: colors.textSecondary },
-  section: { ...typography.caption, color: colors.textSecondary, fontWeight: '800', letterSpacing: 1.4, marginTop: 8 },
+  itemSeparator: { height: 0 },
+  empty: { ...typography.bodySmall, color: colors.t2, padding: 20, textAlign: 'center' },
+  notice: { borderLeftColor: colors.bd, borderLeftWidth: 2, gap: 10, padding: 16 },
+  noticeTitle: { ...typography.titleSmall, color: colors.tx },
+  noticeText: { ...typography.bodySmall, color: colors.t2 },
+  section: { ...typography.monoLabel, color: colors.t2, marginTop: 8 },
   search: { marginBottom: 2 },
-  label: { ...typography.label, color: colors.textSecondary, fontWeight: '800', marginTop: 5 },
+  label: { ...typography.label, color: colors.t2, marginTop: 5 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   resultsHeader: { alignItems: 'flex-end', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  resultCount: { ...typography.bodySmall, color: colors.textSecondary, marginTop: 4 },
-  selectedCount: { ...typography.label, color: colors.primary, fontWeight: '800' },
-  languageButton: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 12, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: 48, paddingHorizontal: 13 },
-  languageName: { color: colors.textPrimary, fontSize: 14, fontWeight: '800' },
-  languageCode: { color: colors.textSecondary, fontSize: 12 },
-  card: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 18, borderWidth: 1, flexDirection: 'row', gap: 12, minHeight: 112, padding: 13 },
-  cardSelected: { borderColor: colors.primary, borderWidth: 2 },
-  checkbox: { alignItems: 'center', borderColor: colors.border, borderRadius: 7, borderWidth: 2, height: 28, justifyContent: 'center', width: 28 },
-  checkboxSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
-  checkboxText: { color: colors.onPrimary, fontSize: 16, fontWeight: '900' },
+  resultCount: { ...typography.bodySmall, color: colors.t2, marginTop: 4 },
+  selectedCount: { ...typography.label, color: colors.tx, fontWeight: '500' },
+  languageButton: { alignItems: 'center', backgroundColor: colors.s1, borderColor: colors.mu, borderRadius: 12, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: 48, paddingHorizontal: 12 },
+  languageName: { color: colors.tx, flex: 1, fontFamily: fontFamilies.text, fontSize: 14, fontWeight: '400' },
+  languageCode: { color: colors.mu, fontFamily: fontFamilies.data, fontSize: 11 },
+  card: { alignItems: 'center', borderBottomColor: colors.bd, borderBottomWidth: 1, flexDirection: 'row', gap: 12, minHeight: 96, paddingVertical: 12 },
+  cardSelected: { backgroundColor: colors.s2 },
+  checkbox: { alignItems: 'center', borderColor: colors.mu, borderRadius: 4, borderWidth: 1, height: 24, justifyContent: 'center', width: 24 },
+  checkboxSelected: { backgroundColor: colors.ac, borderColor: colors.ac },
   cardCopy: { flex: 1, minWidth: 0 },
-  cardName: { color: colors.textPrimary, fontSize: 16, fontWeight: '800', lineHeight: 22 },
-  cardMeta: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, marginTop: 3 },
-  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 8 },
-  badge: { backgroundColor: colors.surfaceSecondary, borderRadius: 999, color: colors.textPrimary, fontSize: 12, paddingHorizontal: 8, paddingVertical: 4 },
-  badgeImported: { backgroundColor: colors.successSurface, borderRadius: 999, color: colors.success, fontSize: 12, fontWeight: '800', paddingHorizontal: 8, paddingVertical: 4 },
-  arrow: { color: colors.textSecondary, fontSize: 24 },
+  cardName: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 16, fontWeight: '500', lineHeight: 22 },
+  cardMeta: { color: colors.t2, fontFamily: fontFamilies.text, fontSize: 14, lineHeight: 20, marginTop: 3 },
+  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
+  badge: { borderColor: colors.bd, borderRadius: 8, borderWidth: 1, color: colors.t2, fontFamily: fontFamilies.text, fontSize: 11, paddingHorizontal: 8, paddingVertical: 4 },
+  badgeImported: { borderColor: colors.bd, borderRadius: 8, borderWidth: 1, color: colors.tx, fontFamily: fontFamilies.text, fontSize: 11, paddingHorizontal: 8, paddingVertical: 4 },
   pagination: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between' },
-  bottomSafe: { backgroundColor: colors.background, borderTopColor: colors.border, borderTopWidth: 1 },
+  bottomSafe: { backgroundColor: colors.bg, borderTopColor: colors.bd, borderTopWidth: 1 },
   bottomBar: { gap: 8, paddingHorizontal: shared.screen.horizontalPadding, paddingTop: 8 },
   bottomTop: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  importButton: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 12, justifyContent: 'center', minHeight: 48, paddingHorizontal: 16 },
-  importButtonText: { color: colors.onPrimary, fontWeight: '800' },
-  pageNumber: { alignSelf: 'center', color: colors.textPrimary, fontWeight: '800' },
+  importButton: { alignItems: 'center', backgroundColor: colors.ac, borderRadius: 12, justifyContent: 'center', minHeight: 48, paddingHorizontal: 16 },
+  importButtonText: { color: colors.on, fontFamily: fontFamilies.text, fontWeight: '500' },
+  pageNumber: { alignSelf: 'center', color: colors.tx, fontFamily: fontFamilies.data, fontSize: 12 },
   disabled: { opacity: 0.45 },
   backdrop: { backgroundColor: colors.scrim, flex: 1 },
   modalSafe: { backgroundColor: colors.background, flex: 1 },
-  modalHeader: { alignItems: 'center', borderBottomColor: colors.border, borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: 64, paddingHorizontal: shared.screen.horizontalPadding },
-  modalTitle: { ...typography.titleSmall, color: colors.textPrimary },
+  modalHeader: { alignItems: 'center', borderBottomColor: colors.bd, borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: 64, paddingHorizontal: shared.screen.horizontalPadding },
+  modalTitle: { ...typography.titleSmall, color: colors.tx },
   closeButton: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 },
-  closeText: { color: colors.textPrimary, fontSize: 28 },
   modalContent: { gap: 12, padding: shared.screen.horizontalPadding, paddingBottom: 40 },
   languageModal: { flex: 1 },
   languageSearch: { marginHorizontal: shared.screen.horizontalPadding, marginVertical: 10 },
   languageFailure: { alignItems: 'center', gap: 8, paddingHorizontal: shared.screen.horizontalPadding },
-  languageOption: { borderBottomColor: colors.border, borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginHorizontal: shared.screen.horizontalPadding, minHeight: 56, paddingVertical: 16 },
-  languageOptionSelected: { backgroundColor: colors.surfaceSecondary, borderRadius: 10, paddingHorizontal: 10 },
-  previewImage: { aspectRatio: 16 / 9, backgroundColor: colors.surfaceSecondary, borderRadius: 18, width: '100%' },
-  previewName: { color: colors.textPrimary, fontSize: 26, fontWeight: '800' },
-  previewHeading: { ...typography.label, color: colors.textPrimary, fontWeight: '800', marginTop: 5 },
-  previewBody: { ...typography.body, color: colors.textSecondary },
-  warning: { ...typography.bodySmall, color: colors.warning },
+  languageOption: { alignItems: 'center', borderBottomColor: colors.bd, borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginHorizontal: shared.screen.horizontalPadding, minHeight: 56, paddingVertical: 12 },
+  languageOptionSelected: { backgroundColor: colors.s2 },
+  previewImage: { aspectRatio: 16 / 9, backgroundColor: colors.s2, borderRadius: 8, width: '100%' },
+  previewName: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 26, fontWeight: '500' },
+  previewHeading: { ...typography.label, color: colors.tx, fontWeight: '500', marginTop: 5 },
+  previewBody: { ...typography.body, color: colors.t2 },
+  warning: { ...typography.bodySmall, color: colors.dg },
 })

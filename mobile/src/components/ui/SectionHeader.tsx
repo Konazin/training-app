@@ -9,8 +9,8 @@ export function SectionHeader({ title, meta, action }: { title: string; meta?: s
   return <View style={styles.container}><View style={styles.copy}><Text accessibilityRole="header" style={styles.title}>{title}</Text>{meta && <Text style={styles.meta}>{meta}</Text>}</View>{action}</View>
 }
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  container: { alignItems: 'center', flexDirection: 'row', gap: shared.spacing.md, justifyContent: 'space-between', marginBottom: shared.spacing.sm, marginTop: shared.spacing.lg, minHeight: shared.touchTarget.minimum },
+  container: { alignItems: 'center', flexDirection: 'row', gap: shared.spacing.md, justifyContent: 'space-between', marginBottom: shared.spacing.sm, marginTop: shared.spacing.xl, minHeight: shared.touchTarget.minimum },
   copy: { flex: 1 },
-  title: { ...typography.body, color: colors.textPrimary, fontWeight: '800' },
-  meta: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
+  title: { ...typography.titleSmall, color: colors.tx },
+  meta: { ...typography.caption, color: colors.t2, marginTop: 2 },
 })

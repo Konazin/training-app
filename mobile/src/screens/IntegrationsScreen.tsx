@@ -1,11 +1,12 @@
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { ChevronRight, Dumbbell } from 'lucide-react-native'
 import { ScreenScrollView } from '../components/Screen'
 import { ScreenHeader } from '../components/ScreenHeader'
 import type { RootStackParamList } from '../navigation/types'
 import { type ThemeColors, useTheme } from '../theme'
-import { typography } from '../theme/typography'
+import { fontFamilies } from '../theme/typography'
 import { listExerciseProviders } from '@training/training-domain'
 
 export function IntegrationsScreen() {
@@ -30,15 +31,19 @@ export function IntegrationsScreen() {
               navigation.navigate('WgerIntegration')
             }
           }}
-          style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.card, provider.supportState !== 'SUPPORTED' && styles.disabled, pressed && styles.pressed]}
         >
-          <View style={styles.logo}><Text style={styles.logoText}>{provider.name[0]}</Text></View>
+          <View style={styles.logo}><Dumbbell color={colors.tx} size={20} strokeWidth={1.7} /></View>
           <View style={styles.copy}>
             <Text style={styles.title}>Catálogo {provider.name}</Text>
             <Text style={styles.detail}>Busca exercícios públicos e salva uma cópia no aparelho.</Text>
-            <Text style={styles.status}>Manual · Requer internet · Sem sincronização automática</Text>
+            <Text style={styles.status}>
+              {provider.supportState === 'SUPPORTED'
+                ? 'manual · usa internet · salva localmente'
+                : 'indisponível no momento'}
+            </Text>
           </View>
-          <Text style={styles.arrow}>→</Text>
+          <ChevronRight color={colors.mu} size={20} strokeWidth={1.7} />
         </Pressable>
       ))}
     </ScreenScrollView>
@@ -46,30 +51,19 @@ export function IntegrationsScreen() {
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  card: {
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 20,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 14,
-    minHeight: 92,
-    padding: 16,
-  },
+  card: { alignItems: 'center', borderBottomColor: colors.bd, borderBottomWidth: 1, flexDirection: 'row', gap: 14, minHeight: 92, paddingVertical: 16 },
   logo: {
     alignItems: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: 16,
-    height: 56,
+    backgroundColor: colors.s2,
+    borderRadius: 12,
+    height: 48,
     justifyContent: 'center',
-    width: 56,
+    width: 48,
   },
-  logoText: { color: colors.onPrimary, fontSize: 22, fontWeight: '900' },
   copy: { flex: 1 },
-  title: { ...typography.body, color: colors.textPrimary, fontWeight: '800' },
-  detail: { ...typography.bodySmall, color: colors.textSecondary, marginTop: 5 },
-  status: { ...typography.caption, color: colors.textSecondary, fontWeight: '700', marginTop: 7 },
-  arrow: { color: colors.textSecondary, fontSize: 18 },
+  title: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 16, fontWeight: '500' },
+  detail: { color: colors.t2, fontFamily: fontFamilies.text, fontSize: 14, lineHeight: 20, marginTop: 5 },
+  status: { color: colors.mu, fontFamily: fontFamilies.data, fontSize: 11, marginTop: 7 },
   pressed: { opacity: 0.72 },
+  disabled: { opacity: 0.55 },
 })

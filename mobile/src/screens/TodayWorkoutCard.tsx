@@ -44,37 +44,53 @@ export function TodayWorkoutCard({
       accessibilityLabel={`Treino de hoje: ${day.title}. ${statusLabel(day.status)}.`}
       style={styles.card}
     >
-      <Text style={styles.eyebrow}>TREINO DE HOJE</Text>
+      <Text style={styles.eyebrow}>treino · {plan.name}</Text>
       <Text style={styles.title}>{day.title}</Text>
-      <Text style={styles.plan}>{plan.name}</Text>
       <Text style={styles.status}>{statusCopy(day, session)}</Text>
       {day.status === 'READY' && day.exerciseCount > 0 && (
-        <Text style={styles.meta}>
-          {day.exerciseCount} {day.exerciseCount === 1 ? 'exercício' : 'exercícios'}
-          {' · '}{day.plannedSets} séries
-          {day.estimatedDurationMinutes > 0 ? ` · ${day.estimatedDurationMinutes} min` : ''}
-        </Text>
+        <>
+          <View style={styles.exerciseList}>
+            {planDay?.exercises.slice(0, 3).map((item) => (
+              <View key={item.id} style={styles.exerciseRow}>
+                <Text numberOfLines={1} style={styles.exerciseName}>{item.exercise.name}</Text>
+                <Text style={styles.exercisePrescription}>
+                  {item.sets}×{item.minReps}–{item.maxReps}
+                  {item.plannedLoad != null ? ` · ${formatLoad(item.plannedLoad)} kg` : ''}
+                </Text>
+              </View>
+            ))}
+            {day.exerciseCount > 3 && (
+              <Text style={styles.moreExercises}>e mais {day.exerciseCount - 3} exercícios</Text>
+            )}
+          </View>
+          <Text style={styles.meta}>
+            {day.plannedSets} séries
+            {day.estimatedDurationMinutes > 0 ? ` · cerca de ${day.estimatedDurationMinutes} min` : ''}
+          </Text>
+        </>
       )}
       {day.status === 'REST' && !!planDay?.restActivities.length && (
-        <View style={styles.list}>
+        <View style={styles.exerciseList}>
           {planDay.restActivities.slice(0, 3).map((activity) => (
-            <Text key={activity.id} style={styles.listItem}>• {activity.name}</Text>
+            <View key={activity.id} style={styles.exerciseRow}>
+              <Text numberOfLines={1} style={styles.exerciseName}>{activity.name}</Text>
+              <Text style={styles.exercisePrescription}>{activity.estimatedDurationMinutes} min</Text>
+            </View>
           ))}
           {planDay.restActivities.length > 3 && (
-            <Text style={styles.listItem}>
-              +{planDay.restActivities.length - 3} atividades
+            <Text style={styles.moreExercises}>
+              e mais {planDay.restActivities.length - 3} atividades
             </Text>
           )}
         </View>
       )}
       {!!references.length && day.status === 'READY' && (
         <View style={styles.references}>
-          <Text style={styles.referenceTitle}>Referência anterior</Text>
-          {references.map((reference) => (
-            <Text key={reference.exerciseDefinitionId} style={styles.reference}>
-              {reference.exerciseName}: {formatLoad(reference.load)} kg
-            </Text>
-          ))}
+          <Text style={styles.referenceTitle}>referência · {formatReferenceDate(references[0].scheduledDate)}</Text>
+          <Text style={styles.reference}>
+            {references[0].exerciseName}: {formatLoad(references[0].load)} kg
+            {references.length > 1 ? ` · +${references.length - 1} exercícios` : ''}
+          </Text>
         </View>
       )}
       {!!action && (
@@ -149,19 +165,29 @@ function formatLoad(load: number) {
   return Number.isInteger(load) ? String(load) : load.toLocaleString('pt-BR')
 }
 
+function formatReferenceDate(value: string) {
+  const [year, month, day] = value.split('-').map(Number)
+  return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' })
+    .format(new Date(year, month - 1, day))
+    .replaceAll('.', '')
+    .toLocaleLowerCase('pt-BR')
+}
+
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  card: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 22, borderWidth: 1, marginBottom: 16, padding: 20 },
-  eyebrow: { ...typography.caption, color: colors.textSecondary, fontWeight: '800', letterSpacing: 1.4 },
-  title: { color: colors.textPrimary, fontSize: 25, fontWeight: '900', lineHeight: 32, marginTop: 14 },
-  plan: { ...typography.bodySmall, color: colors.textSecondary, marginTop: 4 },
-  status: { ...typography.body, color: colors.textPrimary, fontWeight: '700', marginTop: 18 },
-  meta: { ...typography.bodySmall, color: colors.textSecondary, marginTop: 6 },
-  list: { gap: 5, marginTop: 10 },
-  listItem: { ...typography.bodySmall, color: colors.textSecondary },
-  references: { backgroundColor: colors.surfaceSecondary, borderRadius: 14, gap: 4, marginTop: 16, padding: 12 },
-  referenceTitle: { ...typography.caption, color: colors.textSecondary, fontWeight: '800', textTransform: 'uppercase' },
-  reference: { ...typography.bodySmall, color: colors.textPrimary },
-  action: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: colors.primary, borderRadius: 14, justifyContent: 'center', marginTop: 20, minHeight: 48, paddingHorizontal: 18 },
-  actionText: { ...typography.label, color: colors.onPrimary, fontWeight: '900' },
-  pressed: { opacity: 0.72 },
+  card: { marginBottom: 24 },
+  eyebrow: { ...typography.monoLabel, color: colors.t2 },
+  title: { ...typography.title, color: colors.tx, marginTop: 8 },
+  status: { ...typography.body, color: colors.tx, marginTop: 12 },
+  exerciseList: { marginTop: 16 },
+  exerciseRow: { alignItems: 'center', borderBottomColor: colors.bd, borderBottomWidth: 1, flexDirection: 'row', gap: 12, minHeight: 40, paddingVertical: 8 },
+  exerciseName: { ...typography.body, color: colors.tx, flex: 1 },
+  exercisePrescription: { ...typography.numberSmall, color: colors.t2, textAlign: 'right' },
+  moreExercises: { ...typography.bodySmall, color: colors.t2, marginTop: 8 },
+  meta: { ...typography.bodySmall, color: colors.t2, marginTop: 8 },
+  references: { borderTopColor: colors.bd, borderTopWidth: 1, gap: 4, marginTop: 16, paddingTop: 12 },
+  referenceTitle: { ...typography.monoLabel, color: colors.t2 },
+  reference: { ...typography.bodySmall, color: colors.tx },
+  action: { alignItems: 'center', backgroundColor: colors.ac, borderRadius: 12, justifyContent: 'center', marginTop: 20, minHeight: 56, paddingHorizontal: 18 },
+  actionText: { ...typography.titleSmall, color: colors.on },
+  pressed: { backgroundColor: colors.primaryPressed },
 })
