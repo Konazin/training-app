@@ -71,9 +71,13 @@ const emptyItem = (): NutritionMealItemInput => ({
 export function NutritionScreen({
   repositories,
   secrets,
+  secretsRevision = 0,
+  onOpenAiSettings,
 }: {
   repositories: LocalRepositories
   secrets: SecretsRepository
+  secretsRevision?: number
+  onOpenAiSettings: () => void
 }) {
   const { colors } = useTheme()
   const styles = createStyles(colors)
@@ -87,10 +91,6 @@ export function NutritionScreen({
   const [noticeTone, setNoticeTone] = useState<'warning' | 'danger' | 'success'>('warning')
   const [loading, setLoading] = useState(false)
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false)
-  const [keyEntry, setKeyEntry] = useState('')
-  const [showAiSettings, setShowAiSettings] = useState(false)
-  const [editingKey, setEditingKey] = useState(false)
-  const [savingKey, setSavingKey] = useState(false)
   const [preferences, setPreferences] = useState('')
   const [dietSuggestion, setDietSuggestion] = useState<NutritionAiDietSuggestion | null>(null)
   const [editingMenuId, setEditingMenuId] = useState<string | null>(null)
@@ -144,16 +144,14 @@ export function NutritionScreen({
     void secrets.get(GEMINI_API_KEY_SECRET).then((key) => {
       if (mounted.current) {
         setApiKeyConfigured(Boolean(key))
-        setShowAiSettings(!key)
       }
     }).catch(() => {
       if (mounted.current) {
-        setShowAiSettings(true)
         setNotice('O armazenamento seguro não está disponível neste aparelho.')
         setNoticeTone('danger')
       }
     })
-  }, [secrets])
+  }, [secrets, secretsRevision])
 
   const saveMeal = async (input: NutritionMealInput) => {
     try {
@@ -209,56 +207,13 @@ export function NutritionScreen({
     }
   }
 
-  const saveApiKey = async () => {
-    setSavingKey(true)
-    try {
-      await secrets.set(GEMINI_API_KEY_SECRET, keyEntry)
-      setKeyEntry('')
-      setApiKeyConfigured(true)
-      setEditingKey(false)
-      setNotice('Chave salva no armazenamento seguro deste aparelho.')
-      setNoticeTone('success')
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Não foi possível salvar a chave.')
-      setNoticeTone('danger')
-    } finally {
-      setSavingKey(false)
-    }
-  }
-
-  const removeApiKey = () => Alert.alert(
-    'Remover chave Gemini?',
-    'A chave será apagada do armazenamento seguro deste aparelho. Nenhuma outra informação será alterada.',
-    [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Remover chave',
-        style: 'destructive',
-        onPress: () => {
-          void secrets.remove(GEMINI_API_KEY_SECRET).then(() => {
-            setApiKeyConfigured(false)
-            setEditingKey(false)
-            setShowAiSettings(true)
-            setNotice('Chave removida.')
-            setNoticeTone('success')
-          }).catch(() => {
-            setNotice('Não foi possível remover a chave do armazenamento seguro.')
-            setNoticeTone('danger')
-          })
-        },
-      },
-    ],
-  )
-
   const runPhotoEstimate = async (source: 'CAMERA' | 'GALLERY') => {
     let temporaryImageUri: string | null = null
     let timeout: ReturnType<typeof setTimeout> | null = null
     try {
       const key = await secrets.get(GEMINI_API_KEY_SECRET)
       if (!key) {
-        setNotice('Configure sua chave Gemini antes de analisar uma imagem.')
-        setNoticeTone('warning')
-        setShowAiSettings(true)
+        onOpenAiSettings()
         return
       }
       setAiBusy(true)
@@ -329,9 +284,7 @@ export function NutritionScreen({
     try {
       const key = await secrets.get(GEMINI_API_KEY_SECRET)
       if (!key) {
-        setNotice('Configure sua chave Gemini antes de gerar uma sugestão.')
-        setNoticeTone('warning')
-        setShowAiSettings(true)
+        onOpenAiSettings()
         return
       }
       setAiBusy(true)
@@ -488,6 +441,7 @@ export function NutritionScreen({
         <Action label="Galeria · estimar com IA" onPress={() => void runPhotoEstimate('GALLERY')} disabled={aiBusy} />
         <Action label="Adicionar manualmente" primary onPress={() => setEditing(newMeal(date))} disabled={aiBusy} />
       </View>
+      {!apiKeyConfigured && <AiKeyRow configured={false} onPress={onOpenAiSettings} />}
 
       <SectionHeader title="Refeições" />
       {!meals.length ? (
@@ -522,36 +476,7 @@ export function NutritionScreen({
       <Text style={styles.helper}>
         Opcional e requer internet. Metas e preferências digitadas só são enviadas após sua confirmação. As sugestões são genéricas e precisam ser revisadas.
       </Text>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ expanded: showAiSettings }}
-        onPress={() => setShowAiSettings((current) => !current)}
-        style={styles.settingsToggle}
-      >
-        <View style={styles.settingsCopy}>
-          <Text style={styles.settingsTitle}>Gemini</Text>
-          <Text style={styles.helper}>{apiKeyConfigured ? 'Chave pessoal salva neste aparelho' : 'Configure uma chave sua para ativar as sugestões'}</Text>
-        </View>
-        <Text style={styles.settingsArrow}>{showAiSettings ? '−' : '+'}</Text>
-      </Pressable>
-      {showAiSettings && (
-        <View style={styles.settingsCard}>
-          <Text style={styles.bodyText}>A chave fica no armazenamento seguro do Android e não entra no banco nem nos backups. Em cada solicitação, ela é enviada ao Google Gemini para autenticação; o provedor controla suas cotas e possíveis custos.</Text>
-          {apiKeyConfigured && !editingKey ? (
-            <View style={styles.row}>
-              <Action label="Trocar chave" onPress={() => { setEditingKey(true); setKeyEntry(''); setShowAiSettings(true) }} />
-              <Action label="Remover chave" onPress={removeApiKey} danger />
-            </View>
-          ) : (
-            <>
-              <Field label="Chave pessoal da Gemini API" value={keyEntry} onChangeText={setKeyEntry} secureTextEntry autoCapitalize="none" autoCorrect={false} />
-              <Action label={savingKey ? 'Salvando…' : 'Salvar chave neste aparelho'} primary onPress={() => void saveApiKey()} disabled={savingKey || !keyEntry.trim()} />
-            </>
-          )}
-          <Text style={styles.privacyNote}>Antes de cada envio, o app explica quais dados serão compartilhados. Revise também os termos atuais do provedor.</Text>
-          <Text style={styles.privacyNote}>Use uma chave dedicada e não a compartilhe. Como a chamada ocorre no celular, uma chave pessoal pode ser exposta se o aparelho estiver comprometido; restrinja ou revogue a chave na conta do provedor quando necessário.</Text>
-        </View>
-      )}
+      <AiKeyRow configured={apiKeyConfigured} onPress={onOpenAiSettings} />
       <Field
         label="Preferências para a sugestão (opcional, até 500 caracteres)"
         value={preferences}
@@ -835,6 +760,25 @@ function Field(props: React.ComponentProps<typeof TextInput> & { label: string }
         style={[styles.input, inputProps.multiline && styles.multilineInput]}
       />
     </View>
+  )
+}
+
+function AiKeyRow({ configured, onPress }: { configured: boolean; onPress: () => void }) {
+  const { colors } = useTheme()
+  const styles = createStyles(colors)
+  return (
+    <Pressable
+      accessibilityLabel={configured ? 'Gemini: chave configurada. Gerenciar chave' : 'Gemini: sem chave. Configurar chave'}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={styles.settingsToggle}
+    >
+      <View style={styles.settingsCopy}>
+        <Text style={styles.settingsTitle}>Gemini</Text>
+        <Text style={styles.helper}>{configured ? 'Chave pessoal salva neste aparelho' : 'Configure uma chave sua para ativar as estimativas e sugestões'}</Text>
+      </View>
+      <ChevronRight color={colors.mu} size={20} strokeWidth={1.7} />
+    </Pressable>
   )
 }
 
@@ -1130,8 +1074,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   settingsToggle: { alignItems: 'center', borderBottomColor: colors.bd, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', justifyContent: 'space-between', marginVertical: 6, minHeight: 56 },
   settingsCopy: { flex: 1, paddingRight: 12 },
   settingsTitle: { ...typography.label, color: colors.tx, fontWeight: '500' },
-  settingsArrow: { color: colors.tx, fontFamily: typography.titleSmall.fontFamily, fontSize: 22 },
-  settingsCard: { backgroundColor: colors.s1, borderRadius: 12, marginBottom: 12, padding: 12 },
   suggestionCard: { backgroundColor: colors.s1, borderRadius: 12, marginVertical: 12, padding: 12 },
   eyebrow: { ...typography.monoLabel, color: colors.t2, marginBottom: 12 },
   action: { alignItems: 'center', backgroundColor: 'transparent', borderColor: colors.mu, borderRadius: 12, borderWidth: 1, justifyContent: 'center', minHeight: 48, paddingHorizontal: 14, paddingVertical: 10 },

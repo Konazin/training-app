@@ -1,7 +1,7 @@
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { ChevronRight, Dumbbell } from 'lucide-react-native'
+import { ChevronRight, Dumbbell, Sparkles } from 'lucide-react-native'
 import { ScreenScrollView } from '../components/Screen'
 import { ScreenHeader } from '../components/ScreenHeader'
 import type { RootStackParamList } from '../navigation/types'
@@ -46,6 +46,19 @@ export function IntegrationsScreen() {
           <ChevronRight color={colors.mu} size={20} strokeWidth={1.7} />
         </Pressable>
       ))}
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => navigation.navigate('NutritionAiSettings')}
+        style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+      >
+        <View style={styles.logo}><Sparkles color={colors.tx} size={20} strokeWidth={1.7} /></View>
+        <View style={styles.copy}>
+          <Text style={styles.title}>Gemini · IA da Nutrição</Text>
+          <Text style={styles.detail}>Chave pessoal para estimar refeições por foto e sugerir cardápios.</Text>
+          <Text style={styles.status}>opcional · usa internet · chave no armazenamento seguro</Text>
+        </View>
+        <ChevronRight color={colors.mu} size={20} strokeWidth={1.7} />
+      </Pressable>
     </ScreenScrollView>
   )
 }

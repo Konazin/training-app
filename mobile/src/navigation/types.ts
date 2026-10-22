@@ -14,6 +14,7 @@ export type RootStackParamList = {
   ExerciseDetail: { exerciseId: number }
   Integrations: undefined
   WgerIntegration: undefined
+  NutritionAiSettings: undefined
   AppearanceSettings: undefined
   Session: undefined
   ArchivedTrainingPlans: undefined

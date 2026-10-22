@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, AppState, Text, View } from 'react-native'
 import {
   DefaultTheme,
@@ -47,6 +47,7 @@ import { HomeScreen } from './src/screens/HomeScreen'
 import { HistoryScreen } from './src/screens/HistoryScreen'
 import { MoreScreen } from './src/screens/MoreScreen'
 import { NutritionScreen } from './src/features/nutrition/NutritionScreen'
+import { NutritionAiSettingsScreen } from './src/features/nutrition/NutritionAiSettingsScreen'
 import { AppearanceSettingsScreen } from './src/screens/AppearanceSettingsScreen'
 import { IntegrationsScreen } from './src/screens/IntegrationsScreen'
 import { WgerIntegrationScreen } from './src/features/wger/WgerIntegrationScreen'
@@ -130,6 +131,7 @@ function LocalApp({
     savedPreferences,
   } = useTheme()
   const secrets = useMemo(() => createSecureSecretsRepository(), [])
+  const [secretsRevision, setSecretsRevision] = useState(0)
   const controller = useTrainingController(repositories.exercises, repositories.dashboard)
   const maintenanceRun = useRef<Promise<void> | null>(null)
   const runNutritionMaintenance = useCallback(() => {
@@ -245,6 +247,7 @@ function LocalApp({
                   <MainTabs
                     repositories={repositories}
                     secrets={secrets}
+                    secretsRevision={secretsRevision}
                     navigation={navigation}
                     controller={controller}
                     trainingPlan={trainingPlan}
@@ -301,6 +304,9 @@ function LocalApp({
                     onImported={controller.refresh}
                   />
                 )}
+              </Stack.Screen>
+              <Stack.Screen name="NutritionAiSettings">
+                {() => <NutritionAiSettingsScreen secrets={secrets} onChanged={() => setSecretsRevision((value) => value + 1)} />}
               </Stack.Screen>
               <Stack.Screen name="AppearanceSettings" component={AppearanceSettingsScreen} />
               <Stack.Screen name="TrainingPlanEditor">
@@ -501,6 +507,7 @@ function starterPackMessage(state: ReturnType<typeof useStarterPackImportControl
 function MainTabs({
   repositories,
   secrets,
+  secretsRevision,
   navigation,
   controller,
   trainingPlan,
@@ -513,6 +520,7 @@ function MainTabs({
 }: {
   repositories: LocalRepositories
   secrets: SecretsRepository
+  secretsRevision: number
   navigation: NativeStackNavigationProp<RootStackParamList>
   controller: ReturnType<typeof useTrainingController>
   trainingPlan: ReturnType<typeof useTrainingPlanController>
@@ -658,7 +666,7 @@ function MainTabs({
         )}
       </Tabs.Screen>
       <Tabs.Screen name="Nutrition">
-        {() => <NutritionScreen repositories={repositories} secrets={secrets} />}
+        {() => <NutritionScreen repositories={repositories} secrets={secrets} secretsRevision={secretsRevision} onOpenAiSettings={() => navigation.navigate('NutritionAiSettings')} />}
       </Tabs.Screen>
       <Tabs.Screen name="More">
         {() => (

@@ -72,7 +72,7 @@ describe('nutrição local renderizada', () => {
       },
     })
     const secrets: SecretsRepository = { get: async () => null, set: async () => undefined, remove: async () => undefined }
-    await renderAsync(createElement(NutritionScreen, { repositories, secrets }))
+    await renderAsync(createElement(NutritionScreen, { repositories, secrets, onOpenAiSettings: jest.fn() }))
 
     expect(screen.getByText('Nenhuma refeição registrada neste dia.')).toBeTruthy()
     expect(screen.queryByText(/será adicionada na próxima etapa/i)).toBeNull()
@@ -88,15 +88,16 @@ describe('nutrição local renderizada', () => {
     expect(repositories.nutritionMaintenance.aggregateDay).toHaveBeenCalled()
   })
 
-  it('mantém a configuração Gemini no armazenamento de segredos, não no banco local', async () => {
+  it('abre a tela de chave Gemini a partir da Nutrição quando não há chave', async () => {
     const repositories = createRepositories()
-    const secrets: SecretsRepository = { get: async () => null, set: jest.fn(async () => undefined), remove: async () => undefined }
-    await renderAsync(createElement(NutritionScreen, { repositories, secrets }))
-    fireEvent.changeText(screen.getByLabelText('Chave pessoal da Gemini API'), 'AIza-user-test-key')
-    fireEvent.press(screen.getByText('Salvar chave neste aparelho'))
-
-    await waitFor(() => expect(secrets.set).toHaveBeenCalledWith('nutrition.gemini.api-key', 'AIza-user-test-key'))
-    expect(repositories.settings.set).not.toHaveBeenCalledWith(expect.stringContaining('secret'), expect.anything())
+    const secrets: SecretsRepository = { get: async () => null, set: async () => undefined, remove: async () => undefined }
+    const onOpenAiSettings = jest.fn()
+    await renderAsync(createElement(NutritionScreen, { repositories, secrets, onOpenAiSettings }))
+    expect(screen.queryByLabelText('Chave pessoal da Gemini API')).toBeNull()
+    fireEvent.press(screen.getAllByLabelText('Gemini: sem chave. Configurar chave')[0]!)
+    expect(onOpenAiSettings).toHaveBeenCalledTimes(1)
+    fireEvent.press(screen.getByText('Câmera · estimar com IA'))
+    await waitFor(() => expect(onOpenAiSettings).toHaveBeenCalledTimes(2))
   })
 
   it('preserva decimais digitados e mostra a confirmação depois de salvar', async () => {
@@ -105,7 +106,7 @@ describe('nutrição local renderizada', () => {
       nutritionMeals: { create: jest.fn(async (input: NutritionMealInput) => { saved = input; return { ...input, id: 1, createdAt: '', updatedAt: '', items: [] } }) },
     })
     const secrets: SecretsRepository = { get: async () => null, set: async () => undefined, remove: async () => undefined }
-    await renderAsync(createElement(NutritionScreen, { repositories, secrets }))
+    await renderAsync(createElement(NutritionScreen, { repositories, secrets, onOpenAiSettings: jest.fn() }))
     fireEvent.press(screen.getByText('Adicionar manualmente'))
     await waitFor(() => expect(screen.getByText('Adicionar refeição')).toBeTruthy())
     fireEvent.changeText(screen.getByLabelText('Alimento'), 'Pão')
@@ -126,7 +127,7 @@ describe('nutrição local renderizada', () => {
   it('mantém a confirmação ao salvar metas e não permite avançar além de hoje', async () => {
     const repositories = createRepositories()
     const secrets: SecretsRepository = { get: async () => null, set: async () => undefined, remove: async () => undefined }
-    await renderAsync(createElement(NutritionScreen, { repositories, secrets }))
+    await renderAsync(createElement(NutritionScreen, { repositories, secrets, onOpenAiSettings: jest.fn() }))
     fireEvent.changeText(screen.getAllByLabelText('Calorias (kcal)')[0]!, '2000')
     fireEvent.press(screen.getByText('Salvar metas'))
     await waitFor(() => expect(screen.getByText('Metas salvas neste aparelho.')).toBeTruthy())
