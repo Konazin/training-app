@@ -24,6 +24,7 @@ import {
   calculateHistoryProgress,
   localDateKey,
   type BackupRepository,
+  type SecretsRepository,
 } from '@training/training-domain'
 import type { MainTabParamList, RootStackParamList } from './src/navigation/types'
 import { useTrainingController } from './src/controllers/useTrainingController'
@@ -70,6 +71,7 @@ import { Onboarding } from './src/features/onboarding/Onboarding'
 import { useOnboarding } from './src/features/onboarding/useOnboarding'
 import { useStarterPackImportController } from './src/features/exercise-library/useStarterPackImportController'
 import { WGER_STARTER_PACK, recommendedPackEnabled } from '@training/training-domain'
+import { createSecureSecretsRepository, GEMINI_API_KEY_SECRET } from './src/integrations/secureSecrets'
 
 const Stack = createNativeStackNavigator<RootStackParamList>()
 const Tabs = createBottomTabNavigator<MainTabParamList>()
@@ -127,6 +129,7 @@ function LocalApp({
     preferences,
     savedPreferences,
   } = useTheme()
+  const secrets = useMemo(() => createSecureSecretsRepository(), [])
   const controller = useTrainingController(repositories.exercises, repositories.dashboard)
   const maintenanceRun = useRef<Promise<void> | null>(null)
   const runNutritionMaintenance = useCallback(() => {
@@ -241,6 +244,7 @@ function LocalApp({
                 {({ navigation }) => (
                   <MainTabs
                     repositories={repositories}
+                    secrets={secrets}
                     navigation={navigation}
                     controller={controller}
                     trainingPlan={trainingPlan}
@@ -496,6 +500,7 @@ function starterPackMessage(state: ReturnType<typeof useStarterPackImportControl
 
 function MainTabs({
   repositories,
+  secrets,
   navigation,
   controller,
   trainingPlan,
@@ -507,6 +512,7 @@ function MainTabs({
   onOnboarding,
 }: {
   repositories: LocalRepositories
+  secrets: SecretsRepository
   navigation: NativeStackNavigationProp<RootStackParamList>
   controller: ReturnType<typeof useTrainingController>
   trainingPlan: ReturnType<typeof useTrainingPlanController>
@@ -652,7 +658,7 @@ function MainTabs({
         )}
       </Tabs.Screen>
       <Tabs.Screen name="Nutrition">
-        {() => <NutritionScreen repositories={repositories} />}
+        {() => <NutritionScreen repositories={repositories} secrets={secrets} />}
       </Tabs.Screen>
       <Tabs.Screen name="More">
         {() => (
@@ -665,7 +671,14 @@ function MainTabs({
             onIntegrations={() => navigation.navigate('Integrations')}
             onExport={() => void backup.exportBackup()}
             onImport={() => void backup.importBackup()}
-            onErase={() => void backup.eraseAll()}
+            onErase={async () => {
+              if (!await backup.eraseAll()) return
+              try {
+                await secrets.remove(GEMINI_API_KEY_SECRET)
+              } catch {
+                Alert.alert('Dados apagados', 'A chave de IA não pôde ser removida do armazenamento seguro. Remova-a nas configurações de Nutrição.')
+              }
+            }}
             automaticBackups={backup.automaticBackups}
             onRestoreAutomatic={(uri) => void backup.restoreAutomatic(uri)}
             onShareAutomatic={(uri) => void backup.shareAutomatic(uri)}

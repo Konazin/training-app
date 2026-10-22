@@ -30,6 +30,15 @@ export interface DailyNutritionSummary {
 }
 export type DailyNutritionSummaryInput = Omit<DailyNutritionSummary, 'id'> & { id?: number }
 export interface NutritionGoals { caloriesKcal: number | null; proteinGrams: number | null; carbohydratesGrams: number | null; fatGrams: number | null; fiberGrams: number | null }
+export interface NutritionImageInput { base64: string; mimeType: 'image/jpeg' | 'image/png' | 'image/webp' }
+export interface NutritionAiMealEstimate { title: string; items: NutritionMealItemInput[] }
+export interface NutritionAiSuggestedMeal { mealType: NutritionMealType; title: string; items: NutritionMealItemInput[] }
+export interface NutritionAiDietSuggestion { title: string; summary: string; meals: NutritionAiSuggestedMeal[] }
+export interface NutritionAiDietRequest { goals: NutritionGoals; preferences: string }
+export interface NutritionAiProvider {
+  estimateMeal(image: NutritionImageInput, signal?: AbortSignal): Promise<NutritionAiMealEstimate>
+  suggestDailyMenu(input: NutritionAiDietRequest, signal?: AbortSignal): Promise<NutritionAiDietSuggestion>
+}
 export interface NutritionMealRepository { create(input: NutritionMealInput): Promise<NutritionMeal>; update(id: number, input: NutritionMealInput): Promise<NutritionMeal>; delete(id: number): Promise<void>; findById(id: number): Promise<NutritionMeal | null>; listByDate(localDate: string): Promise<NutritionMeal[]>; listBetweenDates(startDate: string, endDate: string): Promise<NutritionMeal[]> }
 export interface NutritionSummaryRepository { findByDate(localDate: string): Promise<DailyNutritionSummary | null>; listBetweenDates(startDate: string, endDate: string): Promise<DailyNutritionSummary[]>; upsert(summary: DailyNutritionSummaryInput): Promise<DailyNutritionSummary> }
 export interface NutritionMaintenanceRepository { aggregateDay(localDate: string): Promise<DailyNutritionSummary | null>; closePendingDays(today: string): Promise<void>; purgeExpiredMealDetails(today: string, retentionDays?: number): Promise<number>; run(today: string): Promise<void> }

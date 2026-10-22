@@ -1514,6 +1514,34 @@ describe('SQLite local schema', () => {
     await expect(repositories.preferences.load()).resolves.toEqual({ displayName: 'Atleta' })
     await database.close()
   })
+
+  it('remove o resumo do dia quando a última refeição é excluída', async () => {
+    const database = betterDatabase(newDatabase())
+    await runMigrations(database)
+    const repositories = createLocalRepositories(database)
+    const date = '2026-10-16'
+    const meal = await repositories.nutritionMeals.create({
+      localDate: date,
+      consumedAt: `${date}T12:00:00.000Z`,
+      mealType: 'LUNCH',
+      title: 'Almoço',
+      notes: '',
+      source: 'MANUAL',
+      items: [{
+        name: 'Arroz', portionDescription: '1 porção', estimatedGrams: null,
+        caloriesKcal: 100, proteinGrams: 2, carbohydratesGrams: 20,
+        fatGrams: 1, fiberGrams: 1, micronutrients: {}, confidence: null,
+        dataSource: 'MANUAL', sortOrder: 0,
+      }],
+    })
+    await repositories.nutritionMaintenance.aggregateDay(date)
+    expect(await repositories.nutritionSummaries.findByDate(date)).not.toBeNull()
+
+    await repositories.nutritionMeals.delete(meal.id)
+    await expect(repositories.nutritionMaintenance.aggregateDay(date)).resolves.toBeNull()
+    await expect(repositories.nutritionSummaries.findByDate(date)).resolves.toBeNull()
+    await database.close()
+  })
 })
 
 function newDatabase() {
