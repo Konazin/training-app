@@ -5,12 +5,12 @@
     "scheme": "trainingapp",
     "platforms": ["android"],
     "icon": "./assets/icon.png",
-    "version": "0.12.1",
+    "version": "0.12.2",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "android": {
       "package": "com.konazin.trainingapp",
-      "versionCode": 19,
+      "versionCode": 20,
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#101216"
