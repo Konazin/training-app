@@ -47,4 +47,16 @@ describe('ExerciseDB provider', () => {
     const fetcher = async () => new Response('{}', { status: 404, headers: { 'content-type': 'application/json' } })
     await expect(new ExerciseDbClient({ fetch: fetcher }).findByExternalId('gone-1')).resolves.toBeNull()
   })
+  it('marca só uma mídia como principal e preserva todos os músculos alvo', async () => {
+    const full = { ...row, targetMuscles: ['pectorals', 'serratus anterior'], imageUrls: { '360p': 'https://cdn.exercisedb.dev/a.png' } }
+    const page = await new ExerciseDbClient({ fetch: async () => response([full]) }).search(query)
+    const media = page.items[0]!.media
+    expect(media.map((item) => item.main)).toEqual([true, false])
+    expect(media.map((item) => item.sortOrder)).toEqual([0, 1])
+    expect(page.items[0]!.secondaryMuscleGroups).toEqual(['serratus anterior', 'triceps'])
+  })
+  it('explica o limite de consultas (429)', async () => {
+    const limited = async () => new Response('{}', { status: 429, headers: { 'content-type': 'application/json' } })
+    await expect(new ExerciseDbClient({ fetch: limited }).search(query)).rejects.toThrow('limite de consultas')
+  })
 })

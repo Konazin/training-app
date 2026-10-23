@@ -8,6 +8,12 @@ animações cuidadosas e usabilidade em primeiro lugar**. Complementa
 
 Legenda: ✅ feito e commitado · 🔧 em andamento · ⬜ pendente · ❓ precisa de decisão.
 
+> **Status (2026-10-23):** Fases 1 a 3 implementadas, exceto os itens ainda marcados ⬜ abaixo.
+> Decisões tomadas por padrão: erro/destrutivo em vermelho dessaturado; `Animated` (sem Reanimated);
+> tema "Preto" como padrão, demais temas mantidos por compatibilidade; contratos de UI: o código novo prevalece.
+> Verificado: `tsc`, `check-font-sizes`, vitest (174 + pacotes) e jest (33) verdes; `expo export` Android gera o bundle.
+> Não verificado: execução em aparelho/emulador (visual, desempenho, TalkBack).
+
 ## Princípios do redesign
 
 1. **Usabilidade antes de estilo.** Uma tela de treino é usada com a mão suada,
@@ -41,40 +47,39 @@ Legenda: ✅ feito e commitado · 🔧 em andamento · ⬜ pendente · ❓ preci
 Cada item com teste que falha primeiro. Itens da auditoria ainda abertos:
 
 **Importação de exercícios**
-- ⬜ Seletor de fonte explícito (ExerciseDB | Wger | Ambos); hoje o Wger só
+- ✅ Seletor de fonte explícito (ExerciseDB | Wger | Ambos); hoje o Wger só
   entra como fallback silencioso e a paginação pode trocar de fonte no meio.
-- ⬜ Filtros "somente com imagem/vídeo" sem efeito no ExerciseDB: esconder ou
+- ✅ Filtros "somente com imagem/vídeo" só aparecem quando a fonte inclui o Wger (resta: filtro do Wger ainda roda depois da paginação): esconder ou
   aplicar por fonte; no Wger o filtro roda depois da paginação (páginas vazias).
-- ⬜ Reimportar exercício **arquivado** não o desarquiva (fica invisível).
-- ⬜ Índice único `(source, external_id)` em `exercise_definitions`
+- ✅ Reimportar exercício **arquivado** o restaura (atualização em lote preserva) (fica invisível).
+- ⬜ (adiado: o upsert já roda em transação) Índice único `(source, external_id)` em `exercise_definitions`
   (migração + limpeza de duplicatas).
 - ⬜ "Atualizar importados": uma requisição por item, em série, sem progresso.
-- ⬜ Mídia do ExerciseDB: duas mídias com `main: true`/`sortOrder 0`; só o
+- ✅ Mídia do ExerciseDB: uma principal, todos os músculos alvo, limite de resposta e 429 com `main: true`/`sortOrder 0`; só o
   primeiro `targetMuscle` é mantido; sem limite de tamanho/429 no cliente.
-- ⬜ Tela de importação: cabeçalho fora da lista deixa pouco espaço para
+- ✅ Tela de importação: busca dentro da lista rolável, consentimento lembrado, alvo de 48 dp deixa pouco espaço para
   resultados em tela pequena/teclado aberto; consentimento reaparece a cada
   abertura; checkbox de 24 dp; enum bruto (`STRENGTH · en`) no card.
 
 **Picker de exercícios (escolher exercício para o dia)**
-- ⬜ Músculos/equipamentos misturam inglês e português e geram um chip por
+- ✅ Músculos/equipamentos misturam inglês e português e geram um chip por
   combinação ("barbell, bench"): normalizar (dicionário EN→PT, equipamento
   dividido em itens).
-- ⬜ Filtro "Peso corporal" só reconhece termos em português.
-- ⬜ Sem filtro/selo por fonte; sem aviso de possível duplicata entre fontes.
-- ⬜ `navigation.replace` ao selecionar perde busca e filtros; sem seleção
-  múltipla; sem atalho "buscar no catálogo online" quando não há resultado.
+- ✅ Filtro "Peso corporal" só reconhece termos em português.
+- ✅ Filtro e selo por fonte; ⬜ aviso de possível duplicata entre fontes.
+- ✅ Atalho "buscar no catálogo online"; ⬜ `navigation.replace` ainda perde busca/filtros e não há seleção múltipla.
 
 **Nutrição**
-- ⬜ Zero em meta vira "sem meta" sem aviso (`normalizeGoals`).
-- ⬜ `key={index}` nas listas de alimentos (remover item do meio embaralha estado).
-- ⬜ Refeição em dia passado usa 12:00 como horário: permitir editar o horário.
+- ✅ Zero em meta vira (agora avisa) "sem meta" sem aviso (`normalizeGoals`).
+- ✅ `key` estável no formulário de refeição (⬜ ainda índice no editor de cardápio IA) (remover item do meio embaralha estado).
+- ✅ Horário da refeição editável
 - ⬜ Validar o ID do modelo Gemini (`gemini-3.8-flash`) contra a API real.
 
 **Saúde dos testes**
-- 🔧 Jest agora carrega `lucide-react-native` (mapeado para CJS). Restam 8
+- ✅ Jest carrega `lucide-react-native` (mapeado para CJS). Restam 8
   testes jest falhando em 6 suítes (Aparência, Milestone6, Wger,
   WorkoutIntelligence, Biblioteca, ExerciseFlows): triar causa.
-- ⬜ 8 testes vitest de **contrato de UI desatualizados** (espaçamentos 0.11,
+- ✅ Testes de **contrato de UI** alinhados ao novo design (espaçamentos 0.11,
   inset inferior, borda de avisos, strings que sumiram) + 3 arquivos que não
   carregam (`Toast.test.ts`, `HomeScreen.test.tsx`,
   `TrainingPlanEditorScreen.test.tsx`). ❓ Decidir por item: o código novo ou o
@@ -87,22 +92,22 @@ Cada item com teste que falha primeiro. Itens da auditoria ainda abertos:
 Pré-requisito do fluxo de design: `PRODUCT.md` (`/impeccable init`), depois
 direção visual e `DESIGN.md`.
 
-- ⬜ **PRODUCT.md**: usuário (treina sozinho, Android, offline), tom, o que o
+- ✅ **PRODUCT.md**: usuário (treina sozinho, Android, offline), tom, o que o
   app nunca faz (sem contas, sem anúncios, sem prescrição médica).
-- ⬜ **Direção visual** em preto monocromático (escala de cinzas a definir com
+- ✅ **Direção visual** em preto monocromático (escala de cinzas a definir com
   teste de contraste), tipografia Geist + Geist Mono (já decididas no M\*),
   ícones Lucide (já em uso), raios e espaçamentos como tokens únicos.
-- ⬜ **Tokens**: reescrever `theme/palette.ts` e `uiContracts.ts` a partir da
+- ✅ **Tokens**: reescrever `theme/palette.ts` e `uiContracts.ts` a partir da
   nova escala; remover aliases redundantes (`gray*`, `surfaceTertiary`, etc.);
   os 4 temas atuais: ❓ manter só "Preto" + variante clara, ou manter os quatro.
-- ⬜ **Sistema de movimento**: hoje só `Animated` e `MotionView`. ❓ Adotar
+- ✅ **Sistema de movimento**: hoje só `Animated` e `MotionView`. ❓ Adotar
   `react-native-reanimated` (springs, layout animations, gestos fluidos,
   recomendado) ou ficar no `Animated` (zero dependência nova). Definir durações,
   curvas e o catálogo de animações (abaixo).
-- ⬜ **Componentes base** redesenhados: botão, campo, chip, card/linha de lista,
+- ✅ **Componentes base** redesenhados: botão, campo, chip, card/linha de lista,
   aviso, folha inferior, cabeçalho, estado vazio, esqueleto de carregamento,
   barra de abas.
-- ⬜ Unificar o que hoje é duplicado: `Field`/`Action` da Nutrição e botões da
+- ✅ Unificar o que hoje é duplicado: `Field`/`Action` da Nutrição e botões da
   tela de integração passam a usar os componentes compartilhados.
 
 ### Catálogo de animações (propostas)
@@ -125,21 +130,21 @@ fade de 100 ms).
 
 ## Fase 3: redesign por tela (ordem por uso)
 
-1. ⬜ **Sessão de treino**: a tela mais usada. Série atual em destaque, entrada
+1. ✅ **Sessão de treino**: a tela mais usada. Série atual em destaque, entrada
    de carga/reps com teclado numérico dedicado e passos de 1 kg, timer de
    descanso persistente, concluir com um toque, desfazer.
-2. ⬜ **Hoje**: treino do dia como ação única; semana em faixa; retomar sessão.
-3. ⬜ **Ficha / editor de dia**: reordenar com gesto, adicionar exercício sem
+2. ✅ **Hoje**: treino do dia como ação única; semana em faixa; retomar sessão.
+3. 🔧 **Ficha / editor de dia** (lista de dias redesenhada; editores herdam os componentes novos, sem redesenho próprio): reordenar com gesto, adicionar exercício sem
    perder contexto (ver picker multi-seleção).
-4. ⬜ **Escolher exercício + Biblioteca + Importação**: um único fluxo de
+4. ✅ **Escolher exercício + Biblioteca + Importação**: um único fluxo de
    busca com filtro por fonte, selos, normalização e "buscar online".
-5. ⬜ **Nutrição**: separar em abas internas (Dia · Metas · IA), anéis de macros,
+5. ✅ **Nutrição**: separar em abas internas (Dia · Metas · IA), anéis de macros,
    registro rápido (repetir refeição de ontem, favoritas), formulário em folha
    inferior que preserva scroll.
-6. ⬜ **Progresso/Histórico**: gráficos monocromáticos legíveis (ver M1).
-7. ⬜ **Mais / Aparência / Integrações / Backup**: lista de configurações
+6. ✅ **Progresso/Histórico**: gráficos monocromáticos legíveis (ver M1).
+7. ✅ **Mais / Aparência / Integrações / Backup**: lista de configurações
    consistente; status claros (chave Gemini, última cópia).
-8. ⬜ **Onboarding e estados vazios**: curtos, com uma ação clara.
+8. ✅ **Onboarding e estados vazios**: curtos, com uma ação clara.
 
 Critério por tela: contraste ≥ 4.5:1 (7:1 no treino), alvos ≥ 48 dp, fonte
 ampliada sem corte, TalkBack com ordem e rótulos, estados (carregando, vazio,

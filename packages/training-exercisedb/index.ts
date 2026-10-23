@@ -2,6 +2,7 @@ import type { ExternalExerciseCandidate, ExternalExerciseCatalogPage, ExternalEx
 
 const BASE_URL = 'https://oss.exercisedb.dev/api/v1'
 const MAX_PAGE_SIZE = 25
+const MAX_RESPONSE_CHARS = 2_000_000
 const LICENSE = 'ExerciseDB/AscendAPI hosted catalog'
 
 class HttpStatusError extends Error {
@@ -58,9 +59,11 @@ export class ExerciseDbClient implements ExternalExerciseCatalogProvider {
     const timer = setTimeout(() => controller.abort('timeout'), this.options.timeoutMs)
     try {
       const response = await this.options.fetch(url.toString(), { headers: { Accept: 'application/json' }, signal: controller.signal })
+      if (response.status === 429) throw new Error('ExerciseDB: limite de consultas atingido. Tente novamente em instantes.')
       if (!response.ok) throw new HttpStatusError(response.status)
-      const body: unknown = await response.json()
-      return body
+      const text = await response.text()
+      if (text.length > MAX_RESPONSE_CHARS) throw new Error('ExerciseDB retornou uma resposta grande demais')
+      try { return JSON.parse(text) as unknown } catch { throw new Error('ExerciseDB retornou schema inválido') }
     } catch (error) {
       if (signal?.aborted) throw new Error('ExerciseDB consulta cancelada')
       if (controller.signal.aborted) throw new Error('ExerciseDB timeout')
@@ -77,12 +80,12 @@ function mapExerciseDb(value: Record<string, unknown> | null, language = 'en'): 
   const gif = typeof value.gifUrl === 'string' ? value.gifUrl : object(value.gifUrls) ? firstUrl(value.gifUrls) : null
   const images = object(value.imageUrls) ? firstUrl(value.imageUrls) : null
   const media: ExternalExerciseMediaCandidate[] = []
-  if (gif && secure(gif)) media.push(mediaItem('IMAGE', gif, value.exerciseId, sourceUrl))
-  if (images && secure(images)) media.push(mediaItem('IMAGE', images, `${value.exerciseId}-image`, sourceUrl))
+  if (gif && secure(gif)) media.push(mediaItem('IMAGE', gif, value.exerciseId, sourceUrl, true, 0))
+  if (images && secure(images)) media.push(mediaItem('IMAGE', images, `${value.exerciseId}-image`, sourceUrl, !media.length, media.length))
   const overview = typeof value.overview === 'string' ? value.overview : ''
-  return { provider: 'EXERCISEDB', externalId: value.exerciseId, name: value.name, description: overview, primaryMuscleGroup: primary[0] ?? 'Não informado', secondaryMuscleGroups: secondary, equipment: equipment.join(', ') || 'Não informado', category: category(strings('exerciseTypes')), difficulty: typeof value.difficulty === 'string' ? value.difficulty : 'Não informado', instructions: strings('instructions').join('\n'), unilateral: false, timed: false, sourceUrl, licenseName: LICENSE, licenseUrl: 'https://docs.ascendapi.com/products/edb-v1/overview', author: 'AscendAPI', media, warnings: media.length ? [] : ['A fonte não forneceu mídia válida'], language, original: value }
+  return { provider: 'EXERCISEDB', externalId: value.exerciseId, name: value.name, description: overview, primaryMuscleGroup: primary[0] ?? 'Não informado', secondaryMuscleGroups: [...primary.slice(1), ...secondary], equipment: equipment.join(', ') || 'Não informado', category: category(strings('exerciseTypes')), difficulty: typeof value.difficulty === 'string' ? value.difficulty : 'Não informado', instructions: strings('instructions').join('\n'), unilateral: false, timed: false, sourceUrl, licenseName: LICENSE, licenseUrl: 'https://docs.ascendapi.com/products/edb-v1/overview', author: 'AscendAPI', media, warnings: media.length ? [] : ['A fonte não forneceu mídia válida'], language, original: value }
 }
-function mediaItem(type: 'IMAGE' | 'VIDEO', url: string, id: string, sourceUrl: string): ExternalExerciseMediaCandidate { return { type, source: 'EXERCISEDB', externalId: id, remoteUrl: url, thumbnailRemoteUrl: null, mimeType: type === 'IMAGE' ? (url.toLowerCase().includes('.gif') ? 'image/gif' : 'image/*') : 'video/*', width: null, height: null, durationSeconds: null, main: true, sortOrder: 0, licenseName: LICENSE, licenseUrl: 'https://docs.ascendapi.com/products/edb-v1/overview', author: 'AscendAPI', sourceUrl } }
+function mediaItem(type: 'IMAGE' | 'VIDEO', url: string, id: string, sourceUrl: string, main: boolean, sortOrder: number): ExternalExerciseMediaCandidate { return { type, source: 'EXERCISEDB', externalId: id, remoteUrl: url, thumbnailRemoteUrl: null, mimeType: type === 'IMAGE' ? (url.toLowerCase().includes('.gif') ? 'image/gif' : 'image/*') : 'video/*', width: null, height: null, durationSeconds: null, main, sortOrder, licenseName: LICENSE, licenseUrl: 'https://docs.ascendapi.com/products/edb-v1/overview', author: 'AscendAPI', sourceUrl } }
 function firstUrl(value: Record<string, unknown>) { return Object.values(value).find((item): item is string => typeof item === 'string' && item.startsWith('https://')) ?? null }
 function secure(value: string) { return value.startsWith('https://') }
 function object(value: unknown): value is Record<string, any> { return !!value && typeof value === 'object' && !Array.isArray(value) }
