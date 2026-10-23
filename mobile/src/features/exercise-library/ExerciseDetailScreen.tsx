@@ -10,6 +10,7 @@ import { ThemedTextInput } from '../../components/ThemedTextInput'
 import { shared, type ThemeColors, useTheme } from '../../theme'
 import { fontFamilies } from '../../theme/typography'
 import { ExerciseVideo } from './ExerciseVideo'
+import { canonicalMuscle, equipmentLabel } from './exerciseTaxonomy'
 import { ExercisePlaceholder } from './ExercisePlaceholder'
 import {
   attributionLabel,
@@ -82,9 +83,8 @@ export function ExerciseDetailScreen({
           <Text style={styles.favorite}>{exercise.favorite ? 'Favorito' : 'Favoritar'}</Text>
         </Pressable>
       </View>
-      <Text style={styles.eyebrow}>{source.toUpperCase()}</Text>
       <Text style={styles.title}>{exercise.name}</Text>
-      <Text style={styles.meta}>{exercise.primaryMuscleGroup} · {exercise.equipment}</Text>
+      <Text style={styles.meta}>{canonicalMuscle(exercise.primaryMuscleGroup)} · {equipmentLabel(exercise.equipment)} · {source}</Text>
 
       {showVideo && videoMedia?.kind === 'VIDEO' ? (
         <ExerciseVideo
@@ -208,7 +208,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   action: { alignItems: 'center', flexDirection: 'row', gap: 6, justifyContent: 'center', minHeight: shared.touchTarget.minimum, paddingHorizontal: 4 },
   actionText: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 14, fontWeight: '500' },
   favorite: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 14, fontWeight: '500' },
-  eyebrow: { color: colors.mu, fontFamily: fontFamilies.data, fontSize: 12 },
   title: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 32, fontWeight: '500' },
   meta: { color: colors.t2, fontFamily: fontFamilies.text, fontSize: 14, marginBottom: 4 },
   image: { aspectRatio: 16 / 9, backgroundColor: colors.s2, borderRadius: 8, width: '100%' },

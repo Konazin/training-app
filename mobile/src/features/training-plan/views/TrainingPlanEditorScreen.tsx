@@ -174,7 +174,6 @@ export function TrainingPlanEditorScreen({
     <>
       <ScreenScrollView contentContainerStyle={{ paddingBottom: 160 }}>
         <ScreenHeader
-          eyebrow={plan ? 'Editar ficha' : 'Nova ficha'}
           title={plan ? plan.name : 'Montar ficha'}
           description="Dados gerais e estrutura da programação semanal."
         />
@@ -417,7 +416,7 @@ function initialEditor(plan?: TrainingPlan) {
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   section: { borderBottomColor: colors.bd, borderBottomWidth: StyleSheet.hairlineWidth, gap: 12, marginBottom: 20, paddingBottom: 20 },
-  sectionTitle: { ...typography.monoLabel, color: colors.t2 },
+  sectionTitle: { ...typography.titleSmall, color: colors.tx },
   templateName: { ...typography.bodySmall, color: colors.tx },
   error: { ...typography.bodySmall, color: colors.dg, marginBottom: 10 },
   hint: { ...typography.caption, color: colors.t2, marginTop: 4 },

@@ -67,7 +67,6 @@ export function TrainingPlanTrashScreen({
         ListHeaderComponent={(
           <>
             <ScreenHeader
-              eyebrow="Gestão de fichas"
               title="Lixeira de fichas"
               description={TRASH_RETENTION_DESCRIPTION}
             />

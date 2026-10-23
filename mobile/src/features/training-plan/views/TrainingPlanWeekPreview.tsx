@@ -64,7 +64,7 @@ export function TrainingPlanWeekPreview({ days }: { days: readonly PreviewDay[] 
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   week: { flexDirection: 'row', flexWrap: 'wrap', gap: 0 },
-  day: { borderBottomColor: colors.bd, borderBottomWidth: 1, borderColor: 'transparent', borderLeftWidth: 2, flexBasis: '33.33%', flexGrow: 1, minHeight: 106, padding: 12 },
+  day: { borderBottomColor: colors.bd, borderBottomWidth: 1, borderColor: 'transparent', flexBasis: '33.33%', flexGrow: 1, minHeight: 106, padding: 12 },
   rest: { borderLeftColor: colors.mu },
   warning: { borderLeftColor: colors.dg },
   weekday: { color: colors.mu, fontFamily: fontFamilies.data, fontSize: 12, fontWeight: '400' },
@@ -72,5 +72,5 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   meta: { color: colors.t2, fontFamily: fontFamilies.text, fontSize: 12, marginTop: 5 },
   count: { color: colors.t2, fontFamily: fontFamilies.text, fontSize: 12, marginTop: 3 },
   warningText: { color: colors.dg, fontFamily: fontFamilies.text, fontSize: 12, fontWeight: '500', marginTop: 5 },
-  notice: { borderLeftColor: colors.dg, borderLeftWidth: 2, color: colors.t2, fontFamily: fontFamilies.text, fontSize: 13, lineHeight: 18, marginTop: 8, padding: shared.spacing.sm },
+  notice: { backgroundColor: colors.s1, borderRadius: 14, color: colors.t2, fontFamily: fontFamilies.text, fontSize: 13, lineHeight: 18, marginTop: 8, padding: shared.spacing.sm },
 })

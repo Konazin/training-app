@@ -86,7 +86,6 @@ export function RestActivityEditorScreen({
     <>
     <ScreenScrollView contentContainerStyle={styles.content}>
       <ScreenHeader
-        eyebrow={activity ? 'Editar atividade' : 'Nova atividade'}
         title={activity?.name ?? 'Descanso ativo'}
         description="Atividade opcional para o dia de recuperação."
       />

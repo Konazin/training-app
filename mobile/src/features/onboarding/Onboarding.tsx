@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import { Animated, Modal, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { type ThemeColors, useTheme } from '../../theme'
+import { easeOut, PressableScale, Reveal, useMotion } from '../../motion'
+import { shared, type ThemeColors, useTheme } from '../../theme'
 import { typography } from '../../theme/typography'
 import { WGER_STARTER_PACK } from '@training/training-domain'
 import { recommendedPackEnabled } from '@training/training-domain'
@@ -64,64 +65,76 @@ export function Onboarding({
         style={styles.backdrop}
       >
         <SafeAreaView edges={['top', 'bottom']} style={styles.sheet}>
+          <View
+            accessibilityLabel={`Passo ${step + 1} de ${STEPS.length}`}
+            accessibilityRole="progressbar"
+            accessibilityValue={{ min: 1, max: STEPS.length, now: step + 1 }}
+            style={styles.dots}
+          >
+            {STEPS.map((item, index) => <StepDot active={index === step} done={index < step} key={item.title} />)}
+          </View>
           <ScrollView
             contentContainerStyle={styles.content}
             keyboardShouldPersistTaps="handled"
             style={styles.scroll}
           >
-            <Text style={styles.progress}>PASSO {step + 1} DE {STEPS.length}</Text>
-            <Text accessibilityRole="header" style={styles.title}>{current.title}</Text>
-            <Text style={styles.description}>{current.description}</Text>
-            {last && (
-              <View style={styles.choices}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: !starterPackEnabled || starterPackBusy, busy: starterPackBusy }}
-                  disabled={!starterPackEnabled || starterPackBusy}
-                  onPress={() => void onComplete().then(() => {
-                    onOpenLibrary?.()
-                    onImportStarterPack?.()
-                  })}
-                  style={({ pressed }) => [styles.choice, (!starterPackEnabled || starterPackBusy) && styles.disabled, pressed && styles.pressed]}
-                >
-                  <Text style={styles.choiceTitle}>Importar pacote recomendado</Text>
-                  <Text style={styles.choiceDetail}>Pacote atual · {WGER_STARTER_PACK.length} exercícios</Text>
-                  <Text style={styles.choiceDetail}>O pacote recomendado contém exercícios revisados individualmente. A quantidade pode variar conforme a disponibilidade e a qualidade dos dados do provider.</Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => void onComplete().then(onOpenWger)}
-                  style={({ pressed }) => [styles.choice, pressed && styles.pressed]}
-                >
-                  <Text style={styles.choiceTitle}>Explorar catálogo externo</Text>
-                  <Text style={styles.choiceDetail}>Requer internet e só consulta após sua ação.</Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => void onComplete().then(onCreateCustom)}
-                  style={({ pressed }) => [styles.choice, pressed && styles.pressed]}
-                >
-                  <Text style={styles.choiceTitle}>Criar exercício personalizado</Text>
-                  <Text style={styles.choiceDetail}>Conteúdo escrito e controlado por você.</Text>
-                </Pressable>
-              </View>
-            )}
+            <Reveal key={step}>
+              <Text accessibilityRole="header" style={styles.title}>{current.title}</Text>
+              <Text style={styles.description}>{current.description}</Text>
+              {last && (
+                <View style={styles.choices}>
+                  <PressableScale
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: !starterPackEnabled || starterPackBusy, busy: starterPackBusy }}
+                    disabled={!starterPackEnabled || starterPackBusy}
+                    onPress={() => void onComplete().then(() => {
+                      onOpenLibrary?.()
+                      onImportStarterPack?.()
+                    })}
+                    pressedScale={0.99}
+                    style={[styles.choice, (!starterPackEnabled || starterPackBusy) && styles.disabled]}
+                  >
+                    <Text style={styles.choiceTitle}>Importar pacote recomendado</Text>
+                    <Text style={styles.choiceDetail}>Pacote atual · {WGER_STARTER_PACK.length} exercícios</Text>
+                    <Text style={styles.choiceDetail}>O pacote recomendado contém exercícios revisados individualmente. A quantidade pode variar conforme a disponibilidade e a qualidade dos dados do provider.</Text>
+                  </PressableScale>
+                  <PressableScale
+                    accessibilityRole="button"
+                    onPress={() => void onComplete().then(onOpenWger)}
+                    pressedScale={0.99}
+                    style={styles.choice}
+                  >
+                    <Text style={styles.choiceTitle}>Explorar catálogo externo</Text>
+                    <Text style={styles.choiceDetail}>Requer internet e só consulta após sua ação.</Text>
+                  </PressableScale>
+                  <PressableScale
+                    accessibilityRole="button"
+                    onPress={() => void onComplete().then(onCreateCustom)}
+                    pressedScale={0.99}
+                    style={styles.choice}
+                  >
+                    <Text style={styles.choiceTitle}>Criar exercício personalizado</Text>
+                    <Text style={styles.choiceDetail}>Conteúdo escrito e controlado por você.</Text>
+                  </PressableScale>
+                </View>
+              )}
+            </Reveal>
           </ScrollView>
           <View style={styles.actions}>
-            <Pressable
+            <PressableScale
               accessibilityRole="button"
               onPress={() => void onSkip()}
-              style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}
+              style={styles.secondary}
             >
               <Text style={styles.secondaryText}>Pular</Text>
-            </Pressable>
-            <Pressable
+            </PressableScale>
+            <PressableScale
               accessibilityRole="button"
               onPress={() => last ? void onComplete() : setStep((value) => value + 1)}
-              style={({ pressed }) => [styles.primary, pressed && styles.pressed]}
+              style={styles.primary}
             >
               <Text style={styles.primaryText}>{last ? 'Continuar sem exercícios' : 'Próximo'}</Text>
-            </Pressable>
+            </PressableScale>
           </View>
         </SafeAreaView>
       </View>
@@ -129,67 +142,77 @@ export function Onboarding({
   )
 }
 
+/** Ponto de progresso: o ativo se alonga em uma barra; os concluídos ficam preenchidos. */
+function StepDot({ active, done }: { active: boolean; done: boolean }) {
+  const { colors } = useTheme()
+  const motion = useMotion()
+  const width = useRef(new Animated.Value(active ? 1 : 0)).current
+  useEffect(() => {
+    if (motion.effective !== 'FULL') { width.setValue(active ? 1 : 0); return }
+    const animation = Animated.timing(width, { duration: 280, easing: easeOut, toValue: active ? 1 : 0, useNativeDriver: false })
+    animation.start()
+    return () => animation.stop()
+  }, [active, motion.effective, width])
+  return (
+    <Animated.View
+      style={{
+        backgroundColor: active || done ? colors.tx : colors.s2,
+        borderRadius: 3,
+        height: 6,
+        width: width.interpolate({ inputRange: [0, 1], outputRange: [6, 28] }),
+      }}
+    />
+  )
+}
+
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   backdrop: {
-    alignItems: 'center',
-    backgroundColor: colors.overlay,
+    backgroundColor: colors.bg,
     flex: 1,
-    justifyContent: 'center',
-    padding: 20,
   },
   sheet: {
-    backgroundColor: colors.bg,
-    borderColor: colors.bd,
-    borderRadius: 12,
-    borderWidth: 1,
-    maxHeight: '88%',
-    maxWidth: 520,
-    minHeight: 320,
-    overflow: 'hidden',
+    flex: 1,
     width: '100%',
   },
+  dots: { alignItems: 'center', flexDirection: 'row', gap: 6, paddingHorizontal: 24, paddingTop: 24 },
   scroll: { flexShrink: 1 },
-  content: { flexGrow: 1, padding: 24 },
-  progress: { ...typography.monoLabel, color: colors.t2 },
-  title: { ...typography.title, color: colors.tx, marginTop: 16 },
-  description: { ...typography.body, color: colors.t2, marginTop: 12 },
-  choices: { gap: 10, marginTop: 20 },
+  content: { flexGrow: 1, justifyContent: 'center', padding: 24 },
+  title: { ...typography.display, color: colors.tx },
+  description: { ...typography.bodyLarge, color: colors.t2, marginTop: 16 },
+  choices: { gap: 12, marginTop: 32 },
   choice: {
-    borderBottomColor: colors.bd,
-    borderBottomWidth: 1,
-    minHeight: 56,
-    padding: 12,
+    backgroundColor: colors.s1,
+    borderRadius: shared.radii.lg,
+    minHeight: 64,
+    padding: 20,
   },
   disabled: { opacity: 0.55 },
-  choiceTitle: { ...typography.label, color: colors.tx, fontWeight: '500' },
+  choiceTitle: { ...typography.titleSmall, color: colors.tx },
   choiceDetail: { ...typography.caption, color: colors.t2, marginTop: 4 },
   actions: {
-    borderTopColor: colors.bd,
-    borderTopWidth: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    padding: 16,
+    gap: 12,
+    padding: 24,
   },
   primary: {
     alignItems: 'center',
     backgroundColor: colors.ac,
-    borderRadius: 12,
+    borderRadius: shared.radii.md,
     flexGrow: 1,
     justifyContent: 'center',
     minHeight: 56,
     paddingHorizontal: 18,
   },
-  primaryText: { ...typography.label, color: colors.on, fontWeight: '500' },
+  primaryText: { ...typography.titleSmall, color: colors.on, fontWeight: '500' },
   secondary: {
     alignItems: 'center',
     borderColor: colors.mu,
-    borderRadius: 12,
+    borderRadius: shared.radii.md,
     borderWidth: 1,
     justifyContent: 'center',
-    minHeight: 48,
-    paddingHorizontal: 18,
+    minHeight: 56,
+    paddingHorizontal: 22,
   },
-  secondaryText: { ...typography.label, color: colors.tx, fontWeight: '500' },
-  pressed: { opacity: 0.75 },
+  secondaryText: { ...typography.bodySmall, color: colors.tx, fontWeight: '500' },
 })

@@ -129,7 +129,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   templateCopy: { flex: 1, gap: 4 },
   cardTitle: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 17, fontWeight: '500' },
   startBlank: { color: colors.ac, fontFamily: fontFamilies.text, fontSize: 13, fontWeight: '500' },
-  info: { borderLeftColor: colors.bd, borderLeftWidth: 2, color: colors.t2, fontFamily: fontFamilies.text, fontSize: 14, lineHeight: 20, padding: 12 },
+  info: { backgroundColor: colors.s1, borderRadius: 14, color: colors.t2, fontFamily: fontFamilies.text, fontSize: 14, lineHeight: 20, padding: 12 },
   actions: { flexDirection: 'row', gap: 10, padding: shared.pagePadding },
   pressed: { backgroundColor: colors.s2 },
 })

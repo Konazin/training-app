@@ -105,9 +105,8 @@ export function TrainingPlanDayScreen({
   return (
     <ScreenScrollView>
       <ScreenHeader
-        eyebrow={plan.name}
         title={labels[day.weekday]}
-        description="Configuração deste dia da ficha."
+        description={`${plan.name} · configuração deste dia da ficha.`}
       />
       <View style={styles.form}>
         <FormField label="Título" value={title} onChangeText={setTitle} />

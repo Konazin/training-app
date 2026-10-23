@@ -120,7 +120,6 @@ export function DayExerciseEditorScreen({
     <>
     <ScreenScrollView contentContainerStyle={styles.content}>
       <ScreenHeader
-        eyebrow={configured ? 'Editar exercício do dia' : 'Configurar antes de adicionar'}
         title={definition.name}
         description={`${definition.primaryMuscleGroup} · ${definition.category}`}
       />

@@ -82,7 +82,6 @@ export function NutritionAiSettingsScreen({
   return (
     <ScreenScrollView>
       <ScreenHeader
-        eyebrow="Nutrição · IA opcional"
         title="Chave Gemini"
         description="Necessária só para estimar refeições por foto e sugerir cardápios."
       />

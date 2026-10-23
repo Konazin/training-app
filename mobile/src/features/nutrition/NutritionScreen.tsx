@@ -656,7 +656,6 @@ function MealForm({
   return (
     <ScreenScrollView>
       <ScreenHeader
-        eyebrow="Nutrição · local"
         title={initial.id ? 'Editar refeição' : initial.source === 'MANUAL' ? 'Adicionar refeição' : 'Revisar refeição'}
         description={initial.source === 'MANUAL' ? 'Os valores são informados por você.' : 'Estimativa aproximada. Revise cada item antes de salvar.'}
       />
@@ -765,7 +764,7 @@ function EditableDietSuggestion({
   }
   return (
     <View style={styles.suggestionCard}>
-      <Text style={styles.eyebrow}>RASCUNHO · REVISE ANTES DE SALVAR</Text>
+      <Text accessibilityRole="header" style={styles.draftTitle}>Rascunho · revise antes de salvar</Text>
       <Field label="Título" value={suggestion.title} onChangeText={(title) => onChange({ ...suggestion, title })} />
       <Field label="Resumo" value={suggestion.summary} onChangeText={(summary) => onChange({ ...suggestion, summary })} multiline />
       {suggestion.meals.map((meal, mealIndex) => (
@@ -1173,7 +1172,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   settingsCopy: { flex: 1, paddingRight: 12 },
   settingsTitle: { ...typography.label, color: colors.tx, fontWeight: '500' },
   suggestionCard: { backgroundColor: colors.s1, borderRadius: 20, marginVertical: 12, padding: 12 },
-  eyebrow: { ...typography.monoLabel, color: colors.t2, marginBottom: 12 },
+  draftTitle: { ...typography.titleSmall, color: colors.tx, marginBottom: 12 },
   action: { alignItems: 'center', backgroundColor: 'transparent', borderColor: colors.mu, borderRadius: 14, borderWidth: 1, justifyContent: 'center', minHeight: 48, paddingHorizontal: 14, paddingVertical: 10 },
   actionPrimary: { backgroundColor: colors.ac, borderColor: colors.ac },
   actionDanger: { borderColor: colors.dg },

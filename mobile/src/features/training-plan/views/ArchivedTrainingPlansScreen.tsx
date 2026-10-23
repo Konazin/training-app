@@ -30,7 +30,6 @@ export function ArchivedTrainingPlansScreen({
       contentContainerStyle={[styles.content, !archived.length && styles.emptyContent]}
       ListHeaderComponent={(
         <ScreenHeader
-          eyebrow="Gestão de fichas"
           title="Fichas arquivadas"
           description="Restaure uma ficha antes de editar ou ativar."
         />

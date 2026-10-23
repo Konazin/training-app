@@ -19,10 +19,8 @@ jest.mock('@training/training-local-db', () => ({
   },
 }))
 jest.mock('../../theme', () => ({
+  shared: require('../../theme/tokens').shared,
   useTheme: () => ({ colors: new Proxy({}, { get: () => '#111111' }) }),
-}))
-jest.mock('../../theme/typography', () => ({
-  typography: { body: {}, caption: {}, label: {}, title: {} },
 }))
 import { Onboarding } from './Onboarding'
 import { useOnboarding } from './useOnboarding'
