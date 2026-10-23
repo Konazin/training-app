@@ -750,6 +750,47 @@ describe('controllers locais', () => {
     languages.mockRestore()
   })
 
+  it('pagina o ExerciseDB por cursor e continua a consulta já executada', async () => {
+    const pageOne = { ...page(wgerCandidate('1', 'Um'), 1), hasNext: true, nextCursor: 'c2' }
+    const pageTwo = { ...page(wgerCandidate('2', 'Dois'), 2), hasNext: true, hasPrevious: true, nextCursor: 'c3' }
+    const search = vi.fn().mockResolvedValueOnce(pageOne).mockResolvedValueOnce(pageTwo).mockResolvedValueOnce(pageOne)
+    const provider = { descriptor: { id: 'EXERCISEDB' as const }, search, findByExternalId: vi.fn() } as unknown as import('@training/training-exercisedb').ExerciseDbClient
+    const imports = { previewExisting: vi.fn(async () => []), importSelected: vi.fn() } as unknown as ExternalExerciseImportRepository
+    const exercises = { list: vi.fn(async () => []) } as unknown as ExerciseLibraryRepository
+    const hook = await renderController(() => useWgerIntegrationController(imports, exercises, vi.fn(async () => {}), provider))
+    act(() => hook.current.setQuery((current) => ({ ...current, text: 'bench' })))
+    await act(async () => { await hook.current.search(1) })
+    // texto editado depois da busca não pode trocar o resultado da paginação
+    act(() => hook.current.setQuery((current) => ({ ...current, text: 'squat' })))
+    await act(async () => { await hook.current.search(2) })
+    expect(search.mock.calls[1]![0]).toMatchObject({ text: 'bench', page: 2, cursor: 'c2' })
+    await act(async () => { await hook.current.search(1) })
+    expect(search.mock.calls[2]![0]).toMatchObject({ text: 'squat', page: 1 })
+    expect(search.mock.calls[2]![0].cursor).toBeUndefined()
+    hook.unmount()
+  })
+
+  it('não cai para o Wger quando a consulta ao ExerciseDB é cancelada', async () => {
+    const wgerSearch = vi.spyOn(WgerExerciseCatalogProvider.prototype, 'search')
+    const provider = {
+      descriptor: { id: 'EXERCISEDB' as const },
+      search: vi.fn((_query: unknown, signal: AbortSignal) => new Promise((_, reject) => signal.addEventListener('abort', () => reject(new Error('ExerciseDB consulta cancelada'))))),
+      findByExternalId: vi.fn(),
+    } as unknown as import('@training/training-exercisedb').ExerciseDbClient
+    const imports = { previewExisting: vi.fn(async () => []), importSelected: vi.fn() } as unknown as ExternalExerciseImportRepository
+    const exercises = { list: vi.fn(async () => []) } as unknown as ExerciseLibraryRepository
+    const hook = await renderController(() => useWgerIntegrationController(imports, exercises, vi.fn(async () => {}), provider))
+    await act(async () => {
+      const request = hook.current.search(1)
+      hook.current.cancel()
+      expect(await request).toBe(false)
+    })
+    expect(wgerSearch).not.toHaveBeenCalled()
+    expect(hook.current.phase).not.toBe('error')
+    hook.unmount()
+    wgerSearch.mockRestore()
+  })
+
   it('mantém seleção e importação ao trocar de página', async () => {
     const first = wgerCandidate('1', 'Primeiro')
     const second = wgerCandidate('2', 'Segundo')

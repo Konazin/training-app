@@ -47,6 +47,8 @@ export function useWgerIntegrationController(
   const [languagesFailed, setLanguagesFailed] = useState(false)
   const languageRequest = useRef<Promise<WgerLanguageOption[]> | null>(null)
   const requestId = useRef(0)
+  const committedQuery = useRef(DEFAULT_WGER_QUERY)
+  const cursors = useRef<Map<number, string>>(new Map())
   const abort = useRef<AbortController | null>(null)
 
   const loadImportedCount = useCallback(async () => {
@@ -65,25 +67,42 @@ export function useWgerIntegrationController(
     }
   }, [loadImportedCount])
 
-  const search = useCallback(async (page = 1) => {
+  const search = useCallback(async (requestedPage = 1, overrides: Partial<ExternalExerciseCatalogQuery> = {}) => {
     abort.current?.abort()
     const controller = new AbortController()
     abort.current = controller
     const currentRequest = ++requestId.current
-    const nextQuery = { ...query, page }
-    const requestQuery = { ...nextQuery, language: query.language === 'auto' ? deviceLocale() : query.language }
-    setQuery(nextQuery)
+    // A primeira página usa o que está na tela; as demais continuam a consulta já executada,
+    // para que editar o campo de busca não troque o resultado da paginação.
+    const base = requestedPage === 1 ? { ...query, ...overrides } : { ...committedQuery.current, ...overrides }
+    // ExerciseDB pagina por cursor: sem cursor conhecido a única página alcançável é a primeira.
+    const cursor = requestedPage > 1 ? cursors.current.get(requestedPage) : undefined
+    const page = requestedPage > 1 && !cursor && provider.descriptor?.id === 'EXERCISEDB' ? 1 : requestedPage
+    if (page === 1) cursors.current = new Map()
+    const nextQuery = { ...base, page }
+    const requestQuery = {
+      ...nextQuery,
+      language: base.language === 'auto' ? deviceLocale() : base.language,
+      ...(cursor ? { cursor } : {}),
+    }
+    // Paginar não pode sobrescrever o que o usuário digitou depois da busca.
+    setQuery((current) => page === 1 ? nextQuery : { ...current, page })
     setPhase('loading')
     setMessage({ text: '', kind: 'info' })
     try {
       let result
+      let usedFallback = false
       try { result = await provider.search(requestQuery, controller.signal) }
       catch (error) {
-        if (provider.descriptor?.id !== 'EXERCISEDB') throw error
+        if (controller.signal.aborted || provider.descriptor?.id !== 'EXERCISEDB') throw error
         setMessage({ text: 'ExerciseDB indisponível; tentando Wger…', kind: 'warning' })
-        result = await fallback.search(requestQuery, controller.signal)
+        usedFallback = true
+        result = await fallback.search({ ...requestQuery, cursor: undefined }, controller.signal)
       }
       if (requestId.current !== currentRequest) return false
+      committedQuery.current = nextQuery
+      // O nextCursor do Wger é uma URL e não serve ao ExerciseDB.
+      if (result.nextCursor && !usedFallback) cursors.current.set(page + 1, result.nextCursor)
       const previewExisting = await imports.previewExisting(result.items)
       if (requestId.current !== currentRequest) return false
       setItems(result.items)
@@ -95,8 +114,11 @@ export function useWgerIntegrationController(
       if (!result.items.length) setMessage({ text: 'Nenhum exercício encontrado nesta página.', kind: 'warning' })
       return true
     } catch (error) {
-      if (error instanceof WgerHttpError && error.code === 'ABORTED') return false
       if (requestId.current !== currentRequest) return false
+      if (controller.signal.aborted || (error instanceof WgerHttpError && error.code === 'ABORTED')) {
+        setPhase('results')
+        return false
+      }
       const offline = error instanceof WgerHttpError && error.code === 'OFFLINE'
       setPhase(offline ? 'offline' : 'error')
       setMessage({ text: messageFrom(error), kind: 'error' })
