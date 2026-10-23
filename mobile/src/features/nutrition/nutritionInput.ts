@@ -1,4 +1,4 @@
-import { localDateKey } from '@training/training-domain'
+import { localDateKey, type NutritionMeal, type NutritionMealInput } from '@training/training-domain'
 
 /** Parses user-typed decimals ("1,5" or "1.5"). Empty text yields `emptyValue`; invalid text yields NaN. */
 export function parseNumberInput<T extends number | null>(text: string, emptyValue: T): number | T {
@@ -35,4 +35,20 @@ export function timeOfDay(isoString: string) {
 /** Combina o dia da refeição com um horário local "HH:MM" e devolve ISO. */
 export function consumedAtFromTime(localDate: string, time: string) {
   return new Date(`${localDate}T${time}:00`).toISOString()
+}
+
+/** Cópia editável de uma refeição para outro dia/horário; mantém itens, ignora ids. */
+export function cloneMealInput(meal: NutritionMeal, localDate: string, consumedAt: string): NutritionMealInput {
+  return {
+    localDate,
+    consumedAt,
+    mealType: meal.mealType,
+    title: meal.title,
+    notes: meal.notes,
+    source: meal.source,
+    items: meal.items.map(({ id: _id, mealId: _mealId, createdAt: _c, updatedAt: _u, ...item }) => ({
+      ...item,
+      micronutrients: { ...item.micronutrients },
+    })),
+  }
 }

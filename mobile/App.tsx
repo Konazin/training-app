@@ -667,6 +667,16 @@ function MainTabs({
             onRefresh={refreshAll}
             onDateChange={refreshClock}
             onOpenPlan={() => navigation.navigate('MainTabs', { screen: 'Plan' })}
+            onRepeat={async (planId, dayId) => {
+              const success = await workoutSession.start(planId, dayId)
+              if (success) {
+                void triggerHaptic('SESSION_START', preferences.hapticsEnabled)
+                navigation.navigate('Session')
+              } else {
+                Alert.alert('Não foi possível repetir', 'Já há uma sessão ativa, ou a ficha ou o dia foi removido.')
+              }
+              return success
+            }}
           />
         )}
       </Tabs.Screen>
@@ -734,7 +744,9 @@ function RefreshableHistory({
   onRefresh,
   onDateChange,
   onOpenPlan,
+  onRepeat,
 }: {
+  onRepeat: (planId: number, dayId: number) => Promise<boolean>
   sessions: Parameters<typeof HistoryScreen>[0]['sessions']
   progress: Parameters<typeof HistoryScreen>[0]['progress']
   onRefresh: () => Promise<RefreshAllResult>
@@ -751,6 +763,7 @@ function RefreshableHistory({
       warning={refreshState.warning}
       onRefresh={() => void refreshState.refresh()}
       onOpenPlan={onOpenPlan}
+      onRepeat={onRepeat}
     />
   )
 }

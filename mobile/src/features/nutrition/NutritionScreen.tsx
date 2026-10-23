@@ -33,7 +33,7 @@ import { useTheme, type ThemeColors } from '../../theme'
 import { typography } from '../../theme/typography'
 import { createGeminiNutritionProvider } from './geminiNutritionProvider'
 import { GEMINI_API_KEY_SECRET } from '../../integrations/secureSecrets'
-import { consumedAtForDate, consumedAtFromTime, formatNumberInput, parseNumberInput, parseTimeInput, timeOfDay } from './nutritionInput'
+import { cloneMealInput, consumedAtForDate, consumedAtFromTime, formatNumberInput, parseNumberInput, parseTimeInput, timeOfDay } from './nutritionInput'
 
 const EMPTY_GOALS: NutritionGoals = {
   caloriesKcal: null,
@@ -169,6 +169,43 @@ export function NutritionScreen({
       setNotice(error instanceof Error ? error.message : 'Não foi possível salvar a refeição.')
       setNoticeTone('danger')
       throw error
+    }
+  }
+
+  const duplicateMeal = async (meal: NutritionMeal) => {
+    try {
+      await repositories.nutritionMeals.create(cloneMealInput(meal, date, consumedAtForDate(date)))
+      await repositories.nutritionMaintenance.aggregateDay(date)
+      setNotice('Refeição duplicada. Ajuste o que mudou.')
+      setNoticeTone('success')
+      await refresh()
+    } catch {
+      setNotice('Não foi possível duplicar a refeição.')
+      setNoticeTone('danger')
+    }
+  }
+
+  const copyPreviousDay = async () => {
+    const from = addDays(date, -1)
+    try {
+      const previous = await repositories.nutritionMeals.listByDate(from)
+      if (!previous.length) {
+        setNotice('Não há refeições detalhadas no dia anterior (os itens são mantidos por sete dias).')
+        setNoticeTone('warning')
+        return
+      }
+      for (const meal of previous) {
+        await repositories.nutritionMeals.create(
+          cloneMealInput(meal, date, consumedAtFromTime(date, timeOfDay(meal.consumedAt))),
+        )
+      }
+      await repositories.nutritionMaintenance.aggregateDay(date)
+      setNotice(`${previous.length} refeição(ões) copiada(s) do dia anterior.`)
+      setNoticeTone('success')
+      await refresh()
+    } catch {
+      setNotice('Não foi possível copiar o dia anterior.')
+      setNoticeTone('danger')
     }
   }
 
@@ -423,7 +460,11 @@ export function NutritionScreen({
             summary ? (
               <EmptyState title="Os detalhes desta data expiraram." description="O resumo diário continua salvo; os itens de refeição são mantidos por sete dias." />
             ) : (
-              <EmptyState title="Nenhuma refeição registrada neste dia." description="Registre manualmente para começar seu resumo local." />
+              <EmptyState
+                action={<Action label="Copiar dia anterior" onPress={() => void copyPreviousDay()} />}
+                title="Nenhuma refeição registrada neste dia."
+                description="Registre manualmente ou copie as refeições de ontem e ajuste o que mudou."
+              />
             )
           ) : meals.map((meal, index) => (
             <Reveal index={index} key={meal.id}>
@@ -441,6 +482,7 @@ export function NutritionScreen({
                 </PressableScale>
                 <View style={styles.row}>
                   <Action label="Abrir / editar" onPress={() => setEditing(meal)} />
+                  <Action label="Duplicar" onPress={() => void duplicateMeal(meal)} />
                   <Action label="Excluir" onPress={() => removeMeal(meal)} danger />
                 </View>
               </View>

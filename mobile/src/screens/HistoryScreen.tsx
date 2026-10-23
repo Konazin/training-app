@@ -23,6 +23,7 @@ export function HistoryScreen({
   warning,
   onRefresh,
   onOpenPlan,
+  onRepeat,
 }: {
   sessions: WorkoutSession[]
   progress: HistoryProgress
@@ -30,6 +31,7 @@ export function HistoryScreen({
   warning?: string
   onRefresh: () => void
   onOpenPlan: () => void
+  onRepeat?: (planId: number, dayId: number) => Promise<boolean>
 }) {
   const { colors } = useTheme()
   const styles = createStyles(colors)
@@ -94,6 +96,15 @@ export function HistoryScreen({
               Planejado: {exercise.name} · Realizado: {exercise.substituteName}
             </Text>
           ))}
+          {!!onRepeat && session.status === 'COMPLETED' && (
+            <View style={styles.repeat}>
+              <PrimaryButton
+                label="Repetir este treino"
+                onPress={() => void onRepeat(session.trainingPlanId, session.planDayId)}
+                secondary
+              />
+            </View>
+          )}
         </View>
         </Reveal>
       ))}
@@ -154,5 +165,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   status: { ...typography.caption, color: colors.tx },
   day: { ...typography.caption, color: colors.t2 },
   meta: { ...typography.numberSmall, color: colors.t2, lineHeight: 20, marginTop: 7 },
+  repeat: { alignItems: 'flex-start', marginTop: 12 },
   substitution: { ...typography.bodySmall, color: colors.t2, marginTop: 8 },
 })

@@ -161,12 +161,12 @@ Priorizadas por valor para quem treina e por caber no princípio local-first.
 - ✅ **Calculadora de anilhas** e arredondamento por equipamento.
 - ⬜ Timer de descanso em **notificação** (app em segundo plano) com háptico.
 - ⬜ Sugestão de carga/progressão explicada (base já existe; refinar).
-- ⬜ Duplicar sessão anterior; "repetir último treino".
+- ✅ Duplicar sessão anterior; "repetir último treino" (botão no Progresso).
 - ⬜ Medidas corporais e peso, com gráfico simples.
 - ✅ Exportar histórico em CSV (além do backup completo).
 
 **Nutrição**
-- ⬜ Alimentos e refeições **favoritos**; copiar o dia anterior.
+- 🟡 Alimentos e refeições **favoritos** (pendente); copiar o dia anterior e duplicar refeição ✅.
 - ⬜ Código de barras (Open Food Facts, consulta manual e opcional).
 - ⬜ Hidratação (contador simples).
 - ⬜ Cálculo opcional de metas pelo usuário, sempre editável e sem prescrição.

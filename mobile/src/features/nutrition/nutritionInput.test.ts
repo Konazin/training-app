@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { consumedAtForDate, consumedAtFromTime, formatNumberInput, parseNumberInput, parseTimeInput, timeOfDay } from './nutritionInput'
+import { cloneMealInput, consumedAtForDate, consumedAtFromTime, formatNumberInput, parseNumberInput, parseTimeInput, timeOfDay } from './nutritionInput'
 
 describe('entrada numérica da nutrição', () => {
   it('aceita ponto ou vírgula e preserva texto parcial como número válido', () => {
@@ -41,5 +41,22 @@ describe('horário da refeição', () => {
     expect(timeOfDay(iso)).toBe('19:30')
     const date = new Date(iso)
     expect([date.getFullYear(), date.getMonth(), date.getDate()]).toEqual([2026, 9, 20])
+  })
+})
+
+describe('cloneMealInput', () => {
+  it('copia itens sem ids e não compartilha micronutrientes', () => {
+    const meal = {
+      id: 9, localDate: '2026-07-01', consumedAt: '2026-07-01T12:00:00.000Z', mealType: 'LUNCH',
+      title: 'Almoço', notes: '', source: 'MANUAL', createdAt: '', updatedAt: '',
+      items: [{ id: 3, mealId: 9, name: 'Arroz', portionDescription: '', estimatedGrams: 100,
+        caloriesKcal: 130, proteinGrams: 2, carbohydratesGrams: 28, fatGrams: 0, fiberGrams: 0,
+        micronutrients: { sodium_mg: 1 }, confidence: null, dataSource: 'MANUAL', sortOrder: 0,
+        createdAt: '', updatedAt: '' }],
+    } as never
+    const copy = cloneMealInput(meal, '2026-07-02', '2026-07-02T12:00:00.000Z')
+    expect(copy.localDate).toBe('2026-07-02')
+    expect(copy.items[0]).not.toHaveProperty('id')
+    expect(copy.items[0]).toMatchObject({ name: 'Arroz', caloriesKcal: 130 })
   })
 })

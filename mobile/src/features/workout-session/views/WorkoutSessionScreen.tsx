@@ -18,6 +18,8 @@ import {
   selectPreviousPerformance,
   suggestProgression,
   effectiveExerciseDefinitionId,
+  buildExerciseProgress,
+  detectSetRecords,
 } from '@training/training-domain'
 import type { RestTimerState } from '../model/restTimer'
 import { Screen, ScreenScrollView } from '../../../components/Screen'
@@ -88,6 +90,7 @@ export function WorkoutSessionScreen(props: Props) {
   const secondaryText = preferences.workoutHighContrast ? colors.workout.textSecondary : colors.t2
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>()
   const [now, setNow] = useState(Date.now())
+  const [recordNotice, setRecordNotice] = useState('')
   const [rpe, setRpe] = useState('')
   const [notes, setNotes] = useState(session?.notes ?? '')
   const [canLeave, setCanLeave] = useState(false)
@@ -349,6 +352,11 @@ export function WorkoutSessionScreen(props: Props) {
           </View>
         </Reveal>
       )}
+      {!!recordNotice && (
+        <Text accessibilityLiveRegion="polite" onPress={() => setRecordNotice('')} style={styles.recordNotice}>
+          {recordNotice}
+        </Text>
+      )}
       {restFinished && <Text accessibilityLiveRegion="polite" style={styles.restComplete}>Descanso concluído</Text>}
 
       {session.exercises.map((exercise, index) => {
@@ -535,6 +543,15 @@ export function WorkoutSessionScreen(props: Props) {
               onSave={(input) => onUpdateSet(exercise.id, set.id, input)}
               onRemove={() => onRemoveSet(exercise.id, set.id)}
               onStartRest={() => onStartRest(exercise.id, set.id, exercise.restSeconds)}
+              onRecord={(reps, load) => {
+                const kinds = detectSetRecords(
+                  buildExerciseProgress(history, effectiveId).records,
+                  load,
+                  reps,
+                )
+                if (!kinds.length) return
+                setRecordNotice(`Novo recorde em ${definition?.name ?? exercise.name}: ${kinds.includes('LOAD') ? 'maior carga' : '1RM estimado'}.`)
+              }}
             />
           ))}
 
@@ -743,6 +760,7 @@ function SetEditor({
   onSave,
   onRemove,
   onStartRest,
+  onRecord,
 }: {
   exercise: SessionExercise
   set: SetLog
@@ -755,6 +773,7 @@ function SetEditor({
   onSave: (input: SetLogInput) => Promise<boolean>
   onRemove: () => Promise<boolean>
   onStartRest: () => void
+  onRecord: (reps: number, load: number) => void
 }) {
   const { colors, preferences } = useTheme()
   const styles = createStyles(colors, highContrast)
@@ -783,6 +802,7 @@ function SetEditor({
     const success = await onSave(input(true))
     if (success && !set.completed) {
       void triggerHaptic('SET_COMPLETE', preferences.hapticsEnabled)
+      onRecord(toNumber(reps), toNumber(load))
       onStartRest()
     }
     return success
@@ -1119,6 +1139,7 @@ const createStyles = (colors: ThemeColors, highContrast = false) => {
     substitutionName: { ...typography.bodySmall, color: text },
     exerciseNotes: { borderTopColor: border, borderTopWidth: StyleSheet.hairlineWidth, gap: 8, paddingVertical: 12 },
     saved: { ...typography.caption, color: text },
+    recordNotice: { ...typography.body, color: text, fontWeight: '600', marginBottom: 12 },
     finish: { borderTopColor: border, borderTopWidth: StyleSheet.hairlineWidth, gap: 12, marginTop: 12, paddingTop: 20 },
     finishTitle: { ...typography.titleSmall, color: text },
     input: { backgroundColor: highContrast ? surface : secondarySurface, borderColor: highContrast ? border : 'transparent', borderRadius: 12, borderWidth: highContrast ? 1 : 0, color: text, fontFamily: fontFamilies.text, fontSize: 15, minHeight: 48, paddingHorizontal: 12 },
