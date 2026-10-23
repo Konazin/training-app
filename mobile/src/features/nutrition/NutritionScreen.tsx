@@ -509,6 +509,7 @@ export function NutritionScreen({
             <Text accessibilityRole="header" style={styles.sectionTitle}>Refeições</Text>
             <Action label="Adicionar refeição" primary onPress={() => setAddSheet(true)} disabled={aiBusy} />
           </View>
+          {aiBusy && <Action label="Cancelar solicitação" onPress={cancelAi} />}
           {!meals.length ? (
             summary ? (
               <EmptyState title="Os detalhes desta data expiraram." description="O resumo diário continua salvo; os itens de refeição são mantidos por sete dias." />

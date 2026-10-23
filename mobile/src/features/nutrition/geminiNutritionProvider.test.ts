@@ -137,6 +137,43 @@ describe('Gemini nutrition provider', () => {
       expect(busy).toHaveBeenCalledTimes(3)
     })
 
+    it('falls back when a model answers with unusable output, and reports it if all do', async () => {
+      const tried: string[] = []
+      const fetchMock = vi.fn(async (url: RequestInfo | URL) => {
+        tried.push(modelOf(url))
+        return tried.length === 1
+          ? new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"title":' }] } }] }), { status: 200 })
+          : response(mealJson)
+      })
+      await expect(createGeminiNutritionProvider('key', fetchMock, chain).estimateMeal(image)).resolves.toMatchObject({ title: 'Prato de teste' })
+      expect(tried).toEqual(['fast', 'mid'])
+
+      const bad = vi.fn(async () => response({ ...mealJson, items: [] }))
+      await expect(createGeminiNutritionProvider('key', bad, chain).estimateMeal(image)).rejects.toThrow('resposta incompatível')
+      expect(bad).toHaveBeenCalledTimes(3)
+    })
+
+    it('reports a user cancel as cancelled even while the response body is being read', async () => {
+      const controller = new AbortController()
+      const fetchMock = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+        const body = new Promise<string>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })))
+        })
+        return { ok: true, status: 200, json: () => body.then(JSON.parse) } as unknown as Response
+      })
+      const pending = createGeminiNutritionProvider('key', fetchMock, chain).estimateMeal(image, controller.signal)
+      setTimeout(() => controller.abort(), 5)
+      await expect(pending).rejects.toThrow('cancelada')
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('leaves room for thinking tokens in the output limit', async () => {
+      const fetchMock = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => response(mealJson))
+      await createGeminiNutritionProvider('key', fetchMock, chain).estimateMeal(image)
+      const body = JSON.parse(String(fetchMock.mock.calls[0]![1]?.body)) as { generationConfig: { maxOutputTokens: number } }
+      expect(body.generationConfig.maxOutputTokens).toBeGreaterThanOrEqual(8192)
+    })
+
     it('stops immediately without trying other models when the user cancels', async () => {
       const controller = new AbortController()
       const fetchMock = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => hang(init))

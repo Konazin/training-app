@@ -38,62 +38,71 @@ export function createGeminiNutritionProvider(
   return {
     estimateMeal: async (image, signal) => {
       validateImage(image)
-      const response = await generate(fetchImpl, chain, key, imagePrompt(), image, signal)
-      const title = requiredString(response.title, 'title', 100)
-      const items = parseItems(response.items)
-      if (!items.length) throw invalidResponse()
-      return { title, items }
+      return generate(fetchImpl, chain, key, imagePrompt(), parseMeal, image, signal)
     },
     suggestDailyMenu: async (input, signal) => {
       const preferences = input.preferences.trim()
       if (preferences.length > 500) throw new Error('As preferências devem ter no máximo 500 caracteres.')
       const prompt = dietPrompt(input, preferences)
-      const response = await generate(fetchImpl, chain, key, prompt, undefined, signal)
-      const title = requiredString(response.title, 'title', 100)
-      const summary = requiredString(response.summary, 'summary', 500)
-      if (!Array.isArray(response.meals) || response.meals.length < 1 || response.meals.length > 8) {
-        throw invalidResponse()
-      }
-      return {
-        title,
-        summary,
-        meals: response.meals.map((value, index) => {
-          const meal = object(value)
-          if (!mealTypes.includes(meal.mealType as NutritionMealType)) throw invalidResponse()
-          const items = parseItems(meal.items)
-          if (!items.length) throw invalidResponse()
-          return {
-            mealType: meal.mealType as NutritionMealType,
-            title: requiredString(meal.title, `meals[${index}].title`, 100),
-            items,
-          }
-        }),
-      }
+      return generate(fetchImpl, chain, key, prompt, parseMenu, undefined, signal)
     },
+  }
+}
+
+function parseMeal(response: Record<string, unknown>): NutritionAiMealEstimate {
+  const title = requiredString(response.title, 'title', 100)
+  const items = parseItems(response.items)
+  if (!items.length) throw invalidResponse()
+  return { title, items }
+}
+
+function parseMenu(response: Record<string, unknown>): NutritionAiDietSuggestion {
+  const title = requiredString(response.title, 'title', 100)
+  const summary = requiredString(response.summary, 'summary', 500)
+  if (!Array.isArray(response.meals) || response.meals.length < 1 || response.meals.length > 8) {
+    throw invalidResponse()
+  }
+  return {
+    title,
+    summary,
+    meals: response.meals.map((value, index) => {
+      const meal = object(value)
+      if (!mealTypes.includes(meal.mealType as NutritionMealType)) throw invalidResponse()
+      const items = parseItems(meal.items)
+      if (!items.length) throw invalidResponse()
+      return {
+        mealType: meal.mealType as NutritionMealType,
+        title: requiredString(meal.title, `meals[${index}].title`, 100),
+        items,
+      }
+    }),
   }
 }
 
 class RetryableError extends Error {}
 
-async function generate(
+async function generate<T>(
   fetchImpl: FetchLike,
   chain: readonly GeminiModelAttempt[],
   apiKey: string,
   prompt: string,
+  parse: (response: Record<string, unknown>) => T,
   image?: NutritionImageInput,
   signal?: AbortSignal,
-) {
+): Promise<T> {
   const parts: Record<string, unknown>[] = [{ text: prompt }]
   if (image) parts.push({ inlineData: { mimeType: image.mimeType, data: image.base64 } })
   const body = JSON.stringify({
     contents: [{ role: 'user', parts }],
-    generationConfig: { responseMimeType: 'application/json', temperature: 0.2, maxOutputTokens: 4096 },
+    generationConfig: { responseMimeType: 'application/json', temperature: 0.2, maxOutputTokens: 8192 },
   })
   let lastError: Error = new Error('Não foi possível conectar ao Gemini. Confira a internet e tente novamente.')
   for (const attempt of chain) {
     if (signal?.aborted) throw new Error('Análise cancelada.')
     try {
-      return await generateWithModel(fetchImpl, attempt, apiKey, body, signal)
+      const response = await generateWithModel(fetchImpl, attempt, apiKey, body, signal)
+      // Saída inutilizável também tenta o próximo modelo.
+      try { return parse(response) } catch (error) { throw new RetryableError(error instanceof Error ? error.message : invalidResponse().message) }
     } catch (error) {
       if (!(error instanceof RetryableError)) throw error
       lastError = error
@@ -133,10 +142,15 @@ async function generateWithModel(
       const failure = providerError(response.status)
       throw isRetryableStatus(response.status) ? new RetryableError(failure.message) : failure
     }
-    return await readResponse(response)
+    try {
+      return await readResponse(response)
+    } catch (error) {
+      throw error instanceof RetryableError ? error : new RetryableError(error instanceof Error ? error.message : invalidResponse().message)
+    }
   } catch (error) {
+    if (signal?.aborted) throw new Error('Análise cancelada.')
     // O timeout também vale enquanto o corpo da resposta é lido.
-    if (timedOut && !(error instanceof RetryableError) && !signal?.aborted) {
+    if (timedOut && !(error instanceof RetryableError)) {
       throw new RetryableError('A análise demorou demais e foi interrompida (conexão lenta ou serviço ocupado). Tente de novo ou registre manualmente.')
     }
     throw error
@@ -152,7 +166,7 @@ function isRetryableStatus(status: number) {
 
 async function readResponse(response: Response) {
   let body: unknown
-  try { body = await response.json() } catch { throw invalidResponse() }
+  try { body = await response.json() } catch { throw new RetryableError(invalidResponse().message) }
   const root = object(body)
   const candidates = Array.isArray(root.candidates) ? root.candidates : []
   const first = candidates.length ? object(candidates[0]) : null
