@@ -155,15 +155,15 @@ erro, offline) desenhados.
 Priorizadas por valor para quem treina e por caber no princípio local-first.
 
 **Treino**
-- ⬜ Progresso por exercício (histórico, 1RM estimado, volume) já planejado no M1.
-- ⬜ Detecção e histórico de **recordes pessoais**.
+- ✅ Progresso por exercício (histórico, 1RM estimado, volume) já planejado no M1.
+- ✅ Detecção e histórico de **recordes pessoais**.
 - ⬜ **Séries de aquecimento**, tipos de série (drop, falha), **supersets**.
-- ⬜ **Calculadora de anilhas** e arredondamento por equipamento.
+- ✅ **Calculadora de anilhas** e arredondamento por equipamento.
 - ⬜ Timer de descanso em **notificação** (app em segundo plano) com háptico.
 - ⬜ Sugestão de carga/progressão explicada (base já existe; refinar).
 - ⬜ Duplicar sessão anterior; "repetir último treino".
 - ⬜ Medidas corporais e peso, com gráfico simples.
-- ⬜ Exportar histórico em CSV (além do backup completo).
+- ✅ Exportar histórico em CSV (além do backup completo).
 
 **Nutrição**
 - ⬜ Alimentos e refeições **favoritos**; copiar o dia anterior.

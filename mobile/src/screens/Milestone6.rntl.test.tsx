@@ -41,6 +41,8 @@ describe('avisos e provider renderizados', () => {
       onIntegrations: jest.fn(),
       onAppearance: jest.fn(),
       onLibrary: jest.fn(),
+      onPlateCalculator: jest.fn(),
+      onExportCsv: jest.fn(),
       onTrash: jest.fn(),
       trashCount: 0,
       onExport: jest.fn(),

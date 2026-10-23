@@ -166,6 +166,12 @@ export function ExerciseDetailScreen({
         ) : <Text style={styles.body}>{exercise.notes || 'Nenhuma nota pessoal.'}</Text>}
       </View>
 
+      <PrimaryButton
+        label="Ver progresso e recordes"
+        onPress={() => (navigation as any).navigate('ExerciseProgress', { exerciseId: exercise.id })}
+        secondary
+      />
+
       {!!message && <Text accessibilityLiveRegion="polite" style={styles.message}>{message}</Text>}
       <Text style={styles.attribution}>
         Fonte da mídia: {attributionLabel(displayedAttribution)}

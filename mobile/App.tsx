@@ -22,6 +22,7 @@ import { type LocalRepositories } from '@training/training-local-db'
 import {
   buildLocalNotices,
   calculateHistoryProgress,
+  sessionsToCsv,
   localDateKey,
   type BackupRepository,
   type SecretsRepository,
@@ -45,6 +46,8 @@ import { ExerciseDetailScreen } from './src/features/exercise-library/ExerciseDe
 import { LibraryScreen } from './src/screens/LibraryScreen'
 import { HomeScreen } from './src/screens/HomeScreen'
 import { HistoryScreen } from './src/screens/HistoryScreen'
+import { ExerciseProgressScreen } from './src/features/progress/ExerciseProgressScreen'
+import { PlateCalculatorScreen } from './src/features/progress/PlateCalculatorScreen'
 import { MoreScreen } from './src/screens/MoreScreen'
 import { TabIcon } from './src/components/TabIcon'
 import { NutritionScreen } from './src/features/nutrition/NutritionScreen'
@@ -57,7 +60,7 @@ import { useAppBootstrap } from './src/features/bootstrap/useAppBootstrap'
 import { useLocalRuntime } from './src/features/bootstrap/useLocalRuntime'
 import { BootstrapScreen } from './src/features/bootstrap/BootstrapScreen'
 import { AppErrorBoundary } from './src/features/bootstrap/AppErrorBoundary'
-import { exportDiagnostic } from './src/integrations/backupFiles'
+import { exportDiagnostic, shareHistoryCsv } from './src/integrations/backupFiles'
 import { getAppVersion } from './src/config/version'
 import { Toast } from './src/components/Toast'
 import { triggerHaptic } from './src/theme/haptics'
@@ -296,6 +299,15 @@ function LocalApp({
                   />
                 )}
               </Stack.Screen>
+              <Stack.Screen name="ExerciseProgress">
+                {() => (
+                  <ExerciseProgressScreen
+                    exercises={controller.exerciseLibrary}
+                    sessions={workoutSession.sessions}
+                  />
+                )}
+              </Stack.Screen>
+              <Stack.Screen name="PlateCalculator" component={PlateCalculatorScreen} />
               <Stack.Screen name="Integrations" component={IntegrationsScreen} />
               <Stack.Screen name="WgerIntegration">
                 {() => (
@@ -667,6 +679,11 @@ function MainTabs({
             busy={backup.busy}
             onAppearance={() => navigation.navigate('AppearanceSettings')}
             onLibrary={() => navigation.navigate('Library')}
+            onPlateCalculator={() => navigation.navigate('PlateCalculator')}
+            onExportCsv={() => {
+              shareHistoryCsv(sessionsToCsv(workoutSession.sessions)).catch((error: unknown) =>
+                Alert.alert('Não foi possível exportar', error instanceof Error ? error.message : 'Tente novamente.'))
+            }}
             onTrash={() => navigation.navigate('TrainingPlanTrash')}
             trashCount={trash.count}
             onIntegrations={() => navigation.navigate('Integrations')}

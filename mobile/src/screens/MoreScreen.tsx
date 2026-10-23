@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Alert, StyleSheet, Text, View } from 'react-native'
 import type { ReactNode } from 'react'
-import { Archive, BookOpen, ChevronRight, Download, Globe, Lightbulb, Palette, Trash2, Upload } from 'lucide-react-native'
+import { Archive, BookOpen, Calculator, ChevronRight, Download, FileSpreadsheet, Globe, Lightbulb, Palette, Trash2, Upload } from 'lucide-react-native'
 import { ScreenScrollView } from '../components/Screen'
 import { PressableScale, Reveal } from '../motion'
 import { ScreenHeader } from '../components/ScreenHeader'
@@ -19,6 +19,8 @@ export function MoreScreen({
   onIntegrations,
   onAppearance,
   onLibrary,
+  onPlateCalculator,
+  onExportCsv,
   onTrash,
   trashCount,
   onExport,
@@ -36,6 +38,8 @@ export function MoreScreen({
   onIntegrations: () => void
   onAppearance: () => void
   onLibrary: () => void
+  onPlateCalculator: () => void
+  onExportCsv: () => void
   onTrash: () => void
   trashCount: number
   onExport: () => void
@@ -104,6 +108,7 @@ export function MoreScreen({
       />
       <Text accessibilityRole="header" style={styles.section}>Conteúdo</Text>
       <MenuItem icon={<BookOpen color={colors.tx} size={20} strokeWidth={1.5} />} label="Biblioteca de exercícios" detail="Criar e editar" onPress={onLibrary} disabled={busy} />
+      <MenuItem icon={<Calculator color={colors.tx} size={20} strokeWidth={1.5} />} label="Calculadora de anilhas" detail="Anilhas por lado para a carga total" onPress={onPlateCalculator} disabled={busy} />
       <MenuItem
         icon={<Trash2 color={colors.tx} size={20} strokeWidth={1.5} />}
         label="Lixeira de fichas"
@@ -124,6 +129,7 @@ export function MoreScreen({
       <Text accessibilityRole="header" style={styles.section}>Backup</Text>
       <MenuItem icon={<Download color={colors.tx} size={20} strokeWidth={1.5} />} label="Exportar backup" detail="Schema 3 · arquivo identificado por data" onPress={onExport} disabled={busy} />
       <MenuItem icon={<Upload color={colors.tx} size={20} strokeWidth={1.5} />} label="Importar backup" detail="Validar e restaurar" onPress={onImport} disabled={busy} />
+      <MenuItem icon={<FileSpreadsheet color={colors.tx} size={20} strokeWidth={1.5} />} label="Exportar histórico (CSV)" detail="Séries, cargas e repetições para planilha" onPress={onExportCsv} disabled={busy} />
       <Text accessibilityRole="header" style={styles.section}>Backups automáticos</Text>
       {!automaticBackups.length && <Text style={styles.note}>Nenhum backup automático criado.</Text>}
       {automaticBackups.map((backup) => (
