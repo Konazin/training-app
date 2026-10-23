@@ -4,7 +4,12 @@ import { fireEvent, renderAsync, screen, waitFor } from '@testing-library/react-
 import type { LocalRepositories } from '@training/training-local-db'
 import type { NutritionMealInput, SecretsRepository } from '@training/training-domain'
 
+jest.mock('react-native-safe-area-context', () => ({
+  SafeAreaProvider: ({ children }: { children: unknown }) => children,
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+}))
 jest.mock('../../theme', () => ({
+  shared: require('../../theme/tokens').shared,
   useTheme: () => ({ colors: new Proxy({}, { get: () => '#111111' }) }),
 }))
 jest.mock('../../components/Screen', () => {
@@ -17,33 +22,6 @@ jest.mock('../../components/ScreenHeader', () => ({
     const React = require('react')
     const { Text, View } = require('react-native')
     return React.createElement(View, null, React.createElement(Text, null, title), description && React.createElement(Text, null, description))
-  },
-}))
-jest.mock('../../components/ui', () => ({
-  EmptyState: ({ title, description }: { title: string; description: string }) => {
-    const React = require('react')
-    const { Text, View } = require('react-native')
-    return React.createElement(View, null, React.createElement(Text, null, title), React.createElement(Text, null, description))
-  },
-  InlineNotice: ({ message }: { message: string }) => {
-    const React = require('react')
-    const { Text } = require('react-native')
-    return React.createElement(Text, null, message)
-  },
-  MetricCard: ({ label, value, detail }: { label: string; value: string; detail?: string }) => {
-    const React = require('react')
-    const { Text } = require('react-native')
-    return React.createElement(Text, null, `${label}: ${value}${detail ? ` · ${detail}` : ''}`)
-  },
-  SectionHeader: ({ title }: { title: string }) => {
-    const React = require('react')
-    const { Text } = require('react-native')
-    return React.createElement(Text, null, title)
-  },
-  StatusPill: ({ label }: { label: string }) => {
-    const React = require('react')
-    const { Text } = require('react-native')
-    return React.createElement(Text, null, label)
   },
 }))
 jest.mock('expo-image-picker', () => ({
@@ -76,8 +54,9 @@ describe('nutrição local renderizada', () => {
 
     expect(screen.getByText('Nenhuma refeição registrada neste dia.')).toBeTruthy()
     expect(screen.queryByText(/será adicionada na próxima etapa/i)).toBeNull()
+    fireEvent.press(screen.getByText('Adicionar refeição'))
     fireEvent.press(screen.getByText('Adicionar manualmente'))
-    await waitFor(() => expect(screen.getByText('Adicionar refeição')).toBeTruthy())
+    await waitFor(() => expect(screen.getByLabelText('Alimento')).toBeTruthy())
     fireEvent.changeText(screen.getByLabelText('Alimento'), 'Aveia')
     fireEvent.changeText(screen.getByLabelText('Porção'), '1 tigela')
     fireEvent.changeText(screen.getAllByLabelText('Calorias (kcal)')[0]!, '120')
@@ -94,8 +73,11 @@ describe('nutrição local renderizada', () => {
     const onOpenAiSettings = jest.fn()
     await renderAsync(createElement(NutritionScreen, { repositories, secrets, onOpenAiSettings }))
     expect(screen.queryByLabelText('Chave pessoal da Gemini API')).toBeNull()
+    fireEvent.press(screen.getByText('IA'))
     fireEvent.press(screen.getAllByLabelText('Gemini: sem chave. Configurar chave')[0]!)
     expect(onOpenAiSettings).toHaveBeenCalledTimes(1)
+    fireEvent.press(screen.getByText('Dia'))
+    fireEvent.press(screen.getByText('Adicionar refeição'))
     fireEvent.press(screen.getByText('Câmera · estimar com IA'))
     await waitFor(() => expect(onOpenAiSettings).toHaveBeenCalledTimes(2))
   })
@@ -107,8 +89,9 @@ describe('nutrição local renderizada', () => {
     })
     const secrets: SecretsRepository = { get: async () => null, set: async () => undefined, remove: async () => undefined }
     await renderAsync(createElement(NutritionScreen, { repositories, secrets, onOpenAiSettings: jest.fn() }))
+    fireEvent.press(screen.getByText('Adicionar refeição'))
     fireEvent.press(screen.getByText('Adicionar manualmente'))
-    await waitFor(() => expect(screen.getByText('Adicionar refeição')).toBeTruthy())
+    await waitFor(() => expect(screen.getByLabelText('Alimento')).toBeTruthy())
     fireEvent.changeText(screen.getByLabelText('Alimento'), 'Pão')
     const protein = () => screen.getAllByLabelText('Proteína (g)')[0]!
     fireEvent.changeText(protein(), '1.')
@@ -128,9 +111,11 @@ describe('nutrição local renderizada', () => {
     const repositories = createRepositories()
     const secrets: SecretsRepository = { get: async () => null, set: async () => undefined, remove: async () => undefined }
     await renderAsync(createElement(NutritionScreen, { repositories, secrets, onOpenAiSettings: jest.fn() }))
+    fireEvent.press(screen.getByText('Metas'))
     fireEvent.changeText(screen.getAllByLabelText('Calorias (kcal)')[0]!, '2000')
     fireEvent.press(screen.getByText('Salvar metas'))
     await waitFor(() => expect(screen.getByText('Metas salvas neste aparelho.')).toBeTruthy())
+    fireEvent.press(screen.getByText('Dia'))
     expect(screen.getByLabelText('Próximo dia').props.accessibilityState).toMatchObject({ disabled: true })
   })
 })

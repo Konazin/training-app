@@ -16,3 +16,23 @@ export function consumedAtForDate(date: string, now = new Date()) {
   if (date === localDateKey(now)) return now.toISOString()
   return new Date(`${date}T12:00:00`).toISOString()
 }
+
+/** "7:05", "07:05" ou "7h05" -> "07:05"; texto inválido -> null. */
+export function parseTimeInput(text: string) {
+  const match = /^\s*(\d{1,2})\s*[:hH]\s*(\d{2})\s*$/.exec(text)
+  if (!match) return null
+  const hours = Number(match[1])
+  const minutes = Number(match[2])
+  if (hours > 23 || minutes > 59) return null
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+}
+
+export function timeOfDay(isoString: string) {
+  const date = new Date(isoString)
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+/** Combina o dia da refeição com um horário local "HH:MM" e devolve ISO. */
+export function consumedAtFromTime(localDate: string, time: string) {
+  return new Date(`${localDate}T${time}:00`).toISOString()
+}

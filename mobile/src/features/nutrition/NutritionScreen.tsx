@@ -25,14 +25,15 @@ import {
   type SecretsRepository,
 } from '@training/training-domain'
 import type { LocalRepositories } from '@training/training-local-db'
-import { EmptyState, InlineNotice, MetricCard, SectionHeader, StatusPill } from '../../components/ui'
+import { BottomSheet, EmptyState, InlineNotice, SegmentedControl, StatusPill } from '../../components/ui'
+import { AnimatedNumber, PressableScale, ProgressBar, ProgressRing, Reveal } from '../../motion'
 import { ScreenScrollView } from '../../components/Screen'
 import { ScreenHeader } from '../../components/ScreenHeader'
 import { useTheme, type ThemeColors } from '../../theme'
 import { typography } from '../../theme/typography'
 import { createGeminiNutritionProvider } from './geminiNutritionProvider'
 import { GEMINI_API_KEY_SECRET } from '../../integrations/secureSecrets'
-import { consumedAtForDate, formatNumberInput, parseNumberInput } from './nutritionInput'
+import { consumedAtForDate, consumedAtFromTime, formatNumberInput, parseNumberInput, parseTimeInput, timeOfDay } from './nutritionInput'
 
 const EMPTY_GOALS: NutritionGoals = {
   caloriesKcal: null,
@@ -96,6 +97,8 @@ export function NutritionScreen({
   const [editingMenuId, setEditingMenuId] = useState<string | null>(null)
   const [savedMenus, setSavedMenus] = useState<SavedMenu[]>([])
   const [aiBusy, setAiBusy] = useState(false)
+  const [tab, setTab] = useState<'DAY' | 'GOALS' | 'AI'>('DAY')
+  const [addSheet, setAddSheet] = useState(false)
   const requestId = useRef(0)
   const activeRequest = useRef<AbortController | null>(null)
   const mounted = useRef(true)
@@ -198,7 +201,8 @@ export function NutritionScreen({
       await repositories.settings.set(NUTRITION_GOALS_KEY, normalizeGoals(next))
       setGoals(normalizeGoals(next))
       await repositories.nutritionMaintenance.aggregateDay(date)
-      setNotice('Metas salvas neste aparelho.')
+      const zeroed = Object.values(next).some((value) => value === 0)
+      setNotice(zeroed ? 'Metas salvas. Valores iguais a zero foram tratados como "sem meta".' : 'Metas salvas neste aparelho.')
       setNoticeTone('success')
       await refresh()
     } catch {
@@ -386,138 +390,210 @@ export function NutritionScreen({
     <ScreenScrollView
       refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void refresh()} tintColor={colors.ac} />}
     >
-      <ScreenHeader eyebrow="Acompanhamento local" title="Nutrição" description={readableDate(date)} />
-
-      <View style={styles.dateRow}>
-        <DateStep label="Dia anterior" onPress={() => changeDate(-1)} previous />
-        <Text accessibilityRole="header" style={styles.selectedDate}>{date === today ? 'Hoje' : readableDate(date)}</Text>
-        <DateStep label="Próximo dia" onPress={() => changeDate(1)} disabled={date >= today} />
+      <Reveal>
+        <ScreenHeader title="Nutrição" description="Acompanhamento local, sem prescrição." />
+      </Reveal>
+      <View style={styles.tabs}>
+        <SegmentedControl
+          label="Seção da nutrição"
+          onChange={setTab}
+          options={[{ value: 'DAY', label: 'Dia' }, { value: 'GOALS', label: 'Metas' }, { value: 'AI', label: 'IA' }]}
+          value={tab}
+        />
       </View>
-      {date !== today && <Action label="Hoje" onPress={() => selectDate(today)} />}
 
       {!!notice && <InlineNotice tone={noticeTone === 'success' ? 'success' : noticeTone} message={notice} />}
 
-      <SectionHeader title="Resumo do dia" />
-      <View style={styles.metrics}>
-        <MetricCard label="Calorias" value={`${formatAmount(totals.caloriesKcal)} kcal`} detail={goalDetail(totals.caloriesKcal, dailyGoals.caloriesKcal)} />
-        <MetricCard label="Proteína" value={`${formatAmount(totals.proteinGrams)} g`} detail={goalDetail(totals.proteinGrams, dailyGoals.proteinGrams)} />
-        <MetricCard label="Carboidratos" value={`${formatAmount(totals.carbohydratesGrams)} g`} detail={goalDetail(totals.carbohydratesGrams, dailyGoals.carbohydratesGrams)} />
-        <MetricCard label="Gordura" value={`${formatAmount(totals.fatGrams)} g`} detail={goalDetail(totals.fatGrams, dailyGoals.fatGrams)} />
-        <MetricCard label="Fibras" value={`${formatAmount(totals.fiberGrams)} g`} detail={goalDetail(totals.fiberGrams, dailyGoals.fiberGrams)} />
-      </View>
-      <Text style={styles.helper}>
-        {summary?.mealCount ?? meals.length} refeição(ões) neste dia. Metas são definidas por você; o app não faz prescrição nutricional.
-      </Text>
-
-      <SectionHeader title="Últimos 7 dias" />
-      {!recentSummaries.length ? (
-        <Text style={styles.helper}>Os resumos aparecem aqui depois que você registrar refeições.</Text>
-      ) : (
-        <View style={styles.historyList}>
-          {recentSummaries.map((entry) => (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected: entry.localDate === date }}
-              key={entry.localDate}
-              onPress={() => selectDate(entry.localDate)}
-              style={[styles.historyRow, entry.localDate === date && styles.historyRowSelected]}
-            >
-              <View style={styles.historyDate}>
-                <Text style={styles.historyDateText}>{shortDate(entry.localDate)}</Text>
-                <Text style={styles.historyMeta}>{entry.mealCount} refeições</Text>
-              </View>
-              <View style={styles.historyTotals}>
-                <Text style={styles.historyCalories}>{formatAmount(entry.totalCaloriesKcal)} kcal</Text>
-                <Text style={styles.historyMeta}>{formatAmount(entry.totalProteinGrams)} g proteína</Text>
-              </View>
-            </Pressable>
-          ))}
-        </View>
-      )}
-
-      <SectionHeader title="Adicionar refeição" />
-      <View style={styles.actions}>
-        <Action label="Câmera · estimar com IA" onPress={() => void runPhotoEstimate('CAMERA')} disabled={aiBusy} />
-        <Action label="Galeria · estimar com IA" onPress={() => void runPhotoEstimate('GALLERY')} disabled={aiBusy} />
-        <Action label="Adicionar manualmente" primary onPress={() => setEditing(newMeal(date))} disabled={aiBusy} />
-      </View>
-      {!apiKeyConfigured && <AiKeyRow configured={false} onPress={onOpenAiSettings} />}
-
-      <SectionHeader title="Refeições" />
-      {!meals.length ? (
-        summary ? (
-          <EmptyState title="Os detalhes desta data expiraram." description="O resumo diário continua salvo; os itens de refeição são mantidos por sete dias." />
-        ) : (
-          <EmptyState title="Nenhuma refeição registrada neste dia." description="Registre manualmente para começar seu resumo local." />
-        )
-      ) : meals.map((meal) => (
-        <View key={meal.id} style={styles.mealCard}>
-          <View style={styles.mealHeader}>
-            <StatusPill label={mealTypeLabel(meal.mealType)} />
-            <Text style={styles.time}>{new Date(meal.consumedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
-          </View>
-          <Text style={styles.mealTitle}>{meal.title || 'Refeição sem título'}</Text>
-          <Text style={styles.detail}>
-            {meal.items.length} item(ns) · {formatAmount(sumMeal(meal, 'caloriesKcal'))} kcal · {formatAmount(sumMeal(meal, 'proteinGrams'))} g proteína
-          </Text>
-          {!!meal.notes && <Text style={styles.detail}>{meal.notes}</Text>}
-          <View style={styles.row}>
-            <Action label="Abrir / editar" onPress={() => setEditing(meal)} />
-            <Action label="Excluir" onPress={() => removeMeal(meal)} danger />
-          </View>
-        </View>
-      ))}
-
-      <SectionHeader title="Metas nutricionais" />
-      <Text style={styles.helper}>Defina valores pessoais para acompanhar. Eles não são recomendações médicas.</Text>
-      <GoalFields goals={goals} onSave={setGoal} />
-
-      <SectionHeader title="Sugestões de cardápio com IA" />
-      <Text style={styles.helper}>
-        Opcional e requer internet. Metas e preferências digitadas só são enviadas após sua confirmação. As sugestões são genéricas e precisam ser revisadas.
-      </Text>
-      <AiKeyRow configured={apiKeyConfigured} onPress={onOpenAiSettings} />
-      <Field
-        label="Preferências para a sugestão (opcional, até 500 caracteres)"
-        value={preferences}
-        onChangeText={setPreferences}
-        multiline
-        maxLength={500}
-        placeholder="Ex.: refeições vegetarianas e preparo simples"
-      />
-      <View style={styles.row}>
-        <Action label="Gerar sugestão de um dia" primary onPress={() => void generateDietSuggestion()} disabled={aiBusy} />
-        {aiBusy && <Action label="Cancelar solicitação" onPress={cancelAi} />}
-      </View>
-
-      {dietSuggestion && (
-        <EditableDietSuggestion
-          suggestion={dietSuggestion}
-          busy={aiBusy}
-          editingSaved={editingMenuId !== null}
-          onChange={setDietSuggestion}
-          onSave={() => void saveDietSuggestion()}
-          onDiscard={() => { setDietSuggestion(null); setEditingMenuId(null) }}
-        />
-      )}
-
-      {!!savedMenus.length && (
+      {tab === 'DAY' && (
         <>
-          <SectionHeader title="Sugestões salvas neste aparelho" />
-          {savedMenus.map((menu) => (
-            <View key={menu.id} style={styles.mealCard}>
-              <Text style={styles.mealTitle}>{menu.suggestion.title}</Text>
-              <Text style={styles.detail}>{menu.suggestion.meals.length} refeições · salva em {new Date(menu.createdAt).toLocaleDateString('pt-BR')}</Text>
-              <Text style={styles.bodyText}>{menu.suggestion.summary}</Text>
-              <View style={styles.row}>
-                <Action label="Editar sugestão" onPress={() => { setEditingMenuId(menu.id); setDietSuggestion(menu.suggestion) }} />
-                <Action label="Excluir" danger onPress={() => deleteSavedMenu(menu.id)} />
+          <View style={styles.dateRow}>
+            <DateStep label="Dia anterior" onPress={() => changeDate(-1)} previous />
+            <Text accessibilityRole="header" style={styles.selectedDate}>{date === today ? 'Hoje' : readableDate(date)}</Text>
+            <DateStep label="Próximo dia" onPress={() => changeDate(1)} disabled={date >= today} />
+          </View>
+          {date !== today && <Action label="Hoje" onPress={() => selectDate(today)} />}
+
+          <MacroSummary totals={totals} goals={dailyGoals} mealCount={summary?.mealCount ?? meals.length} />
+
+          <View style={styles.mealsHeader}>
+            <Text accessibilityRole="header" style={styles.sectionTitle}>Refeições</Text>
+            <Action label="Adicionar refeição" primary onPress={() => setAddSheet(true)} disabled={aiBusy} />
+          </View>
+          {!meals.length ? (
+            summary ? (
+              <EmptyState title="Os detalhes desta data expiraram." description="O resumo diário continua salvo; os itens de refeição são mantidos por sete dias." />
+            ) : (
+              <EmptyState title="Nenhuma refeição registrada neste dia." description="Registre manualmente para começar seu resumo local." />
+            )
+          ) : meals.map((meal, index) => (
+            <Reveal index={index} key={meal.id}>
+              <View style={styles.mealCard}>
+                <PressableScale accessibilityLabel={`Abrir ${meal.title || mealTypeLabel(meal.mealType)}`} accessibilityRole="button" onPress={() => setEditing(meal)} pressedScale={0.99}>
+                  <View style={styles.mealHeader}>
+                    <StatusPill label={mealTypeLabel(meal.mealType)} />
+                    <Text style={styles.time}>{new Date(meal.consumedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+                  </View>
+                  <Text style={styles.mealTitle}>{meal.title || 'Refeição sem título'}</Text>
+                  <Text style={styles.detail}>
+                    {meal.items.length} item(ns) · {formatAmount(sumMeal(meal, 'caloriesKcal'))} kcal · {formatAmount(sumMeal(meal, 'proteinGrams'))} g proteína
+                  </Text>
+                  {!!meal.notes && <Text style={styles.detail}>{meal.notes}</Text>}
+                </PressableScale>
+                <View style={styles.row}>
+                  <Action label="Abrir / editar" onPress={() => setEditing(meal)} />
+                  <Action label="Excluir" onPress={() => removeMeal(meal)} danger />
+                </View>
               </View>
-            </View>
+            </Reveal>
           ))}
+
+          <Text accessibilityRole="header" style={styles.sectionTitle}>Últimos 7 dias</Text>
+          {!recentSummaries.length ? (
+            <Text style={styles.helper}>Os resumos aparecem aqui depois que você registrar refeições.</Text>
+          ) : (
+            <View style={styles.historyList}>
+              {recentSummaries.map((entry) => (
+                <PressableScale
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: entry.localDate === date }}
+                  key={entry.localDate}
+                  onPress={() => selectDate(entry.localDate)}
+                  pressedScale={0.99}
+                  style={[styles.historyRow, entry.localDate === date && styles.historyRowSelected]}
+                >
+                  <View style={styles.historyDate}>
+                    <Text style={styles.historyDateText}>{shortDate(entry.localDate)}</Text>
+                    <Text style={styles.historyMeta}>{entry.mealCount} refeições</Text>
+                  </View>
+                  <View style={styles.historyTotals}>
+                    <Text style={styles.historyCalories}>{formatAmount(entry.totalCaloriesKcal)} kcal</Text>
+                    <Text style={styles.historyMeta}>{formatAmount(entry.totalProteinGrams)} g proteína</Text>
+                  </View>
+                </PressableScale>
+              ))}
+            </View>
+          )}
         </>
       )}
+
+      {tab === 'GOALS' && (
+        <>
+          <Text style={styles.helper}>Defina valores pessoais para acompanhar. Deixe em branco para não definir uma meta. Eles não são recomendações médicas.</Text>
+          <GoalFields goals={goals} onSave={setGoal} />
+        </>
+      )}
+
+      {tab === 'AI' && (
+        <>
+          <Text style={styles.helper}>
+            Opcional e requer internet. Metas e preferências digitadas só são enviadas após sua confirmação. As sugestões são genéricas e precisam ser revisadas.
+          </Text>
+          <AiKeyRow configured={apiKeyConfigured} onPress={onOpenAiSettings} />
+          <Field
+            label="Preferências para a sugestão (opcional, até 500 caracteres)"
+            value={preferences}
+            onChangeText={setPreferences}
+            multiline
+            maxLength={500}
+            placeholder="Ex.: refeições vegetarianas e preparo simples"
+          />
+          <View style={styles.row}>
+            <Action label="Gerar sugestão de um dia" primary onPress={() => void generateDietSuggestion()} disabled={aiBusy} />
+            {aiBusy && <Action label="Cancelar solicitação" onPress={cancelAi} />}
+          </View>
+
+          {dietSuggestion && (
+            <EditableDietSuggestion
+              suggestion={dietSuggestion}
+              busy={aiBusy}
+              editingSaved={editingMenuId !== null}
+              onChange={setDietSuggestion}
+              onSave={() => void saveDietSuggestion()}
+              onDiscard={() => { setDietSuggestion(null); setEditingMenuId(null) }}
+            />
+          )}
+
+          {!!savedMenus.length && (
+            <>
+              <Text accessibilityRole="header" style={styles.sectionTitle}>Sugestões salvas neste aparelho</Text>
+              {savedMenus.map((menu) => (
+                <View key={menu.id} style={styles.mealCard}>
+                  <Text style={styles.mealTitle}>{menu.suggestion.title}</Text>
+                  <Text style={styles.detail}>{menu.suggestion.meals.length} refeições · salva em {new Date(menu.createdAt).toLocaleDateString('pt-BR')}</Text>
+                  <Text style={styles.bodyText}>{menu.suggestion.summary}</Text>
+                  <View style={styles.row}>
+                    <Action label="Editar sugestão" onPress={() => { setEditingMenuId(menu.id); setDietSuggestion(menu.suggestion) }} />
+                    <Action label="Excluir" danger onPress={() => deleteSavedMenu(menu.id)} />
+                  </View>
+                </View>
+              ))}
+            </>
+          )}
+        </>
+      )}
+
+      <BottomSheet title="Adicionar refeição" visible={addSheet} onClose={() => setAddSheet(false)}>
+        <View style={styles.sheetActions}>
+          <Action label="Adicionar manualmente" primary onPress={() => { setAddSheet(false); setEditing(newMeal(date)) }} disabled={aiBusy} />
+          <Action label="Câmera · estimar com IA" onPress={() => { setAddSheet(false); void runPhotoEstimate('CAMERA') }} disabled={aiBusy} />
+          <Action label="Galeria · estimar com IA" onPress={() => { setAddSheet(false); void runPhotoEstimate('GALLERY') }} disabled={aiBusy} />
+          {!apiKeyConfigured && <AiKeyRow configured={false} onPress={() => { setAddSheet(false); onOpenAiSettings() }} />}
+        </View>
+      </BottomSheet>
     </ScreenScrollView>
+  )
+}
+
+/** Resumo do dia: anel de calorias e barras de macros, animados ao abrir e ao mudar o dia. */
+function MacroSummary({
+  totals,
+  goals,
+  mealCount,
+}: {
+  totals: NutrientTotals
+  goals: NutritionGoals
+  mealCount: number
+}) {
+  const { colors } = useTheme()
+  const styles = createStyles(colors)
+  const calorieGoal = goals.caloriesKcal && goals.caloriesKcal > 0 ? goals.caloriesKcal : null
+  const bars: { label: string; key: NutrientKey; unit: string }[] = [
+    { label: 'Proteína', key: 'proteinGrams', unit: 'g' },
+    { label: 'Carboidratos', key: 'carbohydratesGrams', unit: 'g' },
+    { label: 'Gordura', key: 'fatGrams', unit: 'g' },
+    { label: 'Fibras', key: 'fiberGrams', unit: 'g' },
+  ]
+  return (
+    <View style={styles.summary}>
+      <View style={styles.summaryTop}>
+        <ProgressRing
+          label={calorieGoal ? `Calorias: ${Math.round(totals.caloriesKcal / calorieGoal * 100)}% da meta` : 'Calorias do dia'}
+          progress={calorieGoal ? totals.caloriesKcal / calorieGoal : 0}
+          size={120}
+          stroke={7}
+        >
+          <AnimatedNumber format={(value) => formatAmount(value)} style={styles.kcalValue} value={Math.round(totals.caloriesKcal)} />
+          <Text style={styles.kcalUnit}>kcal</Text>
+        </ProgressRing>
+        <View style={styles.summaryCopy}>
+          <Text style={styles.summaryTitle}>{calorieGoal ? goalDetail(totals.caloriesKcal, calorieGoal) : 'Sem meta de calorias'}</Text>
+          <Text style={styles.helper}>{mealCount} refeição(ões) neste dia.</Text>
+        </View>
+      </View>
+      {bars.map(({ label, key, unit }) => {
+        const goal = goals[key]
+        return (
+          <View accessibilityLabel={`${label}: ${formatAmount(totals[key])} ${unit}${goal ? `, ${goalDetail(totals[key], goal)}` : ''}`} key={key} style={styles.macro}>
+            <View style={styles.macroTop}>
+              <Text style={styles.macroLabel}>{label}</Text>
+              <Text style={styles.macroValue}>{formatAmount(totals[key])} {unit}{goal ? ` / ${formatAmount(goal)}` : ''}</Text>
+            </View>
+            <ProgressBar color={colors.ac} progress={goal ? totals[key] / goal : 0} trackColor={colors.s2} height={4} />
+          </View>
+        )
+      })}
+      <Text style={styles.helper}>Metas são definidas por você; o app não faz prescrição nutricional.</Text>
+    </View>
   )
 }
 
@@ -533,6 +609,7 @@ function MealForm({
   const { colors } = useTheme()
   const styles = createStyles(colors)
   const [meal, setMeal] = useState(initial)
+  const [time, setTime] = useState(() => timeOfDay(initial.consumedAt))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const updateItem = (index: number, field: keyof NutritionMealItemInput, value: string | number | null) => {
@@ -543,6 +620,11 @@ function MealForm({
   }
   const submit = async () => {
     setError('')
+    const parsedTime = parseTimeInput(time)
+    if (!parsedTime) {
+      setError('Informe o horário no formato HH:MM, por exemplo 12:30.')
+      return
+    }
     const hasInvalidItem = !meal.items.length || meal.items.some((item) =>
       !item.name.trim()
       || [item.caloriesKcal, item.proteinGrams, item.carbohydratesGrams, item.fatGrams, item.fiberGrams]
@@ -557,7 +639,7 @@ function MealForm({
     try {
       await onSave({
         localDate: meal.localDate,
-        consumedAt: meal.consumedAt,
+        consumedAt: parsedTime === timeOfDay(meal.consumedAt) ? meal.consumedAt : consumedAtFromTime(meal.localDate, parsedTime),
         mealType: meal.mealType,
         title: meal.title,
         notes: meal.notes,
@@ -585,11 +667,12 @@ function MealForm({
           <Action key={type} label={mealTypeLabel(type)} primary={meal.mealType === type} onPress={() => setMeal({ ...meal, mealType: type })} />
         ))}
       </View>
+      <Field label="Horário (HH:MM)" value={time} onChangeText={setTime} keyboardType="numbers-and-punctuation" maxLength={5} />
       <Field label="Título (opcional)" value={meal.title} onChangeText={(title) => setMeal({ ...meal, title })} />
       <Field label="Observações" value={meal.notes} onChangeText={(notes) => setMeal({ ...meal, notes })} multiline />
-      <SectionHeader title="Alimentos e valores" />
+      <Text accessibilityRole="header" style={styles.sectionTitle}>Alimentos e valores</Text>
       {meal.items.map((item, index) => (
-        <View key={index} style={styles.itemCard}>
+        <View key={item.id} style={styles.itemCard}>
           <Field label="Alimento" value={item.name} onChangeText={(value) => updateItem(index, 'name', value)} />
           <Field label="Porção" value={item.portionDescription} onChangeText={(value) => updateItem(index, 'portionDescription', value)} />
           <NumberField label="Peso estimado (g, opcional)" value={item.estimatedGrams} emptyValue={null} onChangeValue={(value) => updateItem(index, 'estimatedGrams', value)} />
@@ -829,22 +912,21 @@ function Action({
   const { colors } = useTheme()
   const styles = createStyles(colors)
   return (
-    <Pressable
+    <PressableScale
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityRole="button"
       accessibilityState={{ disabled: Boolean(disabled) }}
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [
+      style={[
         styles.action,
         primary && styles.actionPrimary,
         danger && styles.actionDanger,
         disabled && styles.actionDisabled,
-        pressed && !disabled && styles.actionPressed,
       ]}
     >
       <Text style={[styles.actionText, primary && styles.actionPrimaryText, danger && styles.actionDangerText]}>{label}</Text>
-    </Pressable>
+    </PressableScale>
   )
 }
 
@@ -993,8 +1075,11 @@ function isSavedMenuItem(value: unknown): value is NutritionMealItemInput {
 type NutrientKey = 'caloriesKcal' | 'proteinGrams' | 'carbohydratesGrams' | 'fatGrams' | 'fiberGrams'
 type NutrientTotals = Record<NutrientKey, number>
 
+let localItemId = 0
+/** Itens ainda não salvos recebem ids locais únicos, para que a lista mantenha o estado certo ao remover um do meio. */
 function withMealItemIds(item: NutritionMealItemInput, index: number, mealId = 0): NutritionMealItem {
-  return { ...item, id: index + 1, mealId, createdAt: '', updatedAt: '' }
+  localItemId += 1
+  return { ...item, id: -localItemId, mealId, createdAt: '', updatedAt: '' }
 }
 
 function sumItems(items: NutritionMeal[]): NutrientTotals {
@@ -1044,26 +1129,39 @@ function mealTypeLabel(type: NutritionMealType) {
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   dateRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
   selectedDate: { ...typography.numberMedium, color: colors.tx, flex: 1, textAlign: 'center' },
-  metrics: { columnGap: 16, flexDirection: 'row', flexWrap: 'wrap', rowGap: 0 },
+  tabs: { marginBottom: 20 },
+  sectionTitle: { ...typography.titleSmall, color: colors.tx, marginBottom: 8, marginTop: 24 },
+  mealsHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
+  sheetActions: { gap: 10 },
+  summary: { backgroundColor: colors.s1, borderRadius: 20, gap: 14, marginTop: 8, padding: 20 },
+  summaryTop: { alignItems: 'center', flexDirection: 'row', gap: 20 },
+  summaryCopy: { flex: 1 },
+  summaryTitle: { ...typography.body, color: colors.tx },
+  kcalValue: { ...typography.numberLarge, color: colors.tx, fontSize: 28, lineHeight: 30 },
+  kcalUnit: { ...typography.captionSmall, color: colors.t2 },
+  macro: { gap: 6 },
+  macroTop: { flexDirection: 'row', justifyContent: 'space-between' },
+  macroLabel: { ...typography.bodySmall, color: colors.tx },
+  macroValue: { ...typography.numberSmall, color: colors.t2 },
   helper: { ...typography.bodySmall, color: colors.t2, marginVertical: 8 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
   row: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
   historyList: { gap: 0 },
   historyRow: { alignItems: 'center', borderBottomColor: colors.bd, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', justifyContent: 'space-between', minHeight: 56, paddingVertical: 8 },
-  historyRowSelected: { backgroundColor: colors.s2 },
+  historyRowSelected: { backgroundColor: colors.s1 },
   historyDate: { flex: 1 },
   historyDateText: { ...typography.bodySmall, color: colors.tx },
   historyTotals: { alignItems: 'flex-end' },
   historyCalories: { ...typography.numberSmall, color: colors.tx },
   historyMeta: { ...typography.captionSmall, color: colors.t2, marginTop: 2 },
-  mealCard: { borderBottomColor: colors.bd, borderBottomWidth: StyleSheet.hairlineWidth, marginBottom: 8, paddingVertical: 12 },
+  mealCard: { borderBottomColor: colors.bd, borderBottomWidth: StyleSheet.hairlineWidth, marginBottom: 8, paddingVertical: 16 },
   mealHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   time: { ...typography.numberSmall, color: colors.t2 },
   mealTitle: { ...typography.body, color: colors.tx, fontWeight: '500', marginTop: 8 },
   detail: { ...typography.bodySmall, color: colors.t2, marginVertical: 4 },
   label: { ...typography.captionSmall, color: colors.t2, marginBottom: 4 },
   fieldWrap: { flex: 1, marginBottom: 10, minWidth: 0 },
-  input: { ...typography.body, backgroundColor: colors.s1, borderColor: colors.mu, borderRadius: 12, borderWidth: 1, color: colors.tx, minHeight: 48, paddingHorizontal: 12, paddingVertical: 10 },
+  input: { ...typography.body, backgroundColor: colors.s1, borderColor: colors.mu, borderRadius: 14, borderWidth: 1, color: colors.tx, minHeight: 48, paddingHorizontal: 12, paddingVertical: 10 },
   multilineInput: { minHeight: 88, textAlignVertical: 'top' },
   two: { flexDirection: 'row', gap: 8 },
   twoChild: { flex: 1, minWidth: 0 },
@@ -1074,9 +1172,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   settingsToggle: { alignItems: 'center', borderBottomColor: colors.bd, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', justifyContent: 'space-between', marginVertical: 6, minHeight: 56 },
   settingsCopy: { flex: 1, paddingRight: 12 },
   settingsTitle: { ...typography.label, color: colors.tx, fontWeight: '500' },
-  suggestionCard: { backgroundColor: colors.s1, borderRadius: 12, marginVertical: 12, padding: 12 },
+  suggestionCard: { backgroundColor: colors.s1, borderRadius: 20, marginVertical: 12, padding: 12 },
   eyebrow: { ...typography.monoLabel, color: colors.t2, marginBottom: 12 },
-  action: { alignItems: 'center', backgroundColor: 'transparent', borderColor: colors.mu, borderRadius: 12, borderWidth: 1, justifyContent: 'center', minHeight: 48, paddingHorizontal: 14, paddingVertical: 10 },
+  action: { alignItems: 'center', backgroundColor: 'transparent', borderColor: colors.mu, borderRadius: 14, borderWidth: 1, justifyContent: 'center', minHeight: 48, paddingHorizontal: 14, paddingVertical: 10 },
   actionPrimary: { backgroundColor: colors.ac, borderColor: colors.ac },
   actionDanger: { borderColor: colors.dg },
   actionDisabled: { opacity: 0.5 },

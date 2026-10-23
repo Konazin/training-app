@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { consumedAtForDate, formatNumberInput, parseNumberInput } from './nutritionInput'
+import { consumedAtForDate, consumedAtFromTime, formatNumberInput, parseNumberInput, parseTimeInput, timeOfDay } from './nutritionInput'
 
 describe('entrada numérica da nutrição', () => {
   it('aceita ponto ou vírgula e preserva texto parcial como número válido', () => {
@@ -24,5 +24,22 @@ describe('consumedAtForDate', () => {
     const iso = consumedAtForDate('2026-10-20', new Date(2026, 9, 22, 8, 30))
     const d = new Date(iso)
     expect([d.getFullYear(), d.getMonth(), d.getDate(), d.getHours()]).toEqual([2026, 9, 20, 12])
+  })
+})
+
+describe('horário da refeição', () => {
+  it('aceita formatos comuns e rejeita horas inválidas', () => {
+    expect(parseTimeInput('7:05')).toBe('07:05')
+    expect(parseTimeInput('07:05')).toBe('07:05')
+    expect(parseTimeInput('19h30')).toBe('19:30')
+    expect(parseTimeInput('24:00')).toBeNull()
+    expect(parseTimeInput('12:60')).toBeNull()
+    expect(parseTimeInput('abc')).toBeNull()
+  })
+  it('combina dia e horário local sem mudar de dia', () => {
+    const iso = consumedAtFromTime('2026-10-20', '19:30')
+    expect(timeOfDay(iso)).toBe('19:30')
+    const date = new Date(iso)
+    expect([date.getFullYear(), date.getMonth(), date.getDate()]).toEqual([2026, 9, 20])
   })
 })
