@@ -380,12 +380,13 @@ async function renderDuplicate(props: Parameters<typeof duplicateHarness>[0]) {
 }
 
 function duplicateOption(view: ReactTestRenderer, mode: TrainingPlanDuplicateMode) {
+  const label = ({
+    COMPLETE: 'Duplicar completa',
+    STRUCTURE_ONLY: 'Apenas estrutura',
+    WITHOUT_LOADS: 'Sem cargas planejadas',
+  })[mode]
   return view.root.findAllByProps({ accessibilityRole: 'radio' })
-    .find((node) => node.props.children?.[0]?.props?.children?.[1] === ({
-      COMPLETE: 'Duplicar completa',
-      STRUCTURE_ONLY: 'Apenas estrutura',
-      WITHOUT_LOADS: 'Sem cargas planejadas',
-    })[mode])!
+    .find((node) => node.findAll((child) => (child.type as unknown) === 'Text' && child.props.children === label).length > 0)!
 }
 
 function deferredResult() {

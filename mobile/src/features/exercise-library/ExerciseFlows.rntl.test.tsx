@@ -60,7 +60,7 @@ describe('seleção e detalhe renderizados', () => {
     }))
 
     expect(screen.queryByText('PLAYER MONTADO')).toBeNull()
-    fireEvent.press(screen.getByText('▶ Reproduzir vídeo'))
+    fireEvent.press(screen.getByText('Reproduzir vídeo'))
     expect(screen.getByText('PLAYER MONTADO')).toBeTruthy()
 
     fireEvent.press(screen.getByText('Editar notas'))

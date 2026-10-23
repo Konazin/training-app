@@ -29,7 +29,7 @@ describe('contratos de aparência e acessibilidade', () => {
   })
 
   it('mantém estados de treino em texto e progresso acessível', () => {
-    for (const label of ['SESSÃO PAUSADA', 'SESSÃO EM ANDAMENTO', 'Concluída', 'Pendente', 'Abandonar sessão']) {
+    for (const label of ['Sessão pausada', 'Sessão em andamento', 'Concluída', 'Pendente', 'Abandonar sessão']) {
       expect(sessionSource).toContain(label)
     }
     expect(sessionSource).toContain('accessibilityValue')

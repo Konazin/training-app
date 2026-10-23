@@ -8,10 +8,12 @@ function source(relative: string) {
 describe('UI da biblioteca integrada', () => {
   it('oferece filtros, pacotes, esqueleto, mídia e favorito acessível', () => {
     const library = source('./ExerciseLibraryScreen.tsx')
+    const filters = source('./ExerciseFilters.tsx')
     for (const label of [
       'Todos', 'Favoritos', 'Recentes', 'Com mídia', 'Peso corporal',
-      'GRUPO MUSCULAR', 'EQUIPAMENTO', 'CATEGORIA', 'FONTE', 'PACOTES',
-    ]) expect(library).toContain(label)
+      'Grupo muscular', 'Equipamento', 'Fonte', 'Pacotes',
+    ]) expect(filters).toContain(label)
+    expect(library).toContain('useExerciseFilters')
     expect(library).toContain('<SkeletonList')
     expect(library).toContain('accessibilityState={{ selected: exercise.favorite }}')
     expect(library).toContain('exerciseMediaLabel(exercise)')
@@ -34,10 +36,12 @@ describe('UI da biblioteca integrada', () => {
     const picker = source('../training-plan/views/ExercisePicker.tsx')
     expect(picker).toContain('lastSelection')
     expect(picker).toContain('< 800')
-    expect(picker).toContain('Nome, alias, músculo ou equipamento')
-    expect(picker).toContain('Favoritos')
-    expect(picker).toContain('Recentes')
-    expect(picker).toContain('EXERCISE_PACKS')
+    const filters = source('./ExerciseFilters.tsx')
+    expect(picker).toContain('ExerciseFilters')
+    expect(filters).toContain('Nome, alias, músculo ou equipamento')
+    expect(filters).toContain('Favoritos')
+    expect(filters).toContain('Recentes')
+    expect(filters).toContain('EXERCISE_PACKS')
   })
 
   it('player não inicia sozinho, pausa sem foco e encerra no unmount', () => {

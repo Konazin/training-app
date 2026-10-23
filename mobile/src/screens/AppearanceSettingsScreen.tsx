@@ -1,13 +1,12 @@
-import { useEffect, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
-import { ArrowLeft, Check } from 'lucide-react-native'
+import { useEffect, useRef, useState } from 'react'
+import { Animated, StyleSheet, Text, View } from 'react-native'
+import { Check } from 'lucide-react-native'
 import { ScreenScrollView } from '../components/Screen'
 import { ScreenHeader } from '../components/ScreenHeader'
 import { PrimaryButton } from '../components/PrimaryButton'
 import { BottomActionBar } from '../components/ui/BottomActionBar'
 import { SegmentedControl } from '../components/ui/SegmentedControl'
-import { MotionView } from '../components/MotionView'
+import { PressableScale, Reveal, easeOut, useMotion } from '../motion'
 import {
   shared,
   themePresetIds,
@@ -21,7 +20,7 @@ import { typography } from '../theme/typography'
 
 const presetLabels: Record<ThemePreset, string> = {
   DARK_BLUE: 'Azul midnight',
-  MONOCHROME: 'Monocromático',
+  MONOCHROME: 'Preto',
   DRACULA: 'Violeta midnight',
   WHITE_BLUE: 'Branco e azul',
 }
@@ -38,7 +37,6 @@ const motionOptions = [
 ] as const
 
 export function AppearanceSettingsScreen() {
-  const navigation = useNavigation()
   const {
     colors,
     isDark,
@@ -66,30 +64,19 @@ export function AppearanceSettingsScreen() {
   return (<>
     <ScreenScrollView contentContainerStyle={styles.scrollContent}>
       <ScreenHeader
-        eyebrow="Preferências locais"
         title="Aparência e acessibilidade"
         description="As alterações são exibidas agora e só ficam salvas após a confirmação."
-        action={(
-          <Pressable
-            accessibilityLabel="Voltar"
-            accessibilityRole="button"
-            onPress={() => navigation.goBack()}
-            style={styles.back}
-          >
-            <ArrowLeft color={colors.tx} size={20} strokeWidth={1.7} />
-          </Pressable>
-        )}
       />
 
-      <MotionView style={styles.preview}>
-        <Text style={styles.previewEyebrow}>Prévia ao vivo</Text>
+      <Reveal style={styles.preview}>
+        <Text style={styles.previewLabel}>Prévia ao vivo</Text>
         <Text style={styles.previewTitle}>Força e mobilidade</Text>
         <Text style={styles.previewCopy}>3 exercícios · estado descrito com texto</Text>
         <View style={styles.previewButton}><Text style={styles.previewButtonText}>Começar treino</Text></View>
-      </MotionView>
+      </Reveal>
 
       <PreferenceSection title="Tema">
-        {themePresetIds.map((preset) => (
+        {[...themePresetIds].sort((a, b) => Number(b === 'MONOCHROME') - Number(a === 'MONOCHROME')).map((preset) => (
           <ThemePresetRow
             key={preset}
             preset={preset}
@@ -135,16 +122,16 @@ export function AppearanceSettingsScreen() {
           {message}
         </Text>
       )}
-      <Pressable
+      <PressableScale
         accessibilityRole="button"
         onPress={() => {
           restoreDefaults()
           setMessage('Padrões restaurados na prévia. Confirme para salvar.')
         }}
-        style={({ pressed }) => [styles.restore, pressed && styles.pressed]}
+        style={styles.restore}
       >
         <Text style={styles.restoreText}>Restaurar padrões</Text>
-      </Pressable>
+      </PressableScale>
     </ScreenScrollView>
     <BottomActionBar>
       <PrimaryButton label="Salvar preferências" onPress={() => void save()} />
@@ -169,11 +156,12 @@ function ThemePresetRow({
   const styles = createStyles(colors)
   const swatch = resolvePalette(preset, dark)
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="radio"
       accessibilityState={{ checked: selected }}
       onPress={onPress}
-      style={({ pressed }) => [styles.themeRow, pressed && styles.pressed]}
+      pressedScale={0.99}
+      style={styles.themeRow}
     >
       <View style={styles.swatches} accessibilityElementsHidden>
         {[swatch.bg, swatch.s1, swatch.ac].map((color, index) => (
@@ -185,7 +173,7 @@ function ThemePresetRow({
         {selected && <Check color={colors.on} size={13} strokeWidth={2} />}
       </View>
       {selected && <Text style={styles.selectedText}>Selecionado</Text>}
-    </Pressable>
+    </PressableScale>
   )
 }
 
@@ -202,30 +190,45 @@ function PreferenceSection({ title, children }: { title: string; children: React
 
 function ToggleRow({ label, checked, onPress }: { label: string; checked: boolean; onPress: () => void }) {
   const { colors } = useTheme()
+  const motion = useMotion()
   const styles = createStyles(colors)
+  const position = useRef(new Animated.Value(checked ? 1 : 0)).current
+  useEffect(() => {
+    if (motion.effective !== 'FULL') { position.setValue(checked ? 1 : 0); return }
+    const animation = Animated.timing(position, { duration: 200, easing: easeOut, toValue: checked ? 1 : 0, useNativeDriver: true })
+    animation.start()
+    return () => animation.stop()
+  }, [checked, motion.effective, position])
   return (
-    <Pressable
+    <PressableScale
       accessibilityLabel={label}
       accessibilityRole="switch"
       accessibilityState={{ checked }}
       onPress={onPress}
-      style={({ pressed }) => [styles.toggleRow, pressed && styles.pressed]}
+      pressedScale={0.99}
+      style={styles.toggleRow}
     >
       <Text style={styles.toggleLabel}>{label}</Text>
       <View style={[styles.switchTrack, checked && styles.switchTrackChecked]}>
-        <View style={[styles.switchThumb, checked && styles.switchThumbChecked]} />
+        <Animated.View
+          style={[
+            styles.switchThumb,
+            checked && styles.switchThumbChecked,
+            { transform: [{ translateX: position.interpolate({ inputRange: [0, 1], outputRange: [0, 18] }) }] },
+          ]}
+        />
       </View>
-    </Pressable>
+    </PressableScale>
   )
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   scrollContent: { paddingBottom: 160 },
   sectionTitle: {
-    ...typography.monoLabel,
+    ...typography.caption,
     color: colors.t2,
     marginBottom: 8,
-    marginTop: 24,
+    marginTop: 28,
   },
   themeRow: { alignItems: 'center', borderBottomColor: colors.bd, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: 8, minHeight: 56 },
   swatches: { flexDirection: 'row', gap: 3, width: 48 },
@@ -247,41 +250,36 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   switchTrack: {
     backgroundColor: colors.s2,
     borderColor: colors.mu,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
-    height: 24,
+    height: 32,
     justifyContent: 'center',
-    paddingHorizontal: 2,
-    width: 42,
+    paddingHorizontal: 3,
+    width: 52,
   },
   switchTrackChecked: { backgroundColor: colors.ac, borderColor: colors.ac },
-  switchThumb: { backgroundColor: colors.tx, borderRadius: 8, height: 16, width: 16 },
-  switchThumbChecked: { alignSelf: 'flex-end', backgroundColor: colors.on },
+  switchThumb: { backgroundColor: colors.tx, borderRadius: 11, height: 22, width: 22 },
+  switchThumbChecked: { backgroundColor: colors.on },
   preview: {
     backgroundColor: colors.s1,
-    borderColor: colors.bd,
-    borderRadius: 12,
-    borderWidth: 1,
+    borderRadius: shared.radii.lg,
     marginBottom: 8,
-    padding: 16,
+    padding: 20,
   },
-  previewEyebrow: { ...typography.monoLabel, color: colors.t2 },
+  previewLabel: { ...typography.caption, color: colors.t2 },
   previewTitle: { ...typography.title, color: colors.tx, marginTop: 6 },
   previewCopy: { ...typography.bodySmall, color: colors.t2, marginTop: 5 },
   previewButton: {
     alignItems: 'center',
     backgroundColor: colors.ac,
-    borderRadius: 12,
+    borderRadius: shared.radii.md,
     justifyContent: 'center',
-    marginTop: 12,
-    minHeight: 48,
+    marginTop: 16,
+    minHeight: 52,
   },
   previewButtonText: { ...typography.label, color: colors.on, fontWeight: '500' },
   success: { ...typography.bodySmall, color: colors.tx, marginVertical: 12 },
   error: { ...typography.bodySmall, color: colors.dg, marginVertical: 12 },
   restore: { alignItems: 'flex-start', justifyContent: 'center', minHeight: shared.touchTarget.minimum, marginTop: 8 },
-  restoreText: { ...typography.bodySmall, color: colors.tx, textDecorationLine: 'underline' },
-  pressed: { opacity: 0.72 },
-  back: { alignItems: 'center', justifyContent: 'center', minHeight: shared.touchTarget.minimum, minWidth: shared.touchTarget.minimum },
-  backText: { color: colors.tx, fontSize: 24, fontWeight: '400' },
+  restoreText: { ...typography.bodySmall, color: colors.t2 },
 })
