@@ -63,6 +63,20 @@ describe('estado da biblioteca', () => {
     expect(groupExercisesByMuscle(items).find((group) => group.muscle === 'Peito')?.exercises).toHaveLength(2)
   })
 
+  test('filtra de forma consistente exercícios do catálogo embutido, ExerciseDB e Wger', () => {
+    const items = [
+      exercise(1, { name: 'Supino', normalizedName: 'supino', primaryMuscleGroup: 'Peito', equipment: 'Barra e banco', source: 'BUNDLED' }),
+      exercise(2, { name: 'bench press', normalizedName: 'bench press', primaryMuscleGroup: 'pectorals', equipment: 'barbell, bench', source: 'EXERCISEDB' }),
+      exercise(3, { name: 'Push up', normalizedName: 'push up', primaryMuscleGroup: 'Chest', equipment: 'none (bodyweight exercise)', source: 'WGER' }),
+      exercise(4, { name: 'push-up', normalizedName: 'push up 2', primaryMuscleGroup: 'chest', equipment: 'bodyweight', source: 'EXERCISEDB' }),
+    ]
+    expect(filterExerciseLibrary(items, '', { kind: 'MUSCLE', value: 'Peito' })).toHaveLength(4)
+    expect(filterExerciseLibrary(items, '', { kind: 'EQUIPMENT', value: 'Barra' }).map((item) => item.id).sort()).toEqual([1, 2])
+    expect(filterExerciseLibrary(items, '', { kind: 'BODYWEIGHT' }).map((item) => item.id).sort()).toEqual([3, 4])
+    expect(filterExerciseLibrary(items, '', { kind: 'SOURCE', value: 'EXERCISEDB' }).map((item) => item.id).sort()).toEqual([2, 4])
+    expect(groupExercisesByMuscle(items)).toHaveLength(1)
+  })
+
   test('resolve placeholder, imagem local, vídeo remoto e ausência sem colapsar', () => {
     const placeholder = media({ localUri: 'placeholder://mobility', source: 'BUNDLED' })
     const illustrated = exercise(1, { media: [placeholder] })

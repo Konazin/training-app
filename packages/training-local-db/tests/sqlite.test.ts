@@ -751,6 +751,13 @@ describe('SQLite local schema', () => {
     expect(after?.media[0]).toMatchObject({ id: mediaId, remoteUrl: 'https://wger.de/media/updated.png' })
     expect((await repositories.sessions.getHistory())[0]?.exercises
       .find((item) => item.exerciseDefinitionId === imported.id)?.name).toBe('Rosca sem peso')
+    // Escolher o item de novo na importação o traz de volta; atualização em lote não.
+    const restored = await repositories.externalExerciseImport.importSelected([candidate], { restoreArchived: true })
+    expect(restored).toMatchObject({ updated: 1 })
+    expect((await repositories.exercises.findById(imported.id))?.archived).toBe(false)
+    await repositories.exercises.archive(imported.id)
+    await repositories.externalExerciseImport.importSelected([candidate])
+    expect((await repositories.exercises.findById(imported.id))?.archived).toBe(true)
     const invalidMedia = await repositories.externalExerciseImport.importSelected([{
       ...candidate,
       externalId: '985',

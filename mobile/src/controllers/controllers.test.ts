@@ -685,7 +685,7 @@ describe('controllers locais', () => {
     act(() => hook.current.toggle(candidateB))
     expect(hook.current.selected.size).toBe(1)
     await act(async () => { await hook.current.importSelected() })
-    expect(imports.importSelected).toHaveBeenCalledWith([candidateB])
+    expect(imports.importSelected).toHaveBeenCalledWith([candidateB], { restoreArchived: true })
     expect(hook.current.phase).toBe('success')
     expect(changed).toHaveBeenCalled()
 
@@ -811,7 +811,7 @@ describe('controllers locais', () => {
     act(() => hook.current.toggle(second))
     expect(hook.current.selected.size).toBe(2)
     await act(async () => { await hook.current.importSelected() })
-    expect(imports.importSelected).toHaveBeenCalledWith([first, second])
+    expect(imports.importSelected).toHaveBeenCalledWith([first, second], { restoreArchived: true })
     hook.unmount()
   })
 })
