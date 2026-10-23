@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
-import { ArrowLeft, Circle, CircleCheck, Minus, Pause, Play, Plus } from 'lucide-react-native'
+import { ArrowLeft, Minus, Pause, Play, Plus } from 'lucide-react-native'
 import { useNavigation, usePreventRemove } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import type { RootStackParamList } from '../../../navigation/types'
@@ -36,6 +36,7 @@ import { attributionLabel, resolveMediaAttribution } from '../../exercise-librar
 import { ThemedTextInput } from '../../../components/ThemedTextInput'
 import { BottomActionBar } from '../../../components/ui/BottomActionBar'
 import { PrimaryButton } from '../../../components/PrimaryButton'
+import { AnimatedNumber, CheckDraw, PressableScale, ProgressBar, ProgressRing, Reveal } from '../../../motion'
 import { triggerHaptic } from '../../../theme/haptics'
 import { fontFamilies, typography } from '../../../theme/typography'
 
@@ -92,6 +93,7 @@ export function WorkoutSessionScreen(props: Props) {
   const { colors, preferences } = useTheme()
   const styles = createStyles(colors, preferences.workoutHighContrast)
   const text = preferences.workoutHighContrast ? colors.workout.text : colors.tx
+  const accentColor = preferences.workoutHighContrast ? colors.workout.completed : colors.ac
   const secondaryText = preferences.workoutHighContrast ? colors.workout.textSecondary : colors.t2
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>()
   const [now, setNow] = useState(Date.now())
@@ -154,6 +156,11 @@ export function WorkoutSessionScreen(props: Props) {
       restTimer.endsAt - (restTimer.paused ? restTimer.pausedAt ?? now : now)
     ) / 1000))
     : 0
+  const restSetKey = restTimer ? `${restTimer.sessionId}:${restTimer.setId}` : ''
+  const restTotalRef = useRef({ key: '', total: 0 })
+  if (restTotalRef.current.key !== restSetKey) restTotalRef.current = { key: restSetKey, total: remaining }
+  else if (remaining > restTotalRef.current.total) restTotalRef.current.total = remaining
+  const restTotal = restTotalRef.current.total
   const timerKey = restTimer ? `${restTimer.sessionId}:${restTimer.setId}:${restTimer.endsAt}` : ''
   const firstPendingSet = session?.exercises
     .filter((exercise) => exercise.status !== 'SKIPPED')
@@ -299,7 +306,7 @@ export function WorkoutSessionScreen(props: Props) {
               ? <Pause color={secondaryText} size={12} strokeWidth={2} />
               : <View style={styles.stateDot} />}
             <Text style={styles.sessionStateText}>
-              {session.status === 'PAUSED' ? 'Pausada' : 'Em andamento'}
+              {session.status === 'PAUSED' ? 'Sessão pausada' : 'Sessão em andamento'}
             </Text>
           </View>
         </View>
@@ -321,32 +328,35 @@ export function WorkoutSessionScreen(props: Props) {
         style={styles.progressBlock}
       >
         <View style={styles.progressInfo}>
-          <Text style={styles.progressValue}>
-            {session.completedSets} / {session.totalPlannedSets} séries
-          </Text>
-          <Text style={styles.volumeValue}>{session.totalVolume} kg</Text>
+          <View style={styles.progressCount}>
+            <AnimatedNumber style={styles.progressBig} value={session.completedSets} />
+            <Text style={styles.progressTotal}> / {session.totalPlannedSets} séries</Text>
+          </View>
+          <AnimatedNumber format={(value) => `${value.toLocaleString('pt-BR')} kg`} style={styles.volumeValue} value={session.totalVolume} />
         </View>
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, {
-            width: `${session.totalPlannedSets
-              ? Math.min(100, session.completedSets / session.totalPlannedSets * 100)
-              : 0}%`,
-          }]} />
-        </View>
+        <ProgressBar
+          color={accentColor}
+          progress={session.totalPlannedSets ? session.completedSets / session.totalPlannedSets : 0}
+          trackColor={preferences.workoutHighContrast ? colors.workout.pending : colors.s2}
+        />
       </View>
 
       {remaining > 0 && (
-        <View accessible accessibilityLabel={formatTimerAnnouncement(Math.ceil(remaining / 15) * 15)} accessibilityLiveRegion="polite" accessibilityRole="timer" style={styles.timer}>
-          <View>
-            <Text style={styles.timerLabel}>Descanso</Text>
-            <Text style={styles.timerValue}>{formatTime(remaining)}</Text>
+        <Reveal>
+          <View accessible accessibilityLabel={formatTimerAnnouncement(Math.ceil(remaining / 15) * 15)} accessibilityLiveRegion="polite" accessibilityRole="timer" style={styles.timer}>
+            <ProgressRing label="Tempo de descanso restante" progress={restTotal ? remaining / restTotal : 0} size={112} stroke={6}>
+              <Text style={styles.timerValue}>{formatTime(remaining)}</Text>
+            </ProgressRing>
+            <View style={styles.timerSide}>
+              <Text style={styles.timerLabel}>Descanso</Text>
+              <View style={styles.timerActions}>
+                <TimerAction label="−15 s" onPress={() => onAdjustRest(-15)} kind="secondary" />
+                <TimerAction label="+15 s" onPress={() => onAdjustRest(15)} kind="secondary" />
+              </View>
+              <TimerAction label="Pular descanso" onPress={onSkipRest} kind="tonal" />
+            </View>
           </View>
-          <View style={styles.timerActions}>
-            <TimerAction label="−15 s" onPress={() => onAdjustRest(-15)} kind="secondary" />
-            <TimerAction label="+15 s" onPress={() => onAdjustRest(15)} kind="secondary" />
-            <TimerAction label="Pular descanso" onPress={onSkipRest} kind="tonal" />
-          </View>
-        </View>
+        </Reveal>
       )}
       {restFinished && <Text accessibilityLiveRegion="polite" style={styles.restComplete}>Descanso concluído</Text>}
 
@@ -378,16 +388,11 @@ export function WorkoutSessionScreen(props: Props) {
         const isActiveExercise = activeExercise?.id === exercise.id
         const detailsExpanded = expandedExerciseDetails === exercise.id
         return (
+          <Reveal key={exercise.id} index={index + 1}>
           <View
-            key={exercise.id}
             accessibilityLabel={`${exercise.name}. Estado: ${statusLabel}.`}
             style={[styles.exerciseBlock, isActiveExercise && styles.activeExerciseBlock]}
           >
-            {isActiveExercise && (
-              <Text style={styles.exerciseEyebrow}>
-                Exercício {index + 1} de {session.exercises.length} · {activeSet?.completed ? 'em revisão' : 'em andamento'}
-              </Text>
-            )}
             <View style={styles.exerciseHeader}>
               <View style={[styles.index, isActiveExercise && styles.indexActive]}>
                 <Text style={[styles.indexText, isActiveExercise && styles.indexActiveText]}>{index + 1}</Text>
@@ -572,6 +577,7 @@ export function WorkoutSessionScreen(props: Props) {
               </TouchableOpacity>
             </View>
           </View>
+          </Reveal>
         )
       })}
 
@@ -811,9 +817,7 @@ function SetEditor({
         onPress={onActivate}
         style={styles.compactSetRow}
       >
-        {set.completed
-          ? <CircleCheck color={highContrast ? colors.workout.text : colors.tx} size={20} strokeWidth={1.8} />
-          : <Circle color={highContrast ? colors.workout.textSecondary : colors.t2} size={20} strokeWidth={1.5} />}
+        <CheckDraw checked={set.completed} size={26} />
         <Text style={styles.compactSetText}>Série {set.setNumber}</Text>
         <Text style={styles.compactSetSummary}>{summary}</Text>
         <Text style={styles.compactSetStatus}>{set.completed ? 'Concluída' : 'Pendente'}</Text>
@@ -825,8 +829,8 @@ function SetEditor({
     <View accessibilityLabel={`Série ${set.setNumber}. ${set.completed ? 'Concluída' : 'Em andamento'}.`} style={styles.activeSetEditor}>
       <View style={styles.setTitle}>
         <View style={styles.activeSetHeading}>
-          <Circle color={highContrast ? colors.workout.text : colors.ac} size={18} strokeWidth={2} />
-          <Text style={styles.setNumber}>Série {set.setNumber} · {set.completed ? 'edição' : 'em andamento'}</Text>
+          <Text style={styles.setNumber}>Série {set.setNumber}</Text>
+          <Text style={styles.setPhase}>{set.completed ? 'editando' : 'em andamento'}</Text>
         </View>
         {set.manuallyAdded && (
           <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={() => void onRemove()} style={styles.textAction}>
@@ -1003,13 +1007,13 @@ function TimerAction({
   const { colors, preferences } = useTheme()
   const styles = createStyles(colors, preferences.workoutHighContrast)
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       onPress={onPress}
       style={[styles.timerAction, kind === 'tonal' && styles.timerActionTonal]}
     >
       <Text style={styles.timerActionText}>{label}</Text>
-    </Pressable>
+    </PressableScale>
   )
 }
 
@@ -1049,29 +1053,31 @@ const createStyles = (colors: ThemeColors, highContrast = false) => {
     topBar: { alignItems: 'center', flexDirection: 'row', gap: 8, marginBottom: 24, minHeight: 48 },
     backButton: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 40 },
     topBarTitle: { flex: 1, minWidth: 0 },
-    topBarName: { color: text, fontFamily: fontFamilies.text, fontSize: 14, fontWeight: '500' },
+    topBarName: { color: text, fontFamily: fontFamilies.text, fontSize: 17, fontWeight: '500' },
     sessionState: { alignItems: 'center', flexDirection: 'row', gap: 6, marginTop: 3 },
     stateDot: { backgroundColor: accent, borderRadius: 4, height: 7, width: 7 },
     sessionStateText: { ...typography.captionSmall, color: muted },
     abandonTop: { alignItems: 'center', justifyContent: 'center', minHeight: 48, paddingHorizontal: 4 },
     abandonTopText: { ...typography.bodySmall, color: danger, textDecorationLine: 'underline', textDecorationStyle: 'solid' },
-    progressBlock: { marginBottom: 28 },
-    progressInfo: { alignItems: 'baseline', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+    progressBlock: { marginBottom: 24 },
+    progressInfo: { alignItems: 'baseline', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+    progressCount: { alignItems: 'baseline', flexDirection: 'row' },
+    progressBig: { ...typography.numberLarge, color: text },
+    progressTotal: { ...typography.bodySmall, color: muted },
     progressValue: { ...typography.numberMedium, color: text },
     volumeValue: { ...typography.numberSmall, color: muted },
-    progressTrack: { backgroundColor: secondarySurface, borderRadius: 2, height: 3, overflow: 'hidden' },
-    progressFill: { backgroundColor: accent, height: 3 },
-    timer: { backgroundColor: highContrast ? background : 'transparent', borderColor: highContrast ? border : 'transparent', borderWidth: highContrast ? borderWidth : 0, gap: 12, marginBottom: 24, padding: highContrast ? 16 : 0 },
+    timer: { alignItems: 'center', backgroundColor: surface, borderColor: highContrast ? border : 'transparent', borderRadius: 20, borderWidth: highContrast ? borderWidth : 0, flexDirection: 'row', gap: 20, marginBottom: 20, padding: 20 },
+    timerSide: { flex: 1, gap: 8 },
+    setPhase: { ...typography.caption, color: muted },
     timerLabel: { ...typography.caption, color: muted },
-    timerValue: { ...typography.numberXL, color: highContrast ? text : accent, fontWeight: highContrast ? '400' : '300', marginTop: 3 },
-    timerActions: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    timerAction: { alignItems: 'center', borderColor: highContrast ? border : colors.mu, borderRadius: 12, borderWidth: 1, justifyContent: 'center', minHeight: 48, paddingHorizontal: 14 },
-    timerActionTonal: { backgroundColor: secondarySurface, borderColor: 'transparent' },
+    timerValue: { ...typography.numberLarge, color: text, fontSize: 28, lineHeight: 32 },
+    timerActions: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+    timerAction: { alignItems: 'center', borderColor: highContrast ? border : colors.mu, borderRadius: 14, borderWidth: 1, justifyContent: 'center', minHeight: 48, paddingHorizontal: 14 },
+    timerActionTonal: { alignSelf: 'flex-start', backgroundColor: secondarySurface, borderColor: 'transparent', marginTop: 8 },
     timerActionText: { ...typography.bodySmall, color: text, fontWeight: '500' },
     restComplete: { ...typography.bodySmall, color: accent, marginBottom: 20 },
-    exerciseBlock: { backgroundColor: 'transparent', borderColor: 'transparent', borderRadius: 12, borderWidth: 0, marginBottom: 20, overflow: 'hidden' },
-    activeExerciseBlock: { backgroundColor: surface, borderColor: accent, borderWidth: highContrast ? 2 : 1, paddingHorizontal: 12, paddingTop: 12 },
-    exerciseEyebrow: { ...typography.captionSmall, color: muted, marginHorizontal: 4, marginBottom: 4 },
+    exerciseBlock: { backgroundColor: 'transparent', borderColor: 'transparent', borderRadius: 20, borderWidth: 0, marginBottom: 16, overflow: 'hidden' },
+    activeExerciseBlock: { backgroundColor: surface, borderColor: highContrast ? accent : 'transparent', borderWidth: highContrast ? 2 : 0, paddingHorizontal: 16, paddingTop: 16 },
     exerciseHeader: { alignItems: 'center', flexDirection: 'row', gap: 12, paddingVertical: 8 },
     index: { alignItems: 'center', borderColor: border, borderRadius: 16, borderWidth: 1, height: 32, justifyContent: 'center', width: 32 },
     indexActive: { backgroundColor: accent, borderColor: accent },
@@ -1084,25 +1090,25 @@ const createStyles = (colors: ThemeColors, highContrast = false) => {
     videoLink: { ...typography.bodySmall, color: text, marginTop: 2, textDecorationLine: 'underline' },
     textAction: { justifyContent: 'center', minHeight: 48 },
     skip: { ...typography.caption, color: muted, paddingHorizontal: 4, textDecorationLine: 'underline' },
-    compactSetRow: { alignItems: 'center', borderBottomColor: border, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: 10, minHeight: 52, paddingHorizontal: 4 },
+    compactSetRow: { alignItems: 'center', borderBottomColor: border, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: 14, minHeight: 56, paddingHorizontal: 2 },
     compactSetText: { ...typography.bodySmall, color: text },
     compactSetSummary: { ...typography.numberSmall, color: muted, flex: 1, textAlign: 'right' },
     compactSetStatus: { ...typography.captionSmall, color: muted, minWidth: 64, textAlign: 'right' },
-    activeSetEditor: { backgroundColor: highContrast ? surface : secondarySurface, borderColor: accent, borderRadius: 12, borderWidth: highContrast ? 2 : 1, gap: 12, marginTop: 8, padding: 12 },
+    activeSetEditor: { backgroundColor: highContrast ? background : secondarySurface, borderColor: highContrast ? accent : 'transparent', borderRadius: 16, borderWidth: highContrast ? 2 : 0, gap: 14, marginTop: 8, padding: 16 },
     setTitle: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
     activeSetHeading: { alignItems: 'center', flexDirection: 'row', gap: 8 },
-    setNumber: { ...typography.caption, color: text },
+    setNumber: { ...typography.titleSmall, color: text },
     removeSet: { ...typography.captionSmall, color: danger, textDecorationLine: 'underline' },
     fields: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
     field: { flexGrow: 1, minWidth: 120 },
     setLabel: { ...typography.captionSmall, color: muted, marginBottom: 4 },
-    stepper: { alignItems: 'center', backgroundColor: highContrast ? background : secondarySurface, borderColor: highContrast ? border : 'transparent', borderRadius: 10, borderWidth: highContrast ? 1 : 0, flexDirection: 'row', height: 48, overflow: 'hidden' },
-    stepperButton: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 },
-    stepperInput: { ...typography.numberMedium, backgroundColor: 'transparent', borderWidth: 0, color: text, flex: 1, minHeight: 48, minWidth: 30, paddingHorizontal: 2, paddingVertical: 0, textAlign: 'center' },
+    stepper: { alignItems: 'center', backgroundColor: highContrast ? background : surface, borderColor: highContrast ? border : 'transparent', borderRadius: 14, borderWidth: highContrast ? 1 : 0, flexDirection: 'row', height: 56, overflow: 'hidden' },
+    stepperButton: { alignItems: 'center', justifyContent: 'center', minHeight: 56, minWidth: 52 },
+    stepperInput: { ...typography.numberLarge, backgroundColor: 'transparent', borderWidth: 0, color: text, flex: 1, fontSize: 28, minHeight: 56, minWidth: 30, paddingHorizontal: 2, paddingVertical: 0, textAlign: 'center' },
     setInput: { backgroundColor: highContrast ? background : secondarySurface, borderColor: highContrast ? border : 'transparent', borderRadius: 10, borderWidth: highContrast ? 1 : 0, color: text, fontFamily: fontFamilies.data, fontSize: 18, minHeight: 48, paddingHorizontal: 12 },
     setNotes: { backgroundColor: highContrast ? background : secondarySurface, borderColor: highContrast ? border : 'transparent', borderRadius: 10, borderWidth: highContrast ? 1 : 0, color: text, fontFamily: fontFamilies.text, fontSize: 15, minHeight: 48, paddingHorizontal: 12 },
     setActions: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-    saveSet: { alignItems: 'center', borderColor: highContrast ? border : colors.mu, borderRadius: 12, borderWidth: 1, justifyContent: 'center', minHeight: 48, minWidth: 120, paddingHorizontal: 12 },
+    saveSet: { alignItems: 'center', borderColor: highContrast ? border : colors.mu, borderRadius: 14, borderWidth: 1, justifyContent: 'center', minHeight: 48, minWidth: 120, paddingHorizontal: 12 },
     saveSetText: { ...typography.bodySmall, color: text, fontWeight: '500' },
     completionHint: { ...typography.captionSmall, color: muted, flex: 1, minWidth: 145 },
     addSetText: { ...typography.bodySmall, color: text, textDecorationLine: 'underline' },
@@ -1127,7 +1133,7 @@ const createStyles = (colors: ThemeColors, highContrast = false) => {
     input: { backgroundColor: highContrast ? surface : secondarySurface, borderColor: highContrast ? border : 'transparent', borderRadius: 12, borderWidth: highContrast ? 1 : 0, color: text, fontFamily: fontFamilies.text, fontSize: 15, minHeight: 48, paddingHorizontal: 12 },
     error: { ...typography.caption, color: danger, paddingHorizontal: 2 },
     footerActions: { flexDirection: 'row', gap: 8 },
-    footerSecondary: { alignItems: 'center', borderColor: highContrast ? border : colors.mu, borderRadius: 12, borderWidth: 1, flex: 1, flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 48, paddingHorizontal: 10 },
+    footerSecondary: { alignItems: 'center', borderColor: border, borderRadius: 14, borderWidth: 1, flex: 1, flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 48, paddingHorizontal: 10 },
     footerSecondaryText: { ...typography.bodySmall, color: text, fontWeight: '500' },
     primary: { alignItems: 'center', backgroundColor: accent, borderRadius: 12, justifyContent: 'center', minHeight: 56, paddingHorizontal: 20 },
     primaryText: { color: onAccent, ...typography.titleSmall },

@@ -13,7 +13,13 @@ jest.mock('@react-navigation/native', () => ({
   useNavigation: () => mockNavigation,
   usePreventRemove: jest.fn(),
 }))
+jest.mock('react-native-safe-area-context', () => ({
+  SafeAreaProvider: ({ children }: { children: unknown }) => children,
+  SafeAreaView: require('react-native').View,
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+}))
 jest.mock('../../theme', () => ({
+  shared: require('../../theme/tokens').shared,
   useTheme: () => ({
     colors: new Proxy({}, { get: () => '#111111' }),
     preferences: { workoutHighContrast: false, hapticsEnabled: false },
@@ -68,6 +74,7 @@ describe('inteligência local renderizada na sessão', () => {
       ...actions,
     }))
 
+    fireEvent.press(screen.getByText('Histórico e opções'))
     expect(screen.getByText('Último desempenho')).toBeTruthy()
     expect(screen.getByText(/Carga anterior: 10 kg/)).toBeTruthy()
     expect(screen.getByText('Sugestão local')).toBeTruthy()
@@ -83,7 +90,7 @@ describe('inteligência local renderizada na sessão', () => {
     expect(actions.onUpdateExerciseNotes).toHaveBeenCalledWith(1, 'Execução estável')
 
     fireEvent.changeText(screen.getByLabelText('Observação da série'), 'Cadência controlada')
-    fireEvent.press(screen.getByText('Salvar'))
+    fireEvent.press(screen.getByText('Salvar rascunho'))
     expect(actions.onUpdateSet).toHaveBeenCalledWith(
       1,
       1,
@@ -108,7 +115,8 @@ describe('inteligência local renderizada na sessão', () => {
       busyKeys: new Set<string>(),
       ...actions,
     }))
-    expect(screen.getByText('SESSÃO PAUSADA')).toBeTruthy()
+    expect(screen.getByText('Sessão pausada')).toBeTruthy()
+    fireEvent.press(screen.getByText('Histórico e opções'))
     expect(screen.getByDisplayValue('Anotação da sessão')).toBeTruthy()
     fireEvent.press(screen.getByText('Dispensar'))
     expect(screen.queryByText('Sugestão local')).toBeNull()
@@ -132,6 +140,7 @@ describe('inteligência local renderizada na sessão', () => {
       busyKeys: new Set<string>(),
       ...actions,
     }))
+    fireEvent.press(screen.getByText('Histórico e opções'))
     fireEvent.press(screen.getByText('Desfazer substituição'))
     expect(actions.onUndoSubstitution).toHaveBeenCalledWith(1)
     await view.unmountAsync()

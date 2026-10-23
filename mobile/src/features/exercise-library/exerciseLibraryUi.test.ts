@@ -50,6 +50,6 @@ describe('UI da biblioteca integrada', () => {
   it('mantém alto contraste do treino depois da integração', () => {
     const workout = source('../workout-session/views/WorkoutSessionScreen.tsx')
     expect(workout).toContain('preferences.workoutHighContrast')
-    expect(workout).toContain('Estado: {statusLabel}')
+    expect(workout).toContain('Estado: ${statusLabel}')
   })
 })

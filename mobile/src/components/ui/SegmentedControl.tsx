@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native'
+import { useMotion } from '../../motion/useMotion'
 import { shared, type ThemeColors, useTheme } from '../../theme'
 import { typography } from '../../theme/typography'
 
@@ -7,7 +8,8 @@ export interface SegmentOption<T extends string> { value: T; label: string; acce
 
 /** Seletor segmentado com indicador que desliza até a opção ativa. */
 export function SegmentedControl<T extends string>({ options, value, onChange, label }: { options: readonly SegmentOption<T>[]; value: T; onChange: (value: T) => void; label: string }) {
-  const { colors, motion } = useTheme()
+  const { colors } = useTheme()
+  const motion = useMotion()
   const styles = createStyles(colors)
   const [width, setWidth] = useState(0)
   const index = Math.max(0, options.findIndex((option) => option.value === value))

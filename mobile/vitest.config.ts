@@ -29,7 +29,7 @@ function lucideStub(): Plugin {
     name: 'lucide-stub',
     enforce: 'pre',
     resolveId: (source) => (source === 'lucide-react-native' ? id : null),
-    load: (loaded) => (loaded === id ? [...names].map((name) => `export const ${name} = () => null`).join('\n') : null),
+    load: (loaded) => (loaded === id ? [...names].filter((name) => /^[A-Z]\w*$/.test(name)).map((name) => `export const ${name} = () => null`).join('\n') : null),
   }
 }
 

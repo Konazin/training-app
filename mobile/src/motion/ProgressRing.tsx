@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useRef } from 'react'
 import { Animated, StyleSheet, View } from 'react-native'
 import Svg, { Circle } from 'react-native-svg'
 import { useTheme } from '../theme'
+import { useMotion } from './useMotion'
 import { easeOut } from './easing'
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
@@ -20,7 +21,8 @@ export function ProgressRing({
   children?: ReactNode
   label?: string
 }) {
-  const { colors, motion } = useTheme()
+  const { colors } = useTheme()
+  const motion = useMotion()
   const clamped = Math.min(Math.max(Number.isFinite(progress) ? progress : 0, 0), 1)
   const value = useRef(new Animated.Value(motion.effective === 'FULL' ? 0 : clamped)).current
   useEffect(() => {

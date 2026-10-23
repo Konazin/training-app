@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Animated, StyleSheet, View } from 'react-native'
 import Svg, { Path } from 'react-native-svg'
 import { useTheme } from '../theme'
+import { useMotion } from './useMotion'
 import { easeOut } from './easing'
 
 const AnimatedPath = Animated.createAnimatedComponent(Path)
@@ -12,7 +13,8 @@ const CHECK_LENGTH = 22
  * O estado se lê pela forma (anel x disco com check), nunca só pela cor.
  */
 export function CheckDraw({ checked, size = 32 }: { checked: boolean; size?: number }) {
-  const { colors, motion } = useTheme()
+  const { colors } = useTheme()
+  const motion = useMotion()
   const progress = useRef(new Animated.Value(checked ? 1 : 0)).current
   const mounted = useRef(false)
   useEffect(() => {

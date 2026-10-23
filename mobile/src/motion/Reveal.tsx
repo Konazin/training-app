@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useRef } from 'react'
 import { Animated, type StyleProp, type ViewStyle } from 'react-native'
-import { useTheme } from '../theme'
+import { useMotion } from './useMotion'
 import { easeOut } from './easing'
 import { enterDuration, staggerDelay } from './motionMath'
 
@@ -9,7 +9,7 @@ import { enterDuration, staggerDelay } from './motionMath'
  * escalonar (até 8 itens). Roda uma vez, na montagem.
  */
 export function Reveal({ children, index = 0, style }: { children: ReactNode; index?: number; style?: StyleProp<ViewStyle> }) {
-  const { motion } = useTheme()
+  const motion = useMotion()
   const progress = useRef(new Animated.Value(motion.effective === 'OFF' ? 1 : 0)).current
   useEffect(() => {
     const duration = enterDuration(motion)

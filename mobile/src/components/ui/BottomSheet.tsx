@@ -2,12 +2,14 @@ import type { ReactNode } from 'react'
 import { useEffect, useRef } from 'react'
 import { Animated, Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 import { easeOut } from '../../motion'
+import { useMotion } from '../../motion/useMotion'
 import { shared, type ThemeColors, useTheme } from '../../theme'
 import { typography } from '../../theme/typography'
 
 /** Folha inferior: o fundo escurece e o painel sobe com mola curta. Movimento reduzido vira fade. */
 export function BottomSheet({ visible, title, description, children, onClose }: { visible: boolean; title: string; description?: string; children: ReactNode; onClose: () => void }) {
-  const { colors, motion } = useTheme()
+  const { colors } = useTheme()
+  const motion = useMotion()
   const progress = useRef(new Animated.Value(0)).current
   const styles = createStyles(colors)
   useEffect(() => {

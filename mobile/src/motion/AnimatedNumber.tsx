@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Animated, Text, type TextProps } from 'react-native'
-import { useTheme } from '../theme'
+import { useMotion } from './useMotion'
 import { easeOut } from './easing'
 import { tweenValue } from './motionMath'
 
@@ -12,7 +12,7 @@ export function AnimatedNumber({
   duration = 420,
   ...props
 }: { value: number; decimals?: number; format?: (value: number) => string; duration?: number } & TextProps) {
-  const { motion } = useTheme()
+  const motion = useMotion()
   const progress = useRef(new Animated.Value(1)).current
   const from = useRef(value)
   const [shown, setShown] = useState(value)
