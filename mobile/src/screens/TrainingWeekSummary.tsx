@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { Check } from 'lucide-react-native'
 import type { WeeklyTrainingDayOverview, WeeklyTrainingOverview } from '@training/training-domain'
+import { ProgressBar } from '../motion'
 import { type ThemeColors, useTheme } from '../theme'
 import { typography } from '../theme/typography'
 
@@ -32,15 +33,12 @@ export function TrainingWeekSummary({ overview }: { overview: WeeklyTrainingOver
   const { colors } = useTheme()
   const styles = createStyles(colors)
   const progressText = `${overview.completedTrainingDays} de ${overview.plannedTrainingDays} treinos concluídos`
-  const width = overview.plannedTrainingDays
-    ? `${overview.progressPercent}%` as `${number}%`
-    : '0%'
 
   return (
     <View style={styles.section}>
       <View style={styles.header}>
         <View style={styles.headerCopy}>
-          <Text style={styles.eyebrow}>semana</Text>
+          <Text accessibilityRole="header" style={styles.title}>Semana</Text>
           <Text style={styles.progressText}>{progressText}</Text>
         </View>
         <Pressable
@@ -64,7 +62,11 @@ export function TrainingWeekSummary({ overview }: { overview: WeeklyTrainingOver
         }}
         style={styles.track}
       >
-        <View style={[styles.fill, { width }]} />
+        <ProgressBar
+          color={colors.ac}
+          progress={overview.plannedTrainingDays ? overview.progressPercent / 100 : 0}
+          trackColor={colors.s2}
+        />
       </View>
       {expanded && (
         <View style={styles.days}>
@@ -114,18 +116,17 @@ function StateGlyph({ status }: { status: WeeklyTrainingDayOverview['status'] })
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  section: { marginBottom: 8, marginTop: 8 },
+  section: { marginBottom: 8 },
   header: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
   headerCopy: { flex: 1 },
-  eyebrow: { ...typography.monoLabel, color: colors.t2 },
-  progressText: { ...typography.bodySmall, color: colors.tx, marginTop: 4 },
+  title: { ...typography.titleSmall, color: colors.tx },
+  progressText: { ...typography.bodySmall, color: colors.t2, marginTop: 2 },
   expand: { alignItems: 'center', justifyContent: 'center', minHeight: 48, paddingHorizontal: 4 },
-  expandText: { ...typography.bodySmall, color: colors.tx, fontWeight: '500', textDecorationLine: 'underline', textDecorationColor: colors.tx },
-  track: { backgroundColor: colors.s2, borderRadius: 2, height: 3, marginTop: 12, overflow: 'hidden' },
-  fill: { backgroundColor: colors.ac, borderRadius: 2, height: 3 },
+  expandText: { ...typography.bodySmall, color: colors.t2, fontWeight: '500' },
+  track: { marginTop: 12 },
   days: { flexDirection: 'row', gap: 2, justifyContent: 'space-between', marginTop: 12 },
-  day: { alignItems: 'center', borderRadius: 10, flex: 1, gap: 4, justifyContent: 'center', minHeight: 76, paddingHorizontal: 1, paddingVertical: 6 },
-  today: { backgroundColor: colors.s2 },
+  day: { alignItems: 'center', borderRadius: 14, flex: 1, gap: 4, justifyContent: 'center', minHeight: 76, paddingHorizontal: 1, paddingVertical: 6 },
+  today: { backgroundColor: colors.s1 },
   weekday: { ...typography.captionSmall, color: colors.t2 },
   todayText: { color: colors.tx, fontWeight: '600' },
   status: { ...typography.captionSmall, color: colors.t2, textAlign: 'center' },

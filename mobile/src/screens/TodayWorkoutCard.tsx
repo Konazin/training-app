@@ -1,11 +1,12 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, Text, View } from 'react-native'
 import type {
   ExerciseLoadReference,
   TrainingPlan,
   WeeklyTrainingDayOverview,
   WorkoutSession,
 } from '@training/training-domain'
-import { type ThemeColors, useTheme } from '../theme'
+import { PrimaryButton } from '../components/PrimaryButton'
+import { shared, type ThemeColors, useTheme } from '../theme'
 import { typography } from '../theme/typography'
 
 export function TodayWorkoutCard({
@@ -39,14 +40,14 @@ export function TodayWorkoutCard({
   })
   const planDay = plan.days.find((item) => item.id === day.planDayId)
   const latestReference = references[0]
+  const primary = day.status === 'READY' || day.status === 'ACTIVE' || day.status === 'PAUSED'
 
   return (
     <View
       accessibilityLabel={`Treino de hoje: ${day.title}. ${statusLabel(day.status)}.`}
       style={styles.card}
     >
-      <Text style={styles.eyebrow}>treino · {plan.name}</Text>
-      <Text style={styles.title}>{day.title}</Text>
+      <Text style={styles.plan}>{plan.name}</Text>
       <Text style={styles.status}>{statusCopy(day, session)}</Text>
       {day.status === 'READY' && day.exerciseCount > 0 && (
         <>
@@ -87,7 +88,7 @@ export function TodayWorkoutCard({
       )}
       {latestReference && day.status === 'READY' && (
         <View style={styles.references}>
-          <Text style={styles.referenceTitle}>referência · {formatReferenceDate(latestReference.scheduledDate)}</Text>
+          <Text style={styles.referenceTitle}>Referência anterior · {formatReferenceDate(latestReference.scheduledDate)}</Text>
           <Text style={styles.reference}>
             {latestReference.exerciseName}: {formatLoad(latestReference.load)} kg
             {references.length > 1 ? ` · +${references.length - 1} exercícios` : ''}
@@ -95,13 +96,9 @@ export function TodayWorkoutCard({
         </View>
       )}
       {!!action && (
-        <Pressable
-          accessibilityRole="button"
-          onPress={action.onPress}
-          style={({ pressed }) => [styles.action, pressed && styles.pressed]}
-        >
-          <Text style={styles.actionText}>{action.label}</Text>
-        </Pressable>
+        <View style={styles.action}>
+          <PrimaryButton label={action.label} onPress={action.onPress} secondary={!primary} />
+        </View>
       )}
     </View>
   )
@@ -175,20 +172,17 @@ function formatReferenceDate(value: string) {
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  card: { marginBottom: 24 },
-  eyebrow: { ...typography.monoLabel, color: colors.t2 },
-  title: { ...typography.title, color: colors.tx, marginTop: 8 },
-  status: { ...typography.body, color: colors.tx, marginTop: 12 },
-  exerciseList: { marginTop: 16 },
-  exerciseRow: { alignItems: 'center', borderBottomColor: colors.bd, borderBottomWidth: 1, flexDirection: 'row', gap: 12, minHeight: 40, paddingVertical: 8 },
+  card: {},
+  plan: { ...typography.caption, color: colors.t2 },
+  status: { ...typography.bodyLarge, color: colors.tx, marginTop: shared.spacing.sm },
+  exerciseList: { marginTop: shared.spacing.lg },
+  exerciseRow: { alignItems: 'center', borderBottomColor: colors.bd, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: shared.spacing.md, minHeight: 52, paddingVertical: shared.spacing.sm },
   exerciseName: { ...typography.body, color: colors.tx, flex: 1 },
   exercisePrescription: { ...typography.numberSmall, color: colors.t2, textAlign: 'right' },
-  moreExercises: { ...typography.bodySmall, color: colors.t2, marginTop: 8 },
-  meta: { ...typography.bodySmall, color: colors.t2, marginTop: 8 },
-  references: { borderTopColor: colors.bd, borderTopWidth: 1, gap: 4, marginTop: 16, paddingTop: 12 },
-  referenceTitle: { ...typography.monoLabel, color: colors.t2 },
+  moreExercises: { ...typography.bodySmall, color: colors.t2, marginTop: shared.spacing.sm },
+  meta: { ...typography.numberSmall, color: colors.t2, marginTop: shared.spacing.md },
+  references: { gap: 4, marginTop: shared.spacing.lg },
+  referenceTitle: { ...typography.captionSmall, color: colors.t2 },
   reference: { ...typography.bodySmall, color: colors.tx },
-  action: { alignItems: 'center', backgroundColor: colors.ac, borderRadius: 12, justifyContent: 'center', marginTop: 20, minHeight: 56, paddingHorizontal: 18 },
-  actionText: { ...typography.titleSmall, color: colors.on },
-  pressed: { backgroundColor: colors.primaryPressed },
+  action: { marginTop: shared.spacing.xl },
 })

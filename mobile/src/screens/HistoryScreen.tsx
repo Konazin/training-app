@@ -1,9 +1,11 @@
-import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native'
-import { CircleCheck, CirclePause, CirclePlay, CircleX } from 'lucide-react-native'
+import { RefreshControl, StyleSheet, Text, View } from 'react-native'
+import { ChartNoAxesColumnIncreasing, CircleCheck, CirclePause, CirclePlay, CircleX } from 'lucide-react-native'
 import type { HistoryProgress, WorkoutSession } from '@training/training-domain'
 import { ScreenHeader } from '../components/ScreenHeader'
 import { ScreenScrollView } from '../components/Screen'
 import { PrimaryButton } from '../components/PrimaryButton'
+import { EmptyState, InlineNotice } from '../components/ui'
+import { AnimatedNumber, Reveal } from '../motion'
 import { type ThemeColors, useTheme } from '../theme'
 import { typography } from '../theme/typography'
 
@@ -36,39 +38,41 @@ export function HistoryScreen({
       includeBottomInset={false}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} tintColor={colors.tx} />}
     >
-      <ScreenHeader
-        eyebrow="treinos salvos neste aparelho"
-        title="Progresso"
-        description="Resultados calculados a partir das sessões concluídas."
-      />
+      <Reveal>
+        <ScreenHeader
+          title="Progresso"
+          description="Calculado a partir das sessões salvas neste aparelho."
+        />
+      </Reveal>
       {!!warning && (
-        <View accessibilityRole="alert" style={styles.warning}>
-          <Text style={styles.warningMark}>!</Text>
-          <Text style={styles.warningText}>{warning}</Text>
-          <Pressable accessibilityRole="button" onPress={onRefresh} style={styles.warningAction}>
-            <Text style={styles.warningActionText}>Tentar de novo</Text>
-          </Pressable>
-        </View>
+        <InlineNotice
+          action={<PrimaryButton label="Tentar de novo" onPress={onRefresh} secondary />}
+          message={warning}
+          tone="warning"
+        />
       )}
-      <View style={styles.metrics}>
-        <Metric label="sessões" value={progress.completedSessions} detail="concluídas no total" />
-        <Metric label="esta semana" value={progress.completedThisWeek} detail="segunda a domingo" />
-        <Metric label="conclusão" value={`${progress.completionRate}%`} detail="entre as sessões iniciadas" />
-        <Metric label="exercícios" value={progress.completedExercises} detail="concluídos no total" />
-        <Metric label="tempo" value={formatDuration(progress.totalDurationSeconds)} detail="somente sessões concluídas" />
-        <Metric label="volume" value={`${Math.round(progress.totalVolume).toLocaleString('pt-BR')} kg`} detail="somente sessões concluídas" />
-      </View>
+      <Reveal index={1}>
+        <View style={styles.metrics}>
+          <Metric label="Sessões" value={progress.completedSessions} detail="concluídas no total" />
+          <Metric label="Esta semana" value={progress.completedThisWeek} detail="segunda a domingo" />
+          <Metric label="Conclusão" value={progress.completionRate} suffix="%" detail="entre as sessões iniciadas" />
+          <Metric label="Exercícios" value={progress.completedExercises} detail="concluídos no total" />
+          <Metric label="Tempo" value={formatDuration(progress.totalDurationSeconds)} detail="somente sessões concluídas" />
+          <Metric label="Volume" value={Math.round(progress.totalVolume)} suffix=" kg" detail="somente sessões concluídas" />
+        </View>
+      </Reveal>
       <Text style={styles.sectionTitle}>Sessões salvas</Text>
       {!sessions.length ? (
-        <View style={styles.empty}>
-          <Text accessibilityRole="header" style={styles.emptyTitle}>Nenhuma sessão salva</Text>
-          <Text style={styles.emptyDescription}>Conclua um treino para começar a acompanhar o histórico neste aparelho.</Text>
-          <PrimaryButton label="Abrir ficha" onPress={onOpenPlan} />
-        </View>
-      ) : sessions.map((session) => (
+        <EmptyState
+          action={<PrimaryButton label="Abrir ficha" onPress={onOpenPlan} />}
+          description="Conclua um treino para começar a acompanhar o histórico neste aparelho."
+          icon={<ChartNoAxesColumnIncreasing color={colors.tx} size={24} strokeWidth={1.5} />}
+          title="Nenhuma sessão salva"
+        />
+      ) : sessions.map((session, index) => (
+        <Reveal index={index + 2} key={session.id}>
         <View
           accessibilityLabel={`${session.workoutName}, ${session.dayName}, ${statusLabels[session.status]}`}
-          key={session.id}
           style={styles.session}
         >
           <View style={styles.sessionHeader}>
@@ -91,18 +95,22 @@ export function HistoryScreen({
             </Text>
           ))}
         </View>
+        </Reveal>
       ))}
     </ScreenScrollView>
   )
 }
 
-function Metric({ label, value, detail }: { label: string; value: string | number; detail: string }) {
+function Metric({ label, value, suffix = '', detail }: { label: string; value: string | number; suffix?: string; detail: string }) {
   const { colors } = useTheme()
   const styles = createStyles(colors)
+  const shown = typeof value === 'number' ? `${value.toLocaleString('pt-BR')}${suffix}` : value
   return (
-    <View accessibilityLabel={`${label}: ${value}. ${detail}`} style={styles.metric}>
+    <View accessibilityLabel={`${label}: ${shown}. ${detail}`} style={styles.metric}>
       <Text style={styles.label}>{label}</Text>
-      <Text adjustsFontSizeToFit minimumFontScale={0.8} style={styles.value}>{value}</Text>
+      {typeof value === 'number'
+        ? <AnimatedNumber adjustsFontSizeToFit format={(current) => `${current.toLocaleString('pt-BR')}${suffix}`} minimumFontScale={0.8} style={styles.value} value={value} />
+        : <Text adjustsFontSizeToFit minimumFontScale={0.8} style={styles.value}>{value}</Text>}
       <Text style={styles.detail}>{detail}</Text>
     </View>
   )
@@ -132,18 +140,13 @@ export function formatDuration(seconds: number) {
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  warning: { alignItems: 'flex-start', backgroundColor: colors.s1, borderRadius: 12, flexDirection: 'row', gap: 10, marginBottom: 16, padding: 14 },
-  warningMark: { ...typography.bodySmall, color: colors.tx, fontWeight: '600' },
-  warningText: { ...typography.bodySmall, color: colors.tx, flex: 1 },
-  warningAction: { justifyContent: 'center', minHeight: 48 },
-  warningActionText: { ...typography.bodySmall, color: colors.tx, fontWeight: '600', textDecorationLine: 'underline', textDecorationColor: colors.tx },
-  metrics: { columnGap: 16, flexDirection: 'row', flexWrap: 'wrap', marginBottom: 16, rowGap: 0 },
-  metric: { borderTopColor: colors.bd, borderTopWidth: 1, flexBasis: '47%', flexGrow: 1, minWidth: 128, paddingBottom: 16, paddingTop: 14 },
-  label: { ...typography.monoLabel, color: colors.t2 },
+  metrics: { columnGap: 12, flexDirection: 'row', flexWrap: 'wrap', marginBottom: 16, rowGap: 12 },
+  metric: { backgroundColor: colors.s1, borderRadius: 20, flexBasis: '47%', flexGrow: 1, minWidth: 128, padding: 16 },
+  label: { ...typography.caption, color: colors.t2 },
   value: { ...typography.numberLarge, color: colors.tx, marginTop: 8 },
   detail: { ...typography.captionSmall, color: colors.t2, marginTop: 5 },
   sectionTitle: { ...typography.titleSmall, color: colors.tx, marginBottom: 4, marginTop: 8 },
-  session: { borderBottomColor: colors.bd, borderBottomWidth: 1, paddingBottom: 16, paddingTop: 16 },
+  session: { borderBottomColor: colors.bd, borderBottomWidth: StyleSheet.hairlineWidth, paddingBottom: 16, paddingTop: 16 },
   sessionHeader: { alignItems: 'baseline', flexDirection: 'row', gap: 10, justifyContent: 'space-between' },
   sessionTitle: { ...typography.body, color: colors.tx, flex: 1, fontWeight: '500' },
   sessionDate: { ...typography.numberSmall, color: colors.t2 },
@@ -152,7 +155,4 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   day: { ...typography.caption, color: colors.t2 },
   meta: { ...typography.numberSmall, color: colors.t2, lineHeight: 20, marginTop: 7 },
   substitution: { ...typography.bodySmall, color: colors.t2, marginTop: 8 },
-  empty: { alignItems: 'flex-start', paddingBottom: 24, paddingTop: 16 },
-  emptyTitle: { ...typography.titleSmall, color: colors.tx },
-  emptyDescription: { ...typography.bodySmall, color: colors.t2, marginTop: 6 },
 })
