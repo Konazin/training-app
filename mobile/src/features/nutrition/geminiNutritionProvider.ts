@@ -9,8 +9,16 @@ import {
   type NutritionMealType,
 } from '@training/training-domain'
 
-export const GEMINI_NUTRITION_MODEL = 'gemini-3.8-flash'
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_NUTRITION_MODEL}:generateContent`
+export type GeminiModelAttempt = { model: string; timeoutMs: number }
+// Do mais rápido ao mais lento; modelos maiores ganham mais tempo antes do timeout.
+// Medido em 2026-10: 3.5-flash-lite ~2 s, 3.6-flash ~8 s, 3.8-flash instável/sobrecarregado.
+export const GEMINI_MODEL_CHAIN: readonly GeminiModelAttempt[] = [
+  { model: 'gemini-3.5-flash-lite', timeoutMs: 30_000 },
+  { model: 'gemini-3.6-flash', timeoutMs: 60_000 },
+  { model: 'gemini-3.8-flash', timeoutMs: 90_000 },
+]
+export const GEMINI_NUTRITION_MODEL = GEMINI_MODEL_CHAIN[0]!.model
+const GEMINI_ENDPOINT = (model: string) => `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
 const MAX_IMAGE_BASE64_CHARS = 12 * 1024 * 1024
 const mealTypes: NutritionMealType[] = [
   'BREAKFAST', 'MORNING_SNACK', 'LUNCH', 'AFTERNOON_SNACK', 'DINNER', 'SUPPER', 'OTHER',
@@ -18,7 +26,11 @@ const mealTypes: NutritionMealType[] = [
 
 type FetchLike = typeof fetch
 
-export function createGeminiNutritionProvider(apiKey: string, fetchImpl: FetchLike = fetch): NutritionAiProvider {
+export function createGeminiNutritionProvider(
+  apiKey: string,
+  fetchImpl: FetchLike = fetch,
+  chain: readonly GeminiModelAttempt[] = GEMINI_MODEL_CHAIN,
+): NutritionAiProvider {
   const key = apiKey.trim()
   if (!key || key.length > 512 || /\s/.test(key)) {
     throw new Error('Configure uma chave Gemini válida antes de continuar.')
@@ -26,7 +38,7 @@ export function createGeminiNutritionProvider(apiKey: string, fetchImpl: FetchLi
   return {
     estimateMeal: async (image, signal) => {
       validateImage(image)
-      const response = await generate(fetchImpl, key, imagePrompt(), image, signal)
+      const response = await generate(fetchImpl, chain, key, imagePrompt(), image, signal)
       const title = requiredString(response.title, 'title', 100)
       const items = parseItems(response.items)
       if (!items.length) throw invalidResponse()
@@ -36,7 +48,7 @@ export function createGeminiNutritionProvider(apiKey: string, fetchImpl: FetchLi
       const preferences = input.preferences.trim()
       if (preferences.length > 500) throw new Error('As preferências devem ter no máximo 500 caracteres.')
       const prompt = dietPrompt(input, preferences)
-      const response = await generate(fetchImpl, key, prompt, undefined, signal)
+      const response = await generate(fetchImpl, chain, key, prompt, undefined, signal)
       const title = requiredString(response.title, 'title', 100)
       const summary = requiredString(response.summary, 'summary', 500)
       if (!Array.isArray(response.meals) || response.meals.length < 1 || response.meals.length > 8) {
@@ -61,8 +73,11 @@ export function createGeminiNutritionProvider(apiKey: string, fetchImpl: FetchLi
   }
 }
 
+class RetryableError extends Error {}
+
 async function generate(
   fetchImpl: FetchLike,
+  chain: readonly GeminiModelAttempt[],
   apiKey: string,
   prompt: string,
   image?: NutritionImageInput,
@@ -70,24 +85,72 @@ async function generate(
 ) {
   const parts: Record<string, unknown>[] = [{ text: prompt }]
   if (image) parts.push({ inlineData: { mimeType: image.mimeType, data: image.base64 } })
-  let response: Response
-  try {
-    response = await fetchImpl(GEMINI_ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts }],
-        generationConfig: { responseMimeType: 'application/json', temperature: 0.2, maxOutputTokens: 4096 },
-      }),
-      signal,
-    })
-  } catch (error) {
-    if (signal?.aborted || (error instanceof Error && error.name === 'AbortError')) {
-      throw new Error('Análise cancelada.')
+  const body = JSON.stringify({
+    contents: [{ role: 'user', parts }],
+    generationConfig: { responseMimeType: 'application/json', temperature: 0.2, maxOutputTokens: 4096 },
+  })
+  let lastError: Error = new Error('Não foi possível conectar ao Gemini. Confira a internet e tente novamente.')
+  for (const attempt of chain) {
+    if (signal?.aborted) throw new Error('Análise cancelada.')
+    try {
+      return await generateWithModel(fetchImpl, attempt, apiKey, body, signal)
+    } catch (error) {
+      if (!(error instanceof RetryableError)) throw error
+      lastError = error
     }
-    throw new Error('Não foi possível conectar ao Gemini. Confira a internet e tente novamente.')
   }
-  if (!response.ok) throw providerError(response.status)
+  throw lastError
+}
+
+async function generateWithModel(
+  fetchImpl: FetchLike,
+  { model, timeoutMs }: GeminiModelAttempt,
+  apiKey: string,
+  body: string,
+  signal?: AbortSignal,
+) {
+  const controller = new AbortController()
+  const forwardAbort = () => controller.abort()
+  signal?.addEventListener('abort', forwardAbort)
+  let timedOut = false
+  const timer = setTimeout(() => { timedOut = true; controller.abort() }, timeoutMs)
+  try {
+    let response: Response
+    try {
+      response = await fetchImpl(GEMINI_ENDPOINT(model), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body,
+        signal: controller.signal,
+      })
+    } catch (error) {
+      if (signal?.aborted) throw new Error('Análise cancelada.')
+      if (timedOut) throw new RetryableError('A análise demorou demais e foi interrompida (conexão lenta ou serviço ocupado). Tente de novo ou registre manualmente.')
+      if (error instanceof Error && error.name === 'AbortError') throw new Error('Análise cancelada.')
+      throw new RetryableError('Não foi possível conectar ao Gemini. Confira a internet e tente novamente.')
+    }
+    if (!response.ok) {
+      const failure = providerError(response.status)
+      throw isRetryableStatus(response.status) ? new RetryableError(failure.message) : failure
+    }
+    return await readResponse(response)
+  } catch (error) {
+    // O timeout também vale enquanto o corpo da resposta é lido.
+    if (timedOut && !(error instanceof RetryableError) && !signal?.aborted) {
+      throw new RetryableError('A análise demorou demais e foi interrompida (conexão lenta ou serviço ocupado). Tente de novo ou registre manualmente.')
+    }
+    throw error
+  } finally {
+    clearTimeout(timer)
+    signal?.removeEventListener('abort', forwardAbort)
+  }
+}
+
+function isRetryableStatus(status: number) {
+  return status === 404 || status === 429 || status >= 500
+}
+
+async function readResponse(response: Response) {
   let body: unknown
   try { body = await response.json() } catch { throw invalidResponse() }
   const root = object(body)

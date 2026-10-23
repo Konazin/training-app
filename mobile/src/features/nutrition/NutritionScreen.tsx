@@ -47,7 +47,6 @@ const EMPTY_GOALS: NutritionGoals = {
   fiberGrams: null,
 }
 const NUTRITION_GOALS_KEY = 'nutrition.goals'
-const TIMEOUT_MESSAGE = 'A análise passou de 90 segundos e foi interrompida (conexão lenta ou serviço ocupado). Tente de novo ou registre manualmente.'
 const SAVED_MENUS_KEY = 'nutrition.ai.saved-menus'
 const MEAL_TYPES: NutritionMealType[] = [
   'BREAKFAST', 'MORNING_SNACK', 'LUNCH', 'AFTERNOON_SNACK', 'DINNER', 'SUPPER', 'OTHER',
@@ -298,8 +297,6 @@ export function NutritionScreen({
 
   const runPhotoEstimate = async (source: 'CAMERA' | 'GALLERY') => {
     let temporaryImageUri: string | null = null
-    let timeout: ReturnType<typeof setTimeout> | null = null
-    let timedOut = false
     try {
       const key = await secrets.get(GEMINI_API_KEY_SECRET)
       if (!key) {
@@ -332,7 +329,6 @@ export function NutritionScreen({
 
       const controller = new AbortController()
       activeRequest.current = controller
-      timeout = setTimeout(() => { timedOut = true; controller.abort() }, 90_000)
       const estimate = await createGeminiNutritionProvider(key).estimateMeal({
         base64: asset.base64,
         mimeType,
@@ -353,11 +349,10 @@ export function NutritionScreen({
       setNotice('')
     } catch (error) {
       if (mounted.current) {
-        setNotice(timedOut ? TIMEOUT_MESSAGE : error instanceof Error ? error.message : 'Não foi possível analisar a imagem.')
+        setNotice(error instanceof Error ? error.message : 'Não foi possível analisar a imagem.')
         setNoticeTone('danger')
       }
     } finally {
-      if (timeout) clearTimeout(timeout)
       activeRequest.current = null
       if (mounted.current) setAiBusy(false)
       if (temporaryImageUri) deleteTemporaryImage(temporaryImageUri)
@@ -370,8 +365,6 @@ export function NutritionScreen({
       setNoticeTone('warning')
       return
     }
-    let timeout: ReturnType<typeof setTimeout> | null = null
-    let timedOut = false
     try {
       const key = await secrets.get(GEMINI_API_KEY_SECRET)
       if (!key) {
@@ -382,7 +375,6 @@ export function NutritionScreen({
       if (!await confirmAiSend('menu')) return
       const controller = new AbortController()
       activeRequest.current = controller
-      timeout = setTimeout(() => { timedOut = true; controller.abort() }, 90_000)
       const suggestion = await createGeminiNutritionProvider(key).suggestDailyMenu({ goals, preferences }, controller.signal)
       if (!mounted.current) return
       setEditingMenuId(null)
@@ -391,11 +383,10 @@ export function NutritionScreen({
       setNoticeTone('warning')
     } catch (error) {
       if (mounted.current) {
-        setNotice(timedOut ? TIMEOUT_MESSAGE : error instanceof Error ? error.message : 'Não foi possível gerar a sugestão.')
+        setNotice(error instanceof Error ? error.message : 'Não foi possível gerar a sugestão.')
         setNoticeTone('danger')
       }
     } finally {
-      if (timeout) clearTimeout(timeout)
       activeRequest.current = null
       if (mounted.current) setAiBusy(false)
     }
