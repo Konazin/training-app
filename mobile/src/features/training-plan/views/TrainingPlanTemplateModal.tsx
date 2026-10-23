@@ -124,7 +124,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   content: { gap: 10, padding: shared.pagePadding },
   title: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 25, fontWeight: '500', marginBottom: 4 },
   description: { color: colors.t2, fontFamily: fontFamilies.text, fontSize: 14, lineHeight: 20 },
-  meta: { color: colors.mu, fontFamily: fontFamilies.data, fontSize: 11, marginTop: 6 },
+  meta: { color: colors.mu, fontFamily: fontFamilies.data, fontSize: 12, marginTop: 6 },
   card: { alignItems: 'center', borderBottomColor: colors.bd, borderBottomWidth: 1, flexDirection: 'row', gap: 14, minHeight: 96, paddingVertical: 14 },
   templateCopy: { flex: 1, gap: 4 },
   cardTitle: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 17, fontWeight: '500' },

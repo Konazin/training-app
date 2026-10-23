@@ -154,7 +154,7 @@ export function TrainingPlanView({
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   headerButton: { alignItems: 'center', backgroundColor: colors.ac, borderRadius: 12, height: 48, justifyContent: 'center', width: 48 },
   archivedLink: { alignSelf: 'flex-start', justifyContent: 'center', marginBottom: 12, minHeight: 48 },
-  archivedLinkText: { ...typography.bodySmall, color: colors.tx, textDecorationLine: 'underline', textUnderlineOffset: 3 },
+  archivedLinkText: { ...typography.bodySmall, color: colors.tx, textDecorationLine: 'underline' },
   planScroll: { marginBottom: 18 },
   planChip: { backgroundColor: 'transparent', borderColor: colors.mu, borderRadius: 12, borderWidth: 1, justifyContent: 'center', marginRight: 8, minHeight: 48, minWidth: 145, paddingHorizontal: 12 },
   planChipActive: { backgroundColor: colors.ac, borderColor: colors.ac },
@@ -176,7 +176,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   dayTitle: { ...typography.body, color: colors.tx, fontWeight: '500' },
   dayMeta: { ...typography.caption, color: colors.t2, marginTop: 2 },
   start: { alignSelf: 'flex-start', justifyContent: 'center', minHeight: 48, paddingLeft: 50 },
-  startText: { ...typography.bodySmall, color: colors.tx, textDecorationLine: 'underline', textUnderlineOffset: 3 },
+  startText: { ...typography.bodySmall, color: colors.tx, textDecorationLine: 'underline' },
   empty: { alignItems: 'flex-start', minHeight: 280, justifyContent: 'center' },
   emptyTitle: { ...typography.titleSmall, color: colors.tx, marginBottom: 15 },
   primary: { alignItems: 'center', backgroundColor: colors.ac, borderRadius: 12, justifyContent: 'center', minHeight: 56, paddingHorizontal: 18 },

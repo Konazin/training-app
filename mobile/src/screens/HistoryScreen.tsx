@@ -117,7 +117,7 @@ function StatusGlyph({ status, colors }: { status: WorkoutSession['status']; col
 }
 
 function formatDateKey(value: string) {
-  const [year, month, day] = value.split('-').map(Number)
+  const [year = 1970, month = 1, day = 1] = value.split('-').map(Number)
   return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' })
     .format(new Date(year, month - 1, day))
     .replaceAll('.', '')

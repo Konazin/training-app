@@ -15,7 +15,7 @@ export interface UiPreferences {
 
 export const defaultUiPreferences: Readonly<UiPreferences> = Object.freeze({
   themePreset: 'MONOCHROME',
-  appearance: 'SYSTEM',
+  appearance: 'DARK',
   motion: 'SYSTEM',
   workoutHighContrast: false,
   hapticsEnabled: true,

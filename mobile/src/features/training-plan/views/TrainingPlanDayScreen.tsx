@@ -327,7 +327,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   itemTitle: { ...typography.body, color: colors.tx, fontWeight: '500' },
   meta: { ...typography.caption, color: colors.t2, marginTop: 2 },
   itemAction: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 },
-  link: { ...typography.bodySmall, color: colors.tx, textDecorationLine: 'underline', textUnderlineOffset: 3 },
+  link: { ...typography.bodySmall, color: colors.tx, textDecorationLine: 'underline' },
   rowError: { ...typography.captionSmall, color: colors.dg, width: '100%' },
   error: { ...typography.bodySmall, color: colors.dg, marginBottom: 8 },
   start: { alignItems: 'center', backgroundColor: colors.ac, borderRadius: 12, minHeight: 56, justifyContent: 'center' },

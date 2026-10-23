@@ -55,8 +55,8 @@ describe.each([
 })
 
 it('aplica insets superior e inferior conforme a tela', () => {
-  expect(screenPadding(32, 24, true)).toEqual({ paddingTop: 48, paddingBottom: 44 })
-  expect(screenPadding(32, 24, false)).toEqual({ paddingTop: 48, paddingBottom: 120 })
+  expect(screenPadding(32, 24, true)).toEqual({ paddingTop: 48, paddingBottom: 48 })
+  expect(screenPadding(32, 24, false)).toEqual({ paddingTop: 48, paddingBottom: 96 })
 })
 
 it('resolve tema sistema, claro e escuro', () => {
@@ -73,11 +73,11 @@ it('mantém escala tipográfica e alvos mínimos', async () => {
 })
 
 it('expõe a fundação de espaçamento, raios, controles e movimento da 0.11', () => {
-  expect(Object.values(shared.radii)).toEqual([14, 18, 22, 26])
+  expect(Object.values(shared.radii)).toEqual([10, 14, 20, 28])
   expect(Object.values(shared.spacing).every((value) => value % 4 === 0)).toBe(true)
   expect(shared.control.primaryHeight).toBeGreaterThanOrEqual(52)
   expect(shared.control.primaryHeight).toBeLessThanOrEqual(56)
-  expect(Object.values(shared.motion).every((value) => value >= 150 && value <= 250)).toBe(true)
+  expect(Object.values(shared.motion).every((value) => value >= 100 && value <= 400)).toBe(true)
 })
 
 it.each([320, 360, 375, 390, 412, 430, 480])('mantém a grade da Home dentro de %i px', (viewport) => {

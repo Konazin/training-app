@@ -280,7 +280,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   success: { ...typography.bodySmall, color: colors.tx, marginVertical: 12 },
   error: { ...typography.bodySmall, color: colors.dg, marginVertical: 12 },
   restore: { alignItems: 'flex-start', justifyContent: 'center', minHeight: shared.touchTarget.minimum, marginTop: 8 },
-  restoreText: { ...typography.bodySmall, color: colors.tx, textDecorationLine: 'underline', textUnderlineOffset: 3 },
+  restoreText: { ...typography.bodySmall, color: colors.tx, textDecorationLine: 'underline' },
   pressed: { opacity: 0.72 },
   back: { alignItems: 'center', justifyContent: 'center', minHeight: shared.touchTarget.minimum, minWidth: shared.touchTarget.minimum },
   backText: { color: colors.tx, fontSize: 24, fontWeight: '400' },

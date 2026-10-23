@@ -45,10 +45,10 @@ export function BootstrapScreen({ state, message, onRetry, migrationName, onExpo
 
 const styles = StyleSheet.create({
   screen: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28 },
-  mark: { fontFamily: fontFamilies.data, fontSize: 11, marginBottom: 18 },
+  mark: { fontFamily: fontFamilies.data, fontSize: 12, marginBottom: 18 },
   title: { fontFamily: fontFamilies.text, fontSize: 24, fontWeight: '500', textAlign: 'center' },
   message: { fontFamily: fontFamilies.text, lineHeight: 20, marginTop: 12, textAlign: 'center' },
-  address: { fontFamily: fontFamilies.data, fontSize: 11, marginTop: 8, textAlign: 'center' },
+  address: { fontFamily: fontFamilies.data, fontSize: 12, marginTop: 8, textAlign: 'center' },
   button: { alignItems: 'center', borderRadius: 12, justifyContent: 'center', marginTop: 22, minHeight: 56, paddingHorizontal: 22 },
   diagnostic: { fontFamily: fontFamilies.text, fontSize: 14, fontWeight: '500' },
   pressed: { opacity: 0.75 },

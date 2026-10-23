@@ -208,7 +208,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   action: { alignItems: 'center', flexDirection: 'row', gap: 6, justifyContent: 'center', minHeight: shared.touchTarget.minimum, paddingHorizontal: 4 },
   actionText: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 14, fontWeight: '500' },
   favorite: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 14, fontWeight: '500' },
-  eyebrow: { color: colors.mu, fontFamily: fontFamilies.data, fontSize: 11 },
+  eyebrow: { color: colors.mu, fontFamily: fontFamilies.data, fontSize: 12 },
   title: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 32, fontWeight: '500' },
   meta: { color: colors.t2, fontFamily: fontFamilies.text, fontSize: 14, marginBottom: 4 },
   image: { aspectRatio: 16 / 9, backgroundColor: colors.s2, borderRadius: 8, width: '100%' },

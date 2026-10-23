@@ -38,6 +38,7 @@ export function TodayWorkoutCard({
     onOpenPlan,
   })
   const planDay = plan.days.find((item) => item.id === day.planDayId)
+  const latestReference = references[0]
 
   return (
     <View
@@ -84,11 +85,11 @@ export function TodayWorkoutCard({
           )}
         </View>
       )}
-      {!!references.length && day.status === 'READY' && (
+      {latestReference && day.status === 'READY' && (
         <View style={styles.references}>
-          <Text style={styles.referenceTitle}>referência · {formatReferenceDate(references[0].scheduledDate)}</Text>
+          <Text style={styles.referenceTitle}>referência · {formatReferenceDate(latestReference.scheduledDate)}</Text>
           <Text style={styles.reference}>
-            {references[0].exerciseName}: {formatLoad(references[0].load)} kg
+            {latestReference.exerciseName}: {formatLoad(latestReference.load)} kg
             {references.length > 1 ? ` · +${references.length - 1} exercícios` : ''}
           </Text>
         </View>
@@ -166,7 +167,7 @@ function formatLoad(load: number) {
 }
 
 function formatReferenceDate(value: string) {
-  const [year, month, day] = value.split('-').map(Number)
+  const [year = 1970, month = 1, day = 1] = value.split('-').map(Number)
   return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' })
     .format(new Date(year, month - 1, day))
     .replaceAll('.', '')

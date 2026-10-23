@@ -16,7 +16,7 @@ export const typography = {
   caption: { fontFamily: fontFamilies.text, fontSize: 13, fontWeight: '400' as const, lineHeight: 18 },
   captionSmall: { fontFamily: fontFamilies.text, fontSize: 12, fontWeight: '400' as const, lineHeight: 16 },
   monoLabel: { fontFamily: fontFamilies.data, fontSize: 12, fontWeight: '400' as const, lineHeight: 16 },
-  numberXL: { fontFamily: fontFamilies.data, fontSize: 64, fontWeight: '300' as const, lineHeight: 64, letterSpacing: -1.9 },
+  numberXL: { fontFamily: fontFamilies.data, fontSize: 72, fontWeight: '300' as const, lineHeight: 72, letterSpacing: -2.4 },
   numberLarge: { fontFamily: fontFamilies.data, fontSize: 32, fontWeight: '300' as const, lineHeight: 35, letterSpacing: -1 },
   numberMedium: { fontFamily: fontFamilies.data, fontSize: 20, fontWeight: '500' as const, lineHeight: 24 },
   numberSmall: { fontFamily: fontFamilies.data, fontSize: 14, fontWeight: '400' as const, lineHeight: 20 },

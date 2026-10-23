@@ -86,8 +86,8 @@ const highContrastWorkout: WorkoutColors = {
 function blend(background: string, foreground: string, opacity: number) {
   const channel = (base: number, top: number) => Math.round(base * (1 - opacity) + top * opacity)
   const hex = (value: string) => [1, 3, 5].map((start) => Number.parseInt(value.slice(start, start + 2), 16))
-  const [br, bg, bb] = hex(background)
-  const [fr, fg, fb] = hex(foreground)
+  const [br = 0, bg = 0, bb = 0] = hex(background)
+  const [fr = 0, fg = 0, fb = 0] = hex(foreground)
   return `#${[channel(br, fr), channel(bg, fg), channel(bb, fb)]
     .map((value) => value.toString(16).padStart(2, '0'))
     .join('')}`
@@ -135,13 +135,14 @@ function createPalette(tokens: SemanticPalette, dark: boolean): ThemeColors {
 }
 
 const monochromeLight = createPalette({
-  bg: '#FAFAFA', s1: '#FFFFFF', s2: '#F0F0F0', bd: '#E2E2E2',
-  tx: '#111111', t2: '#5C5C5C', mu: '#6E6E6E', ac: '#111111', on: '#FFFFFF', dg: '#B3261E',
+  bg: '#FFFFFF', s1: '#F5F5F5', s2: '#EBEBEB', bd: '#E3E3E3',
+  tx: '#0A0A0A', t2: '#525252', mu: '#6B6B6B', ac: '#0A0A0A', on: '#FFFFFF', dg: '#B3261E',
 }, false)
 
+// Preto verdadeiro (OLED). Camadas sobem em cinzas neutros; branco é a única "cor".
 const monochromeDark = createPalette({
-  bg: '#121212', s1: '#1A1A1A', s2: '#242424', bd: '#2B2B2B',
-  tx: '#F2F2F2', t2: '#A0A0A0', mu: '#8A8A8A', ac: '#F2F2F2', on: '#121212', dg: '#FF8A7A',
+  bg: '#000000', s1: '#0C0C0C', s2: '#171717', bd: '#242424',
+  tx: '#FAFAFA', t2: '#A3A3A3', mu: '#7A7A7A', ac: '#FAFAFA', on: '#000000', dg: '#FF7A6B',
 }, true)
 
 const violetLight = createPalette({

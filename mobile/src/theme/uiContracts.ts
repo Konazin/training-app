@@ -27,9 +27,9 @@ export function pressedChipColors(colors: ThemeColors) {
 
 export function feedbackColors(colors: ThemeColors, kind: 'info' | 'success' | 'warning' | 'error') {
   return {
-    info: { background: colors.s1, border: colors.s1, text: colors.t2 },
-    success: { background: colors.s1, border: colors.s1, text: colors.tx },
-    warning: { background: colors.s1, border: colors.s1, text: colors.tx },
+    info: { background: colors.s1, border: colors.bd, text: colors.t2 },
+    success: { background: colors.s1, border: colors.bd, text: colors.tx },
+    warning: { background: colors.s1, border: colors.bd, text: colors.tx },
     error: { background: colors.s1, border: colors.dg, text: colors.dg },
   }[kind]
 }

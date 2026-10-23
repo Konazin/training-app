@@ -76,7 +76,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   copy: { flex: 1 },
   title: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 16, fontWeight: '500' },
   detail: { color: colors.t2, fontFamily: fontFamilies.text, fontSize: 14, lineHeight: 20, marginTop: 5 },
-  status: { color: colors.mu, fontFamily: fontFamilies.data, fontSize: 11, marginTop: 7 },
+  status: { color: colors.mu, fontFamily: fontFamilies.data, fontSize: 12, marginTop: 7 },
   pressed: { opacity: 0.72 },
   disabled: { opacity: 0.55 },
 })

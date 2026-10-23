@@ -46,6 +46,7 @@ import { LibraryScreen } from './src/screens/LibraryScreen'
 import { HomeScreen } from './src/screens/HomeScreen'
 import { HistoryScreen } from './src/screens/HistoryScreen'
 import { MoreScreen } from './src/screens/MoreScreen'
+import { TabIcon } from './src/components/TabIcon'
 import { NutritionScreen } from './src/features/nutrition/NutritionScreen'
 import { NutritionAiSettingsScreen } from './src/features/nutrition/NutritionAiSettingsScreen'
 import { AppearanceSettingsScreen } from './src/screens/AppearanceSettingsScreen'
@@ -585,15 +586,7 @@ function MainTabs({
           textAlign: 'center',
         }}>{labels[route.name]}</Text>
       ),
-      tabBarIcon: ({ color, focused }) => {
-        const Icon = icons[route.name]
-        return (
-          <View style={{ alignItems: 'center', gap: 2, width: '100%' }}>
-            <View style={{ backgroundColor: focused ? colors.ac : 'transparent', height: 2, width: 24 }} />
-            <Icon color={color} size={24} strokeWidth={1.5} />
-          </View>
-        )
-      },
+      tabBarIcon: ({ color, focused }) => <TabIcon color={color} focused={focused} icon={icons[route.name]} />,
       tabBarItemStyle: { minHeight: 68, paddingBottom: 4, paddingTop: 4 },
       tabBarStyle: {
         backgroundColor: colors.tabBar,
