@@ -41,6 +41,7 @@ export function reorderControlColors(colors: ThemeColors, enabled: boolean) {
 export function formFieldColors(colors: ThemeColors, focused: boolean, error: boolean, disabled: boolean) {
   return {
     backgroundColor: disabled ? colors.s2 : colors.s1,
+    color: colors.tx,
     borderColor: error ? colors.dg : focused ? colors.ac : colors.mu,
     cursorColor: colors.ac,
     selectionColor: colors.focus,

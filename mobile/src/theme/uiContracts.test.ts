@@ -51,6 +51,7 @@ describe.each([
     expect(formFieldColors(colors, false, true, false).borderColor).toBe(colors.danger)
     expect(formFieldColors(colors, false, false, false).cursorColor).toBe(colors.primary)
     expect(formFieldColors(colors, false, false, false).selectionColor).toBe(colors.focus)
+    expect(formFieldColors(colors, false, false, false).color).toBe(colors.tx)
   })
 })
 
