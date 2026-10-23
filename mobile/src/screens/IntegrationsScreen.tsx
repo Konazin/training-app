@@ -1,82 +1,83 @@
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, Text, View } from 'react-native'
 import { ChevronRight, Dumbbell, Sparkles } from 'lucide-react-native'
 import { ScreenScrollView } from '../components/Screen'
 import { ScreenHeader } from '../components/ScreenHeader'
+import { PressableScale, Reveal } from '../motion'
 import type { RootStackParamList } from '../navigation/types'
-import { type ThemeColors, useTheme } from '../theme'
-import { fontFamilies } from '../theme/typography'
+import { shared, type ThemeColors, useTheme } from '../theme'
+import { typography } from '../theme/typography'
 import { listExerciseProviders } from '@training/training-domain'
 
 export function IntegrationsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>()
   const { colors } = useTheme()
   const styles = createStyles(colors)
+  const providers = listExerciseProviders()
   return (
     <ScreenScrollView>
-      <ScreenHeader
-        eyebrow="Conexões opcionais"
-        title="Integrações"
-        description="A rede só é usada quando você inicia uma consulta."
-      />
-      {listExerciseProviders().map((provider) => (
-        <Pressable
-          key={provider.id}
+      <Reveal>
+        <ScreenHeader
+          title="Integrações"
+          description="A rede só é usada quando você inicia uma consulta."
+        />
+      </Reveal>
+      {providers.map((provider, index) => {
+        const supported = provider.supportState === 'SUPPORTED'
+        return (
+          <Reveal index={index + 1} key={provider.id}>
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !supported }}
+              disabled={!supported}
+              onPress={() => {
+                if (provider.integrationRoute === 'WGER_CATALOG' || provider.integrationRoute === 'EXERCISEDB_CATALOG') {
+                  navigation.navigate('WgerIntegration')
+                }
+              }}
+              pressedScale={0.99}
+              style={[styles.card, !supported && styles.disabled]}
+            >
+              <View style={styles.logo}><Dumbbell color={colors.tx} size={20} strokeWidth={1.7} /></View>
+              <View style={styles.copy}>
+                <Text style={styles.title}>Catálogo {provider.name}</Text>
+                <Text style={styles.detail}>Busca exercícios públicos e salva uma cópia no aparelho.</Text>
+                <Text style={styles.status}>
+                  {supported ? 'Manual · Requer internet · Sem sincronização automática' : 'Indisponível no momento'}
+                </Text>
+              </View>
+              <ChevronRight color={colors.mu} size={20} strokeWidth={1.7} />
+            </PressableScale>
+          </Reveal>
+        )
+      })}
+      <Reveal index={providers.length + 1}>
+        <PressableScale
           accessibilityRole="button"
-          accessibilityState={{ disabled: provider.supportState !== 'SUPPORTED' }}
-          disabled={provider.supportState !== 'SUPPORTED'}
-          onPress={() => {
-            if (provider.integrationRoute === 'WGER_CATALOG' || provider.integrationRoute === 'EXERCISEDB_CATALOG') {
-              navigation.navigate('WgerIntegration')
-            }
-          }}
-          style={({ pressed }) => [styles.card, provider.supportState !== 'SUPPORTED' && styles.disabled, pressed && styles.pressed]}
+          onPress={() => navigation.navigate('NutritionAiSettings')}
+          pressedScale={0.99}
+          style={styles.card}
         >
-          <View style={styles.logo}><Dumbbell color={colors.tx} size={20} strokeWidth={1.7} /></View>
+          <View style={styles.logo}><Sparkles color={colors.tx} size={20} strokeWidth={1.7} /></View>
           <View style={styles.copy}>
-            <Text style={styles.title}>Catálogo {provider.name}</Text>
-            <Text style={styles.detail}>Busca exercícios públicos e salva uma cópia no aparelho.</Text>
-            <Text style={styles.status}>
-              {provider.supportState === 'SUPPORTED'
-                ? 'manual · usa internet · salva localmente'
-                : 'indisponível no momento'}
-            </Text>
+            <Text style={styles.title}>Gemini · IA da Nutrição</Text>
+            <Text style={styles.detail}>Chave pessoal para estimar refeições por foto e sugerir cardápios.</Text>
+            <Text style={styles.status}>Opcional · Requer internet · Chave guardada com segurança no aparelho</Text>
           </View>
           <ChevronRight color={colors.mu} size={20} strokeWidth={1.7} />
-        </Pressable>
-      ))}
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => navigation.navigate('NutritionAiSettings')}
-        style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-      >
-        <View style={styles.logo}><Sparkles color={colors.tx} size={20} strokeWidth={1.7} /></View>
-        <View style={styles.copy}>
-          <Text style={styles.title}>Gemini · IA da Nutrição</Text>
-          <Text style={styles.detail}>Chave pessoal para estimar refeições por foto e sugerir cardápios.</Text>
-          <Text style={styles.status}>opcional · usa internet · chave no armazenamento seguro</Text>
-        </View>
-        <ChevronRight color={colors.mu} size={20} strokeWidth={1.7} />
-      </Pressable>
+        </PressableScale>
+      </Reveal>
     </ScreenScrollView>
   )
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  card: { alignItems: 'center', borderBottomColor: colors.bd, borderBottomWidth: 1, flexDirection: 'row', gap: 14, minHeight: 92, paddingVertical: 16 },
-  logo: {
-    alignItems: 'center',
-    backgroundColor: colors.s2,
-    borderRadius: 12,
-    height: 48,
-    justifyContent: 'center',
-    width: 48,
-  },
+  card: { alignItems: 'center', borderBottomColor: colors.bd, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: 16, minHeight: 96, paddingVertical: 16 },
+  logo: { alignItems: 'center', backgroundColor: colors.s1, borderRadius: shared.radii.md, height: 48, justifyContent: 'center', width: 48 },
   copy: { flex: 1 },
-  title: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 16, fontWeight: '500' },
-  detail: { color: colors.t2, fontFamily: fontFamilies.text, fontSize: 14, lineHeight: 20, marginTop: 5 },
-  status: { color: colors.mu, fontFamily: fontFamilies.data, fontSize: 12, marginTop: 7 },
-  pressed: { opacity: 0.72 },
+  title: { ...typography.titleSmall, color: colors.tx },
+  detail: { ...typography.bodySmall, color: colors.t2, marginTop: 4 },
+  status: { ...typography.captionSmall, color: colors.mu, marginTop: 6 },
   disabled: { opacity: 0.55 },
 })

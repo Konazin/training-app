@@ -18,15 +18,8 @@ jest.mock('@react-navigation/native', () => ({
   useRoute: () => mockRoute,
 }))
 jest.mock('../../theme', () => ({
-  shared: {
-    pagePadding: 20,
-    spacing: { sm: 8, lg: 16 },
-    touchTarget: { minimum: 48 },
-  },
+  shared: require('../../theme/tokens').shared,
   useTheme: () => ({ colors: new Proxy({}, { get: () => '#000000' }) }),
-}))
-jest.mock('../../theme/typography', () => ({
-  typography: { body: {}, bodySmall: {}, caption: {}, label: {}, title: {} },
 }))
 jest.mock('../../components/Screen', () => {
   const { View } = require('react-native')

@@ -1,7 +1,7 @@
 import type { ExerciseDefinition } from '@training/training-domain'
 import { filterExerciseLibrary } from '../../exercise-library/libraryState'
 
-export type QuickFilter = 'ALL' | 'FAVORITES' | 'RECENTS' | 'BODYWEIGHT'
+export type QuickFilter = 'ALL' | 'FAVORITES' | 'RECENTS' | 'MEDIA' | 'BODYWEIGHT'
 
 export interface Facets {
   source: string | null

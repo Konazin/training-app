@@ -28,7 +28,7 @@ jest.mock('@react-navigation/native', () => ({
 jest.mock('../theme', () => ({
   appearancePreferenceIds: ['SYSTEM', 'LIGHT', 'DARK'],
   motionPreferenceIds: ['SYSTEM', 'FULL', 'REDUCED', 'OFF'],
-  shared: { spacing: { sm: 8, lg: 16 }, touchTarget: { minimum: 48 } },
+  shared: require('../theme/tokens').shared,
   themePresetIds: ['DARK_BLUE', 'MONOCHROME', 'DRACULA', 'WHITE_BLUE'],
   useTheme: () => ({
     colors: new Proxy({}, { get: () => '#000000' }),
@@ -36,9 +36,6 @@ jest.mock('../theme', () => ({
   }),
 }))
 jest.mock('../theme/haptics', () => ({ triggerHaptic: jest.fn() }))
-jest.mock('../theme/typography', () => ({
-  typography: { body: {}, bodySmall: {}, caption: {}, label: {}, title: {} },
-}))
 jest.mock('../components/Screen', () => {
   const { View } = require('react-native')
   return { ScreenScrollView: View }

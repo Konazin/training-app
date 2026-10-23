@@ -18,7 +18,6 @@ import { ChevronRight, Heart, Plus } from 'lucide-react-native'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import {
-  EXERCISE_PACKS,
   recommendedPackEnabled,
   type ExerciseDefinition,
   type ExerciseDefinitionInput,
@@ -28,22 +27,20 @@ import { FormField } from '../../components/FormField'
 import { PrimaryButton } from '../../components/PrimaryButton'
 import { Screen } from '../../components/Screen'
 import { ScreenHeader } from '../../components/ScreenHeader'
-import { SelectableChip } from '../../components/SelectableChip'
-import { ThemedTextInput } from '../../components/ThemedTextInput'
+import { SegmentedControl } from '../../components/ui'
 import type { RootStackParamList } from '../../navigation/types'
 import { shared, type ThemeColors, useTheme } from '../../theme'
 import { fontFamilies } from '../../theme/typography'
 import { ExercisePlaceholder } from './ExercisePlaceholder'
 import {
-  filterExerciseLibrary,
   exerciseMediaLabel,
-  exerciseCategoryLabel,
   groupExercisesByMuscle,
   libraryEmptyMessage,
   resolveExerciseMedia,
-  type LibraryFilter,
 } from './libraryState'
-import { PressableScale } from '../../motion'
+import { PressableScale, Reveal } from '../../motion'
+import { ExerciseFilters, useExerciseFilters } from './ExerciseFilters'
+import { canonicalMuscle, equipmentLabel } from './exerciseTaxonomy'
 
 export function ExerciseLibraryScreen({
   exercises,
@@ -73,67 +70,34 @@ export function ExerciseLibraryScreen({
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>()
   const { colors } = useTheme()
   const styles = createStyles(colors)
-  const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<LibraryFilter>({ kind: 'ALL' })
   const [viewMode, setViewMode] = useState<'LIST' | 'MUSCLE'>('LIST')
   const [editing, setEditing] = useState<ExerciseDefinition | null | 'new'>(null)
-  const filtered = useMemo(() => {
-    return filterExerciseLibrary(exercises, query, filter)
-  }, [exercises, filter, query])
-  const muscles = useMemo(() => groupExercisesByMuscle(exercises), [exercises])
-  const equipment = useMemo(() => [...new Set(exercises.map((item) => item.equipment))].sort(), [exercises])
-  const categories = useMemo(() => [...new Set(exercises.map((item) => item.category))].sort(), [exercises])
-  const sources = useMemo(() => [...new Set(exercises.map((item) => item.source))].sort(), [exercises])
-  const emptyMessage = libraryEmptyMessage(exercises.length, query, filter)
+  const available = useMemo(() => exercises.filter((exercise) => !exercise.archived), [exercises])
+  const filters = useExerciseFilters(available)
+  const { filtered, query, active } = filters
+  const emptyMessage = libraryEmptyMessage(exercises.length, query, active ? { kind: 'MUSCLE', value: '' } : { kind: 'ALL' })
   const sections = useMemo(() => groupExercisesByMuscle(filtered)
     .map((group) => ({ title: group.muscle, data: group.exercises })), [filtered])
   const listHeader = <>
-    <ScreenHeader
-      eyebrow="Catálogo no aparelho"
-      title="Biblioteca de exercícios"
-      description="Crie, edite e use exercícios sem conexão."
-    />
-    <ThemedTextInput
-      accessibilityLabel="Buscar exercício"
-      value={query}
-      onChangeText={setQuery}
-      placeholder="Nome, músculo ou equipamento"
-      style={styles.search}
-    />
-    <View accessibilityLabel="Modo de visualização" style={styles.filters}>
-      <SelectableChip label="Lista" selected={viewMode === 'LIST'} onPress={() => setViewMode('LIST')} />
-      <SelectableChip label="Por músculo" selected={viewMode === 'MUSCLE'} onPress={() => setViewMode('MUSCLE')} />
+    <Reveal>
+      <ScreenHeader
+        title="Biblioteca de exercícios"
+        description="Crie, edite e use exercícios sem conexão."
+      />
+    </Reveal>
+    <ExerciseFilters exercises={available} filters={filters} />
+    <View accessibilityLabel="Modo de visualização" style={styles.viewMode}>
+      <SegmentedControl
+        label="Modo de visualização"
+        onChange={setViewMode}
+        options={[{ value: 'LIST', label: 'Lista' }, { value: 'MUSCLE', label: 'Por músculo' }]}
+        value={viewMode}
+      />
     </View>
-    <View style={styles.filters}>
-      <FilterChip label="Todos" filter={{ kind: 'ALL' }} selected={filter} onSelect={setFilter} />
-      <FilterChip label="Favoritos" filter={{ kind: 'FAVORITES' }} selected={filter} onSelect={setFilter} />
-      <FilterChip label="Recentes" filter={{ kind: 'RECENTS' }} selected={filter} onSelect={setFilter} />
-      <FilterChip label="Com mídia" filter={{ kind: 'MEDIA' }} selected={filter} onSelect={setFilter} />
-      <FilterChip label="Peso corporal" filter={{ kind: 'BODYWEIGHT' }} selected={filter} onSelect={setFilter} />
-    </View>
-    <FilterGroup title="pacotes">
-      {EXERCISE_PACKS.map((pack) => (
-        <FilterChip key={pack.id} label={pack.name} filter={{ kind: 'PACK', value: pack.id }} selected={filter} onSelect={setFilter} />
-      ))}
-    </FilterGroup>
-    <FilterGroup title="grupo muscular">
-      {muscles.map((group) => (
-        <FilterChip key={group.muscle} label={`${group.muscle} (${group.exercises.length})`} filter={{ kind: 'MUSCLE', value: group.muscle }} selected={filter} onSelect={setFilter} />
-      ))}
-    </FilterGroup>
-    <FilterGroup title="equipamento">
-      {equipment.map((value) => <FilterChip key={value} label={value} filter={{ kind: 'EQUIPMENT', value }} selected={filter} onSelect={setFilter} />)}
-    </FilterGroup>
-    <FilterGroup title="categoria">
-      {categories.map((value) => <FilterChip key={value} label={exerciseCategoryLabel(value)} filter={{ kind: 'CATEGORY', value }} selected={filter} onSelect={setFilter} />)}
-    </FilterGroup>
-    <FilterGroup title="fonte">
-      {sources.map((value) => <FilterChip key={value} label={sourceLabel(value)} filter={{ kind: 'SOURCE', value }} selected={filter} onSelect={setFilter} />)}
-    </FilterGroup>
   </>
   const empty = loading && !exercises.length
     ? <SkeletonList />
-    : !exercises.length && !query && filter.kind === 'ALL'
+    : !exercises.length && !query && !active
       ? <EmptyLibrary
           approvedCount={WGER_STARTER_PACK.length}
           onImportStarterPack={onImportStarterPack}
@@ -360,7 +324,7 @@ function ExerciseCard({
   return (
     <View style={styles.card}>
       <Pressable
-        accessibilityLabel={`${exercise.name}, ${exercise.primaryMuscleGroup}, ${exercise.equipment}, fonte ${sourceLabel(exercise.source)}`}
+        accessibilityLabel={`${exercise.name}, ${canonicalMuscle(exercise.primaryMuscleGroup)}, ${equipmentLabel(exercise.equipment)}, fonte ${sourceLabel(exercise.source)}`}
         accessibilityRole="button"
         onLongPress={onEdit}
         onPress={onOpen}
@@ -377,7 +341,7 @@ function ExerciseCard({
             />}
         <View style={styles.cardBody}>
           <Text style={styles.name}>{exercise.name}</Text>
-          <Text style={styles.meta}>{exercise.primaryMuscleGroup} · {exercise.equipment}</Text>
+          <Text style={styles.meta}>{canonicalMuscle(exercise.primaryMuscleGroup)} · {equipmentLabel(exercise.equipment)}</Text>
           <Text style={styles.source}>{sourceLabel(exercise.source)} · {exerciseMediaLabel(exercise)}</Text>
         </View>
         <ChevronRight color={colors.mu} size={20} strokeWidth={1.7} />
@@ -400,35 +364,6 @@ function ExerciseCard({
   )
 }
 
-function FilterChip({
-  label,
-  filter,
-  selected,
-  onSelect,
-}: {
-  label: string
-  filter: LibraryFilter
-  selected: LibraryFilter
-  onSelect: (filter: LibraryFilter) => void
-}) {
-  const active = filter.kind === selected.kind
-    && (!('value' in filter) || ('value' in selected && filter.value === selected.value))
-  return <SelectableChip label={label} selected={active} onPress={() => onSelect(active ? { kind: 'ALL' } : filter)} />
-}
-
-function FilterGroup({ title, children }: { title: string; children: React.ReactNode }) {
-  const { colors } = useTheme()
-  const styles = createStyles(colors)
-  return (
-    <View style={styles.filterGroup}>
-      <Text style={styles.filterTitle}>{title}</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
-        {children}
-      </ScrollView>
-    </View>
-  )
-}
-
 function SkeletonList() {
   const { colors } = useTheme()
   const styles = createStyles(colors)
@@ -446,11 +381,10 @@ function sourceLabel(source: ExerciseDefinition['source']) {
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   screen: { flex: 1 },
   content: { paddingHorizontal: shared.pagePadding, paddingBottom: 72 },
-  search: { backgroundColor: colors.s1, borderColor: colors.mu, borderRadius: 12, borderWidth: 1, color: colors.tx, fontFamily: fontFamilies.text, fontSize: 15, marginBottom: 10, minHeight: 48, paddingHorizontal: 12 },
-  filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
-  card: { alignItems: 'center', borderBottomColor: colors.bd, borderBottomWidth: 1, flexDirection: 'row', minHeight: 76 },
+  viewMode: { marginBottom: 12 },
+  card: { alignItems: 'center', borderBottomColor: colors.bd, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', minHeight: 76 },
   cardMain: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 12, minHeight: 76, paddingVertical: 10 },
-  icon: { backgroundColor: colors.s2, borderRadius: 8, height: 48, width: 48 },
+  icon: { backgroundColor: colors.s2, borderRadius: 12, height: 48, width: 48 },
   cardBody: { flex: 1 },
   name: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 16, fontWeight: '500' },
   meta: { color: colors.t2, fontFamily: fontFamilies.text, fontSize: 14, marginTop: 4 },
@@ -459,25 +393,22 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   editButton: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 },
   favorite: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 },
   empty: { color: colors.t2, fontFamily: fontFamilies.text, padding: 30, textAlign: 'center' },
-  emptyCard: { borderLeftColor: colors.bd, borderLeftWidth: 2, gap: 12, marginVertical: 16, padding: 16 },
+  emptyCard: { backgroundColor: colors.s1, borderRadius: shared.radii.lg, gap: 12, marginVertical: 16, padding: 20 },
   emptyTitle: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 22, fontWeight: '500' },
   emptyCopy: { color: colors.t2, fontFamily: fontFamilies.text, fontSize: 15, lineHeight: 22 },
   emptyHint: { color: colors.mu, fontFamily: fontFamilies.text, fontSize: 12, lineHeight: 18 },
   continue: { alignItems: 'center', minHeight: 48, justifyContent: 'center' },
   continueText: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 14, fontWeight: '500', textDecorationLine: 'underline' },
-  fab: { alignItems: 'center', backgroundColor: colors.ac, borderRadius: 12, bottom: 24, height: 56, justifyContent: 'center', position: 'absolute', right: 20, width: 56 },
+  fab: { alignItems: 'center', backgroundColor: colors.ac, borderRadius: 28, bottom: 24, height: 56, justifyContent: 'center', position: 'absolute', right: 20, width: 56 },
   backdrop: { backgroundColor: colors.overlay, flex: 1, justifyContent: 'flex-end' },
-  safeSheet: { backgroundColor: colors.s1, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '92%' },
+  safeSheet: { backgroundColor: colors.s1, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '92%' },
   sheet: { padding: 20, paddingBottom: 30 },
   sheetTitle: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 22, fontWeight: '500', marginBottom: 20 },
   cancel: { color: colors.t2, fontFamily: fontFamilies.text, fontSize: 12, fontWeight: '500', padding: 15, textAlign: 'center' },
   archive: { color: colors.dg, fontFamily: fontFamilies.text, fontSize: 12, fontWeight: '500', paddingTop: 18, textAlign: 'center' },
   error: { color: colors.dg, fontFamily: fontFamilies.text, fontSize: 12, marginBottom: 10 },
   pressed: { opacity: 0.72 },
-  filterGroup: { marginBottom: 12 },
-  filterTitle: { color: colors.t2, fontFamily: fontFamilies.data, fontSize: 12, fontWeight: '400', marginBottom: 6 },
   muscleHeader: { backgroundColor: colors.bg, color: colors.tx, fontFamily: fontFamilies.text, fontSize: 18, fontWeight: '500', paddingBottom: 8, paddingTop: 14 },
-  filterScroll: { gap: 8, paddingRight: 12 },
   skeleton: { alignItems: 'center', borderBottomColor: colors.bd, borderBottomWidth: 1, flexDirection: 'row', gap: 12, marginBottom: 1, minHeight: 76, paddingVertical: 12 },
   skeletonIcon: { backgroundColor: colors.s2, borderRadius: 8, height: 48, width: 48 },
   skeletonBody: { backgroundColor: colors.s2, borderRadius: 4, height: 16, width: '60%' },

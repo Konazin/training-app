@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Alert, StyleSheet, Text, View } from 'react-native'
 import type { ReactNode } from 'react'
 import { Archive, BookOpen, ChevronRight, Download, Globe, Lightbulb, Palette, Trash2, Upload } from 'lucide-react-native'
 import { ScreenScrollView } from '../components/Screen'
+import { PressableScale, Reveal } from '../motion'
 import { ScreenHeader } from '../components/ScreenHeader'
 import { shared, type ThemeColors, useTheme } from '../theme'
 import { triggerHaptic } from '../theme/haptics'
@@ -69,12 +70,13 @@ export function MoreScreen({
   )
   return (
     <ScreenScrollView includeBottomInset={false}>
-      <ScreenHeader
-        eyebrow="Local e privado"
-        title="Mais"
-        description="Backups e dados guardados neste aparelho. Catálogos externos são opcionais."
-      />
-      {!!visibleNotices.length && <Text style={styles.section}>avisos</Text>}
+      <Reveal>
+        <ScreenHeader
+          title="Mais"
+          description="Backups e dados guardados neste aparelho. Catálogos externos são opcionais."
+        />
+      </Reveal>
+      {!!visibleNotices.length && <Text accessibilityRole="header" style={styles.section}>Avisos</Text>}
       {visibleNotices.map((notice) => (
         <View accessibilityLiveRegion="polite" key={notice.id} style={styles.notice}>
           <Text style={styles.noticeText}>{notice.message}</Text>
@@ -85,7 +87,7 @@ export function MoreScreen({
           />
         </View>
       ))}
-      <Text style={styles.section}>aparência</Text>
+      <Text accessibilityRole="header" style={styles.section}>Aparência</Text>
       <MenuItem
         icon={<Palette color={colors.tx} size={20} strokeWidth={1.5} />}
         label="Aparência e acessibilidade"
@@ -100,7 +102,7 @@ export function MoreScreen({
         onPress={onOnboarding}
         disabled={busy}
       />
-      <Text style={styles.section}>conteúdo</Text>
+      <Text accessibilityRole="header" style={styles.section}>Conteúdo</Text>
       <MenuItem icon={<BookOpen color={colors.tx} size={20} strokeWidth={1.5} />} label="Biblioteca de exercícios" detail="Criar e editar" onPress={onLibrary} disabled={busy} />
       <MenuItem
         icon={<Trash2 color={colors.tx} size={20} strokeWidth={1.5} />}
@@ -111,7 +113,7 @@ export function MoreScreen({
         badge={trashCount}
         accessibilityLabel={trashBadgeAccessibilityLabel(trashCount)}
       />
-      <Text style={styles.section}>integrações</Text>
+      <Text accessibilityRole="header" style={styles.section}>Integrações</Text>
       <MenuItem
         icon={<Globe color={colors.tx} size={20} strokeWidth={1.5} />}
         label="Fontes de exercícios"
@@ -119,10 +121,10 @@ export function MoreScreen({
         onPress={onIntegrations}
         disabled={busy}
       />
-      <Text style={styles.section}>backup</Text>
+      <Text accessibilityRole="header" style={styles.section}>Backup</Text>
       <MenuItem icon={<Download color={colors.tx} size={20} strokeWidth={1.5} />} label="Exportar backup" detail="Schema 3 · arquivo identificado por data" onPress={onExport} disabled={busy} />
       <MenuItem icon={<Upload color={colors.tx} size={20} strokeWidth={1.5} />} label="Importar backup" detail="Validar e restaurar" onPress={onImport} disabled={busy} />
-      <Text style={styles.section}>backups automáticos</Text>
+      <Text accessibilityRole="header" style={styles.section}>Backups automáticos</Text>
       {!automaticBackups.length && <Text style={styles.note}>Nenhum backup automático criado.</Text>}
       {automaticBackups.map((backup) => (
         <View key={backup.uri} style={styles.backup}>
@@ -169,7 +171,7 @@ export function MoreScreen({
           danger
         />
       )}
-      <Text style={styles.section}>manutenção</Text>
+      <Text accessibilityRole="header" style={styles.section}>Manutenção</Text>
       <MenuItem icon={<Trash2 color={colors.dg} size={20} strokeWidth={1.5} />} label="Apagar todos os dados" detail="Exige confirmação" onPress={confirmErase} disabled={busy} danger />
       <Text style={styles.note}>
         Os dados principais ficam no SQLite. Ao desinstalar o aplicativo, eles são apagados; exporte backups regularmente.
@@ -187,9 +189,9 @@ function SmallAction({ label, disabled, danger, onPress }: {
   const { colors } = useTheme()
   const styles = createStyles(colors)
   return (
-    <Pressable accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.smallAction, pressed && styles.pressed]}>
+    <PressableScale accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={styles.smallAction}>
       <Text style={[styles.smallActionText, danger && styles.danger]}>{label}</Text>
-    </Pressable>
+    </PressableScale>
   )
 }
 
@@ -230,7 +232,7 @@ function MenuItem({
   const { colors } = useTheme()
   const styles = createStyles(colors)
   return (
-    <Pressable accessibilityLabel={accessibilityLabel} accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} style={({ pressed }) => [styles.item, disabled && styles.disabled, pressed && styles.pressed]} onPress={onPress}>
+    <PressableScale accessibilityLabel={accessibilityLabel} accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} pressedScale={0.99} style={[styles.item, disabled && styles.disabled]} onPress={onPress}>
       {icon && <View style={styles.icon}>{icon}</View>}
       <View style={styles.itemCopy}>
         <Text style={[styles.label, danger && styles.danger]}>{label}</Text>
@@ -244,28 +246,28 @@ function MenuItem({
         )}
         <ChevronRight color={colors.mu} size={18} strokeWidth={1.5} />
       </View>
-    </Pressable>
+    </PressableScale>
   )
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  section: { ...typography.monoLabel, color: colors.t2, marginBottom: 4, marginTop: 24 },
-  item: { alignItems: 'center', borderBottomColor: colors.bd, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: 12, minHeight: 56, paddingVertical: 8 },
+  section: { ...typography.caption, color: colors.t2, marginBottom: 4, marginTop: 32 },
+  item: { alignItems: 'center', borderBottomColor: colors.bd, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: 12, minHeight: 64, paddingVertical: 8 },
   icon: { alignItems: 'center', justifyContent: 'center', width: 24 },
   itemCopy: { flex: 1, minWidth: 0 },
   disabled: { opacity: 0.5 },
-  label: { ...typography.bodySmall, color: colors.tx, flexShrink: 1 },
+  label: { ...typography.body, color: colors.tx, flexShrink: 1 },
   detail: { ...typography.caption, color: colors.t2, flexShrink: 1, marginTop: 2 },
   danger: { color: colors.dg },
   trailing: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   badge: { alignItems: 'center', backgroundColor: colors.ac, borderRadius: 12, justifyContent: 'center', minHeight: 24, minWidth: 24, paddingHorizontal: 7 },
   badgeText: { color: colors.on, ...typography.captionSmall },
   note: { ...typography.bodySmall, color: colors.t2, marginTop: 18 },
-  notice: { backgroundColor: colors.s1, borderColor: colors.bd, borderRadius: 12, borderWidth: 1, gap: 10, marginBottom: 8, padding: 12 },
+  notice: { backgroundColor: colors.s1, borderRadius: shared.radii.md, gap: 10, marginBottom: 8, padding: 16 },
   noticeText: { ...typography.bodySmall, color: colors.tx },
   backup: { borderBottomColor: colors.bd, borderBottomWidth: StyleSheet.hairlineWidth, gap: 8, marginBottom: 8, paddingVertical: 12 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-  smallAction: { alignItems: 'center', borderColor: colors.mu, borderRadius: 12, borderWidth: 1, justifyContent: 'center', minHeight: shared.touchTarget.minimum, paddingHorizontal: 12 },
+  smallAction: { alignItems: 'center', borderColor: colors.mu, borderRadius: shared.radii.md, borderWidth: 1, justifyContent: 'center', minHeight: shared.touchTarget.minimum, paddingHorizontal: 12 },
   smallActionText: { ...typography.labelSmall, color: colors.tx },
   pressed: { opacity: 0.72 },
 })

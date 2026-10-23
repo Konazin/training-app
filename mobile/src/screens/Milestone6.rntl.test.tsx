@@ -11,14 +11,11 @@ jest.mock('@react-navigation/native', () => ({
   useNavigation: () => mockNavigation,
 }))
 jest.mock('../theme', () => ({
-  shared: { touchTarget: { minimum: 48 } },
+  shared: require('../theme/tokens').shared,
   useTheme: () => ({
     colors: new Proxy({}, { get: () => '#111111' }),
     preferences: { hapticsEnabled: false },
   }),
-}))
-jest.mock('../theme/typography', () => ({
-  typography: { body: {}, bodySmall: {}, caption: {}, labelSmall: {} },
 }))
 jest.mock('../theme/haptics', () => ({ triggerHaptic: jest.fn() }))
 jest.mock('../components/Screen', () => {
