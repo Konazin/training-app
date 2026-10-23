@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Check } from 'lucide-react-native'
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
@@ -12,6 +12,7 @@ import type { RootStackParamList } from '../../../navigation/types'
 import { useUnsavedChangesGuard } from '../../../navigation/useUnsavedChangesGuard'
 import type { RestActivityInput, TrainingPlan } from '../model/trainingPlan'
 import { shared, type ThemeColors, useTheme } from '../../../theme'
+import { PressableScale } from '../../../motion'
 
 const categories = [
   'caminhada',
@@ -109,17 +110,17 @@ export function RestActivityEditorScreen({
           onChangeText={setDuration}
           keyboardType="number-pad"
         />
-        <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{ checked: optional }} style={styles.checkboxRow} onPress={() => setOptional((current) => !current)}>
+        <PressableScale accessibilityRole="checkbox" accessibilityState={{ checked: optional }} style={styles.checkboxRow} onPress={() => setOptional((current) => !current)}>
           <View style={[styles.checkbox, optional && styles.checkboxActive]}>
             {optional && <Check color={colors.on} size={16} strokeWidth={2} />}
           </View>
           <Text style={styles.checkboxLabel}>Atividade opcional</Text>
-        </TouchableOpacity>
+        </PressableScale>
         {!!(formError || errors[key]) && <Text style={styles.error}>{formError || errors[key]}</Text>}
       </View>
     </ScreenScrollView>
     <BottomActionBar>
-      <TouchableOpacity
+      <PressableScale
         accessibilityRole="button"
         accessibilityState={{ disabled: busyKeys.has(key), busy: busyKeys.has(key) }}
         disabled={busyKeys.has(key)}
@@ -127,7 +128,7 @@ export function RestActivityEditorScreen({
         style={[styles.saveButton, busyKeys.has(key) && styles.disabled]}
       >
         <Text style={styles.saveButtonText}>{busyKeys.has(key) ? 'Salvando…' : 'Salvar atividade'}</Text>
-      </TouchableOpacity>
+      </PressableScale>
     </BottomActionBar>
     </>
   )

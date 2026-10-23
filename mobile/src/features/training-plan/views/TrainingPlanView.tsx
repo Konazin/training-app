@@ -1,12 +1,16 @@
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
-import { Check, ChevronRight, Plus } from 'lucide-react-native'
+import { ChevronRight, ClipboardList, Play, Plus } from 'lucide-react-native'
+import { PrimaryButton } from '../../../components/PrimaryButton'
 import { ScreenHeader } from '../../../components/ScreenHeader'
+import { SelectableChip } from '../../../components/SelectableChip'
+import { EmptyState } from '../../../components/ui'
+import { PressableScale, Reveal } from '../../../motion'
 import { ScreenScrollView } from '../../../components/Screen'
 import type { RootStackParamList } from '../../../navigation/types'
 import type { TrainingPlan } from '../model/trainingPlan'
-import { type ThemeColors, useTheme } from '../../../theme'
+import { shared, type ThemeColors, useTheme } from '../../../theme'
 import { typography } from '../../../theme/typography'
 
 const weekday = {
@@ -39,112 +43,111 @@ export function TrainingPlanView({
 
   return (
     <ScreenScrollView includeBottomInset={false} showsVerticalScrollIndicator={false}>
-      <ScreenHeader
-        eyebrow="Planejamento semanal"
-        title="Ficha"
-        description="Escolha uma ficha e organize os dias de treino."
-        action={(
-          <TouchableOpacity
-            accessibilityLabel="Criar ficha"
-            accessibilityRole="button"
-            style={styles.headerButton}
-            onPress={() => navigation.navigate('TrainingPlanEditor')}
-          >
-            <Plus color={colors.on} size={20} strokeWidth={1.8} />
-          </TouchableOpacity>
-        )}
-      />
-      <TouchableOpacity
-        accessibilityRole="button"
-        style={styles.archivedLink}
-        onPress={() => navigation.navigate('ArchivedTrainingPlans')}
-      >
-        <Text style={styles.archivedLinkText}>Ver fichas arquivadas</Text>
-      </TouchableOpacity>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.planScroll}>
-        {visiblePlans.map((plan) => (
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityState={{ selected: selectedPlan?.id === plan.id }}
-            key={plan.id}
-            style={[styles.planChip, selectedPlan?.id === plan.id && styles.planChipActive]}
-            onPress={() => onSelect(plan.id)}
-          >
-            <Text style={[styles.planName, selectedPlan?.id === plan.id && styles.inverse]}>
-              {plan.name}
-            </Text>
-            <View style={styles.planMetaRow}>
-              {selectedPlan?.id === plan.id && <Check color={colors.on} size={13} />}
-              <Text style={[styles.planMeta, selectedPlan?.id === plan.id && styles.inverse]}>
-                {plan.active ? 'Ativa' : selectedPlan?.id === plan.id ? 'Selecionada' : 'Selecionar'}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      <Reveal>
+        <ScreenHeader
+          title="Ficha"
+          description="Escolha uma ficha e organize os dias de treino."
+          action={(
+            <PressableScale
+              accessibilityLabel="Criar ficha"
+              accessibilityRole="button"
+              style={styles.headerButton}
+              onPress={() => navigation.navigate('TrainingPlanEditor')}
+            >
+              <Plus color={colors.on} size={22} strokeWidth={1.8} />
+            </PressableScale>
+          )}
+        />
+      </Reveal>
+      {visiblePlans.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.planScroll} contentContainerStyle={styles.planChips}>
+          {visiblePlans.map((plan) => (
+            <SelectableChip
+              key={plan.id}
+              label={plan.active ? `${plan.name} · ativa` : plan.name}
+              selected={selectedPlan?.id === plan.id}
+              onPress={() => onSelect(plan.id)}
+            />
+          ))}
+        </ScrollView>
+      )}
 
       {!selectedPlan ? (
-        <View style={styles.empty}>
-          <Text style={styles.emptyTitle}>{loading ? 'Carregando fichas…' : 'Nenhuma ficha disponível'}</Text>
-          {!loading && (
-            <TouchableOpacity accessibilityRole="button" style={styles.primary} onPress={() => navigation.navigate('TrainingPlanEditor')}>
-              <Text style={styles.primaryText}>Criar ficha</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        <EmptyState
+          action={!loading ? <PrimaryButton label="Criar ficha" onPress={() => navigation.navigate('TrainingPlanEditor')} /> : undefined}
+          description={loading ? 'Um instante…' : 'Crie uma ficha para organizar a semana de treino.'}
+          icon={<ClipboardList color={colors.tx} size={24} strokeWidth={1.5} />}
+          title={loading ? 'Carregando fichas…' : 'Nenhuma ficha disponível'}
+        />
       ) : (
         <>
-          <View style={styles.planHeader}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.eyebrow}>{selectedPlan.category} · {selectedPlan.difficulty}</Text>
-              <Text style={styles.title}>{selectedPlan.name}</Text>
-              {!!selectedPlan.description && <Text style={styles.description}>{selectedPlan.description}</Text>}
-            </View>
-            <TouchableOpacity
-              accessibilityRole="button"
-              style={styles.secondary}
-              onPress={() => navigation.navigate('TrainingPlanEditor', { planId: selectedPlan.id })}
-            >
-              <Text style={styles.secondaryText}>Editar</Text>
-            </TouchableOpacity>
-          </View>
-
-          {selectedPlan.days.map((day) => (
-            <View key={day.id} style={styles.dayCard}>
-              <TouchableOpacity
+          <Reveal index={1}>
+            <View style={styles.planHeader}>
+              <View style={styles.planCopy}>
+                <Text style={styles.title}>{selectedPlan.name}</Text>
+                <Text style={styles.planMeta}>{selectedPlan.category} · {selectedPlan.difficulty}</Text>
+                {!!selectedPlan.description && <Text style={styles.description}>{selectedPlan.description}</Text>}
+              </View>
+              <PressableScale
                 accessibilityRole="button"
-                style={styles.dayBody}
-                onPress={() => navigation.navigate('TrainingPlanDay', {
-                  planId: selectedPlan.id,
-                  dayId: day.id,
-                })}
+                style={styles.secondary}
+                onPress={() => navigation.navigate('TrainingPlanEditor', { planId: selectedPlan.id })}
               >
-                <View style={[styles.dayBadge, day.restDay && styles.restBadge]}>
-                  <Text style={styles.dayBadgeText}>{weekday[day.weekday]}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.dayTitle}>
-                    {day.restDay ? 'Dia de descanso' : day.title || 'Treino a configurar'}
-                  </Text>
-                  <Text style={styles.dayMeta}>
-                    {day.restDay
-                      ? `${day.restActivities.length} atividades opcionais`
-                      : `${day.exercises.length} exercícios · ${day.estimatedDurationMinutes} min`}
-                  </Text>
-                </View>
-                <ChevronRight color={colors.mu} size={20} strokeWidth={1.7} />
-              </TouchableOpacity>
-              {!day.restDay && day.exercises.length > 0 && (
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  style={styles.start}
-                  onPress={() => void onStart(selectedPlan.id, day.id)}
-                >
-                  <Text style={styles.startText}>Iniciar</Text>
-                </TouchableOpacity>
-              )}
+                <Text style={styles.secondaryText}>Editar</Text>
+              </PressableScale>
             </View>
+          </Reveal>
+
+          {selectedPlan.days.map((day, index) => (
+            <Reveal index={index + 2} key={day.id}>
+              <View style={styles.dayCard}>
+                <PressableScale
+                  accessibilityRole="button"
+                  pressedScale={0.99}
+                  style={styles.dayBody}
+                  onPress={() => navigation.navigate('TrainingPlanDay', {
+                    planId: selectedPlan.id,
+                    dayId: day.id,
+                  })}
+                >
+                  <View style={[styles.dayBadge, day.restDay && styles.restBadge]}>
+                    <Text style={styles.dayBadgeText}>{weekday[day.weekday]}</Text>
+                  </View>
+                  <View style={styles.dayCopy}>
+                    <Text style={styles.dayTitle}>
+                      {day.restDay ? 'Dia de descanso' : day.title || 'Treino a configurar'}
+                    </Text>
+                    <Text style={styles.dayMeta}>
+                      {day.restDay
+                        ? `${day.restActivities.length} atividades opcionais`
+                        : `${day.exercises.length} exercícios · ${day.estimatedDurationMinutes} min`}
+                    </Text>
+                  </View>
+                  {(day.restDay || day.exercises.length === 0) && <ChevronRight color={colors.mu} size={20} strokeWidth={1.7} />}
+                </PressableScale>
+                {!day.restDay && day.exercises.length > 0 && (
+                  <PressableScale
+                    accessibilityLabel={`Iniciar ${day.title || weekday[day.weekday]}`}
+                    accessibilityRole="button"
+                    style={styles.start}
+                    onPress={() => void onStart(selectedPlan.id, day.id)}
+                  >
+                    <Play color={colors.on} fill={colors.on} size={14} strokeWidth={1.5} />
+                    <Text style={styles.startText}>Iniciar</Text>
+                  </PressableScale>
+                )}
+              </View>
+            </Reveal>
           ))}
+          <Reveal index={9}>
+            <PressableScale
+              accessibilityRole="button"
+              style={styles.archivedLink}
+              onPress={() => navigation.navigate('ArchivedTrainingPlans')}
+            >
+              <Text style={styles.archivedLinkText}>Ver fichas arquivadas</Text>
+            </PressableScale>
+          </Reveal>
         </>
       )}
     </ScreenScrollView>
@@ -152,33 +155,26 @@ export function TrainingPlanView({
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  headerButton: { alignItems: 'center', backgroundColor: colors.ac, borderRadius: 12, height: 48, justifyContent: 'center', width: 48 },
-  archivedLink: { alignSelf: 'flex-start', justifyContent: 'center', marginBottom: 12, minHeight: 48 },
-  archivedLinkText: { ...typography.bodySmall, color: colors.tx, textDecorationLine: 'underline' },
-  planScroll: { marginBottom: 18 },
-  planChip: { backgroundColor: 'transparent', borderColor: colors.mu, borderRadius: 12, borderWidth: 1, justifyContent: 'center', marginRight: 8, minHeight: 48, minWidth: 145, paddingHorizontal: 12 },
-  planChipActive: { backgroundColor: colors.ac, borderColor: colors.ac },
-  planName: { ...typography.label, color: colors.tx, fontWeight: '500' },
-  planMetaRow: { alignItems: 'center', flexDirection: 'row', gap: 3, marginTop: 2 },
-  planMeta: { ...typography.captionSmall, color: colors.t2 },
-  inverse: { color: colors.on },
-  planHeader: { alignItems: 'flex-start', flexDirection: 'row', gap: 12, marginBottom: 16, paddingVertical: 8 },
-  eyebrow: { ...typography.monoLabel, color: colors.t2 },
-  title: { ...typography.title, color: colors.tx, marginTop: 5 },
-  description: { ...typography.bodySmall, color: colors.t2, marginTop: 6 },
-  secondary: { alignItems: 'center', borderColor: colors.mu, borderRadius: 12, borderWidth: 1, justifyContent: 'center', minHeight: 48, paddingHorizontal: 14 },
-  secondaryText: { ...typography.bodySmall, color: colors.tx },
-  dayCard: { borderBottomColor: colors.bd, borderBottomWidth: 1 },
-  dayBody: { alignItems: 'center', flexDirection: 'row', gap: 12, minHeight: 68 },
+  headerButton: { alignItems: 'center', backgroundColor: colors.ac, borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
+  archivedLink: { alignSelf: 'flex-start', justifyContent: 'center', marginTop: shared.spacing.lg, minHeight: 48 },
+  archivedLinkText: { ...typography.bodySmall, color: colors.t2 },
+  planScroll: { flexGrow: 0, marginBottom: shared.spacing.xl },
+  planChips: { gap: shared.spacing.sm, paddingRight: shared.spacing.lg },
+  planHeader: { alignItems: 'flex-start', flexDirection: 'row', gap: shared.spacing.md, marginBottom: shared.spacing.lg },
+  planCopy: { flex: 1 },
+  planMeta: { ...typography.caption, color: colors.t2, marginTop: 4 },
+  title: { ...typography.title, color: colors.tx },
+  description: { ...typography.bodySmall, color: colors.t2, marginTop: shared.spacing.sm },
+  secondary: { alignItems: 'center', borderColor: colors.mu, borderRadius: shared.radii.md, borderWidth: 1, justifyContent: 'center', minHeight: 48, paddingHorizontal: 16 },
+  secondaryText: { ...typography.bodySmall, color: colors.tx, fontWeight: '500' },
+  dayCard: { alignItems: 'center', borderBottomColor: colors.bd, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: shared.spacing.sm },
+  dayBody: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: shared.spacing.md, minHeight: 72 },
+  dayCopy: { flex: 1 },
   dayBadge: { alignItems: 'center', height: 36, justifyContent: 'center', width: 38 },
-  restBadge: { borderColor: colors.bd, borderRadius: 12, borderWidth: 1 },
+  restBadge: { borderColor: colors.bd, borderRadius: shared.radii.md, borderWidth: 1 },
   dayBadgeText: { ...typography.monoLabel, color: colors.t2 },
   dayTitle: { ...typography.body, color: colors.tx, fontWeight: '500' },
   dayMeta: { ...typography.caption, color: colors.t2, marginTop: 2 },
-  start: { alignSelf: 'flex-start', justifyContent: 'center', minHeight: 48, paddingLeft: 50 },
-  startText: { ...typography.bodySmall, color: colors.tx, textDecorationLine: 'underline' },
-  empty: { alignItems: 'flex-start', minHeight: 280, justifyContent: 'center' },
-  emptyTitle: { ...typography.titleSmall, color: colors.tx, marginBottom: 15 },
-  primary: { alignItems: 'center', backgroundColor: colors.ac, borderRadius: 12, justifyContent: 'center', minHeight: 56, paddingHorizontal: 18 },
-  primaryText: { ...typography.label, color: colors.on, fontWeight: '500' },
+  start: { alignItems: 'center', backgroundColor: colors.ac, borderRadius: 24, flexDirection: 'row', gap: 6, justifyContent: 'center', minHeight: 48, paddingHorizontal: 18 },
+  startText: { ...typography.bodySmall, color: colors.on, fontWeight: '600' },
 })

@@ -11,7 +11,6 @@ import {
   SectionList,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -44,6 +43,7 @@ import {
   resolveExerciseMedia,
   type LibraryFilter,
 } from './libraryState'
+import { PressableScale } from '../../motion'
 
 export function ExerciseLibraryScreen({
   exercises,
@@ -177,14 +177,14 @@ export function ExerciseLibraryScreen({
           renderItem={renderExercise}
         />
       )}
-      <TouchableOpacity
+      <PressableScale
         accessibilityLabel="Criar exercício personalizado"
         accessibilityRole="button"
         style={styles.fab}
         onPress={() => setEditing('new')}
       >
         <Plus color={colors.on} size={22} strokeWidth={1.8} />
-      </TouchableOpacity>
+      </PressableScale>
       <ExerciseForm
         exercise={editing === 'new' ? null : editing}
         visible={editing !== null}
@@ -333,8 +333,8 @@ function ExerciseForm({
               timed: exercise?.timed ?? false,
             })
           }} />
-          {!!onArchive && <TouchableOpacity accessibilityRole="button" onPress={onArchive}><Text style={styles.archive}>Arquivar</Text></TouchableOpacity>}
-          <TouchableOpacity accessibilityRole="button" onPress={onClose}><Text style={styles.cancel}>Cancelar</Text></TouchableOpacity>
+          {!!onArchive && <PressableScale accessibilityRole="button" onPress={onArchive}><Text style={styles.archive}>Arquivar</Text></PressableScale>}
+          <PressableScale accessibilityRole="button" onPress={onClose}><Text style={styles.cancel}>Cancelar</Text></PressableScale>
           </ScrollView>
         </SafeAreaView>
       </KeyboardAvoidingView>
@@ -392,9 +392,9 @@ function ExerciseCard({
         <Heart color={exercise.favorite ? colors.tx : colors.mu} fill={exercise.favorite ? colors.tx : 'transparent'} size={19} strokeWidth={1.7} />
       </Pressable>
       {!!onEdit && (
-        <TouchableOpacity accessibilityLabel={`Editar ${exercise.name}`} accessibilityRole="button" onPress={onEdit} style={styles.editButton}>
+        <PressableScale accessibilityLabel={`Editar ${exercise.name}`} accessibilityRole="button" onPress={onEdit} style={styles.editButton}>
           <Text style={styles.edit}>Editar</Text>
-        </TouchableOpacity>
+        </PressableScale>
       )}
     </View>
   )

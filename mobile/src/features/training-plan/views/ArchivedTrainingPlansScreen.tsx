@@ -1,10 +1,11 @@
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { FlatList, StyleSheet, Text, View } from 'react-native'
 import { RotateCcw } from 'lucide-react-native'
 import type { TrainingPlan } from '../model/trainingPlan'
 import { shared, type ThemeColors, useTheme } from '../../../theme'
 import { Screen } from '../../../components/Screen'
 import { ScreenHeader } from '../../../components/ScreenHeader'
 import { fontFamilies } from '../../../theme/typography'
+import { PressableScale } from '../../../motion'
 
 export function ArchivedTrainingPlansScreen({
   plans,
@@ -50,7 +51,7 @@ export function ArchivedTrainingPlansScreen({
               </Text>
               {!!errors[key] && <Text style={styles.error}>{errors[key]}</Text>}
             </View>
-            <TouchableOpacity
+            <PressableScale
               accessibilityRole="button"
               accessibilityState={{ disabled: busyKeys.has(key) }}
               disabled={busyKeys.has(key)}
@@ -59,7 +60,7 @@ export function ArchivedTrainingPlansScreen({
             >
               <RotateCcw color={colors.on} size={16} />
               <Text style={styles.restoreText}>{busyKeys.has(key) ? 'Restaurando…' : 'Restaurar'}</Text>
-            </TouchableOpacity>
+            </PressableScale>
           </View>
         )
       }}

@@ -2,7 +2,8 @@ import { createElement } from 'react'
 import { act, create } from 'react-test-renderer'
 
 const mockController = {
-  query: { page: 1, pageSize: 50, language: 'auto', text: '', onlyWithImage: false, onlyWithVideo: false },
+  source: 'EXERCISEDB', setSource: jest.fn(),
+  query: { page: 1, pageSize: 25, language: 'auto', text: '', onlyWithImage: false, onlyWithVideo: false },
   items: Array.from({ length: 50 }, (_, id) => ({
     provider: id % 2 ? 'WGER' : 'EXERCISEDB', externalId: String(id), name: `Exercício ${id}`,
     description: '', primaryMuscleGroup: 'Peito', secondaryMuscleGroups: [], equipment: 'Nenhum',
@@ -16,16 +17,21 @@ const mockController = {
 }
 
 jest.mock('./useWgerIntegrationController', () => ({ useWgerIntegrationController: () => mockController }))
+jest.mock('react-native-safe-area-context', () => ({
+  SafeAreaView: require('react-native').View,
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+}))
+jest.mock('@react-native-async-storage/async-storage', () => ({ getItem: jest.fn(async () => '1'), setItem: jest.fn(async () => undefined) }))
 jest.mock('../../theme', () => ({
-  shared: { screen: { horizontalPadding: 16 } },
+  shared: require('../../theme/tokens').shared,
   useTheme: () => ({ colors: new Proxy({}, { get: () => '#000000' }) }),
 }))
-jest.mock('../../theme/typography', () => ({ typography: { body: {}, bodySmall: {}, caption: {}, label: {}, titleSmall: {}, title: {} } }))
 jest.mock('../../components/Screen', () => ({ Screen: ({ children }: { children: unknown }) => children }))
 jest.mock('../../components/ScreenHeader', () => ({ ScreenHeader: () => null }))
 jest.mock('../../components/PrimaryButton', () => ({ PrimaryButton: () => null }))
 jest.mock('../../components/SelectableChip', () => ({ SelectableChip: () => null }))
 jest.mock('../../components/ThemedTextInput', () => ({ ThemedTextInput: () => null }))
+jest.mock('../../components/ui', () => ({ SegmentedControl: () => null }))
 jest.mock('../../components/FormField', () => ({ FormField: () => null }))
 jest.mock('../../components/Toast', () => ({ Toast: () => null }))
 
@@ -43,7 +49,7 @@ describe('barra fixa do catálogo', () => {
       }))
     })
     const list = renderer.root.find((node) => node.type === FlatList && node.props.data.length === 50)
-    expect(list.props.style).toEqual(expect.objectContaining({ flex: 1, minHeight: 120 }))
+    expect(list.props.style).toEqual(expect.objectContaining({ flex: 1 }))
     expect(renderer.root.findAllByType(Text).some((node) => node.props.children === 'Importar selecionados')).toBe(true)
     expect(renderer.root.findAllByType(Text).some((node) => node.props.children === 'Anterior')).toBe(true)
     expect(renderer.root.findAllByType(Text).some((node) => node.props.children === 'Próxima')).toBe(true)

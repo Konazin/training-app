@@ -1,14 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import {
-  Alert,
-  Linking,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native'
+import { Alert, Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 import { ArrowLeft, Minus, Pause, Play, Plus } from 'lucide-react-native'
 import { useNavigation, usePreventRemove } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
@@ -229,13 +220,13 @@ export function WorkoutSessionScreen(props: Props) {
       <Screen><View style={styles.empty}>
         <Text style={styles.emptyTitle}>Nenhuma sessão ativa</Text>
         <Text style={styles.muted}>Escolha um treino na ficha semanal.</Text>
-        <TouchableOpacity
+        <PressableScale
           accessibilityRole="button"
           style={styles.primary}
           onPress={() => navigation.navigate('MainTabs', { screen: 'Plan' })}
         >
           <Text style={styles.primaryText}>Abrir ficha</Text>
-        </TouchableOpacity>
+        </PressableScale>
       </View></Screen>
     )
   }
@@ -296,9 +287,9 @@ export function WorkoutSessionScreen(props: Props) {
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.topBar}>
-        <TouchableOpacity accessibilityLabel="Voltar" accessibilityRole="button" onPress={() => navigation.goBack()} style={styles.backButton}>
+        <PressableScale accessibilityLabel="Voltar" accessibilityRole="button" onPress={() => navigation.goBack()} style={styles.backButton}>
           <ArrowLeft color={text} size={20} strokeWidth={1.8} />
-        </TouchableOpacity>
+        </PressableScale>
         <View style={styles.topBarTitle}>
           <Text style={styles.topBarName} numberOfLines={1}>{session.workoutName}</Text>
           <View style={styles.sessionState}>
@@ -310,9 +301,9 @@ export function WorkoutSessionScreen(props: Props) {
             </Text>
           </View>
         </View>
-        <TouchableOpacity accessibilityRole="button" accessibilityState={{ disabled: busyKeys.has('session') }} disabled={busyKeys.has('session')} onPress={confirmAbandonSession} style={styles.abandonTop}>
+        <PressableScale accessibilityRole="button" accessibilityState={{ disabled: busyKeys.has('session') }} disabled={busyKeys.has('session')} onPress={confirmAbandonSession} style={styles.abandonTop}>
           <Text style={styles.abandonTopText}>Abandonar</Text>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
 
       <View
@@ -419,12 +410,12 @@ export function WorkoutSessionScreen(props: Props) {
                   </Text>
                 )}
                 {!!exercise.primaryVideoUrl && (
-                  <TouchableOpacity accessibilityLabel={`Ver execução de ${exercise.name}`} accessibilityRole="button" onPress={() => openVideo(exercise)} style={styles.textAction}>
+                  <PressableScale accessibilityLabel={`Ver execução de ${exercise.name}`} accessibilityRole="button" onPress={() => openVideo(exercise)} style={styles.textAction}>
                     <Text style={styles.videoLink}>Ver execução</Text>
-                  </TouchableOpacity>
+                  </PressableScale>
                 )}
               </View>
-              <TouchableOpacity
+              <PressableScale
                 accessibilityRole="button"
                 accessibilityState={{ disabled: busyKeys.has(`exercise:${exercise.id}`), selected: exercise.status === 'SKIPPED' }}
                 disabled={busyKeys.has(`exercise:${exercise.id}`)}
@@ -437,7 +428,7 @@ export function WorkoutSessionScreen(props: Props) {
                 <Text style={styles.skip}>
                   {exercise.status === 'SKIPPED' ? 'Desfazer' : 'Pular'}
                 </Text>
-              </TouchableOpacity>
+              </PressableScale>
             </View>
 
             {previous && detailsExpanded && (
@@ -508,7 +499,7 @@ export function WorkoutSessionScreen(props: Props) {
               />
             )}
             {substitutionFor === exercise.id && substitutions.map((candidate) => (
-              <TouchableOpacity
+              <PressableScale
                 key={candidate.exercise.id}
                 accessibilityRole="button"
                 disabled={busyKeys.has(`substitution:${exercise.id}`)}
@@ -523,7 +514,7 @@ export function WorkoutSessionScreen(props: Props) {
               >
                 <Text style={styles.substitutionName}>{candidate.exercise.name}</Text>
                 <Text style={styles.referenceText}>{candidate.reason}</Text>
-              </TouchableOpacity>
+              </PressableScale>
             ))}
             </View>}
 
@@ -557,15 +548,15 @@ export function WorkoutSessionScreen(props: Props) {
             <Text accessibilityLiveRegion="polite" style={styles.error}>{errors[`exercise:${exercise.id}`]}</Text>
           )}
             <View style={styles.exerciseActions}>
-              <TouchableOpacity
+              <PressableScale
                 accessibilityRole="button"
                 accessibilityState={{ expanded: detailsExpanded }}
                 style={styles.detailAction}
                 onPress={() => setExpandedExerciseDetails(detailsExpanded ? null : exercise.id)}
               >
                 <Text style={styles.addSetText}>{detailsExpanded ? 'Ocultar detalhes' : 'Histórico e opções'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+              </PressableScale>
+              <PressableScale
                 accessibilityRole="button"
                 accessibilityState={{ disabled: busyKeys.has(`exercise:${exercise.id}`) }}
                 disabled={busyKeys.has(`exercise:${exercise.id}`)}
@@ -574,7 +565,7 @@ export function WorkoutSessionScreen(props: Props) {
               >
                 <Plus color={preferences.workoutHighContrast ? colors.workout.text : colors.tx} size={15} strokeWidth={1.8} />
                 <Text style={styles.addSetText}>Série</Text>
-              </TouchableOpacity>
+              </PressableScale>
             </View>
           </View>
           </Reveal>
@@ -605,7 +596,7 @@ export function WorkoutSessionScreen(props: Props) {
           maxLength={2_000}
           style={styles.input}
         />
-        <TouchableOpacity
+        <PressableScale
           accessibilityRole="button"
           accessibilityState={{ disabled: busyKeys.has('session-note') }}
           disabled={busyKeys.has('session-note')}
@@ -615,7 +606,7 @@ export function WorkoutSessionScreen(props: Props) {
           })()}
         >
           <Text style={styles.saveSetText}>Salvar anotação</Text>
-        </TouchableOpacity>
+        </PressableScale>
         {sessionNoteSaved && (
           <Text accessibilityLiveRegion="polite" style={styles.saved}>Anotação salva.</Text>
         )}
@@ -632,7 +623,7 @@ export function WorkoutSessionScreen(props: Props) {
         />
       )}
       <View style={styles.footerActions}>
-        <TouchableOpacity
+        <PressableScale
           accessibilityRole="button"
           accessibilityState={{ disabled: busyKeys.has('session') }}
           disabled={busyKeys.has('session')}
@@ -649,8 +640,8 @@ export function WorkoutSessionScreen(props: Props) {
             ? <Play color={text} size={16} strokeWidth={1.8} />
             : <Pause color={text} size={16} strokeWidth={1.8} />}
           <Text style={styles.footerSecondaryText}>{session.status === 'PAUSED' ? 'Retomar' : 'Pausar'}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
+        </PressableScale>
+        <PressableScale
           accessibilityRole="button"
           accessibilityState={{ disabled: busyKeys.has('session') }}
           disabled={busyKeys.has('session')}
@@ -658,7 +649,7 @@ export function WorkoutSessionScreen(props: Props) {
           style={styles.footerSecondary}
         >
           <Text style={styles.footerSecondaryText}>Concluir e salvar</Text>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
     </BottomActionBar>
     {videoExercise && <Modal visible transparent animationType="fade" onRequestClose={closeVideo}>
@@ -667,9 +658,9 @@ export function WorkoutSessionScreen(props: Props) {
           <Text style={styles.videoTitle}>{videoExercise.name}</Text>
           {!!videoExercise.primaryVideoUrl && <ExerciseVideo key={videoRetryKey} url={videoExercise.primaryVideoUrl} posterUrl={videoExercise.primaryImageUrl} onRetry={() => setVideoRetryKey((value) => value + 1)} />}
           <Text style={styles.videoAttribution}>{videoAttribution}</Text>
-          {!!videoMetadata?.sourceUrl && <TouchableOpacity accessibilityRole="link" onPress={() => void Linking.openURL(videoMetadata.sourceUrl!)} style={styles.textAction}><Text style={styles.videoLink}>Abrir fonte original</Text></TouchableOpacity>}
-          {!!videoMetadata?.licenseUrl && <TouchableOpacity accessibilityRole="link" onPress={() => void Linking.openURL(videoMetadata.licenseUrl!)} style={styles.textAction}><Text style={styles.videoLink}>Consultar licença</Text></TouchableOpacity>}
-          <TouchableOpacity accessibilityRole="button" onPress={closeVideo} style={styles.textAction}><Text style={styles.videoClose}>Fechar</Text></TouchableOpacity>
+          {!!videoMetadata?.sourceUrl && <PressableScale accessibilityRole="link" onPress={() => void Linking.openURL(videoMetadata.sourceUrl!)} style={styles.textAction}><Text style={styles.videoLink}>Abrir fonte original</Text></PressableScale>}
+          {!!videoMetadata?.licenseUrl && <PressableScale accessibilityRole="link" onPress={() => void Linking.openURL(videoMetadata.licenseUrl!)} style={styles.textAction}><Text style={styles.videoLink}>Consultar licença</Text></PressableScale>}
+          <PressableScale accessibilityRole="button" onPress={closeVideo} style={styles.textAction}><Text style={styles.videoClose}>Fechar</Text></PressableScale>
         </View>
       </Screen>
     </Modal>}
@@ -728,7 +719,7 @@ function SmallAction({
   const { colors, preferences } = useTheme()
   const styles = createStyles(colors, preferences.workoutHighContrast)
   return (
-    <TouchableOpacity
+    <PressableScale
       accessibilityRole="button"
       accessibilityState={{ disabled }}
       disabled={disabled}
@@ -736,7 +727,7 @@ function SmallAction({
       style={styles.smallAction}
     >
       <Text style={styles.smallActionText}>{label}</Text>
-    </TouchableOpacity>
+    </PressableScale>
   )
 }
 
@@ -833,9 +824,9 @@ function SetEditor({
           <Text style={styles.setPhase}>{set.completed ? 'editando' : 'em andamento'}</Text>
         </View>
         {set.manuallyAdded && (
-          <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={() => void onRemove()} style={styles.textAction}>
+          <PressableScale accessibilityRole="button" disabled={busy} onPress={() => void onRemove()} style={styles.textAction}>
             <Text style={styles.removeSet}>Remover</Text>
-          </TouchableOpacity>
+          </PressableScale>
         )}
       </View>
       <View style={styles.fields}>
@@ -860,7 +851,7 @@ function SetEditor({
       />
       {!!error && <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text>}
       <View style={styles.setActions}>
-        <TouchableOpacity
+        <PressableScale
           accessibilityRole="button"
           accessibilityState={{ disabled: busy }}
           disabled={busy}
@@ -868,7 +859,7 @@ function SetEditor({
           onPress={() => void onSave(input(set.completed))}
         >
           <Text style={styles.saveSetText}>{busy ? 'Salvando…' : 'Salvar rascunho'}</Text>
-        </TouchableOpacity>
+        </PressableScale>
         <Text style={styles.completionHint}>
           {set.completed ? 'Use “Salvar série” para guardar as alterações.' : 'Concluir esta série inicia o descanso.'}
         </Text>

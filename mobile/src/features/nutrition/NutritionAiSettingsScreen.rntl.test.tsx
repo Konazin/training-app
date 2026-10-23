@@ -4,7 +4,7 @@ import type { SecretsRepository } from '@training/training-domain'
 
 jest.mock('../../theme', () => ({
   useTheme: () => ({ colors: new Proxy({}, { get: () => '#111111' }) }),
-  shared: { radii: { md: 12 }, control: { primaryHeight: 56, compactHeight: 48 } },
+  shared: require('../../theme/tokens').shared,
 }))
 jest.mock('../../components/Screen', () => {
   const React = require('react')

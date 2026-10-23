@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Modal, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { FormField } from '../../../components/FormField'
@@ -18,6 +18,7 @@ import type {
 } from '../model/trainingPlan'
 import { shared, type ThemeColors, useTheme } from '../../../theme'
 import { ExercisePicker } from './ExercisePicker'
+import { PressableScale } from '../../../motion'
 
 const setTypes: SetType[] = [
   'NORMAL',
@@ -162,15 +163,15 @@ export function DayExerciseEditorScreen({
 
         <Text style={styles.label}>exercício alternativo</Text>
         <View style={styles.alternativeRow}>
-          <TouchableOpacity accessibilityRole="button" style={styles.alternative} onPress={() => setShowAlternativePicker(true)}>
+          <PressableScale accessibilityRole="button" style={styles.alternative} onPress={() => setShowAlternativePicker(true)}>
             <Text style={styles.alternativeText}>
               {library.find((item) => item.id === alternativeId)?.name ?? 'Nenhum'}
             </Text>
-          </TouchableOpacity>
+          </PressableScale>
           {alternativeId != null && (
-            <TouchableOpacity accessibilityRole="button" onPress={() => setAlternativeId(null)} style={styles.clearButton}>
+            <PressableScale accessibilityRole="button" onPress={() => setAlternativeId(null)} style={styles.clearButton}>
               <Text style={styles.clear}>Limpar</Text>
-            </TouchableOpacity>
+            </PressableScale>
           )}
         </View>
         {!!(formError || errors[key]) && <Text style={styles.error}>{formError || errors[key]}</Text>}
@@ -183,9 +184,9 @@ export function DayExerciseEditorScreen({
         <View accessibilityViewIsModal style={[styles.modal, { backgroundColor: colors.background }]}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Exercício alternativo</Text>
-            <TouchableOpacity accessibilityRole="button" onPress={() => setShowAlternativePicker(false)} style={styles.clearButton}>
+            <PressableScale accessibilityRole="button" onPress={() => setShowAlternativePicker(false)} style={styles.clearButton}>
               <Text style={styles.clear}>Fechar</Text>
-            </TouchableOpacity>
+            </PressableScale>
           </View>
           <ExercisePicker
             exercises={library}
@@ -199,7 +200,7 @@ export function DayExerciseEditorScreen({
       </Modal>
     </ScreenScrollView>
     <BottomActionBar>
-      <TouchableOpacity
+      <PressableScale
         accessibilityRole="button"
         accessibilityState={{ disabled: busyKeys.has(key), busy: busyKeys.has(key) }}
         disabled={busyKeys.has(key)}
@@ -207,7 +208,7 @@ export function DayExerciseEditorScreen({
         style={[styles.saveButton, busyKeys.has(key) && styles.disabled]}
       >
         <Text style={styles.saveButtonText}>{busyKeys.has(key) ? 'Salvando…' : configured ? 'Salvar configuração' : 'Adicionar ao dia'}</Text>
-      </TouchableOpacity>
+      </PressableScale>
     </BottomActionBar>
     </>
   )

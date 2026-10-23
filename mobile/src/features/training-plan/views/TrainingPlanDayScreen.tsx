@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Alert, StyleSheet, Text, View } from 'react-native'
 import { ArrowDown, ArrowUp, Check, ChevronRight, Plus, X } from 'lucide-react-native'
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
@@ -13,6 +13,7 @@ import type { TrainingPlan } from '../model/trainingPlan'
 import { shared, type ThemeColors, useTheme } from '../../../theme'
 import { reorderControlColors } from '../../../theme/uiContracts'
 import { typography } from '../../../theme/typography'
+import { PressableScale } from '../../../motion'
 
 const labels = {
   MONDAY: 'Segunda-feira',
@@ -118,12 +119,12 @@ export function TrainingPlanDayScreen({
           keyboardType="number-pad"
         />
         <FormField label="Observações" value={notes} onChangeText={setNotes} multiline />
-        <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{ checked: restDay }} style={styles.checkboxRow} onPress={() => setRestDay((current) => !current)}>
+        <PressableScale accessibilityRole="checkbox" accessibilityState={{ checked: restDay }} style={styles.checkboxRow} onPress={() => setRestDay((current) => !current)}>
           <View style={[styles.checkbox, restDay && styles.checkboxActive]}>
             {restDay && <Check color={colors.on} size={14} strokeWidth={2} />}
           </View>
           <Text style={styles.checkboxLabel}>Marcar como dia de descanso</Text>
-        </TouchableOpacity>
+        </PressableScale>
         {!!errors[dayKey] && <Text style={styles.error}>{errors[dayKey]}</Text>}
         <PrimaryButton
           label="Salvar dia"
@@ -136,7 +137,7 @@ export function TrainingPlanDayScreen({
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Atividades opcionais</Text>
-            <TouchableOpacity
+            <PressableScale
               accessibilityLabel="Adicionar atividade"
               accessibilityRole="button"
               style={styles.add}
@@ -146,7 +147,7 @@ export function TrainingPlanDayScreen({
               })}
             >
               <Plus color={colors.tx} size={19} strokeWidth={1.7} />
-            </TouchableOpacity>
+            </PressableScale>
           </View>
           {restActivities.map((activity, index) => (
             <View key={activity.id} style={styles.item}>
@@ -161,7 +162,7 @@ export function TrainingPlanDayScreen({
                 onUp={() => void moveActivity(index, -1)}
                 onDown={() => void moveActivity(index, 1)}
               />
-              <TouchableOpacity accessibilityRole="button" style={styles.itemAction}
+              <PressableScale accessibilityRole="button" style={styles.itemAction}
                 onPress={() => navigation.navigate('RestActivityEditor', {
                   planId: plan.id,
                   dayId: day.id,
@@ -169,8 +170,8 @@ export function TrainingPlanDayScreen({
                 })}
               >
                 <Text style={styles.link}>Editar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity accessibilityLabel={`Remover ${activity.name}`} accessibilityRole="button" style={styles.itemAction}
+              </PressableScale>
+              <PressableScale accessibilityLabel={`Remover ${activity.name}`} accessibilityRole="button" style={styles.itemAction}
                 disabled={busyKeys.has(`activity:remove:${activity.id}`)}
                 onPress={() => Alert.alert(
                   'Remover atividade?',
@@ -186,7 +187,7 @@ export function TrainingPlanDayScreen({
                 )}
               >
                 <X color={colors.dg} size={18} strokeWidth={1.7} />
-              </TouchableOpacity>
+              </PressableScale>
               {!!errors[`activity:remove:${activity.id}`] && (
                 <Text style={styles.rowError}>{errors[`activity:remove:${activity.id}`]}</Text>
               )}
@@ -215,7 +216,7 @@ export function TrainingPlanDayScreen({
                   onUp={() => void moveExercise(index, -1)}
                   onDown={() => void moveExercise(index, 1)}
                 />
-                <TouchableOpacity accessibilityRole="button" style={styles.itemAction}
+                <PressableScale accessibilityRole="button" style={styles.itemAction}
                   onPress={() => navigation.navigate('DayExerciseEditor', {
                     planId: plan.id,
                     dayId: day.id,
@@ -223,8 +224,8 @@ export function TrainingPlanDayScreen({
                   })}
                 >
                   <Text style={styles.link}>Editar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity accessibilityLabel={`Remover ${exercise.exercise.name}`} accessibilityRole="button" style={styles.itemAction}
+                </PressableScale>
+                <PressableScale accessibilityLabel={`Remover ${exercise.exercise.name}`} accessibilityRole="button" style={styles.itemAction}
                   disabled={busyKeys.has(`exercise:remove:${exercise.id}`)}
                   onPress={() => Alert.alert(
                     'Remover exercício?',
@@ -240,7 +241,7 @@ export function TrainingPlanDayScreen({
                   )}
                 >
                   <X color={colors.dg} size={18} strokeWidth={1.7} />
-                </TouchableOpacity>
+                </PressableScale>
                 {!!errors[`exercise:remove:${exercise.id}`] && (
                   <Text style={styles.rowError}>{errors[`exercise:remove:${exercise.id}`]}</Text>
                 )}
@@ -253,7 +254,7 @@ export function TrainingPlanDayScreen({
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Adicionar da biblioteca</Text>
-            <TouchableOpacity
+            <PressableScale
               accessibilityRole="button"
               style={styles.libraryItem}
               onPress={() => navigation.navigate('ExercisePicker', { planId, dayId })}
@@ -266,16 +267,16 @@ export function TrainingPlanDayScreen({
                 <Text style={styles.link}>Biblioteca</Text>
                 <ChevronRight color={colors.mu} size={18} strokeWidth={1.7} />
               </View>
-            </TouchableOpacity>
+            </PressableScale>
           </View>
           {!!exercises.length && !day.restDay && !dirty && (
-            <TouchableOpacity
+            <PressableScale
               accessibilityRole="button"
               style={styles.start}
               onPress={() => void onStart(plan.id, day.id)}
             >
               <Text style={styles.startText}>Iniciar este treino</Text>
-            </TouchableOpacity>
+            </PressableScale>
           )}
           {!!exercises.length && !day.restDay && dirty && (
             <Text style={styles.saveHint}>Salve as alterações antes de iniciar o treino.</Text>
@@ -304,8 +305,8 @@ function OrderButtons({
   const downColors = reorderControlColors(colors, down && !busy)
   return (
     <View style={{ flexDirection: 'row' }}>
-      <TouchableOpacity accessibilityLabel="Mover para cima" accessibilityRole="button" disabled={!up || busy} onPress={onUp} style={{ alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48, opacity: upColors.opacity }}><ArrowUp color={colors.tx} size={17} strokeWidth={1.7} /></TouchableOpacity>
-      <TouchableOpacity accessibilityLabel="Mover para baixo" accessibilityRole="button" disabled={!down || busy} onPress={onDown} style={{ alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48, opacity: downColors.opacity }}><ArrowDown color={colors.tx} size={17} strokeWidth={1.7} /></TouchableOpacity>
+      <PressableScale accessibilityLabel="Mover para cima" accessibilityRole="button" disabled={!up || busy} onPress={onUp} style={{ alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48, opacity: upColors.opacity }}><ArrowUp color={colors.tx} size={17} strokeWidth={1.7} /></PressableScale>
+      <PressableScale accessibilityLabel="Mover para baixo" accessibilityRole="button" disabled={!down || busy} onPress={onDown} style={{ alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48, opacity: downColors.opacity }}><ArrowDown color={colors.tx} size={17} strokeWidth={1.7} /></PressableScale>
     </View>
   )
 }
