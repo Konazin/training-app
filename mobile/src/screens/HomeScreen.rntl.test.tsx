@@ -67,7 +67,7 @@ describe('Home semanal', () => {
       expect(screen.getByText(label)).toBeTruthy()
     }
     expect(screen.getByText('Lixeira, 2 itens')).toBeTruthy()
-    const progress = screen.getAllByRole('progressbar').find((node) => node.props.accessibilityValue?.max === 6)!
+    const progress = screen.getByLabelText('0 de 6 treinos concluídos')
     expect(progress.props.accessibilityValue).toMatchObject({ min: 0, max: 6, now: 0 })
     fireEvent.press(screen.getByText('Iniciar treino'))
     expect(props.onStartToday).toHaveBeenCalledWith(1, 4)
