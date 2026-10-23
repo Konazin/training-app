@@ -166,9 +166,9 @@ Priorizadas por valor para quem treina e por caber no princípio local-first.
 - ✅ Exportar histórico em CSV (além do backup completo).
 
 **Nutrição**
-- 🟡 Alimentos e refeições **favoritos** (pendente); copiar o dia anterior e duplicar refeição ✅.
+- ✅ Refeições **favoritas**, copiar o dia anterior e duplicar refeição.
 - ⬜ Código de barras (Open Food Facts, consulta manual e opcional).
-- ⬜ Hidratação (contador simples).
+- ✅ Hidratação (contador simples, sem meta).
 - ⬜ Cálculo opcional de metas pelo usuário, sempre editável e sem prescrição.
 
 **Plataforma e confiança**

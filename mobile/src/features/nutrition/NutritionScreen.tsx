@@ -34,6 +34,10 @@ import { typography } from '../../theme/typography'
 import { createGeminiNutritionProvider } from './geminiNutritionProvider'
 import { GEMINI_API_KEY_SECRET } from '../../integrations/secureSecrets'
 import { cloneMealInput, consumedAtForDate, consumedAtFromTime, formatNumberInput, parseNumberInput, parseTimeInput, timeOfDay } from './nutritionInput'
+import {
+  addFavoriteMeal, adjustHydration, favoriteToMealInput, FAVORITE_MEALS_KEY, formatLiters,
+  type FavoriteMeal, HYDRATION_KEY, readFavoriteMeals, readHydration, removeFavoriteMeal, type HydrationLog,
+} from './nutritionExtras'
 
 const EMPTY_GOALS: NutritionGoals = {
   caloriesKcal: null,
@@ -99,6 +103,8 @@ export function NutritionScreen({
   const [aiBusy, setAiBusy] = useState(false)
   const [tab, setTab] = useState<'DAY' | 'GOALS' | 'AI'>('DAY')
   const [addSheet, setAddSheet] = useState(false)
+  const [favorites, setFavorites] = useState<FavoriteMeal[]>([])
+  const [hydration, setHydration] = useState<HydrationLog>({})
   const requestId = useRef(0)
   const activeRequest = useRef<AbortController | null>(null)
   const mounted = useRef(true)
@@ -108,12 +114,14 @@ export function NutritionScreen({
     const operation = ++requestId.current
     setLoading(true)
     try {
-      const [nextMeals, nextSummary, storedGoals, recent, storedMenus] = await Promise.all([
+      const [nextMeals, nextSummary, storedGoals, recent, storedMenus, storedFavorites, storedHydration] = await Promise.all([
         repositories.nutritionMeals.listByDate(date),
         repositories.nutritionSummaries.findByDate(date),
         repositories.settings.get<unknown>(NUTRITION_GOALS_KEY),
         repositories.nutritionSummaries.listBetweenDates(addDays(date, -6), date),
         repositories.settings.get<unknown>(SAVED_MENUS_KEY),
+        repositories.settings.get<unknown>(FAVORITE_MEALS_KEY),
+        repositories.settings.get<unknown>(HYDRATION_KEY),
       ])
       if (!mounted.current || operation !== requestId.current) return
       setMeals(nextMeals)
@@ -121,6 +129,8 @@ export function NutritionScreen({
       setGoals(readGoals(storedGoals))
       setRecentSummaries(recent)
       setSavedMenus(readSavedMenus(storedMenus))
+      setFavorites(readFavoriteMeals(storedFavorites))
+      setHydration(readHydration(storedHydration))
     } catch {
       if (mounted.current && operation === requestId.current) {
         setNotice('Não foi possível atualizar os dados de nutrição deste aparelho.')
@@ -169,6 +179,43 @@ export function NutritionScreen({
       setNotice(error instanceof Error ? error.message : 'Não foi possível salvar a refeição.')
       setNoticeTone('danger')
       throw error
+    }
+  }
+
+  const saveFavorites = async (next: FavoriteMeal[], message: string) => {
+    try {
+      await repositories.settings.set(FAVORITE_MEALS_KEY, next)
+      setFavorites(next)
+      setNotice(message)
+      setNoticeTone('success')
+    } catch {
+      setNotice('Não foi possível atualizar as favoritas.')
+      setNoticeTone('danger')
+    }
+  }
+
+  const addFavorite = async (favorite: FavoriteMeal) => {
+    try {
+      await repositories.nutritionMeals.create(favoriteToMealInput(favorite, date))
+      await repositories.nutritionMaintenance.aggregateDay(date)
+      setAddSheet(false)
+      setNotice(`"${favorite.title}" adicionada. Ajuste o que mudou.`)
+      setNoticeTone('success')
+      await refresh()
+    } catch {
+      setNotice('Não foi possível adicionar a refeição favorita.')
+      setNoticeTone('danger')
+    }
+  }
+
+  const changeWater = async (deltaMl: number) => {
+    const next = adjustHydration(hydration, date, deltaMl)
+    try {
+      await repositories.settings.set(HYDRATION_KEY, next)
+      setHydration(next)
+    } catch {
+      setNotice('Não foi possível salvar a água.')
+      setNoticeTone('danger')
     }
   }
 
@@ -452,6 +499,18 @@ export function NutritionScreen({
 
           <MacroSummary totals={totals} goals={dailyGoals} mealCount={summary?.mealCount ?? meals.length} />
 
+          <View accessibilityLabel={`Água do dia: ${formatLiters(hydration[date] ?? 0)}`} style={styles.mealCard}>
+            <View style={styles.mealHeader}>
+              <Text style={styles.mealTitle}>Água</Text>
+              <Text accessibilityLiveRegion="polite" style={styles.time}>{formatLiters(hydration[date] ?? 0)}</Text>
+            </View>
+            <View style={styles.row}>
+              <Action label="+ 200 mL" onPress={() => void changeWater(200)} />
+              <Action label="+ 500 mL" onPress={() => void changeWater(500)} />
+              <Action label="Desfazer 200 mL" onPress={() => void changeWater(-200)} disabled={(hydration[date] ?? 0) <= 0} />
+            </View>
+          </View>
+
           <View style={styles.mealsHeader}>
             <Text accessibilityRole="header" style={styles.sectionTitle}>Refeições</Text>
             <Action label="Adicionar refeição" primary onPress={() => setAddSheet(true)} disabled={aiBusy} />
@@ -483,6 +542,10 @@ export function NutritionScreen({
                 <View style={styles.row}>
                   <Action label="Abrir / editar" onPress={() => setEditing(meal)} />
                   <Action label="Duplicar" onPress={() => void duplicateMeal(meal)} />
+                  <Action
+                    label="Favoritar"
+                    onPress={() => void saveFavorites(addFavoriteMeal(favorites, meal), 'Refeição salva nas favoritas.')}
+                  />
                   <Action label="Excluir" onPress={() => removeMeal(meal)} danger />
                 </View>
               </View>
@@ -581,6 +644,22 @@ export function NutritionScreen({
           <Action label="Galeria · estimar com IA" onPress={() => { setAddSheet(false); void runPhotoEstimate('GALLERY') }} disabled={aiBusy} />
           {!apiKeyConfigured && <AiKeyRow configured={false} onPress={() => { setAddSheet(false); onOpenAiSettings() }} />}
         </View>
+        {!!favorites.length && (
+          <>
+            <Text accessibilityRole="header" style={styles.sectionTitle}>Favoritas</Text>
+            {favorites.map((favorite) => (
+              <View key={favorite.id} style={styles.row}>
+                <Action label={favorite.title} onPress={() => void addFavorite(favorite)} />
+                <Action
+                  accessibilityLabel={`Remover ${favorite.title} das favoritas`}
+                  danger
+                  label="Remover"
+                  onPress={() => void saveFavorites(removeFavoriteMeal(favorites, favorite.id), 'Favorita removida.')}
+                />
+              </View>
+            ))}
+          </>
+        )}
       </BottomSheet>
     </ScreenScrollView>
   )
