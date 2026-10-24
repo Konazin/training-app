@@ -140,6 +140,9 @@ sem alterar sessões antigas nem criar dependência de serviço remoto.
 
 ### M2 — Confiabilidade técnica
 
+- [ ] **Prioridade 1.1:** migrar para o Expo SDK 57 (`expo@57.0.9` ou mais
+  novo, React Native 0.86.2+) para sair do Hermes V1 com regressão de memória
+  e deixar o check `validate` da CI verde; novo build e smoke físico.
 - [ ] Reavaliar os avisos atuais de dependências e atualizar Expo, React Native
   e grupos compatíveis de forma coordenada, conferindo plugins e exportação
   Android a cada etapa.

@@ -66,6 +66,11 @@ Fora do escopo da 1.0: web, tablet, conta, sincronização, publicidade.
 
 ### Riscos aceitáveis se registrados nas notas da versão
 
+- **Regressão de memória do Hermes V1 (Expo SDK 56).** O `expo-doctor` acusa
+  o Hermes 250829098.0.10; a correção está no SDK 57 (Hermes .0.16+). Sem
+  problema observado no smoke. O check `validate` da CI falha por isso e foi
+  aceito para a 1.0; atualizar para o SDK 57 é a prioridade da 1.1.
+
 - **Avisos de `npm audit` (45, nenhum crítico).** A correção automática
   sugere downgrades de Expo/React Native; não aplicar às cegas. Antes da 1.0,
   reavaliar quais afetam o app em runtime (a maioria está em ferramentas de
@@ -201,4 +206,5 @@ rodar o roteiro e promover a 1.0.0 sem mudanças de código se nada falhar.
 - Nova identidade visual, quatro temas e opções de acessibilidade.
 
 Limitações conhecidas: distribuição por APK interno (sem loja); avisos de
-dependência de ferramentas de build em avaliação.
+dependência de ferramentas de build em avaliação; o Expo SDK 56 usa um Hermes
+V1 com regressão de memória conhecida, corrigida só no SDK 57 (1.1).
