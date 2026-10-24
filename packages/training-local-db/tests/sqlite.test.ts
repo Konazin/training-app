@@ -751,6 +751,13 @@ describe('SQLite local schema', () => {
     expect(after?.media[0]).toMatchObject({ id: mediaId, remoteUrl: 'https://wger.de/media/updated.png' })
     expect((await repositories.sessions.getHistory())[0]?.exercises
       .find((item) => item.exerciseDefinitionId === imported.id)?.name).toBe('Rosca sem peso')
+    // Escolher o item de novo na importação o traz de volta; atualização em lote não.
+    const restored = await repositories.externalExerciseImport.importSelected([candidate], { restoreArchived: true })
+    expect(restored).toMatchObject({ updated: 1 })
+    expect((await repositories.exercises.findById(imported.id))?.archived).toBe(false)
+    await repositories.exercises.archive(imported.id)
+    await repositories.externalExerciseImport.importSelected([candidate])
+    expect((await repositories.exercises.findById(imported.id))?.archived).toBe(true)
     const invalidMedia = await repositories.externalExerciseImport.importSelected([{
       ...candidate,
       externalId: '985',
@@ -1512,6 +1519,34 @@ describe('SQLite local schema', () => {
     }
     await repositories.backup.restore(invalidBackup)
     await expect(repositories.preferences.load()).resolves.toEqual({ displayName: 'Atleta' })
+    await database.close()
+  })
+
+  it('remove o resumo do dia quando a última refeição é excluída', async () => {
+    const database = betterDatabase(newDatabase())
+    await runMigrations(database)
+    const repositories = createLocalRepositories(database)
+    const date = '2026-10-16'
+    const meal = await repositories.nutritionMeals.create({
+      localDate: date,
+      consumedAt: `${date}T12:00:00.000Z`,
+      mealType: 'LUNCH',
+      title: 'Almoço',
+      notes: '',
+      source: 'MANUAL',
+      items: [{
+        name: 'Arroz', portionDescription: '1 porção', estimatedGrams: null,
+        caloriesKcal: 100, proteinGrams: 2, carbohydratesGrams: 20,
+        fatGrams: 1, fiberGrams: 1, micronutrients: {}, confidence: null,
+        dataSource: 'MANUAL', sortOrder: 0,
+      }],
+    })
+    await repositories.nutritionMaintenance.aggregateDay(date)
+    expect(await repositories.nutritionSummaries.findByDate(date)).not.toBeNull()
+
+    await repositories.nutritionMeals.delete(meal.id)
+    await expect(repositories.nutritionMaintenance.aggregateDay(date)).resolves.toBeNull()
+    await expect(repositories.nutritionSummaries.findByDate(date)).resolves.toBeNull()
     await database.close()
   })
 })

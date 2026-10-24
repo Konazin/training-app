@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   ExerciseLibraryRepository,
   ExternalExerciseCandidate,
+  ExternalExerciseCatalogPage,
   ExternalExerciseCatalogQuery,
   ExternalExerciseImportRepository,
 } from '@training/training-domain'
@@ -9,6 +10,8 @@ import { exerciseIdentity } from '@training/training-domain'
 import { WgerExerciseCatalogProvider, WgerHttpError, type WgerLanguageOption } from '@training/training-wger'
 import { ExerciseDbClient } from '@training/training-exercisedb'
 import type { ToastKind } from '../../components/Toast'
+
+export type CatalogSource = 'EXERCISEDB' | 'WGER' | 'BOTH'
 
 export const DEFAULT_WGER_QUERY: ExternalExerciseCatalogQuery = {
   page: 1,
@@ -47,6 +50,10 @@ export function useWgerIntegrationController(
   const [languagesFailed, setLanguagesFailed] = useState(false)
   const languageRequest = useRef<Promise<WgerLanguageOption[]> | null>(null)
   const requestId = useRef(0)
+  const committedQuery = useRef(DEFAULT_WGER_QUERY)
+  const cursors = useRef<Map<number, string>>(new Map())
+  const [source, setSource] = useState<CatalogSource>('EXERCISEDB')
+  const committedSource = useRef<CatalogSource>('EXERCISEDB')
   const abort = useRef<AbortController | null>(null)
 
   const loadImportedCount = useCallback(async () => {
@@ -65,25 +72,53 @@ export function useWgerIntegrationController(
     }
   }, [loadImportedCount])
 
-  const search = useCallback(async (page = 1) => {
+  const search = useCallback(async (requestedPage = 1, overrides: Partial<ExternalExerciseCatalogQuery> = {}, sourceOverride?: CatalogSource) => {
     abort.current?.abort()
     const controller = new AbortController()
     abort.current = controller
     const currentRequest = ++requestId.current
-    const nextQuery = { ...query, page }
-    const requestQuery = { ...nextQuery, language: query.language === 'auto' ? deviceLocale() : query.language }
-    setQuery(nextQuery)
+    // A primeira página usa o que está na tela; as demais continuam a consulta já executada,
+    // para que editar o campo de busca não troque o resultado da paginação.
+    const base = requestedPage === 1 ? { ...query, ...overrides } : { ...committedQuery.current, ...overrides }
+    const activeSource = requestedPage === 1 ? (sourceOverride ?? source) : committedSource.current
+    const wantsCatalog = activeSource !== 'WGER'
+    // ExerciseDB pagina por cursor: sem cursor conhecido a única página alcançável é a primeira.
+    const cursor = requestedPage > 1 ? cursors.current.get(requestedPage) : undefined
+    const needsCursor = wantsCatalog && provider.descriptor?.id === 'EXERCISEDB'
+    const catalogExhausted = needsCursor && requestedPage > 1 && !cursor
+    // Em "Ambos", a fonte esgotada só deixa de contribuir; sozinha, recomeça na primeira página.
+    const page = catalogExhausted && activeSource === 'EXERCISEDB' ? 1 : requestedPage
+    const useCatalog = wantsCatalog && !(catalogExhausted && activeSource === 'BOTH')
+    if (page === 1) cursors.current = new Map()
+    const nextQuery = { ...base, page }
+    const requestQuery = {
+      ...nextQuery,
+      language: base.language === 'auto' ? deviceLocale() : base.language,
+    }
+    // Paginar não pode sobrescrever o que o usuário digitou depois da busca.
+    setQuery((current) => page === 1 ? nextQuery : { ...current, page })
     setPhase('loading')
     setMessage({ text: '', kind: 'info' })
     try {
-      let result
-      try { result = await provider.search(requestQuery, controller.signal) }
-      catch (error) {
-        if (provider.descriptor?.id !== 'EXERCISEDB') throw error
-        setMessage({ text: 'ExerciseDB indisponível; tentando Wger…', kind: 'warning' })
-        result = await fallback.search(requestQuery, controller.signal)
-      }
+      const jobs: { label: string; run: () => ReturnType<typeof provider.search>; cursorSource: boolean }[] = []
+      if (useCatalog) jobs.push({ label: 'ExerciseDB', cursorSource: needsCursor, run: () => provider.search({ ...requestQuery, ...(cursor ? { cursor } : {}) }, controller.signal) })
+      if (activeSource !== 'EXERCISEDB' && provider !== fallback) jobs.push({ label: 'Wger', cursorSource: false, run: () => fallback.search(requestQuery, controller.signal) })
+      const settled = await Promise.allSettled(jobs.map((job) => job.run()))
+      const failed = settled.flatMap((entry, index) => entry.status === 'rejected' ? [{ label: jobs[index]!.label, reason: entry.reason as unknown }] : [])
+      if (failed.length === settled.length) throw failed[0]!.reason
+      const pages = settled.flatMap((entry, index) => entry.status === 'fulfilled' ? [{ value: entry.value, job: jobs[index]! }] : [])
       if (requestId.current !== currentRequest) return false
+      committedQuery.current = nextQuery
+      committedSource.current = activeSource
+      if (requestedPage === 1) setSource(activeSource)
+      for (const { value, job } of pages) {
+        // O nextCursor do Wger é uma URL e não serve ao ExerciseDB.
+        if (job.cursorSource && value.nextCursor) cursors.current.set(page + 1, value.nextCursor)
+      }
+      const result = mergePages(pages.map((entry) => entry.value), page)
+      if (failed.length) {
+        setMessage({ text: `${failed.map((item) => item.label).join(', ')} indisponível; mostrando apenas ${pages.map((entry) => entry.job.label).join(', ')}.`, kind: 'warning' })
+      }
       const previewExisting = await imports.previewExisting(result.items)
       if (requestId.current !== currentRequest) return false
       setItems(result.items)
@@ -95,14 +130,17 @@ export function useWgerIntegrationController(
       if (!result.items.length) setMessage({ text: 'Nenhum exercício encontrado nesta página.', kind: 'warning' })
       return true
     } catch (error) {
-      if (error instanceof WgerHttpError && error.code === 'ABORTED') return false
       if (requestId.current !== currentRequest) return false
+      if (controller.signal.aborted || (error instanceof WgerHttpError && error.code === 'ABORTED')) {
+        setPhase('results')
+        return false
+      }
       const offline = error instanceof WgerHttpError && error.code === 'OFFLINE'
       setPhase(offline ? 'offline' : 'error')
       setMessage({ text: messageFrom(error), kind: 'error' })
       return false
     }
-  }, [fallback, imports, provider, query])
+  }, [fallback, imports, provider, query, source])
 
   const loadLanguages = useCallback(async () => {
     if (languages.length) return languages
@@ -154,7 +192,7 @@ export function useWgerIntegrationController(
     if (!selected.size) return false
     setPhase('importing')
     try {
-      const result = await imports.importSelected([...selected.values()])
+      const result = await imports.importSelected([...selected.values()], { restoreArchived: true })
       await Promise.all([onImported(), loadImportedCount()])
       setExisting((current) => new Set([...current, ...selected.keys()]))
       setSelected(new Map())
@@ -224,6 +262,8 @@ export function useWgerIntegrationController(
   return {
     query,
     setQuery,
+    source,
+    setSource,
     items,
     selected,
     existing,
@@ -256,4 +296,22 @@ function messageFrom(error: unknown) {
 
 export function deviceLocale() {
   return Intl.DateTimeFormat().resolvedOptions().locale.replace('_', '-').toLowerCase() || 'en'
+}
+
+/** Intercala os resultados de várias fontes para que nenhuma domine a página. */
+function mergePages(pages: ExternalExerciseCatalogPage[], page: number): ExternalExerciseCatalogPage {
+  if (pages.length === 1) return pages[0]!
+  const items: ExternalExerciseCandidate[] = []
+  const longest = Math.max(...pages.map((entry) => entry.items.length))
+  for (let index = 0; index < longest; index += 1) {
+    for (const entry of pages) if (entry.items[index]) items.push(entry.items[index]!)
+  }
+  return {
+    items,
+    page,
+    pageSize: pages.reduce((total, entry) => total + entry.pageSize, 0),
+    total: pages.reduce((total, entry) => total + entry.total, 0),
+    hasNext: pages.some((entry) => entry.hasNext),
+    hasPrevious: page > 1,
+  }
 }

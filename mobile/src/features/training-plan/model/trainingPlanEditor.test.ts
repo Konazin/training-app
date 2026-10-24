@@ -71,7 +71,7 @@ describe('editor mobile de fichas', () => {
     expect(optionSource).toContain('minHeight: 56')
     expect(templateSource).toContain('Este template cria a divisão semanal')
     expect(templateSource).toContain('Usar este template')
-    expect(previewSource).toContain('Sem exercícios')
+    expect(previewSource).toContain('sem exercícios')
     expect(duplicateSource).toContain("'COMPLETE'")
     expect(duplicateSource).toContain("'STRUCTURE_ONLY'")
     expect(duplicateSource).toContain("'WITHOUT_LOADS'")

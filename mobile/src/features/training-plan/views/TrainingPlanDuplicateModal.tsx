@@ -1,8 +1,10 @@
 import { useRef } from 'react'
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Check, Circle } from 'lucide-react-native'
 import { type TrainingPlanDuplicateMode } from '@training/training-domain'
 import { shared, type ThemeColors, useTheme } from '../../../theme'
 import { PrimaryButton } from '../../../components/PrimaryButton'
+import { fontFamilies } from '../../../theme/typography'
 import type { TrainingPlanUiResult } from '../controller/useTrainingPlanController'
 
 const options: Array<{
@@ -84,10 +86,15 @@ export function TrainingPlanDuplicateModal({
                 disabled={busy}
                 key={option.mode}
                 onPress={() => onChange(option.mode)}
-                style={[styles.option, selected && styles.selected]}
+                style={({ pressed }) => [styles.option, selected && styles.selected, pressed && styles.pressed]}
               >
-                <Text style={styles.optionTitle}>{selected ? '● ' : '○ '}{option.title}</Text>
-                <Text style={styles.description}>{option.description}</Text>
+                <View style={styles.optionCopy}>
+                  <Text style={styles.optionTitle}>{option.title}</Text>
+                  <Text style={styles.description}>{option.description}</Text>
+                </View>
+                {selected
+                  ? <Check color={colors.ac} size={18} strokeWidth={2} />
+                  : <Circle color={colors.mu} size={18} strokeWidth={1.5} />}
               </Pressable>
             )
           })}
@@ -116,12 +123,14 @@ export function TrainingPlanDuplicateModal({
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   backdrop: { alignItems: 'center', backgroundColor: colors.scrim, flex: 1, justifyContent: 'center', padding: shared.pagePadding },
-  modal: { backgroundColor: colors.surface, borderRadius: 22, maxWidth: 480, padding: 20, width: '100%' },
-  title: { color: colors.textPrimary, fontSize: 22, fontWeight: '900', marginBottom: 12 },
-  option: { borderColor: colors.border, borderRadius: 14, borderWidth: 1, marginBottom: 8, minHeight: 76, padding: 13 },
-  selected: { borderColor: colors.primary, borderWidth: 2 },
-  optionTitle: { color: colors.textPrimary, fontSize: 15, fontWeight: '900' },
-  description: { color: colors.textSecondary, fontSize: 13, lineHeight: 18, marginTop: 4 },
+  modal: { backgroundColor: colors.s1, borderRadius: 12, maxWidth: 480, padding: 20, width: '100%' },
+  title: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 22, fontWeight: '500', marginBottom: 12 },
+  option: { alignItems: 'center', borderBottomColor: colors.bd, borderBottomWidth: 1, flexDirection: 'row', gap: 12, marginBottom: 8, minHeight: 76, paddingVertical: 12 },
+  selected: { backgroundColor: colors.s2 },
+  optionCopy: { flex: 1 },
+  optionTitle: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 15, fontWeight: '500' },
+  description: { color: colors.t2, fontFamily: fontFamilies.text, fontSize: 13, lineHeight: 18, marginTop: 4 },
   loading: { alignItems: 'center', flexDirection: 'row', gap: 8, marginTop: 5 },
   actions: { flexDirection: 'row', gap: 8, marginTop: 14 },
+  pressed: { opacity: 0.75 },
 })

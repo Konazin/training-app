@@ -1,13 +1,16 @@
 # Training App
 
-Aplicativo de gestão de treino mobile-first. O aplicativo padrão em `mobile/`
-é local-only e offline-first: React Native/Expo compõe regras TypeScript puras
-com repositories `expo-sqlite`, sem exigir servidor, VPS, IP, conta ou internet.
+Aplicativo Android de gestão de treino, local-first e offline-first. O app
+padrão em `mobile/` combina regras TypeScript puras com repositories
+`expo-sqlite`; não exige servidor, VPS, conta ou internet para os fluxos
+principais.
 
 ## O que funciona offline
 
-- registrar refeições manuais com vários alimentos, metas locais e resumo diário;
-
+- registrar refeições manuais com vários alimentos, metas, fibras e resumos
+  diários locais;
+- consultar resumos dos últimos sete dias e dias anteriores;
+- editar estimativas de refeição e sugestões de cardápio antes de salvá-las;
 - criar, editar e arquivar exercícios;
 - criar fichas do zero ou com seis templates semanais;
 - editar categoria e dificuldade com presets ou valores personalizados;
@@ -27,11 +30,12 @@ com repositories `expo-sqlite`, sem exigir servidor, VPS, IP, conta ou internet.
 - escolher entre quatro temas, aparência do sistema e níveis de movimento;
 - usar alto contraste no treino e controlar feedback tátil;
 - mover fichas para uma lixeira local com retenção de sete dias;
-- exportar, validar e restaurar backups com `schemaVersion: 2`;
+- exportar, validar e restaurar backups `schemaVersion: 3` (lendo schemas 1 e 2);
 - receber avisos locais dispensáveis e onboarding offline em instalações novas.
 
-O SQLite `training.db` é a fonte de verdade para treino e biblioteca.
+O SQLite `training.db` é a fonte de verdade para treino, biblioteca e nutrição.
 AsyncStorage guarda o cronômetro transitório e preferências visuais versionadas.
+Chaves de IA ficam no SecureStore e nunca entram em backups.
 Desinstalar o aplicativo apaga os dados locais; exporte backups regularmente.
 
 ## Estrutura
@@ -106,9 +110,9 @@ Os cinco backups automáticos mais recentes ficam visíveis em **Mais**, com
 restauração, compartilhamento e exclusão. **Apagar todos os dados** preserva os
 metadados técnicos e continua vazio ao reabrir.
 
-Backups v2 podem incluir preferências visuais, favoritos, recentes e aliases do
-usuário em campos opcionais; arquivos antigos continuam aceitos. Eles não
-contêm tokens, chaves, arquivos de mídia, cache ou estado do player.
+Backups schema 3 incluem dados nutricionais e configurações locais; schemas 1 e
+2 continuam aceitos. Backups não contêm tokens, chaves, imagens de análise,
+cache ou estado transitório do player.
 Veja [backup e restauração](docs/BACKUP_AND_RESTORE.md).
 
 ## Editor, templates e duplicação
@@ -182,10 +186,12 @@ exigir internet. Veja [uso da integração](docs/WGER_INTEGRATION.md) e
 
 ## Internet e componentes opcionais
 
-O app padrão não realiza rede no bootstrap nem para operações principais. O
-Wger é consultado somente na tela da integração; mídia remota só carrega quando
-necessária e vídeos exigem ação explícita. IA, Health Connect e backup remoto
-continuam fora do runtime padrão.
+O app padrão não realiza rede no bootstrap nem para operações principais.
+Wger/ExerciseDB são consultados somente pela integração. Gemini é opcional e
+somente recebe uma imagem ou texto após ação e confirmação explícitas. No uso
+gratuito, o provedor pode usar entradas e respostas para melhorar serviços e
+revisão humana; consulte [modo Nutrição](docs/NUTRITION_MODE.md). Health Connect
+e backup remoto continuam fora do runtime padrão.
 
 O backend Java, PostgreSQL, Docker e a interface web são opcionais e não fazem
 parte do runtime do app padrão. Consulte [servidor opcional](docs/OPTIONAL_SERVER.md).
@@ -203,21 +209,11 @@ npm run typecheck --workspace=@training/training-wger
 npm run test --workspace=@training/training-wger
 npm run typecheck --workspace=training-mobile
 npm run test --workspace=training-mobile
-npm run typecheck --workspace=umamusume-mobile
-EXPO_NO_TELEMETRY=1 npm exec --workspace=training-mobile -- expo install --check
-EXPO_NO_TELEMETRY=1 npm exec --workspace=training-mobile -- expo export --platform android --output-dir dist
 git diff --check
-npm run test --workspace=training-mobile
 ```
 
-O export Expo valida o bundle; esta etapa não gera APK. Para gerar o candidato
-instalável, use [o roteiro do APK local-only](docs/LOCAL_ANDROID_APK.md) e faça
-o teste físico em modo avião com
-[o roteiro local-only](docs/LOCAL_ONLY_SMOKE_TEST.md).
-O roteiro específico desta entrega está em
-[smoke Android dos Marcos 4 e 5](docs/MARCO_4_5_ANDROID_SMOKE.md).
-O APK 0.9.0 foi substituído e não deve seguir para teste formal. O candidato
-0.9.3 mantém o manifesto Wger com 40 aprovados, mas permanece bloqueado até que
-o APK seja gerado; consulte [o relatório 0.9.3](docs/RELEASE_CANDIDATE_0_9_3.md).
-O importador também invalida operações canceladas/desmontadas, reutiliza cache
-válido e mantém a segunda importação sem alterações SQLite.
+Para validar também o bundle Android, execute `npx expo install --check` e
+`npx expo export --platform android` dentro de `mobile/`. O export valida o
+bundle JavaScript, mas não gera APK. Para gerar e instalar o candidato 0.11.0,
+use [o roteiro do APK local-only](docs/LOCAL_ANDROID_APK.md) e execute o
+[smoke test Android](docs/LOCAL_ONLY_SMOKE_TEST.md) em modo avião e com rede.

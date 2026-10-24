@@ -1,29 +1,31 @@
 import { useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import type { WeeklyTrainingOverview } from '@training/training-domain'
+import { Check } from 'lucide-react-native'
+import type { WeeklyTrainingDayOverview, WeeklyTrainingOverview } from '@training/training-domain'
+import { ProgressBar } from '../motion'
 import { type ThemeColors, useTheme } from '../theme'
 import { typography } from '../theme/typography'
 
 const weekdayLabels = {
-  MONDAY: 'SEG',
-  TUESDAY: 'TER',
-  WEDNESDAY: 'QUA',
-  THURSDAY: 'QUI',
-  FRIDAY: 'SEX',
-  SATURDAY: 'SÁB',
-  SUNDAY: 'DOM',
+  MONDAY: 'seg',
+  TUESDAY: 'ter',
+  WEDNESDAY: 'qua',
+  THURSDAY: 'qui',
+  FRIDAY: 'sex',
+  SATURDAY: 'sáb',
+  SUNDAY: 'dom',
 } as const
 
 const statusLabels = {
-  COMPLETED: 'Concluído',
-  ACTIVE: 'Em andamento',
+  COMPLETED: 'Feito',
+  ACTIVE: 'Ativo',
   PAUSED: 'Pausado',
   READY: 'Hoje',
-  SCHEDULED: 'Programado',
-  REST: 'Descanso',
-  MISSED: 'Não registrado',
-  ABANDONED: 'Não concluído',
-  UNCONFIGURED: 'Não configurado',
+  SCHEDULED: 'Previsto',
+  REST: 'Desc.',
+  MISSED: 'Pendente',
+  ABANDONED: 'Parcial',
+  UNCONFIGURED: 'Vazio',
 } as const
 
 export function TrainingWeekSummary({ overview }: { overview: WeeklyTrainingOverview }) {
@@ -31,15 +33,12 @@ export function TrainingWeekSummary({ overview }: { overview: WeeklyTrainingOver
   const { colors } = useTheme()
   const styles = createStyles(colors)
   const progressText = `${overview.completedTrainingDays} de ${overview.plannedTrainingDays} treinos concluídos`
-  const width = overview.plannedTrainingDays
-    ? `${overview.progressPercent}%` as `${number}%`
-    : '0%'
 
   return (
-    <View style={styles.card}>
+    <View style={styles.section}>
       <View style={styles.header}>
         <View style={styles.headerCopy}>
-          <Text style={styles.eyebrow}>ESTA SEMANA</Text>
+          <Text accessibilityRole="header" style={styles.title}>Semana</Text>
           <Text style={styles.progressText}>{progressText}</Text>
         </View>
         <Pressable
@@ -47,7 +46,7 @@ export function TrainingWeekSummary({ overview }: { overview: WeeklyTrainingOver
           accessibilityRole="button"
           accessibilityState={{ expanded }}
           onPress={() => setExpanded((current) => !current)}
-          style={styles.expand}
+          style={({ pressed }) => [styles.expand, pressed && styles.pressed]}
         >
           <Text style={styles.expandText}>{expanded ? 'Recolher' : 'Expandir'}</Text>
         </Pressable>
@@ -63,26 +62,16 @@ export function TrainingWeekSummary({ overview }: { overview: WeeklyTrainingOver
         }}
         style={styles.track}
       >
-        <View style={[styles.fill, { width }]} />
+        <ProgressBar
+          color={colors.ac}
+          progress={overview.plannedTrainingDays ? overview.progressPercent / 100 : 0}
+          trackColor={colors.s2}
+        />
       </View>
       {expanded && (
         <View style={styles.days}>
           {overview.days.map((day) => (
-            <View
-              accessibilityLabel={`${weekdayLabels[day.weekday]}, ${Number(day.dateKey.slice(-2))}, ${day.title}, ${statusLabels[day.status]}${day.isToday ? ', hoje' : ''}`}
-              accessibilityState={{ selected: day.isToday }}
-              key={day.dateKey}
-              style={[styles.day, day.isToday && styles.today]}
-            >
-              <View style={styles.date}>
-                <Text style={styles.weekday}>{weekdayLabels[day.weekday]}</Text>
-                <Text style={styles.dayNumber}>{Number(day.dateKey.slice(-2))}</Text>
-              </View>
-              <Text numberOfLines={2} style={styles.title}>{day.title}</Text>
-              <Text style={[styles.status, day.isToday && styles.todayStatus]}>
-                {statusLabels[day.status]}
-              </Text>
-            </View>
+            <WeekdayCell key={day.dateKey} day={day} />
           ))}
         </View>
       )}
@@ -90,23 +79,64 @@ export function TrainingWeekSummary({ overview }: { overview: WeeklyTrainingOver
   )
 }
 
+function WeekdayCell({ day }: { day: WeeklyTrainingDayOverview }) {
+  const { colors } = useTheme()
+  const styles = createStyles(colors)
+  const label = statusLabels[day.status]
+  const date = Number(day.dateKey.slice(-2))
+
+  return (
+    <View
+      accessibilityLabel={`${weekdayLabels[day.weekday]}, ${date}, ${day.title}, ${label}${day.isToday ? ', hoje' : ''}`}
+      accessibilityState={{ selected: day.isToday }}
+      style={[styles.day, day.isToday && styles.today]}
+    >
+      <Text style={[styles.weekday, day.isToday && styles.todayText]}>{weekdayLabels[day.weekday]}</Text>
+      <StateGlyph status={day.status} />
+      <Text style={[styles.status, day.isToday && styles.todayText]}>{label}</Text>
+    </View>
+  )
+}
+
+function StateGlyph({ status }: { status: WeeklyTrainingDayOverview['status'] }) {
+  const { colors } = useTheme()
+  const styles = createStyles(colors)
+  if (status === 'COMPLETED') {
+    return <View style={styles.completedGlyph}><Check color={colors.on} size={13} strokeWidth={2.2} /></View>
+  }
+  if (status === 'ABANDONED') {
+    return <View style={styles.partialGlyph}><View style={styles.partialFill} /></View>
+  }
+  if (status === 'REST') return <View style={styles.restGlyph} />
+  if (status === 'ACTIVE' || status === 'PAUSED') return <View style={styles.activeGlyph} />
+  if (status === 'READY') {
+    return <View style={styles.todayGlyph}><View style={styles.todayDot} /></View>
+  }
+  return <View style={styles.pendingGlyph} />
+}
+
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  card: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 20, borderWidth: 1, marginBottom: 20, padding: 16 },
-  header: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
+  section: { marginBottom: 8 },
+  header: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
   headerCopy: { flex: 1 },
-  eyebrow: { ...typography.caption, color: colors.textSecondary, fontWeight: '800', letterSpacing: 1.2 },
-  progressText: { ...typography.body, color: colors.textPrimary, fontWeight: '800', marginTop: 5 },
-  expand: { alignItems: 'center', justifyContent: 'center', minHeight: 48, paddingHorizontal: 8 },
-  expandText: { ...typography.label, color: colors.primary, fontWeight: '800' },
-  track: { backgroundColor: colors.surfaceSecondary, borderRadius: 5, height: 10, marginTop: 14, overflow: 'hidden' },
-  fill: { backgroundColor: colors.primary, borderRadius: 5, height: 10 },
-  days: { marginTop: 12 },
-  day: { alignItems: 'center', borderTopColor: colors.border, borderTopWidth: 1, flexDirection: 'row', gap: 12, minHeight: 58, paddingHorizontal: 8, paddingVertical: 7 },
-  today: { backgroundColor: colors.surfaceSecondary, borderRadius: 12 },
-  date: { alignItems: 'center', width: 42 },
-  weekday: { ...typography.caption, color: colors.textSecondary, fontWeight: '800' },
-  dayNumber: { ...typography.body, color: colors.textPrimary, fontWeight: '900' },
-  title: { ...typography.bodySmall, color: colors.textPrimary, flex: 1, fontWeight: '700' },
-  status: { ...typography.caption, color: colors.textSecondary, maxWidth: 94, textAlign: 'right' },
-  todayStatus: { color: colors.primary, fontWeight: '900' },
+  title: { ...typography.titleSmall, color: colors.tx },
+  progressText: { ...typography.bodySmall, color: colors.t2, marginTop: 2 },
+  expand: { alignItems: 'center', justifyContent: 'center', minHeight: 48, paddingHorizontal: 4 },
+  expandText: { ...typography.bodySmall, color: colors.t2, fontWeight: '500' },
+  track: { marginTop: 12 },
+  days: { flexDirection: 'row', gap: 2, justifyContent: 'space-between', marginTop: 12 },
+  day: { alignItems: 'center', borderRadius: 14, flex: 1, gap: 4, justifyContent: 'center', minHeight: 76, paddingHorizontal: 1, paddingVertical: 6 },
+  today: { backgroundColor: colors.s1 },
+  weekday: { ...typography.captionSmall, color: colors.t2 },
+  todayText: { color: colors.tx, fontWeight: '600' },
+  status: { ...typography.captionSmall, color: colors.t2, textAlign: 'center' },
+  completedGlyph: { alignItems: 'center', backgroundColor: colors.ac, borderRadius: 10, height: 20, justifyContent: 'center', width: 20 },
+  partialGlyph: { borderColor: colors.t2, borderRadius: 10, borderWidth: 1, height: 20, overflow: 'hidden', width: 20 },
+  partialFill: { backgroundColor: colors.t2, bottom: 0, left: 0, position: 'absolute', top: 0, width: '50%' },
+  restGlyph: { backgroundColor: colors.mu, borderRadius: 1, height: 2, marginVertical: 9, width: 16 },
+  activeGlyph: { backgroundColor: colors.ac, borderRadius: 5, height: 10, marginVertical: 5, width: 10 },
+  todayGlyph: { alignItems: 'center', borderColor: colors.tx, borderRadius: 10, borderWidth: 1, height: 20, justifyContent: 'center', width: 20 },
+  todayDot: { backgroundColor: colors.tx, borderRadius: 3, height: 6, width: 6 },
+  pendingGlyph: { borderColor: colors.t2, borderRadius: 10, borderWidth: 1, height: 18, marginVertical: 1, width: 18 },
+  pressed: { opacity: 0.72 },
 })

@@ -1,16 +1,18 @@
 import { useState } from 'react'
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Check } from 'lucide-react-native'
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { FormField } from '../../../components/FormField'
-import { PrimaryButton } from '../../../components/PrimaryButton'
 import { Screen, ScreenScrollView } from '../../../components/Screen'
 import { ScreenHeader } from '../../../components/ScreenHeader'
 import { SelectableChip } from '../../../components/SelectableChip'
+import { BottomActionBar } from '../../../components/ui/BottomActionBar'
 import type { RootStackParamList } from '../../../navigation/types'
 import { useUnsavedChangesGuard } from '../../../navigation/useUnsavedChangesGuard'
 import type { RestActivityInput, TrainingPlan } from '../model/trainingPlan'
 import { shared, type ThemeColors, useTheme } from '../../../theme'
+import { PressableScale } from '../../../motion'
 
 const categories = [
   'caminhada',
@@ -81,9 +83,9 @@ export function RestActivityEditorScreen({
   }
 
   return (
-    <ScreenScrollView>
+    <>
+    <ScreenScrollView contentContainerStyle={styles.content}>
       <ScreenHeader
-        eyebrow={activity ? 'Editar atividade' : 'Nova atividade'}
         title={activity?.name ?? 'Descanso ativo'}
         description="Atividade opcional para o dia de recuperação."
       />
@@ -107,32 +109,42 @@ export function RestActivityEditorScreen({
           onChangeText={setDuration}
           keyboardType="number-pad"
         />
-        <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{ checked: optional }} style={styles.checkboxRow} onPress={() => setOptional((current) => !current)}>
+        <PressableScale accessibilityRole="checkbox" accessibilityState={{ checked: optional }} style={styles.checkboxRow} onPress={() => setOptional((current) => !current)}>
           <View style={[styles.checkbox, optional && styles.checkboxActive]}>
-            <Text style={styles.checkboxText}>{optional ? '✓' : ''}</Text>
+            {optional && <Check color={colors.on} size={16} strokeWidth={2} />}
           </View>
           <Text style={styles.checkboxLabel}>Atividade opcional</Text>
-        </TouchableOpacity>
+        </PressableScale>
         {!!(formError || errors[key]) && <Text style={styles.error}>{formError || errors[key]}</Text>}
-        <PrimaryButton
-          label="Salvar atividade"
-          loading={busyKeys.has(key)}
-          onPress={() => void save()}
-        />
       </View>
     </ScreenScrollView>
+    <BottomActionBar>
+      <PressableScale
+        accessibilityRole="button"
+        accessibilityState={{ disabled: busyKeys.has(key), busy: busyKeys.has(key) }}
+        disabled={busyKeys.has(key)}
+        onPress={() => void save()}
+        style={[styles.saveButton, busyKeys.has(key) && styles.disabled]}
+      >
+        <Text style={styles.saveButtonText}>{busyKeys.has(key) ? 'Salvando…' : 'Salvar atividade'}</Text>
+      </PressableScale>
+    </BottomActionBar>
+    </>
   )
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  form: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 20, borderWidth: 1, padding: 16 },
+  content: { paddingBottom: 132 },
+  form: { gap: 4 },
   chips: { marginBottom: 14 },
   checkboxRow: { alignItems: 'center', flexDirection: 'row', gap: 12, marginBottom: 14, minHeight: 48 },
-  checkbox: { alignItems: 'center', borderColor: colors.border, borderRadius: 6, borderWidth: 1, height: 28, justifyContent: 'center', width: 28 },
-  checkboxActive: { backgroundColor: colors.primary },
-  checkboxText: { color: colors.onPrimary, fontSize: 12, fontWeight: '800' },
-  checkboxLabel: { color: colors.textPrimary, fontSize: 14, fontWeight: '700' },
-  error: { color: colors.danger, fontSize: 14, lineHeight: 20, marginBottom: 9 },
+  checkbox: { alignItems: 'center', borderColor: colors.bd, borderRadius: 4, borderWidth: 1, height: 24, justifyContent: 'center', width: 24 },
+  checkboxActive: { backgroundColor: colors.ac, borderColor: colors.ac },
+  checkboxLabel: { color: colors.tx, fontFamily: 'Geist', fontSize: 14, fontWeight: '400' },
+  error: { color: colors.dg, fontFamily: 'Geist', fontSize: 14, lineHeight: 20, marginBottom: 9, marginTop: 8 },
   empty: { alignItems: 'center', flex: 1, justifyContent: 'center' },
-  title: { color: colors.ink, fontSize: 18, fontWeight: '800' },
+  title: { color: colors.tx, fontFamily: 'Geist', fontSize: 18, fontWeight: '500' },
+  saveButton: { alignItems: 'center', backgroundColor: colors.ac, borderRadius: 12, justifyContent: 'center', minHeight: 56 },
+  saveButtonText: { color: colors.on, fontFamily: 'Geist', fontSize: 16, fontWeight: '500' },
+  disabled: { opacity: 0.55 },
 })

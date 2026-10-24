@@ -7,11 +7,13 @@ import { typography } from '../theme/typography'
 interface Props extends ComponentProps<typeof TextInput> {
   error?: boolean
   disabled?: boolean
+  highContrast?: boolean
 }
 
 export function ThemedTextInput({
   disabled = false,
   error = false,
+  highContrast = false,
   editable,
   onBlur,
   onFocus,
@@ -21,10 +23,12 @@ export function ThemedTextInput({
   const { colors } = useTheme()
   const [focused, setFocused] = useState(false)
   const palette = formFieldColors(colors, focused, error, disabled)
+  const cursorColor = highContrast ? colors.workout.timer : palette.cursorColor
+  const selectionColor = highContrast ? colors.workout.timer : palette.selectionColor
   return (
     <TextInput
       accessibilityState={{ disabled }}
-      cursorColor={Platform.OS === 'android' ? palette.cursorColor : undefined}
+      cursorColor={Platform.OS === 'android' ? cursorColor : undefined}
       editable={!disabled && editable !== false}
       onBlur={(event) => {
         setFocused(false)
@@ -35,7 +39,7 @@ export function ThemedTextInput({
         onFocus?.(event)
       }}
       placeholderTextColor={colors.textSecondary}
-      selectionColor={palette.selectionColor}
+      selectionColor={selectionColor}
       style={[styles.input, palette, disabled && styles.disabled, style]}
       {...props}
     />
@@ -44,13 +48,14 @@ export function ThemedTextInput({
 
 const styles = StyleSheet.create({
   input: {
-    borderRadius: 15,
+    borderRadius: 12,
     borderWidth: 1,
+    fontFamily: typography.body.fontFamily,
     fontSize: typography.body.fontSize,
     lineHeight: typography.body.lineHeight,
-    minHeight: 56,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    minHeight: 48,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   disabled: { opacity: 0.7 },
 })

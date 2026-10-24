@@ -18,6 +18,21 @@ export interface WorkoutColors {
 }
 
 export interface ThemeColors {
+  /** MIV semantic roles. Components should prefer these names. */
+  bg: string
+  s1: string
+  s2: string
+  bd: string
+  tx: string
+  t2: string
+  mu: string
+  ac: string
+  on: string
+  dg: string
+  pressed: string
+  onDanger: string
+
+  /** Compatibility aliases used while screens migrate to the MIV roles. */
   background: string
   surface: string
   surfaceSecondary: string
@@ -52,96 +67,123 @@ export interface ThemeColors {
   workout: WorkoutColors
 }
 
-const whiteBlueLight: ThemeColors = {
-  background: '#F5F7FA', surface: '#FFFFFF', surfaceSecondary: '#EAF0F7', surfaceTertiary: '#DCE5F0', card: '#FFFFFF',
-  border: '#CBD5E1', primary: '#155EEF', primaryPressed: '#124DC5', onPrimary: '#FFFFFF',
-  textPrimary: '#111827', textSecondary: '#4B5563', success: '#147A3D', successSurface: '#DCFCE7',
-  warning: '#9A4D00', danger: '#B42318', dangerSurface: '#FEE4E2', focus: '#2563EB',
-  disabled: '#94A3B8', tabBar: '#FFFFFF', overlay: 'rgba(15,23,42,0.64)', scrim: 'rgba(15,23,42,0.64)',
-  black: '#0F172A', nearBlack: '#111827', ink: '#111827', gray700: '#374151', gray500: '#4B5563',
-  gray400: '#4B5563', gray300: '#CBD5E1', gray200: '#D8E0EA', gray100: '#EAF0F7', white: '#FFFFFF',
-  workout: {
-    background: '#FFFFFF', surface: '#F8FAFC', border: '#334155', text: '#0F172A',
-    textSecondary: '#334155', completed: '#166534', onCompleted: '#FFFFFF', pending: '#FFFFFF',
-    timer: '#0F172A', timerText: '#FFFFFF', danger: '#991B1B',
-  },
+type SemanticPalette = Pick<ThemeColors, 'bg' | 's1' | 's2' | 'bd' | 'tx' | 't2' | 'mu' | 'ac' | 'on' | 'dg'>
+
+const highContrastWorkout: WorkoutColors = {
+  background: '#000000',
+  surface: '#0A0A0A',
+  border: '#6B6B6B',
+  text: '#FFFFFF',
+  textSecondary: '#D0D0D0',
+  completed: '#FFFFFF',
+  onCompleted: '#000000',
+  pending: '#1A1A1A',
+  timer: '#FFFFFF',
+  timerText: '#000000',
+  danger: '#FF9C8E',
 }
 
-const whiteBlueDark: ThemeColors = {
-  background: '#0B1220', surface: '#121C2E', surfaceSecondary: '#1B2940', surfaceTertiary: '#263751', card: '#121C2E',
-  border: '#40516B', primary: '#74A7FF', primaryPressed: '#4D8FF7', onPrimary: '#07101F',
-  textPrimary: '#F8FAFC', textSecondary: '#C0CAD8', success: '#5EE68A', successSurface: '#143522',
-  warning: '#FFD166', danger: '#FF8A80', dangerSurface: '#431C20', focus: '#9BC1FF',
-  disabled: '#728097', tabBar: '#121C2E', overlay: 'rgba(0,0,0,0.76)', scrim: 'rgba(0,0,0,0.76)',
-  black: '#07101F', nearBlack: '#121C2E', ink: '#F8FAFC', gray700: '#E2E8F0', gray500: '#C0CAD8',
-  gray400: '#C0CAD8', gray300: '#607089', gray200: '#40516B', gray100: '#1B2940', white: '#FFFFFF',
-  workout: {
-    background: '#07101F', surface: '#101D31', border: '#AFCBFF', text: '#FFFFFF',
-    textSecondary: '#D8E6FF', completed: '#6EE7A0', onCompleted: '#071510', pending: '#101D31',
-    timer: '#FFFFFF', timerText: '#07101F', danger: '#FFB4AC',
-  },
+function blend(background: string, foreground: string, opacity: number) {
+  const channel = (base: number, top: number) => Math.round(base * (1 - opacity) + top * opacity)
+  const hex = (value: string) => [1, 3, 5].map((start) => Number.parseInt(value.slice(start, start + 2), 16))
+  const [br = 0, bg = 0, bb = 0] = hex(background)
+  const [fr = 0, fg = 0, fb = 0] = hex(foreground)
+  return `#${[channel(br, fr), channel(bg, fg), channel(bb, fb)]
+    .map((value) => value.toString(16).padStart(2, '0'))
+    .join('')}`
 }
 
-const darkBlueLight: ThemeColors = {
-  ...whiteBlueLight,
-  background: '#EEF4FA', surfaceSecondary: '#E1EBF5', surfaceTertiary: '#D3E1EE', primary: '#075985', primaryPressed: '#064667',
-  focus: '#0369A1', tabBar: '#F8FBFF', gray100: '#E1EBF5',
-  workout: { ...whiteBlueLight.workout, completed: '#14532D', timer: '#082F49' },
+function createPalette(tokens: SemanticPalette, dark: boolean): ThemeColors {
+  const scrim = dark ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.4)'
+  return {
+    ...tokens,
+    pressed: blend(tokens.s1, tokens.tx, 0.08),
+    onDanger: dark ? tokens.bg : '#FFFFFF',
+    background: tokens.bg,
+    surface: tokens.s1,
+    surfaceSecondary: tokens.s2,
+    surfaceTertiary: tokens.s2,
+    card: tokens.s1,
+    border: tokens.bd,
+    primary: tokens.ac,
+    primaryPressed: blend(tokens.bg, tokens.ac, 0.88),
+    onPrimary: tokens.on,
+    textPrimary: tokens.tx,
+    textSecondary: tokens.t2,
+    success: tokens.tx,
+    successSurface: tokens.s1,
+    warning: tokens.t2,
+    danger: tokens.dg,
+    dangerSurface: tokens.s1,
+    focus: tokens.ac,
+    disabled: `rgba(${Number.parseInt(tokens.tx.slice(1, 3), 16)},${Number.parseInt(tokens.tx.slice(3, 5), 16)},${Number.parseInt(tokens.tx.slice(5, 7), 16)},0.38)`,
+    tabBar: tokens.bg,
+    overlay: scrim,
+    scrim,
+    black: '#000000',
+    nearBlack: tokens.bg,
+    ink: tokens.tx,
+    gray700: tokens.tx,
+    gray500: tokens.t2,
+    gray400: tokens.mu,
+    gray300: tokens.bd,
+    gray200: tokens.s2,
+    gray100: tokens.s1,
+    white: '#FFFFFF',
+    workout: highContrastWorkout,
+  }
 }
 
-const darkBlueDark: ThemeColors = {
-  ...whiteBlueDark,
-  background: '#07101F', surface: '#111F35', surfaceSecondary: '#172A44', surfaceTertiary: '#203652', card: '#111F35',
-  border: '#263B59', primary: '#5B8CFF', primaryPressed: '#79A4FF', onPrimary: '#07101F',
-  tabBar: '#0B1629', nearBlack: '#111F35', gray200: '#263B59', gray100: '#172A44',
-  workout: { ...whiteBlueDark.workout, background: '#020B12', surface: '#0A1B2A', border: '#9AD9FF', pending: '#0A1B2A' },
-}
+const monochromeLight = createPalette({
+  bg: '#FFFFFF', s1: '#F5F5F5', s2: '#EBEBEB', bd: '#E3E3E3',
+  tx: '#0A0A0A', t2: '#525252', mu: '#6B6B6B', ac: '#0A0A0A', on: '#FFFFFF', dg: '#B3261E',
+}, false)
 
-const monochromeLight: ThemeColors = {
-  ...whiteBlueLight,
-  background: '#F4F4F4', surfaceSecondary: '#E7E7E7', border: '#B8B8B8',
-  primary: '#242424', primaryPressed: '#000000', focus: '#4A4A4A', tabBar: '#FFFFFF',
-  success: '#2E5E3E', warning: '#674E10', danger: '#8F2424', gray100: '#E7E7E7',
-  workout: { ...whiteBlueLight.workout, completed: '#1F432B', timer: '#171717' },
-}
+// Preto verdadeiro (OLED). Camadas sobem em cinzas neutros; branco é a única "cor".
+const monochromeDark = createPalette({
+  bg: '#000000', s1: '#0C0C0C', s2: '#171717', bd: '#242424',
+  tx: '#FAFAFA', t2: '#A3A3A3', mu: '#7A7A7A', ac: '#FAFAFA', on: '#000000', dg: '#FF7A6B',
+}, true)
 
-const monochromeDark: ThemeColors = {
-  ...whiteBlueDark,
-  background: '#101010', surface: '#1C1C1C', surfaceSecondary: '#292929', card: '#1C1C1C',
-  border: '#555555', primary: '#F2F2F2', primaryPressed: '#D5D5D5', onPrimary: '#101010',
-  focus: '#FFFFFF', tabBar: '#181818', nearBlack: '#1C1C1C', gray200: '#555555', gray100: '#292929',
-  workout: { ...whiteBlueDark.workout, background: '#050505', surface: '#171717', border: '#FFFFFF', pending: '#171717' },
-}
+const violetLight = createPalette({
+  bg: '#F7F5FC', s1: '#FFFFFF', s2: '#ECE8F7', bd: '#DDD7EE',
+  tx: '#14102A', t2: '#57517A', mu: '#6A6490', ac: '#4A2BA8', on: '#FFFFFF', dg: '#B3261E',
+}, false)
 
-const draculaLight: ThemeColors = {
-  ...whiteBlueLight,
-  background: '#F8F4FC', surfaceSecondary: '#EEE5F6', border: '#CBBBDD',
-  primary: '#6D28D9', primaryPressed: '#5B21B6', focus: '#7C3AED', tabBar: '#FFFAFF',
-  success: '#147A3D', warning: '#8A4B00', danger: '#A61B48', gray100: '#EEE5F6',
-  workout: { ...whiteBlueLight.workout, completed: '#166534', timer: '#3B1764' },
-}
+const violetDark = createPalette({
+  bg: '#0C0A18', s1: '#151226', s2: '#1E1A35', bd: '#2A2546',
+  tx: '#EFEBFA', t2: '#A59FC2', mu: '#8F89AE', ac: '#CBB8FF', on: '#0C0A18', dg: '#FF9A8A',
+}, true)
 
-const draculaDark: ThemeColors = {
-  ...whiteBlueDark,
-  background: '#191622', surface: '#242033', surfaceSecondary: '#302A43', card: '#242033',
-  border: '#574D70', primary: '#C7A0FF', primaryPressed: '#AD7CF3', onPrimary: '#1B1228',
-  success: '#70E89B', warning: '#FFD37A', danger: '#FF8FB3', focus: '#8BE9FD',
-  tabBar: '#211D2D', nearBlack: '#242033', gray200: '#574D70', gray100: '#302A43',
-  workout: {
-    ...whiteBlueDark.workout, background: '#100D17', surface: '#211C2F', border: '#E5D4FF',
-    completed: '#70E89B', pending: '#211C2F', timer: '#F8F5FF', timerText: '#171020', danger: '#FFB3CB',
-  },
-}
+const blueLight = createPalette({
+  bg: '#F4F6FB', s1: '#FFFFFF', s2: '#E6EBF5', bd: '#D6DDEC',
+  tx: '#0E1526', t2: '#4F5B78', mu: '#626E8C', ac: '#1B3A8C', on: '#FFFFFF', dg: '#B3261E',
+}, false)
+
+const blueDark = createPalette({
+  bg: '#080D18', s1: '#101828', s2: '#18233A', bd: '#26324D',
+  tx: '#EAF0FA', t2: '#9DAAC4', mu: '#8693B0', ac: '#A9C4FF', on: '#080D18', dg: '#FF9A8A',
+}, true)
+
+const whiteBlueLight = createPalette({
+  bg: '#FFFFFF', s1: '#F5F7FA', s2: '#E9EDF3', bd: '#DCE2EA',
+  tx: '#0E1116', t2: '#4D5663', mu: '#5F6978', ac: '#1B4FD6', on: '#FFFFFF', dg: '#B3261E',
+}, false)
+
+const whiteBlueDark = createPalette({
+  bg: '#0D1015', s1: '#161A22', s2: '#1F2430', bd: '#2A3140',
+  tx: '#EEF1F6', t2: '#A0A9B8', mu: '#8A94A5', ac: '#8AA9FF', on: '#0D1015', dg: '#FF9A8A',
+}, true)
 
 export const themePalettes: Record<ThemePreset, { light: ThemeColors; dark: ThemeColors }> = {
-  DARK_BLUE: { light: darkBlueLight, dark: darkBlueDark },
+  DARK_BLUE: { light: blueLight, dark: blueDark },
   MONOCHROME: { light: monochromeLight, dark: monochromeDark },
-  DRACULA: { light: draculaLight, dark: draculaDark },
+  DRACULA: { light: violetLight, dark: violetDark },
   WHITE_BLUE: { light: whiteBlueLight, dark: whiteBlueDark },
 }
 
-export const lightColors = whiteBlueLight
-export const darkColors = darkBlueDark
+export const lightColors: ThemeColors = monochromeLight
+export const darkColors: ThemeColors = monochromeDark
 
 export function resolvePalette(preset: ThemePreset, dark: boolean) {
   return themePalettes[preset][dark ? 'dark' : 'light']

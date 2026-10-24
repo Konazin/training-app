@@ -29,7 +29,7 @@ vi.mock('react-native', () => ({
   Text: 'Text',
   View: 'View',
 }))
-vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }))
+vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }) }))
 vi.mock('@react-navigation/native', () => ({
   useNavigation: () => mocks.navigation,
   usePreventRemove: mocks.preventRemove,
@@ -43,6 +43,7 @@ vi.mock('../../../theme', () => ({
   },
   useTheme: () => ({ colors: {} }),
 }))
+vi.mock('../../../motion', () => ({ PressableScale: 'Pressable', Reveal: 'View' }))
 vi.mock('../../../components/FormField', () => ({ FormField: 'FormField' }))
 vi.mock('../../../components/PrimaryButton', () => ({ PrimaryButton: 'PrimaryButton' }))
 vi.mock('../../../components/Screen', () => ({ ScreenScrollView: 'ScreenScrollView' }))
@@ -379,12 +380,13 @@ async function renderDuplicate(props: Parameters<typeof duplicateHarness>[0]) {
 }
 
 function duplicateOption(view: ReactTestRenderer, mode: TrainingPlanDuplicateMode) {
+  const label = ({
+    COMPLETE: 'Duplicar completa',
+    STRUCTURE_ONLY: 'Apenas estrutura',
+    WITHOUT_LOADS: 'Sem cargas planejadas',
+  })[mode]
   return view.root.findAllByProps({ accessibilityRole: 'radio' })
-    .find((node) => node.props.children?.[0]?.props?.children?.[1] === ({
-      COMPLETE: 'Duplicar completa',
-      STRUCTURE_ONLY: 'Apenas estrutura',
-      WITHOUT_LOADS: 'Sem cargas planejadas',
-    })[mode])!
+    .find((node) => node.findAll((child) => (child.type as unknown) === 'Text' && child.props.children === label).length > 0)!
 }
 
 function deferredResult() {

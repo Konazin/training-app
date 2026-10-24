@@ -5,6 +5,7 @@ import {
   type ExerciseDefinition,
   type ExercisePlaceholderKind,
 } from '@training/training-domain'
+import { canonicalMuscle, equipmentTokens } from './exerciseTaxonomy'
 
 export function mergeExercisePages(current: ExerciseDefinition[], next: ExerciseDefinition[], replace = false) {
   return [...new Map((replace ? next : [...current, ...next]).map((item) => [item.id, item])).values()]
@@ -93,15 +94,15 @@ export function filterExerciseLibrary(
   }
   if (filter.kind === 'MEDIA') filtered = filtered.filter(hasRealExerciseMedia)
   if (filter.kind === 'BODYWEIGHT') {
-    filtered = filtered.filter((exercise) =>
-      ['peso corporal', 'sem equipamento'].includes(normalizeName(exercise.equipment)))
+    filtered = filtered.filter((exercise) => equipmentTokens(exercise.equipment).includes('Peso corporal'))
   }
   if (filter.kind === 'EQUIPMENT') {
-    filtered = filtered.filter((exercise) => exercise.equipment === filter.value)
+    filtered = filtered.filter((exercise) => equipmentTokens(exercise.equipment).includes(filter.value))
   }
   if (filter.kind === 'MUSCLE') {
     filtered = filtered.filter((exercise) =>
-      exercise.primaryMuscleGroup === filter.value || exercise.secondaryMuscleGroups.includes(filter.value))
+      canonicalMuscle(exercise.primaryMuscleGroup) === filter.value
+      || exercise.secondaryMuscleGroups.some((muscle) => canonicalMuscle(muscle) === filter.value))
   }
   if (filter.kind === 'CATEGORY') filtered = filtered.filter((exercise) => exercise.category === filter.value)
   if (filter.kind === 'SOURCE') filtered = filtered.filter((exercise) => exercise.source === filter.value)
@@ -116,9 +117,10 @@ export function filterExerciseLibrary(
 export function groupExercisesByMuscle(exercises: readonly ExerciseDefinition[]) {
   const groups = new Map<string, ExerciseDefinition[]>()
   for (const exercise of exercises) {
-    const current = groups.get(exercise.primaryMuscleGroup) ?? []
+    const muscle = canonicalMuscle(exercise.primaryMuscleGroup)
+    const current = groups.get(muscle) ?? []
     current.push(exercise)
-    groups.set(exercise.primaryMuscleGroup, current)
+    groups.set(muscle, current)
   }
   return [...groups.entries()]
     .sort(([first], [second]) => first.localeCompare(second, 'pt-BR'))

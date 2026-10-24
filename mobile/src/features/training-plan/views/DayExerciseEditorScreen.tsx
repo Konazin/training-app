@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Modal, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { FormField } from '../../../components/FormField'
-import { PrimaryButton } from '../../../components/PrimaryButton'
 import { Screen, ScreenScrollView } from '../../../components/Screen'
 import { ScreenHeader } from '../../../components/ScreenHeader'
 import { SelectableChip } from '../../../components/SelectableChip'
+import { BottomActionBar } from '../../../components/ui/BottomActionBar'
 import type { RootStackParamList } from '../../../navigation/types'
 import { useUnsavedChangesGuard } from '../../../navigation/useUnsavedChangesGuard'
 import type { ExerciseDefinition } from '../../../models/training'
@@ -18,6 +18,7 @@ import type {
 } from '../model/trainingPlan'
 import { shared, type ThemeColors, useTheme } from '../../../theme'
 import { ExercisePicker } from './ExercisePicker'
+import { PressableScale } from '../../../motion'
 
 const setTypes: SetType[] = [
   'NORMAL',
@@ -116,9 +117,9 @@ export function DayExerciseEditorScreen({
   }
 
   return (
-    <ScreenScrollView>
+    <>
+    <ScreenScrollView contentContainerStyle={styles.content}>
       <ScreenHeader
-        eyebrow={configured ? 'Editar exercício do dia' : 'Configurar antes de adicionar'}
         title={definition.name}
         description={`${definition.primaryMuscleGroup} · ${definition.category}`}
       />
@@ -147,7 +148,7 @@ export function DayExerciseEditorScreen({
         <FormField label="RPE planejado (1–10)" value={rpe} onChangeText={setRpe} keyboardType="decimal-pad" />
         <FormField label="Observações" value={notes} onChangeText={setNotes} multiline />
 
-        <Text style={styles.label}>TIPO DE SÉRIE</Text>
+        <Text style={styles.label}>tipo de série</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chips}>
           {setTypes.map((item) => (
             <SelectableChip
@@ -159,25 +160,20 @@ export function DayExerciseEditorScreen({
           ))}
         </ScrollView>
 
-        <Text style={styles.label}>EXERCÍCIO ALTERNATIVO</Text>
+        <Text style={styles.label}>exercício alternativo</Text>
         <View style={styles.alternativeRow}>
-          <TouchableOpacity accessibilityRole="button" style={styles.alternative} onPress={() => setShowAlternativePicker(true)}>
+          <PressableScale accessibilityRole="button" style={styles.alternative} onPress={() => setShowAlternativePicker(true)}>
             <Text style={styles.alternativeText}>
               {library.find((item) => item.id === alternativeId)?.name ?? 'Nenhum'}
             </Text>
-          </TouchableOpacity>
+          </PressableScale>
           {alternativeId != null && (
-            <TouchableOpacity accessibilityRole="button" onPress={() => setAlternativeId(null)} style={styles.clearButton}>
+            <PressableScale accessibilityRole="button" onPress={() => setAlternativeId(null)} style={styles.clearButton}>
               <Text style={styles.clear}>Limpar</Text>
-            </TouchableOpacity>
+            </PressableScale>
           )}
         </View>
         {!!(formError || errors[key]) && <Text style={styles.error}>{formError || errors[key]}</Text>}
-        <PrimaryButton
-          label={configured ? 'Salvar configuração' : 'Adicionar ao dia'}
-          loading={busyKeys.has(key)}
-          onPress={() => void save()}
-        />
       </View>
       <Modal
         animationType="slide"
@@ -187,9 +183,9 @@ export function DayExerciseEditorScreen({
         <View accessibilityViewIsModal style={[styles.modal, { backgroundColor: colors.background }]}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Exercício alternativo</Text>
-            <TouchableOpacity accessibilityRole="button" onPress={() => setShowAlternativePicker(false)} style={styles.clearButton}>
+            <PressableScale accessibilityRole="button" onPress={() => setShowAlternativePicker(false)} style={styles.clearButton}>
               <Text style={styles.clear}>Fechar</Text>
-            </TouchableOpacity>
+            </PressableScale>
           </View>
           <ExercisePicker
             exercises={library}
@@ -202,6 +198,18 @@ export function DayExerciseEditorScreen({
         </View>
       </Modal>
     </ScreenScrollView>
+    <BottomActionBar>
+      <PressableScale
+        accessibilityRole="button"
+        accessibilityState={{ disabled: busyKeys.has(key), busy: busyKeys.has(key) }}
+        disabled={busyKeys.has(key)}
+        onPress={() => void save()}
+        style={[styles.saveButton, busyKeys.has(key) && styles.disabled]}
+      >
+        <Text style={styles.saveButtonText}>{busyKeys.has(key) ? 'Salvando…' : configured ? 'Salvar configuração' : 'Adicionar ao dia'}</Text>
+      </PressableScale>
+    </BottomActionBar>
+    </>
   )
 }
 
@@ -211,20 +219,24 @@ function number(value: string) {
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  form: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 20, borderWidth: 1, padding: 16 },
+  content: { paddingBottom: 132 },
+  form: { gap: 4 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   half: { flex: 1, minWidth: 130 },
-  label: { color: colors.textSecondary, fontSize: 14, fontWeight: '800', letterSpacing: 0.6, marginBottom: 7, marginTop: 5 },
+  label: { color: colors.t2, fontFamily: 'Geist', fontSize: 13, fontWeight: '500', marginBottom: 7, marginTop: 13 },
   chips: { marginBottom: 14 },
   alternativeRow: { alignItems: 'center', flexDirection: 'row', gap: 9, marginBottom: 14 },
-  alternative: { backgroundColor: colors.surfaceSecondary, borderRadius: 12, flex: 1, minHeight: 48, justifyContent: 'center', paddingHorizontal: 12 },
-  alternativeText: { color: colors.textPrimary, fontSize: 14, fontWeight: '700' },
-  clear: { color: colors.primary, fontSize: 14, fontWeight: '800' },
+  alternative: { backgroundColor: colors.s2, borderRadius: 12, flex: 1, minHeight: 48, justifyContent: 'center', paddingHorizontal: 12 },
+  alternativeText: { color: colors.tx, fontFamily: 'Geist', fontSize: 14, fontWeight: '400' },
+  clear: { color: colors.ac, fontFamily: 'Geist', fontSize: 14, fontWeight: '500' },
   clearButton: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 },
   modal: { flex: 1, paddingTop: 45 },
   modalHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: shared.pagePadding, paddingVertical: 12 },
   modalTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
-  error: { color: colors.danger, fontSize: 14, lineHeight: 20, marginBottom: 9 },
+  error: { color: colors.dg, fontFamily: 'Geist', fontSize: 14, lineHeight: 20, marginBottom: 9, marginTop: 8 },
   empty: { alignItems: 'center', flex: 1, justifyContent: 'center' },
-  title: { color: colors.ink, fontSize: 18, fontWeight: '800' },
+  title: { color: colors.tx, fontFamily: 'Geist', fontSize: 18, fontWeight: '500' },
+  saveButton: { alignItems: 'center', backgroundColor: colors.ac, borderRadius: 12, justifyContent: 'center', minHeight: 56 },
+  saveButtonText: { color: colors.on, fontFamily: 'Geist', fontSize: 16, fontWeight: '500' },
+  disabled: { opacity: 0.55 },
 })

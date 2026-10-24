@@ -1,6 +1,9 @@
 import { useState } from 'react'
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Alert, StyleSheet, Text, View } from 'react-native'
+import type { ReactNode } from 'react'
+import { Archive, BookOpen, Calculator, ChevronRight, Download, FileSpreadsheet, Globe, Lightbulb, Palette, Trash2, Upload } from 'lucide-react-native'
 import { ScreenScrollView } from '../components/Screen'
+import { PressableScale, Reveal } from '../motion'
 import { ScreenHeader } from '../components/ScreenHeader'
 import { shared, type ThemeColors, useTheme } from '../theme'
 import { triggerHaptic } from '../theme/haptics'
@@ -16,6 +19,8 @@ export function MoreScreen({
   onIntegrations,
   onAppearance,
   onLibrary,
+  onPlateCalculator,
+  onExportCsv,
   onTrash,
   trashCount,
   onExport,
@@ -33,11 +38,13 @@ export function MoreScreen({
   onIntegrations: () => void
   onAppearance: () => void
   onLibrary: () => void
+  onPlateCalculator: () => void
+  onExportCsv: () => void
   onTrash: () => void
   trashCount: number
   onExport: () => void
   onImport: () => void
-  onErase: () => void
+  onErase: () => void | Promise<void>
   automaticBackups: AutomaticBackupInfo[]
   onRestoreAutomatic: (uri: string) => void
   onShareAutomatic: (uri: string) => void
@@ -52,7 +59,7 @@ export function MoreScreen({
   const visibleNotices = notices.filter((notice) => !dismissedNotices.has(notice.id))
   const confirmErase = () => Alert.alert(
     'Apagar todos os dados?',
-    'Um backup automático será criado antes. Esta ação remove fichas, exercícios e histórico deste aparelho.',
+    'Um backup automático será criado antes. Esta ação remove fichas, exercícios, sessões, nutrição e a chave de IA deste aparelho.',
     [
       { text: 'Cancelar', style: 'cancel' },
       {
@@ -60,19 +67,20 @@ export function MoreScreen({
         style: 'destructive',
         onPress: () => {
           void triggerHaptic('DESTRUCTIVE_CONFIRM', preferences.hapticsEnabled)
-          onErase()
+          void onErase()
         },
       },
     ],
   )
   return (
     <ScreenScrollView includeBottomInset={false}>
-      <ScreenHeader
-        eyebrow="Local e privado"
-        title="Mais"
-        description="Backup e dados do aparelho. Nenhuma destas ações usa servidor."
-      />
-      {!!visibleNotices.length && <Text style={styles.section}>AVISOS</Text>}
+      <Reveal>
+        <ScreenHeader
+          title="Mais"
+          description="Backups e dados guardados neste aparelho. Catálogos externos são opcionais."
+        />
+      </Reveal>
+      {!!visibleNotices.length && <Text accessibilityRole="header" style={styles.section}>Avisos</Text>}
       {visibleNotices.map((notice) => (
         <View accessibilityLiveRegion="polite" key={notice.id} style={styles.notice}>
           <Text style={styles.noticeText}>{notice.message}</Text>
@@ -83,22 +91,26 @@ export function MoreScreen({
           />
         </View>
       ))}
-      <Text style={styles.section}>APARÊNCIA</Text>
+      <Text accessibilityRole="header" style={styles.section}>Aparência</Text>
       <MenuItem
+        icon={<Palette color={colors.tx} size={20} strokeWidth={1.5} />}
         label="Aparência e acessibilidade"
         detail="Tema, movimento, contraste e feedback tátil"
         onPress={onAppearance}
         disabled={busy}
       />
       <MenuItem
+        icon={<Lightbulb color={colors.tx} size={20} strokeWidth={1.5} />}
         label="Conhecer o aplicativo"
         detail="Reabrir a apresentação inicial"
         onPress={onOnboarding}
         disabled={busy}
       />
-      <Text style={styles.section}>CONTEÚDO</Text>
-      <MenuItem label="Biblioteca de exercícios" detail="Criar e editar" onPress={onLibrary} disabled={busy} />
+      <Text accessibilityRole="header" style={styles.section}>Conteúdo</Text>
+      <MenuItem icon={<BookOpen color={colors.tx} size={20} strokeWidth={1.5} />} label="Biblioteca de exercícios" detail="Criar e editar" onPress={onLibrary} disabled={busy} />
+      <MenuItem icon={<Calculator color={colors.tx} size={20} strokeWidth={1.5} />} label="Calculadora de anilhas" detail="Anilhas por lado para a carga total" onPress={onPlateCalculator} disabled={busy} />
       <MenuItem
+        icon={<Trash2 color={colors.tx} size={20} strokeWidth={1.5} />}
         label="Lixeira de fichas"
         detail="Restaurar ou excluir definitivamente"
         onPress={onTrash}
@@ -106,20 +118,23 @@ export function MoreScreen({
         badge={trashCount}
         accessibilityLabel={trashBadgeAccessibilityLabel(trashCount)}
       />
-      <Text style={styles.section}>INTEGRAÇÕES</Text>
+      <Text accessibilityRole="header" style={styles.section}>Integrações</Text>
       <MenuItem
+        icon={<Globe color={colors.tx} size={20} strokeWidth={1.5} />}
         label="Fontes de exercícios"
         detail="Catálogos externos opcionais e cópias salvas no aparelho."
         onPress={onIntegrations}
         disabled={busy}
       />
-      <Text style={styles.section}>BACKUP</Text>
-      <MenuItem label="Exportar backup" detail="Schema 2 · arquivo identificado por data" onPress={onExport} disabled={busy} />
-      <MenuItem label="Importar backup" detail="Validar e restaurar" onPress={onImport} disabled={busy} />
-      <Text style={styles.section}>BACKUPS AUTOMÁTICOS</Text>
+      <Text accessibilityRole="header" style={styles.section}>Backup</Text>
+      <MenuItem icon={<Download color={colors.tx} size={20} strokeWidth={1.5} />} label="Exportar backup" detail="Schema 3 · arquivo identificado por data" onPress={onExport} disabled={busy} />
+      <MenuItem icon={<Upload color={colors.tx} size={20} strokeWidth={1.5} />} label="Importar backup" detail="Validar e restaurar" onPress={onImport} disabled={busy} />
+      <MenuItem icon={<FileSpreadsheet color={colors.tx} size={20} strokeWidth={1.5} />} label="Exportar histórico (CSV)" detail="Séries, cargas e repetições para planilha" onPress={onExportCsv} disabled={busy} />
+      <Text accessibilityRole="header" style={styles.section}>Backups automáticos</Text>
       {!automaticBackups.length && <Text style={styles.note}>Nenhum backup automático criado.</Text>}
       {automaticBackups.map((backup) => (
         <View key={backup.uri} style={styles.backup}>
+          <Archive color={colors.t2} size={18} strokeWidth={1.5} />
           <Text style={styles.label}>{reasonLabel(backup.reason)}</Text>
           <Text style={styles.detail}>
             {new Date(backup.createdAt).toLocaleString()} · {formatBytes(backup.sizeBytes)}
@@ -147,6 +162,7 @@ export function MoreScreen({
       ))}
       {!!automaticBackups.length && (
         <MenuItem
+          icon={<Archive color={colors.dg} size={20} strokeWidth={1.5} />}
           label="Excluir backups automáticos"
           detail="Remove todos os arquivos de segurança"
           onPress={() => Alert.alert(
@@ -161,8 +177,8 @@ export function MoreScreen({
           danger
         />
       )}
-      <Text style={styles.section}>MANUTENÇÃO</Text>
-      <MenuItem label="Apagar todos os dados" detail="Exige confirmação" onPress={confirmErase} disabled={busy} danger />
+      <Text accessibilityRole="header" style={styles.section}>Manutenção</Text>
+      <MenuItem icon={<Trash2 color={colors.dg} size={20} strokeWidth={1.5} />} label="Apagar todos os dados" detail="Exige confirmação" onPress={confirmErase} disabled={busy} danger />
       <Text style={styles.note}>
         Os dados principais ficam no SQLite. Ao desinstalar o aplicativo, eles são apagados; exporte backups regularmente.
       </Text>
@@ -179,9 +195,9 @@ function SmallAction({ label, disabled, danger, onPress }: {
   const { colors } = useTheme()
   const styles = createStyles(colors)
   return (
-    <Pressable accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.smallAction, pressed && styles.pressed]}>
+    <PressableScale accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={styles.smallAction}>
       <Text style={[styles.smallActionText, danger && styles.danger]}>{label}</Text>
-    </Pressable>
+    </PressableScale>
   )
 }
 
@@ -201,6 +217,7 @@ function formatBytes(bytes: number) {
 }
 
 function MenuItem({
+  icon,
   label,
   detail,
   onPress,
@@ -209,6 +226,7 @@ function MenuItem({
   badge,
   accessibilityLabel,
 }: {
+  icon?: ReactNode
   label: string
   detail: string
   onPress: () => void
@@ -220,7 +238,8 @@ function MenuItem({
   const { colors } = useTheme()
   const styles = createStyles(colors)
   return (
-    <Pressable accessibilityLabel={accessibilityLabel} accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} style={({ pressed }) => [styles.item, disabled && styles.disabled, pressed && styles.pressed]} onPress={onPress}>
+    <PressableScale accessibilityLabel={accessibilityLabel} accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} pressedScale={0.99} style={[styles.item, disabled && styles.disabled]} onPress={onPress}>
+      {icon && <View style={styles.icon}>{icon}</View>}
       <View style={styles.itemCopy}>
         <Text style={[styles.label, danger && styles.danger]}>{label}</Text>
         <Text style={styles.detail}>{detail}</Text>
@@ -231,30 +250,30 @@ function MenuItem({
             <Text style={styles.badgeText}>{trashBadgeText(badge ?? 0)}</Text>
           </View>
         )}
-        <Text style={styles.arrow}>→</Text>
+        <ChevronRight color={colors.mu} size={18} strokeWidth={1.5} />
       </View>
-    </Pressable>
+    </PressableScale>
   )
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  section: { ...typography.caption, color: colors.textSecondary, fontWeight: '800', letterSpacing: 1.5, marginBottom: 8, marginTop: 20 },
-  item: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 17, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8, minHeight: 68, paddingHorizontal: 16, paddingVertical: 10 },
+  section: { ...typography.caption, color: colors.t2, marginBottom: 4, marginTop: 32 },
+  item: { alignItems: 'center', borderBottomColor: colors.bd, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: 12, minHeight: 64, paddingVertical: 8 },
+  icon: { alignItems: 'center', justifyContent: 'center', width: 24 },
   itemCopy: { flex: 1, minWidth: 0 },
-  disabled: { opacity: 0.55 },
-  label: { ...typography.body, color: colors.textPrimary, flexShrink: 1, fontWeight: '800' },
-  detail: { ...typography.caption, color: colors.textSecondary, flexShrink: 1, marginTop: 4 },
-  danger: { color: colors.danger },
-  arrow: { color: colors.gray500, fontSize: 17 },
+  disabled: { opacity: 0.5 },
+  label: { ...typography.body, color: colors.tx, flexShrink: 1 },
+  detail: { ...typography.caption, color: colors.t2, flexShrink: 1, marginTop: 2 },
+  danger: { color: colors.dg },
   trailing: { alignItems: 'center', flexDirection: 'row', gap: 8 },
-  badge: { alignItems: 'center', backgroundColor: colors.danger, borderRadius: 12, justifyContent: 'center', minHeight: 24, minWidth: 24, paddingHorizontal: 7 },
-  badgeText: { color: colors.onPrimary, fontSize: 12, fontWeight: '900' },
-  note: { ...typography.bodySmall, color: colors.textSecondary, marginTop: 18 },
-  notice: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 17, borderWidth: 1, gap: 10, marginBottom: 8, padding: 16 },
-  noticeText: { ...typography.bodySmall, color: colors.textPrimary },
-  backup: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 17, borderWidth: 1, marginBottom: 8, padding: 16 },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 10 },
-  smallAction: { alignItems: 'center', borderColor: colors.border, borderRadius: 10, borderWidth: 1, justifyContent: 'center', minHeight: shared.touchTarget.minimum, paddingHorizontal: 12 },
-  smallActionText: { ...typography.labelSmall, color: colors.textPrimary, fontWeight: '800' },
+  badge: { alignItems: 'center', backgroundColor: colors.ac, borderRadius: 12, justifyContent: 'center', minHeight: 24, minWidth: 24, paddingHorizontal: 7 },
+  badgeText: { color: colors.on, ...typography.captionSmall },
+  note: { ...typography.bodySmall, color: colors.t2, marginTop: 18 },
+  notice: { backgroundColor: colors.s1, borderRadius: shared.radii.md, gap: 10, marginBottom: 8, padding: 16 },
+  noticeText: { ...typography.bodySmall, color: colors.tx },
+  backup: { borderBottomColor: colors.bd, borderBottomWidth: StyleSheet.hairlineWidth, gap: 8, marginBottom: 8, paddingVertical: 12 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
+  smallAction: { alignItems: 'center', borderColor: colors.mu, borderRadius: shared.radii.md, borderWidth: 1, justifyContent: 'center', minHeight: shared.touchTarget.minimum, paddingHorizontal: 12 },
+  smallActionText: { ...typography.labelSmall, color: colors.tx },
   pressed: { opacity: 0.72 },
 })

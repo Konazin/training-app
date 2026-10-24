@@ -6,6 +6,7 @@ import {
   type Weekday,
 } from '@training/training-domain'
 import { shared, type ThemeColors, useTheme } from '../../../theme'
+import { fontFamilies } from '../../../theme/typography'
 
 type PreviewDay = TrainingPlanDayCreationInput & {
   exercises?: readonly unknown[]
@@ -13,13 +14,13 @@ type PreviewDay = TrainingPlanDayCreationInput & {
 }
 
 const abbreviations: Record<Weekday, string> = {
-  MONDAY: 'SEG',
-  TUESDAY: 'TER',
-  WEDNESDAY: 'QUA',
-  THURSDAY: 'QUI',
-  FRIDAY: 'SEX',
-  SATURDAY: 'SÁB',
-  SUNDAY: 'DOM',
+  MONDAY: 'seg',
+  TUESDAY: 'ter',
+  WEDNESDAY: 'qua',
+  THURSDAY: 'qui',
+  FRIDAY: 'sex',
+  SATURDAY: 'sáb',
+  SUNDAY: 'dom',
 }
 
 export function TrainingPlanWeekPreview({ days }: { days: readonly PreviewDay[] }) {
@@ -44,10 +45,10 @@ export function TrainingPlanWeekPreview({ days }: { days: readonly PreviewDay[] 
             >
               <Text style={styles.weekday}>{abbreviations[WEEKDAYS[index]!]}</Text>
               <Text style={styles.dayTitle}>{day?.title || 'Dia vazio'}</Text>
-              <Text style={styles.meta}>{day?.restDay ? 'Descanso' : day ? 'Treino' : 'Não configurado'}</Text>
+              <Text style={styles.meta}>{day?.restDay ? 'descanso' : day ? 'treino' : 'não configurado'}</Text>
               {!!exerciseCount && <Text style={styles.count}>{exerciseCount} exercícios</Text>}
               {!!activityCount && <Text style={styles.count}>{activityCount} atividades</Text>}
-              {warning && <Text style={styles.warningText}>Sem exercícios</Text>}
+              {warning && <Text style={styles.warningText}>sem exercícios</Text>}
             </View>
           )
         })}
@@ -62,14 +63,14 @@ export function TrainingPlanWeekPreview({ days }: { days: readonly PreviewDay[] 
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  week: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  day: { borderColor: colors.primary, borderRadius: 14, borderWidth: 1, minHeight: 112, padding: 10, width: '31%' },
-  rest: { borderColor: colors.border },
-  warning: { borderColor: colors.warning },
-  weekday: { color: colors.textSecondary, fontSize: 12, fontWeight: '900', letterSpacing: 0.8 },
-  dayTitle: { color: colors.textPrimary, fontSize: 14, fontWeight: '800', lineHeight: 18, marginTop: 5 },
-  meta: { color: colors.textSecondary, fontSize: 12, marginTop: 5 },
-  count: { color: colors.textSecondary, fontSize: 12, marginTop: 3 },
-  warningText: { color: colors.warning, fontSize: 12, fontWeight: '800', marginTop: 5 },
-  notice: { backgroundColor: colors.surfaceSecondary, borderRadius: 10, color: colors.textSecondary, fontSize: 13, lineHeight: 18, marginTop: 8, padding: shared.spacing.sm },
+  week: { flexDirection: 'row', flexWrap: 'wrap', gap: 0 },
+  day: { borderBottomColor: colors.bd, borderBottomWidth: 1, borderColor: 'transparent', flexBasis: '33.33%', flexGrow: 1, minHeight: 106, padding: 12 },
+  rest: { borderLeftColor: colors.mu },
+  warning: { borderLeftColor: colors.dg },
+  weekday: { color: colors.mu, fontFamily: fontFamilies.data, fontSize: 12, fontWeight: '400' },
+  dayTitle: { color: colors.tx, fontFamily: fontFamilies.text, fontSize: 14, fontWeight: '500', lineHeight: 18, marginTop: 6 },
+  meta: { color: colors.t2, fontFamily: fontFamilies.text, fontSize: 12, marginTop: 5 },
+  count: { color: colors.t2, fontFamily: fontFamilies.text, fontSize: 12, marginTop: 3 },
+  warningText: { color: colors.dg, fontFamily: fontFamilies.text, fontSize: 12, fontWeight: '500', marginTop: 5 },
+  notice: { backgroundColor: colors.s1, borderRadius: 14, color: colors.t2, fontFamily: fontFamilies.text, fontSize: 13, lineHeight: 18, marginTop: 8, padding: shared.spacing.sm },
 })

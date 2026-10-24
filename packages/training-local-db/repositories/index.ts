@@ -147,7 +147,7 @@ function externalExerciseImportRepository(database: SqlDatabase): ExternalExerci
         alreadyImported: ids.has(exerciseIdentity(item.provider, item.externalId)),
       }))
     },
-    importSelected: (candidates) => database.transaction(async (transaction) => {
+    importSelected: (candidates, options) => database.transaction(async (transaction) => {
       const result: ExternalExerciseImportResult = emptyImportResult()
       const selected = uniqueCandidates(candidates)
       result.skipped = candidates.length - selected.length
@@ -157,14 +157,15 @@ function externalExerciseImportRepository(database: SqlDatabase): ExternalExerci
           candidate.provider, candidate.externalId,
         )
         const before = existing ? await loadExercise(transaction, existing.id) : null
-        const unchanged = before ? importedExerciseMatches(before, candidate) : false
+        const restoring = Boolean(options?.restoreArchived && before?.archived)
+        const unchanged = before && !restoring ? importedExerciseMatches(before, candidate) : false
         if (unchanged) {
           result.unchanged += 1
           result.affectedIds.push(existing!.id)
           result.warnings.push(...candidate.warnings.map((warning) => `${candidate.name}: ${warning}`))
           continue
         }
-        const exerciseId = await upsertImportedExercise(transaction, candidate, existing?.id)
+        const exerciseId = await upsertImportedExercise(transaction, candidate, existing?.id, restoring)
         await upsertImportedMedia(transaction, exerciseId, candidate)
         if (!existing) result.created += 1
         else result.updated += 1
@@ -187,17 +188,19 @@ async function upsertImportedExercise(
   database: SqlDatabase,
   candidate: ExternalExerciseCandidate,
   existingId?: number,
+  restore = false,
 ) {
   const timestamp = new Date().toISOString()
   if (existingId) {
     await database.run(`
       UPDATE exercise_definitions SET
+        archived = CASE WHEN ? THEN 0 ELSE archived END,
         name = ?, normalized_name = ?, description = ?, primary_muscle_group = ?,
         secondary_muscle_groups_json = ?, equipment = ?, category = ?, difficulty = ?,
         instructions = ?, unilateral = ?, timed = ?, source_url = ?, license_name = ?,
         license_url = ?, author = ?, updated_at = ?
       WHERE id = ? AND source = ?
-    `, candidate.name, normalizeName(candidate.name), candidate.description,
+    `, Number(restore), candidate.name, normalizeName(candidate.name), candidate.description,
     candidate.primaryMuscleGroup, serializeJson(candidate.secondaryMuscleGroups),
     candidate.equipment, candidate.category, candidate.difficulty, candidate.instructions,
     Number(candidate.unilateral), Number(candidate.timed), candidate.sourceUrl,

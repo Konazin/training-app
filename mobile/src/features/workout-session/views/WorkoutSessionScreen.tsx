@@ -1,14 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import {
-  Alert,
-  Linking,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native'
+import { Alert, Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native'
+import { ArrowLeft, Minus, Pause, Play, Plus } from 'lucide-react-native'
 import { useNavigation, usePreventRemove } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import type { RootStackParamList } from '../../../navigation/types'
@@ -26,6 +18,8 @@ import {
   selectPreviousPerformance,
   suggestProgression,
   effectiveExerciseDefinitionId,
+  buildExerciseProgress,
+  detectSetRecords,
 } from '@training/training-domain'
 import type { RestTimerState } from '../model/restTimer'
 import { Screen, ScreenScrollView } from '../../../components/Screen'
@@ -33,7 +27,11 @@ import { type ThemeColors, useTheme } from '../../../theme'
 import { ExerciseVideo } from '../../exercise-library/ExerciseVideo'
 import { attributionLabel, resolveMediaAttribution } from '../../exercise-library/libraryState'
 import { ThemedTextInput } from '../../../components/ThemedTextInput'
+import { BottomActionBar } from '../../../components/ui/BottomActionBar'
+import { PrimaryButton } from '../../../components/PrimaryButton'
+import { AnimatedNumber, CheckDraw, PressableScale, ProgressBar, ProgressRing, Reveal } from '../../../motion'
 import { triggerHaptic } from '../../../theme/haptics'
+import { fontFamilies, typography } from '../../../theme/typography'
 
 interface Props {
   session: WorkoutSession | null
@@ -87,8 +85,12 @@ export function WorkoutSessionScreen(props: Props) {
   } = props
   const { colors, preferences } = useTheme()
   const styles = createStyles(colors, preferences.workoutHighContrast)
+  const text = preferences.workoutHighContrast ? colors.workout.text : colors.tx
+  const accentColor = preferences.workoutHighContrast ? colors.workout.completed : colors.ac
+  const secondaryText = preferences.workoutHighContrast ? colors.workout.textSecondary : colors.t2
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>()
   const [now, setNow] = useState(Date.now())
+  const [recordNotice, setRecordNotice] = useState('')
   const [rpe, setRpe] = useState('')
   const [notes, setNotes] = useState(session?.notes ?? '')
   const [canLeave, setCanLeave] = useState(false)
@@ -96,8 +98,13 @@ export function WorkoutSessionScreen(props: Props) {
   const [videoRetryKey, setVideoRetryKey] = useState(0)
   const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<number>>(new Set())
   const [substitutionFor, setSubstitutionFor] = useState<number | null>(null)
+  const [expandedExerciseDetails, setExpandedExerciseDetails] = useState<number | null>(null)
   const [sessionNoteSaved, setSessionNoteSaved] = useState(false)
+  const [focusedSetId, setFocusedSetId] = useState<number | null>(null)
+  const [restFinished, setRestFinished] = useState(false)
   const notifiedTimer = useRef('')
+  const finishedTimerTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const focusedSetAction = useRef<{ id: number; run: () => Promise<boolean> } | null>(null)
   const noteSession = useRef(session?.id)
   const definitions = useMemo(
     () => new Map(library.map((exercise) => [exercise.id, exercise])),
@@ -133,6 +140,8 @@ export function WorkoutSessionScreen(props: Props) {
       noteSession.current = session.id
       setNotes(session.notes)
       setSessionNoteSaved(false)
+      setFocusedSetId(null)
+      focusedSetAction.current = null
     }
   }, [session])
 
@@ -141,15 +150,43 @@ export function WorkoutSessionScreen(props: Props) {
       restTimer.endsAt - (restTimer.paused ? restTimer.pausedAt ?? now : now)
     ) / 1000))
     : 0
+  const restSetKey = restTimer ? `${restTimer.sessionId}:${restTimer.setId}` : ''
+  const restTotalRef = useRef({ key: '', total: 0 })
+  if (restTotalRef.current.key !== restSetKey) restTotalRef.current = { key: restSetKey, total: remaining }
+  else if (remaining > restTotalRef.current.total) restTotalRef.current.total = remaining
+  const restTotal = restTotalRef.current.total
   const timerKey = restTimer ? `${restTimer.sessionId}:${restTimer.setId}:${restTimer.endsAt}` : ''
-
+  const firstPendingSet = session?.exercises
+    .filter((exercise) => exercise.status !== 'SKIPPED')
+    .flatMap((exercise) => exercise.sets)
+    .find((set) => !set.completed) ?? null
+  const selectedSet = session?.exercises.flatMap((exercise) => exercise.sets)
+    .find((set) => set.id === focusedSetId) ?? null
+  const activeSet = selectedSet ?? firstPendingSet
+  const activeExercise = activeSet
+    ? session?.exercises.find((exercise) => exercise.sets.some((set) => set.id === activeSet.id)) ?? null
+    : null
   useEffect(() => {
     if (restTimer && !restTimer.paused && remaining === 0 && notifiedTimer.current !== timerKey) {
       notifiedTimer.current = timerKey
+      setRestFinished(true)
       void triggerHaptic('REST_TIMER_COMPLETE', preferences.hapticsEnabled)
       onSkipRest()
+      if (finishedTimerTimeout.current) clearTimeout(finishedTimerTimeout.current)
+      finishedTimerTimeout.current = setTimeout(() => {
+        setRestFinished(false)
+        finishedTimerTimeout.current = null
+      }, 1_800)
     }
   }, [onSkipRest, preferences.hapticsEnabled, remaining, restTimer, timerKey])
+
+  useEffect(() => () => {
+    if (finishedTimerTimeout.current) clearTimeout(finishedTimerTimeout.current)
+  }, [])
+
+  useEffect(() => {
+    if (restTimer && remaining > 0) setRestFinished(false)
+  }, [remaining, restTimer])
 
   usePreventRemove(Boolean(session) && !canLeave, ({ data }) => {
     Alert.alert('Sair da sessão?', 'Escolha como deseja deixar o treino.', [
@@ -186,13 +223,13 @@ export function WorkoutSessionScreen(props: Props) {
       <Screen><View style={styles.empty}>
         <Text style={styles.emptyTitle}>Nenhuma sessão ativa</Text>
         <Text style={styles.muted}>Escolha um treino na ficha semanal.</Text>
-        <TouchableOpacity
+        <PressableScale
           accessibilityRole="button"
           style={styles.primary}
           onPress={() => navigation.navigate('MainTabs', { screen: 'Plan' })}
         >
           <Text style={styles.primaryText}>Abrir ficha</Text>
-        </TouchableOpacity>
+        </PressableScale>
       </View></Screen>
     )
   }
@@ -205,78 +242,122 @@ export function WorkoutSessionScreen(props: Props) {
     }
   }
 
+  async function completeFocusedSet() {
+    if (!activeSet) return
+    const action = focusedSetAction.current
+    if (!action || action.id !== activeSet.id) return
+    if (await action.run()) setFocusedSetId(null)
+  }
+
+  function confirmCompleteSession() {
+    Alert.alert(
+      'Concluir sessão?',
+      'A sessão será encerrada e salva no histórico.',
+      [
+        { text: 'Continuar treinando', style: 'cancel' },
+        { text: 'Concluir e salvar', onPress: () => void completeSession() },
+      ],
+    )
+  }
+
+  function confirmAbandonSession() {
+    Alert.alert(
+      'Abandonar sessão?',
+      'Os registros feitos serão preservados.',
+      [
+        { text: 'Continuar treinando', style: 'cancel' },
+        {
+          text: 'Abandonar sessão',
+          style: 'destructive',
+          onPress: () => void (async () => {
+            void triggerHaptic('DESTRUCTIVE_CONFIRM', preferences.hapticsEnabled)
+            if (await onAbandon()) {
+              setCanLeave(true)
+              setTimeout(() => navigation.navigate('MainTabs', { screen: 'History' }), 0)
+            }
+          })(),
+        },
+      ],
+    )
+  }
+
   return (<>
     <ScreenScrollView
-      contentContainerStyle={preferences.workoutHighContrast && { backgroundColor: colors.workout.background }}
+      contentContainerStyle={{
+        backgroundColor: preferences.workoutHighContrast ? colors.workout.background : colors.bg,
+        paddingBottom: 176,
+      }}
       showsVerticalScrollIndicator={false}
     >
-      <View
-        accessibilityLabel={session.status === 'PAUSED' ? 'Sessão pausada' : 'Sessão em andamento'}
-        style={[styles.sessionHeader, session.status === 'PAUSED' && styles.pausedHeader]}
-      >
-        <View style={{ flex: 1 }}>
-          <Text style={styles.eyebrow}>
-            {session.status === 'PAUSED' ? 'SESSÃO PAUSADA' : 'SESSÃO EM ANDAMENTO'}
-          </Text>
-          <Text style={styles.title}>{session.workoutName}</Text>
+      <View style={styles.topBar}>
+        <PressableScale accessibilityLabel="Voltar" accessibilityRole="button" onPress={() => navigation.goBack()} style={styles.backButton}>
+          <ArrowLeft color={text} size={20} strokeWidth={1.8} />
+        </PressableScale>
+        <View style={styles.topBarTitle}>
+          <Text style={styles.topBarName} numberOfLines={1}>{session.workoutName}</Text>
+          <View style={styles.sessionState}>
+            {session.status === 'PAUSED'
+              ? <Pause color={secondaryText} size={12} strokeWidth={2} />
+              : <View style={styles.stateDot} />}
+            <Text style={styles.sessionStateText}>
+              {session.status === 'PAUSED' ? 'Sessão pausada' : 'Sessão em andamento'}
+            </Text>
+          </View>
         </View>
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityState={{ disabled: busyKeys.has('session') }}
-          disabled={busyKeys.has('session')}
-          onPress={() => void (async () => {
-            const resuming = session.status === 'PAUSED'
-            const success = await (resuming ? onResume() : onPause())
-            if (success) {
-              void triggerHaptic(resuming ? 'SESSION_RESUME' : 'SESSION_PAUSE', preferences.hapticsEnabled)
-            }
-          })()}
-          style={styles.secondary}
-        >
-          <Text style={styles.secondaryText}>
-            {session.status === 'PAUSED' ? 'Continuar' : 'Pausar'}
-          </Text>
-        </TouchableOpacity>
+        <PressableScale accessibilityRole="button" accessibilityState={{ disabled: busyKeys.has('session') }} disabled={busyKeys.has('session')} onPress={confirmAbandonSession} style={styles.abandonTop}>
+          <Text style={styles.abandonTopText}>Abandonar</Text>
+        </PressableScale>
       </View>
 
-      <View style={styles.metrics}>
-        <View
-          accessible
-          accessibilityLabel="Progresso da sessão"
-          accessibilityValue={{
-            min: 0,
-            max: session.totalPlannedSets,
-            now: session.completedSets,
-            text: `${session.completedSets} de ${session.totalPlannedSets} séries`,
-          }}
-          style={styles.metric}
-        >
-          <Text style={styles.metricLabel}>PROGRESSO</Text>
-          <Text style={styles.metricValue}>
-            {session.totalPlannedSets
-              ? Math.round(session.completedSets / session.totalPlannedSets * 100)
-              : 0}%
-          </Text>
+      <View
+        accessible
+        accessibilityRole="progressbar"
+        accessibilityLabel="Progresso da sessão"
+        accessibilityValue={{
+          min: 0,
+          max: session.totalPlannedSets,
+          now: session.completedSets,
+          text: `${session.completedSets} de ${session.totalPlannedSets} séries concluídas`,
+        }}
+        style={styles.progressBlock}
+      >
+        <View style={styles.progressInfo}>
+          <View style={styles.progressCount}>
+            <AnimatedNumber style={styles.progressBig} value={session.completedSets} />
+            <Text style={styles.progressTotal}> / {session.totalPlannedSets} séries</Text>
+          </View>
+          <AnimatedNumber format={(value) => `${value.toLocaleString('pt-BR')} kg`} style={styles.volumeValue} value={session.totalVolume} />
         </View>
-        <View accessible accessibilityLabel={`Volume registrado: ${session.totalVolume} quilogramas`} style={styles.metric}>
-          <Text style={styles.metricLabel}>VOLUME</Text>
-          <Text style={styles.metricValue}>{session.totalVolume}kg</Text>
-        </View>
+        <ProgressBar
+          color={accentColor}
+          progress={session.totalPlannedSets ? session.completedSets / session.totalPlannedSets : 0}
+          trackColor={preferences.workoutHighContrast ? colors.workout.pending : colors.s2}
+        />
       </View>
 
       {remaining > 0 && (
-        <View accessible accessibilityLabel={`Descanso: ${formatTime(remaining)} restantes`} accessibilityRole="timer" style={styles.timer}>
-          <View>
-            <Text style={styles.timerLabel}>DESCANSO</Text>
-            <Text style={styles.timerValue}>{formatTime(remaining)}</Text>
+        <Reveal>
+          <View accessible accessibilityLabel={formatTimerAnnouncement(Math.ceil(remaining / 15) * 15)} accessibilityLiveRegion="polite" accessibilityRole="timer" style={styles.timer}>
+            <ProgressRing label="Tempo de descanso restante" progress={restTotal ? remaining / restTotal : 0} size={112} stroke={6}>
+              <Text style={styles.timerValue}>{formatTime(remaining)}</Text>
+            </ProgressRing>
+            <View style={styles.timerSide}>
+              <Text style={styles.timerLabel}>Descanso</Text>
+              <View style={styles.timerActions}>
+                <TimerAction label="−15 s" onPress={() => onAdjustRest(-15)} kind="secondary" />
+                <TimerAction label="+15 s" onPress={() => onAdjustRest(15)} kind="secondary" />
+              </View>
+              <TimerAction label="Pular descanso" onPress={onSkipRest} kind="tonal" />
+            </View>
           </View>
-          <View style={styles.timerActions}>
-            <TimerAction label="−15" onPress={() => onAdjustRest(-15)} />
-            <TimerAction label="+15" onPress={() => onAdjustRest(15)} />
-            <TimerAction label="Pular" onPress={onSkipRest} />
-          </View>
-        </View>
+        </Reveal>
       )}
+      {!!recordNotice && (
+        <Text accessibilityLiveRegion="polite" onPress={() => setRecordNotice('')} style={styles.recordNotice}>
+          {recordNotice}
+        </Text>
+      )}
+      {restFinished && <Text accessibilityLiveRegion="polite" style={styles.restComplete}>Descanso concluído</Text>}
 
       {session.exercises.map((exercise, index) => {
         const effectiveId = effectiveExerciseDefinitionId(exercise)
@@ -303,54 +384,63 @@ export function WorkoutSessionScreen(props: Props) {
           : exercise.sets.length > 0 && exercise.sets.every((set) => set.completed)
             ? 'Concluído'
             : 'Pendente'
+        const isActiveExercise = activeExercise?.id === exercise.id
+        const detailsExpanded = expandedExerciseDetails === exercise.id
         return (
+          <Reveal key={exercise.id} index={index + 1}>
           <View
-            key={exercise.id}
             accessibilityLabel={`${exercise.name}. Estado: ${statusLabel}.`}
-            style={styles.card}
+            style={[styles.exerciseBlock, isActiveExercise && styles.activeExerciseBlock]}
           >
-          <View style={styles.exerciseHeader}>
-            <Text style={styles.index}>{index + 1}</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.exerciseName}>
-                {exercise.substituteName ?? exercise.name}
-              </Text>
-              {!!exercise.substituteName && (
-                <Text style={styles.substitution}>
-                  Planejado: {exercise.name} · Realizado: {exercise.substituteName}
+            <View style={styles.exerciseHeader}>
+              <View style={[styles.index, isActiveExercise && styles.indexActive]}>
+                <Text style={[styles.indexText, isActiveExercise && styles.indexActiveText]}>{index + 1}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.exerciseName}>
+                  {exercise.substituteName ?? exercise.name}
                 </Text>
-              )}
-              <Text style={styles.muted}>
-                {exercise.category === 'CARDIO' || exercise.timed
-                  ? 'Duração'
-                  : `${exercise.plannedMinReps}–${exercise.plannedMaxReps} reps`}
-                {' · '}{exercise.restSeconds}s descanso
-              </Text>
-              <Text style={styles.exerciseStatus}>Estado: {statusLabel}</Text>
-              {!!exercise.primaryVideoUrl && (
-                <TouchableOpacity accessibilityLabel={`Ver execução de ${exercise.name}`} accessibilityRole="button" onPress={() => openVideo(exercise)} style={styles.textAction}>
-                  <Text style={styles.videoLink}>▶ Ver execução</Text>
-                </TouchableOpacity>
-              )}
+                {!!exercise.substituteName && (
+                  <Text style={styles.substitution}>
+                    Planejado: {exercise.name} · Realizado: {exercise.substituteName}
+                  </Text>
+                )}
+                <Text style={styles.muted}>
+                  {exercise.category === 'CARDIO' || exercise.timed
+                    ? 'Duração'
+                    : `${exercise.plannedMinReps}–${exercise.plannedMaxReps} reps`}
+                  {' · '}{exercise.restSeconds}s descanso
+                </Text>
+                {!isActiveExercise && <Text style={styles.exerciseStatus}>{statusLabel}</Text>}
+                {isActiveExercise && previous && (
+                  <Text style={styles.referenceSummary}>
+                    Referência · {new Date(previous.completedAt).toLocaleDateString('pt-BR')} · {previous.load == null ? 'carga não registrada' : `${previous.load} kg`}
+                  </Text>
+                )}
+                {!!exercise.primaryVideoUrl && (
+                  <PressableScale accessibilityLabel={`Ver execução de ${exercise.name}`} accessibilityRole="button" onPress={() => openVideo(exercise)} style={styles.textAction}>
+                    <Text style={styles.videoLink}>Ver execução</Text>
+                  </PressableScale>
+                )}
+              </View>
+              <PressableScale
+                accessibilityRole="button"
+                accessibilityState={{ disabled: busyKeys.has(`exercise:${exercise.id}`), selected: exercise.status === 'SKIPPED' }}
+                disabled={busyKeys.has(`exercise:${exercise.id}`)}
+                style={styles.textAction}
+                onPress={() => void onSetExerciseStatus(
+                  exercise.id,
+                  exercise.status === 'SKIPPED' ? 'PENDING' : 'SKIPPED',
+                )}
+              >
+                <Text style={styles.skip}>
+                  {exercise.status === 'SKIPPED' ? 'Desfazer' : 'Pular'}
+                </Text>
+              </PressableScale>
             </View>
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityState={{ disabled: busyKeys.has(`exercise:${exercise.id}`), selected: exercise.status === 'SKIPPED' }}
-              disabled={busyKeys.has(`exercise:${exercise.id}`)}
-              style={styles.textAction}
-              onPress={() => void onSetExerciseStatus(
-                exercise.id,
-                exercise.status === 'SKIPPED' ? 'PENDING' : 'SKIPPED',
-              )}
-            >
-              <Text style={styles.skip}>
-                {exercise.status === 'SKIPPED' ? 'Desfazer' : 'Pular'}
-              </Text>
-            </TouchableOpacity>
-          </View>
 
-          {previous && (
-            <View style={styles.reference}>
+            {previous && detailsExpanded && (
+              <View style={styles.reference}>
               <Text style={styles.referenceTitle}>Último desempenho</Text>
               <Text style={styles.referenceText}>
                 {new Date(previous.completedAt).toLocaleDateString('pt-BR')} · {previous.completedSetCount} série(s)
@@ -367,11 +457,11 @@ export function WorkoutSessionScreen(props: Props) {
               <Text style={styles.referenceText}>
                 Anotação anterior: {previous.annotation ?? 'nenhuma'}
               </Text>
-            </View>
-          )}
+              </View>
+            )}
 
-          {suggestion.type !== 'NO_HISTORY' && !dismissedSuggestions.has(exercise.id) && (
-            <View accessibilityLabel="Sugestão local disponível" style={styles.suggestion}>
+            {detailsExpanded && suggestion.type !== 'NO_HISTORY' && !dismissedSuggestions.has(exercise.id) && (
+              <View accessibilityLabel="Sugestão local disponível" style={styles.suggestion}>
               <Text style={styles.suggestionTitle}>Sugestão local</Text>
               <Text style={styles.referenceText}>{suggestion.reason}</Text>
               <Text style={styles.referenceText}>
@@ -398,10 +488,10 @@ export function WorkoutSessionScreen(props: Props) {
                   onPress={() => setDismissedSuggestions((current) => new Set(current).add(exercise.id))}
                 />
               </View>
-            </View>
-          )}
+              </View>
+            )}
 
-          <View style={styles.substitutionPanel}>
+            {detailsExpanded && <View style={styles.substitutionPanel}>
             {exercise.substituteExerciseDefinitionId ? (
               <SmallAction
                 label="Desfazer substituição"
@@ -417,7 +507,7 @@ export function WorkoutSessionScreen(props: Props) {
               />
             )}
             {substitutionFor === exercise.id && substitutions.map((candidate) => (
-              <TouchableOpacity
+              <PressableScale
                 key={candidate.exercise.id}
                 accessibilityRole="button"
                 disabled={busyKeys.has(`substitution:${exercise.id}`)}
@@ -432,9 +522,9 @@ export function WorkoutSessionScreen(props: Props) {
               >
                 <Text style={styles.substitutionName}>{candidate.exercise.name}</Text>
                 <Text style={styles.referenceText}>{candidate.reason}</Text>
-              </TouchableOpacity>
+              </PressableScale>
             ))}
-          </View>
+            </View>}
 
           {exercise.sets.map((set) => (
             <SetEditor
@@ -443,36 +533,66 @@ export function WorkoutSessionScreen(props: Props) {
               set={set}
               busy={busyKeys.has(`set:${set.id}`)}
               error={errors[`set:${set.id}`]}
+              active={activeSet?.id === set.id}
+              highContrast={preferences.workoutHighContrast}
+              onActivate={() => setFocusedSetId(set.id)}
+              onRegisterComplete={(run) => {
+                if (run) focusedSetAction.current = { id: set.id, run }
+                else if (focusedSetAction.current?.id === set.id) focusedSetAction.current = null
+              }}
               onSave={(input) => onUpdateSet(exercise.id, set.id, input)}
               onRemove={() => onRemoveSet(exercise.id, set.id)}
               onStartRest={() => onStartRest(exercise.id, set.id, exercise.restSeconds)}
+              onRecord={(reps, load) => {
+                const kinds = detectSetRecords(
+                  buildExerciseProgress(history, effectiveId).records,
+                  load,
+                  reps,
+                )
+                if (!kinds.length) return
+                setRecordNotice(`Novo recorde em ${definition?.name ?? exercise.name}: ${kinds.includes('LOAD') ? 'maior carga' : '1RM estimado'}.`)
+              }}
             />
           ))}
 
-          <ExerciseNotesEditor
-            exercise={exercise}
-            busy={busyKeys.has(`exercise-note:${exercise.id}`)}
-            onSave={(value) => onUpdateExerciseNotes(exercise.id, value)}
-          />
+            {detailsExpanded && <ExerciseNotesEditor
+              exercise={exercise}
+              busy={busyKeys.has(`exercise-note:${exercise.id}`)}
+              onSave={(value) => onUpdateExerciseNotes(exercise.id, value)}
+            />}
 
           {!!errors[`exercise:${exercise.id}`] && (
             <Text accessibilityLiveRegion="polite" style={styles.error}>{errors[`exercise:${exercise.id}`]}</Text>
           )}
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityState={{ disabled: busyKeys.has(`exercise:${exercise.id}`) }}
-            disabled={busyKeys.has(`exercise:${exercise.id}`)}
-            style={styles.addSet}
-            onPress={() => void onAddSet(exercise.id)}
-          >
-            <Text style={styles.addSetText}>＋ Adicionar série</Text>
-          </TouchableOpacity>
+            <View style={styles.exerciseActions}>
+              <PressableScale
+                accessibilityRole="button"
+                accessibilityState={{ expanded: detailsExpanded }}
+                style={styles.detailAction}
+                onPress={() => setExpandedExerciseDetails(detailsExpanded ? null : exercise.id)}
+              >
+                <Text style={styles.addSetText}>{detailsExpanded ? 'Ocultar detalhes' : 'Histórico e opções'}</Text>
+              </PressableScale>
+              <PressableScale
+                accessibilityRole="button"
+                accessibilityState={{ disabled: busyKeys.has(`exercise:${exercise.id}`) }}
+                disabled={busyKeys.has(`exercise:${exercise.id}`)}
+                style={styles.detailAction}
+                onPress={() => void onAddSet(exercise.id)}
+              >
+                <Plus color={preferences.workoutHighContrast ? colors.workout.text : colors.tx} size={15} strokeWidth={1.8} />
+                <Text style={styles.addSetText}>Série</Text>
+              </PressableScale>
+            </View>
           </View>
+          </Reveal>
         )
       })}
 
       <View style={styles.finish}>
+        <Text style={styles.finishTitle}>Resumo da sessão</Text>
         <ThemedTextInput
+          highContrast={preferences.workoutHighContrast}
           accessibilityLabel="RPE geral"
           value={rpe}
           onChangeText={setRpe}
@@ -481,6 +601,7 @@ export function WorkoutSessionScreen(props: Props) {
           style={styles.input}
         />
         <ThemedTextInput
+          highContrast={preferences.workoutHighContrast}
           accessibilityLabel="Anotações da sessão"
           value={notes}
           onChangeText={(value) => {
@@ -492,7 +613,7 @@ export function WorkoutSessionScreen(props: Props) {
           maxLength={2_000}
           style={styles.input}
         />
-        <TouchableOpacity
+        <PressableScale
           accessibilityRole="button"
           accessibilityState={{ disabled: busyKeys.has('session-note') }}
           disabled={busyKeys.has('session-note')}
@@ -502,57 +623,61 @@ export function WorkoutSessionScreen(props: Props) {
           })()}
         >
           <Text style={styles.saveSetText}>Salvar anotação</Text>
-        </TouchableOpacity>
+        </PressableScale>
         {sessionNoteSaved && (
           <Text accessibilityLiveRegion="polite" style={styles.saved}>Anotação salva.</Text>
         )}
         {!!errors.session && <Text accessibilityLiveRegion="polite" style={styles.error}>{errors.session}</Text>}
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityState={{ disabled: busyKeys.has('session') }}
-          disabled={busyKeys.has('session')}
-          style={styles.primary}
-          onPress={() => void completeSession()}
-        >
-          <Text style={styles.primaryText}>Concluir e salvar</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityState={{ disabled: busyKeys.has('session') }}
-          disabled={busyKeys.has('session')}
-          style={styles.textAction}
-          onPress={() => Alert.alert(
-            'Abandonar sessão?',
-            'Os registros feitos serão preservados.',
-            [
-              { text: 'Cancelar', style: 'cancel' },
-              {
-                text: 'Abandonar',
-                style: 'destructive',
-                onPress: () => void (async () => {
-                  void triggerHaptic('DESTRUCTIVE_CONFIRM', preferences.hapticsEnabled)
-                  if (await onAbandon()) {
-                    setCanLeave(true)
-                    setTimeout(() => navigation.navigate('MainTabs', { screen: 'History' }), 0)
-                  }
-                })(),
-              },
-            ],
-          )}
-        >
-          <Text style={styles.abandon}>Abandonar sessão</Text>
-        </TouchableOpacity>
       </View>
     </ScreenScrollView>
+    <BottomActionBar highContrast={preferences.workoutHighContrast}>
+      {activeSet && (
+        <PrimaryButton
+          label={activeSet.completed ? `Salvar série ${activeSet.setNumber}` : `Concluir série ${activeSet.setNumber}`}
+          onPress={() => void completeFocusedSet()}
+          disabled={session.status === 'PAUSED' || busyKeys.has(`set:${activeSet.id}`)}
+          highContrast={preferences.workoutHighContrast}
+        />
+      )}
+      <View style={styles.footerActions}>
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityState={{ disabled: busyKeys.has('session') }}
+          disabled={busyKeys.has('session')}
+          onPress={() => void (async () => {
+            const resuming = session.status === 'PAUSED'
+            const success = await (resuming ? onResume() : onPause())
+            if (success) {
+              void triggerHaptic(resuming ? 'SESSION_RESUME' : 'SESSION_PAUSE', preferences.hapticsEnabled)
+            }
+          })()}
+          style={styles.footerSecondary}
+        >
+          {session.status === 'PAUSED'
+            ? <Play color={text} size={16} strokeWidth={1.8} />
+            : <Pause color={text} size={16} strokeWidth={1.8} />}
+          <Text style={styles.footerSecondaryText}>{session.status === 'PAUSED' ? 'Retomar' : 'Pausar'}</Text>
+        </PressableScale>
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityState={{ disabled: busyKeys.has('session') }}
+          disabled={busyKeys.has('session')}
+          onPress={confirmCompleteSession}
+          style={styles.footerSecondary}
+        >
+          <Text style={styles.footerSecondaryText}>Concluir e salvar</Text>
+        </PressableScale>
+      </View>
+    </BottomActionBar>
     {videoExercise && <Modal visible transparent animationType="fade" onRequestClose={closeVideo}>
       <Screen style={styles.videoBackdrop}>
         <View accessibilityViewIsModal style={styles.videoSheet}>
           <Text style={styles.videoTitle}>{videoExercise.name}</Text>
           {!!videoExercise.primaryVideoUrl && <ExerciseVideo key={videoRetryKey} url={videoExercise.primaryVideoUrl} posterUrl={videoExercise.primaryImageUrl} onRetry={() => setVideoRetryKey((value) => value + 1)} />}
           <Text style={styles.videoAttribution}>{videoAttribution}</Text>
-          {!!videoMetadata?.sourceUrl && <TouchableOpacity accessibilityRole="link" onPress={() => void Linking.openURL(videoMetadata.sourceUrl!)} style={styles.textAction}><Text style={styles.videoLink}>Abrir fonte original</Text></TouchableOpacity>}
-          {!!videoMetadata?.licenseUrl && <TouchableOpacity accessibilityRole="link" onPress={() => void Linking.openURL(videoMetadata.licenseUrl!)} style={styles.textAction}><Text style={styles.videoLink}>Consultar licença</Text></TouchableOpacity>}
-          <TouchableOpacity accessibilityRole="button" onPress={closeVideo} style={styles.textAction}><Text style={styles.videoClose}>Fechar</Text></TouchableOpacity>
+          {!!videoMetadata?.sourceUrl && <PressableScale accessibilityRole="link" onPress={() => void Linking.openURL(videoMetadata.sourceUrl!)} style={styles.textAction}><Text style={styles.videoLink}>Abrir fonte original</Text></PressableScale>}
+          {!!videoMetadata?.licenseUrl && <PressableScale accessibilityRole="link" onPress={() => void Linking.openURL(videoMetadata.licenseUrl!)} style={styles.textAction}><Text style={styles.videoLink}>Consultar licença</Text></PressableScale>}
+          <PressableScale accessibilityRole="button" onPress={closeVideo} style={styles.textAction}><Text style={styles.videoClose}>Fechar</Text></PressableScale>
         </View>
       </Screen>
     </Modal>}
@@ -577,6 +702,7 @@ function ExerciseNotesEditor({
     <View style={styles.exerciseNotes}>
       <Text style={styles.referenceTitle}>Anotações do exercício</Text>
       <ThemedTextInput
+        highContrast={preferences.workoutHighContrast}
         accessibilityLabel={`Anotações do exercício ${exercise.name}`}
         value={notes}
         onChangeText={(value) => {
@@ -610,7 +736,7 @@ function SmallAction({
   const { colors, preferences } = useTheme()
   const styles = createStyles(colors, preferences.workoutHighContrast)
   return (
-    <TouchableOpacity
+    <PressableScale
       accessibilityRole="button"
       accessibilityState={{ disabled }}
       disabled={disabled}
@@ -618,7 +744,7 @@ function SmallAction({
       style={styles.smallAction}
     >
       <Text style={styles.smallActionText}>{label}</Text>
-    </TouchableOpacity>
+    </PressableScale>
   )
 }
 
@@ -627,20 +753,30 @@ function SetEditor({
   set,
   busy,
   error,
+  active,
+  highContrast,
+  onActivate,
+  onRegisterComplete,
   onSave,
   onRemove,
   onStartRest,
+  onRecord,
 }: {
   exercise: SessionExercise
   set: SetLog
   busy: boolean
   error?: string
+  active: boolean
+  highContrast: boolean
+  onActivate: () => void
+  onRegisterComplete: (run: (() => Promise<boolean>) | null) => void
   onSave: (input: SetLogInput) => Promise<boolean>
   onRemove: () => Promise<boolean>
   onStartRest: () => void
+  onRecord: (reps: number, load: number) => void
 }) {
   const { colors, preferences } = useTheme()
-  const styles = createStyles(colors, preferences.workoutHighContrast)
+  const styles = createStyles(colors, highContrast)
   const [reps, setReps] = useState(String(set.reps))
   const [load, setLoad] = useState(String(set.load))
   const [duration, setDuration] = useState(String(set.durationSeconds))
@@ -662,36 +798,70 @@ function SetEditor({
     }
   }
 
-  async function toggle() {
-    const completing = !set.completed
-    if (await onSave(input(completing)) && completing) {
+  async function saveActiveSet() {
+    const success = await onSave(input(true))
+    if (success && !set.completed) {
       void triggerHaptic('SET_COMPLETE', preferences.hapticsEnabled)
+      onRecord(toNumber(reps), toNumber(load))
       onStartRest()
     }
+    return success
+  }
+
+  useEffect(() => {
+    if (!active) {
+      onRegisterComplete(null)
+      return
+    }
+    onRegisterComplete(saveActiveSet)
+    return () => onRegisterComplete(null)
+  }, [active, duration, distance, load, notes, onRegisterComplete, reps, rpe, set.completed])
+
+  if (!active) {
+    const summary = set.completed ? completedSetSummary(set, timed, cardio) : 'Pendente'
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={set.completed
+          ? `Série ${set.setNumber}, ${summary}, concluída. Toque para editar.`
+          : `Série ${set.setNumber}, pendente. Toque para iniciar.`}
+        onPress={onActivate}
+        style={styles.compactSetRow}
+      >
+        <CheckDraw checked={set.completed} size={26} />
+        <Text style={styles.compactSetText}>Série {set.setNumber}</Text>
+        <Text style={styles.compactSetSummary}>{summary}</Text>
+        <Text style={styles.compactSetStatus}>{set.completed ? 'Concluída' : 'Pendente'}</Text>
+      </Pressable>
+    )
   }
 
   return (
-    <View accessibilityLabel={`Série ${set.setNumber}. ${set.completed ? 'Concluída' : 'Pendente'}.`} style={styles.setEditor}>
+    <View accessibilityLabel={`Série ${set.setNumber}. ${set.completed ? 'Concluída' : 'Em andamento'}.`} style={styles.activeSetEditor}>
       <View style={styles.setTitle}>
-        <Text style={styles.setNumber}>SÉRIE {set.setNumber}</Text>
+        <View style={styles.activeSetHeading}>
+          <Text style={styles.setNumber}>Série {set.setNumber}</Text>
+          <Text style={styles.setPhase}>{set.completed ? 'editando' : 'em andamento'}</Text>
+        </View>
         {set.manuallyAdded && (
-          <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={() => void onRemove()} style={styles.textAction}>
+          <PressableScale accessibilityRole="button" disabled={busy} onPress={() => void onRemove()} style={styles.textAction}>
             <Text style={styles.removeSet}>Remover</Text>
-          </TouchableOpacity>
+          </PressableScale>
         )}
       </View>
       <View style={styles.fields}>
         {!timed && (
           <>
-            <SetField label="REPS" value={reps} onChange={setReps} />
-            <SetField label="CARGA KG" value={load} onChange={setLoad} decimal />
+            <StepperField label="Repetições" value={reps} onChange={setReps} step={1} />
+            <StepperField label="Carga · kg" value={load} onChange={setLoad} step={1} />
           </>
         )}
-        {timed && <SetField label="DURAÇÃO S" value={duration} onChange={setDuration} />}
-        {cardio && <SetField label="DISTÂNCIA KM" value={distance} onChange={setDistance} decimal />}
+        {timed && <SetField label="Duração · s" value={duration} onChange={setDuration} />}
+        {cardio && <SetField label="Distância · km" value={distance} onChange={setDistance} decimal />}
         <SetField label="RPE" value={rpe} onChange={setRpe} decimal />
       </View>
       <ThemedTextInput
+        highContrast={highContrast}
         accessibilityLabel="Observação da série"
         value={notes}
         onChangeText={setNotes}
@@ -701,29 +871,31 @@ function SetEditor({
       />
       {!!error && <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text>}
       <View style={styles.setActions}>
-        <TouchableOpacity
+        <PressableScale
           accessibilityRole="button"
           accessibilityState={{ disabled: busy }}
           disabled={busy}
           style={styles.saveSet}
           onPress={() => void onSave(input(set.completed))}
         >
-          <Text style={styles.saveSetText}>{busy ? 'Salvando…' : 'Salvar'}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityState={{ disabled: busy, selected: set.completed }}
-          disabled={busy}
-          style={[styles.check, set.completed && styles.checked]}
-          onPress={() => void toggle()}
-        >
-          <Text style={[styles.checkText, set.completed && styles.checkedText]}>
-            {set.completed ? '✓ Concluída' : '○ Concluir'}
-          </Text>
-        </TouchableOpacity>
+          <Text style={styles.saveSetText}>{busy ? 'Salvando…' : 'Salvar rascunho'}</Text>
+        </PressableScale>
+        <Text style={styles.completionHint}>
+          {set.completed ? 'Use “Salvar série” para guardar as alterações.' : 'Concluir esta série inicia o descanso.'}
+        </Text>
       </View>
     </View>
   )
+}
+
+function completedSetSummary(set: SetLog, timed: boolean, cardio: boolean) {
+  if (cardio) {
+    const pieces = [set.distance == null ? null : `${set.distance} km`, set.durationSeconds == null ? null : `${set.durationSeconds} s`].filter(Boolean)
+    return pieces.join(' · ') || 'Registrada'
+  }
+  if (timed) return set.durationSeconds == null ? 'Registrada' : `${set.durationSeconds} s`
+  const pieces = [set.load == null ? null : `${set.load} kg`, set.reps == null ? null : `${set.reps} reps`].filter(Boolean)
+  return pieces.join(' × ') || 'Registrada'
 }
 
 function SetField({
@@ -743,6 +915,7 @@ function SetField({
     <View style={styles.field}>
       <Text style={styles.setLabel}>{label}</Text>
       <ThemedTextInput
+        highContrast={preferences.workoutHighContrast}
         accessibilityLabel={label}
         value={value}
         onChangeText={onChange}
@@ -754,13 +927,104 @@ function SetField({
   )
 }
 
-function TimerAction({ label, onPress }: { label: string; onPress: () => void }) {
+function StepperField({
+  label,
+  value,
+  onChange,
+  step,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  step: number
+}) {
+  const { colors, preferences } = useTheme()
+  const styles = createStyles(colors, preferences.workoutHighContrast)
+  const interval = useRef<ReturnType<typeof setInterval> | null>(null)
+  const resetTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const holding = useRef(false)
+
+  useEffect(() => () => {
+    if (interval.current) clearInterval(interval.current)
+    if (resetTimeout.current) clearTimeout(resetTimeout.current)
+  }, [])
+
+  function adjust(direction: number) {
+    const next = Math.max(0, toNumber(value) + direction * step)
+    onChange(String(Number(next.toFixed(2))))
+  }
+
+  function startRepeat(direction: number) {
+    holding.current = true
+    adjust(direction)
+    interval.current = setInterval(() => adjust(direction), 120)
+  }
+
+  function stopRepeat() {
+    if (interval.current) clearInterval(interval.current)
+    interval.current = null
+    resetTimeout.current = setTimeout(() => { holding.current = false }, 250)
+  }
+
+  return (
+    <View style={styles.field}>
+      <Text style={styles.setLabel}>{label}</Text>
+      <View style={styles.stepper}>
+        <Pressable
+          accessibilityLabel={`Diminuir ${label}`}
+          accessibilityRole="button"
+          onPress={() => { if (!holding.current) adjust(-1) }}
+          onLongPress={() => startRepeat(-1)}
+          onPressOut={stopRepeat}
+          delayLongPress={350}
+          style={styles.stepperButton}
+        >
+          <Minus color={preferences.workoutHighContrast ? colors.workout.text : colors.tx} size={17} strokeWidth={1.8} />
+        </Pressable>
+        <ThemedTextInput
+          accessibilityLabel={label}
+          value={value}
+          onChangeText={onChange}
+          keyboardType="decimal-pad"
+          selectTextOnFocus
+          highContrast={preferences.workoutHighContrast}
+          style={styles.stepperInput}
+        />
+        <Pressable
+          accessibilityLabel={`Aumentar ${label}`}
+          accessibilityRole="button"
+          onPress={() => { if (!holding.current) adjust(1) }}
+          onLongPress={() => startRepeat(1)}
+          onPressOut={stopRepeat}
+          delayLongPress={350}
+          style={styles.stepperButton}
+        >
+          <Plus color={preferences.workoutHighContrast ? colors.workout.text : colors.tx} size={17} strokeWidth={1.8} />
+        </Pressable>
+      </View>
+    </View>
+  )
+}
+
+function TimerAction({
+  label,
+  onPress,
+  kind,
+}: {
+  label: string
+  onPress: () => void
+  kind: 'secondary' | 'tonal'
+}) {
   const { colors, preferences } = useTheme()
   const styles = createStyles(colors, preferences.workoutHighContrast)
   return (
-    <TouchableOpacity accessibilityRole="button" onPress={onPress} style={styles.timerAction}>
-      <Text style={[timerActionStyle, styles.timerActionText]}>{label}</Text>
-    </TouchableOpacity>
+    <PressableScale
+      accessibilityRole="button"
+      onPress={onPress}
+      style={[styles.timerAction, kind === 'tonal' && styles.timerActionTonal]}
+    >
+      <Text style={styles.timerActionText}>{label}</Text>
+    </PressableScale>
   )
 }
 
@@ -773,92 +1037,124 @@ function formatTime(value: number) {
   return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`
 }
 
-const timerActionStyle = {
-  fontSize: 14,
-  fontWeight: '700' as const,
+function formatTimerAnnouncement(seconds: number) {
+  if (seconds <= 0) return 'Descanso concluído'
+  const minutes = Math.floor(seconds / 60)
+  const remainder = seconds % 60
+  const time = [
+    minutes ? `${minutes} ${minutes === 1 ? 'minuto' : 'minutos'}` : '',
+    remainder ? `${remainder} ${remainder === 1 ? 'segundo' : 'segundos'}` : '',
+  ].filter(Boolean).join(' e ')
+  return `Descanso, ${time} restantes`
 }
 
 const createStyles = (colors: ThemeColors, highContrast = false) => {
   const workout = highContrast ? colors.workout : null
-  const background = workout?.background ?? colors.background
-  const surface = workout?.surface ?? colors.surface
-  const border = workout?.border ?? colors.border
-  const text = workout?.text ?? colors.textPrimary
-  const secondaryText = workout?.textSecondary ?? colors.textSecondary
-  const completed = workout?.completed ?? colors.success
-  const onCompleted = workout?.onCompleted ?? colors.background
-  const danger = workout?.danger ?? colors.danger
+  const background = workout?.background ?? colors.bg
+  const surface = workout?.surface ?? colors.s1
+  const secondarySurface = workout?.pending ?? colors.s2
+  const border = workout?.border ?? colors.bd
+  const muted = workout?.textSecondary ?? colors.t2
+  const text = workout?.text ?? colors.tx
+  const accent = workout?.completed ?? colors.ac
+  const onAccent = workout?.onCompleted ?? colors.on
+  const danger = workout?.danger ?? colors.dg
   const borderWidth = highContrast ? 2 : 1
   return StyleSheet.create({
-  sessionHeader: { alignItems: 'center', backgroundColor: highContrast ? surface : undefined, borderColor: highContrast ? border : undefined, borderRadius: 18, borderWidth: highContrast ? 2 : 0, flexDirection: 'row', gap: 12, marginBottom: 12, padding: 12 },
-  pausedHeader: { backgroundColor: surface, borderColor: colors.warning, borderWidth: 2 },
-  eyebrow: { color: secondaryText, fontSize: 12, fontWeight: '800', letterSpacing: 1.5, marginTop: 10 },
-  title: { color: text, fontSize: 30, fontWeight: '700', letterSpacing: -1, lineHeight: 37, marginTop: 7 },
-  metrics: { flexDirection: 'row', gap: 12, marginBottom: 12 },
-  metric: { backgroundColor: surface, borderColor: border, borderRadius: 18, borderWidth, flex: 1, padding: 16 },
-  metricLabel: { color: secondaryText, fontSize: 12 },
-  metricValue: { color: text, fontSize: 24, fontWeight: '800', lineHeight: 30, marginTop: 6 },
-  timer: { alignItems: 'center', backgroundColor: workout?.timer ?? colors.textPrimary, borderColor: highContrast ? border : undefined, borderRadius: 22, borderWidth: highContrast ? 2 : 0, flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', marginBottom: 12, padding: 18 },
-  timerLabel: { color: workout?.timerText ?? colors.background, fontSize: 14, fontWeight: '800' },
-  timerValue: { color: workout?.timerText ?? colors.background, fontSize: 36, fontWeight: '700', lineHeight: 43, marginTop: 3 },
-  timerActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  timerAction: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 },
-  timerActionText: { color: workout?.timerText ?? colors.background },
-  card: { backgroundColor: surface, borderColor: border, borderRadius: 21, borderWidth, marginBottom: 12, overflow: 'hidden' },
-  exerciseHeader: { alignItems: 'center', flexDirection: 'row', gap: 12, padding: 16 },
-  index: { backgroundColor: colors.primary, borderRadius: 13, color: colors.onPrimary, fontSize: 16, fontWeight: '800', minWidth: 48, overflow: 'hidden', padding: 14, textAlign: 'center' },
-  exerciseName: { color: text, fontSize: 20, fontWeight: '700', lineHeight: 26 },
-  exerciseStatus: { color: text, fontSize: 13, fontWeight: '900', marginTop: 5 },
-  muted: { color: secondaryText, fontSize: 14, lineHeight: 20, marginTop: 4 },
-  videoLink: { color: colors.primary, fontSize: 14, fontWeight: '800', marginTop: 7 },
-  textAction: { justifyContent: 'center', minHeight: 48 },
-  skip: { color: secondaryText, fontSize: 14, fontWeight: '700', padding: 8 },
-  setEditor: { backgroundColor: highContrast ? background : undefined, borderTopColor: border, borderTopWidth: borderWidth, gap: 12, padding: 16 },
-  setTitle: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  setNumber: { color: secondaryText, fontSize: 14, fontWeight: '800' },
-  removeSet: { color: danger, fontSize: 14, fontWeight: '700' },
-  fields: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  field: { flexGrow: 1, minWidth: 108 },
-  setLabel: { color: secondaryText, fontSize: 12, marginBottom: 4 },
-  setInput: { backgroundColor: highContrast ? surface : colors.surfaceSecondary, borderColor: border, borderRadius: 11, borderWidth, color: text, fontSize: 18, fontWeight: '700', minHeight: 56, paddingHorizontal: 12 },
-  setNotes: { backgroundColor: highContrast ? surface : colors.surfaceSecondary, borderColor: border, borderRadius: 11, borderWidth, color: text, fontSize: 16, minHeight: 56, paddingHorizontal: 12 },
-  setActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  saveSet: { alignItems: 'center', borderColor: border, borderRadius: 12, borderWidth, flex: 1, justifyContent: 'center', minHeight: 52, minWidth: 100 },
-  saveSetText: { color: text, fontSize: 14, fontWeight: '800' },
-  check: { alignItems: 'center', backgroundColor: workout?.pending ?? colors.surfaceSecondary, borderColor: border, borderRadius: 12, borderWidth, flex: 1.4, justifyContent: 'center', minHeight: 52, minWidth: 130 },
-  checked: { backgroundColor: completed, borderColor: highContrast ? border : completed },
-  checkText: { color: text, fontSize: 14, fontWeight: '800' },
-  checkedText: { color: onCompleted },
-  addSet: { alignItems: 'center', borderTopColor: border, borderTopWidth: borderWidth, justifyContent: 'center', minHeight: 56 },
-  addSetText: { color: colors.primary, fontSize: 14, fontWeight: '800' },
-  reference: { borderTopColor: border, borderTopWidth: borderWidth, gap: 4, padding: 16 },
-  referenceTitle: { color: text, fontSize: 15, fontWeight: '900' },
-  referenceText: { color: secondaryText, fontSize: 13, lineHeight: 19 },
-  suggestion: { backgroundColor: colors.surfaceSecondary, borderTopColor: border, borderTopWidth: borderWidth, gap: 6, padding: 16 },
-  suggestionTitle: { color: colors.primary, fontSize: 15, fontWeight: '900' },
-  inlineActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 5 },
-  smallAction: { alignItems: 'center', borderColor: border, borderRadius: 11, borderWidth, justifyContent: 'center', minHeight: 48, paddingHorizontal: 12 },
-  smallActionText: { color: text, fontSize: 13, fontWeight: '800' },
-  substitution: { color: colors.primary, fontSize: 13, fontWeight: '800', marginTop: 4 },
-  substitutionPanel: { borderTopColor: border, borderTopWidth: borderWidth, gap: 8, padding: 16 },
-  substitutionOption: { borderColor: border, borderRadius: 12, borderWidth, minHeight: 56, padding: 12 },
-  substitutionName: { color: text, fontSize: 14, fontWeight: '800' },
-  exerciseNotes: { borderTopColor: border, borderTopWidth: borderWidth, gap: 8, padding: 16 },
-  saved: { color: completed, fontSize: 13, fontWeight: '800' },
-  finish: { backgroundColor: surface, borderColor: border, borderRadius: 22, borderWidth, gap: 12, marginTop: 5, padding: 16 },
-  input: { backgroundColor: highContrast ? background : colors.surfaceSecondary, borderColor: border, borderRadius: 14, borderWidth, color: text, fontSize: 16, minHeight: 56, paddingHorizontal: 14 },
-  primary: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 16, justifyContent: 'center', minHeight: 56, paddingHorizontal: 20 },
-  primaryText: { color: colors.onPrimary, fontSize: 16, fontWeight: '800' },
-  secondary: { alignItems: 'center', backgroundColor: highContrast ? background : undefined, borderColor: border, borderRadius: 14, borderWidth, justifyContent: 'center', minHeight: 56, paddingHorizontal: 14 },
-  secondaryText: { color: text, fontSize: 14, fontWeight: '800' },
-  abandon: { color: danger, fontSize: 14, fontWeight: '800', minHeight: 56, padding: 12, textAlign: 'center' },
-  error: { color: danger, fontSize: 14, lineHeight: 20, paddingHorizontal: 2 },
-  empty: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: 30 },
-  emptyTitle: { color: colors.ink, fontSize: 21, fontWeight: '700', marginBottom: 6 },
-  videoBackdrop: { backgroundColor: colors.scrim, justifyContent: 'center', paddingHorizontal: 18 },
-  videoSheet: { backgroundColor: colors.surface, borderRadius: 24, padding: 16 },
-  videoTitle: { color: colors.ink, fontSize: 18, fontWeight: '800', marginBottom: 14 },
-  videoAttribution: { color: colors.gray500, fontSize: 12, lineHeight: 16, marginTop: 4 },
-  videoClose: { color: colors.primary, fontSize: 12, fontWeight: '800', padding: 14, textAlign: 'center' },
+    topBar: { alignItems: 'center', flexDirection: 'row', gap: 8, marginBottom: 24, minHeight: 48 },
+    backButton: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 40 },
+    topBarTitle: { flex: 1, minWidth: 0 },
+    topBarName: { color: text, fontFamily: fontFamilies.text, fontSize: 17, fontWeight: '500' },
+    sessionState: { alignItems: 'center', flexDirection: 'row', gap: 6, marginTop: 3 },
+    stateDot: { backgroundColor: accent, borderRadius: 4, height: 7, width: 7 },
+    sessionStateText: { ...typography.captionSmall, color: muted },
+    abandonTop: { alignItems: 'center', justifyContent: 'center', minHeight: 48, paddingHorizontal: 4 },
+    abandonTopText: { ...typography.bodySmall, color: danger, textDecorationLine: 'underline', textDecorationStyle: 'solid' },
+    progressBlock: { marginBottom: 24 },
+    progressInfo: { alignItems: 'baseline', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+    progressCount: { alignItems: 'baseline', flexDirection: 'row' },
+    progressBig: { ...typography.numberLarge, color: text },
+    progressTotal: { ...typography.bodySmall, color: muted },
+    progressValue: { ...typography.numberMedium, color: text },
+    volumeValue: { ...typography.numberSmall, color: muted },
+    timer: { alignItems: 'center', backgroundColor: surface, borderColor: highContrast ? border : 'transparent', borderRadius: 20, borderWidth: highContrast ? borderWidth : 0, flexDirection: 'row', gap: 20, marginBottom: 20, padding: 20 },
+    timerSide: { flex: 1, gap: 8 },
+    setPhase: { ...typography.caption, color: muted },
+    timerLabel: { ...typography.caption, color: muted },
+    timerValue: { ...typography.numberLarge, color: text, fontSize: 28, lineHeight: 32 },
+    timerActions: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+    timerAction: { alignItems: 'center', borderColor: highContrast ? border : colors.mu, borderRadius: 14, borderWidth: 1, justifyContent: 'center', minHeight: 48, paddingHorizontal: 14 },
+    timerActionTonal: { alignSelf: 'flex-start', backgroundColor: secondarySurface, borderColor: 'transparent', marginTop: 8 },
+    timerActionText: { ...typography.bodySmall, color: text, fontWeight: '500' },
+    restComplete: { ...typography.bodySmall, color: accent, marginBottom: 20 },
+    exerciseBlock: { backgroundColor: 'transparent', borderColor: 'transparent', borderRadius: 20, borderWidth: 0, marginBottom: 16, overflow: 'hidden' },
+    activeExerciseBlock: { backgroundColor: surface, borderColor: highContrast ? accent : 'transparent', borderWidth: highContrast ? 2 : 0, paddingHorizontal: 16, paddingTop: 16 },
+    exerciseHeader: { alignItems: 'center', flexDirection: 'row', gap: 12, paddingVertical: 8 },
+    index: { alignItems: 'center', borderColor: border, borderRadius: 16, borderWidth: 1, height: 32, justifyContent: 'center', width: 32 },
+    indexActive: { backgroundColor: accent, borderColor: accent },
+    indexText: { ...typography.numberSmall, color: muted },
+    indexActiveText: { color: onAccent },
+    exerciseName: { ...typography.titleSmall, color: text },
+    exerciseStatus: { ...typography.captionSmall, color: muted, marginTop: 4 },
+    muted: { ...typography.caption, color: muted, marginTop: 3 },
+    referenceSummary: { ...typography.captionSmall, color: muted, marginTop: 6 },
+    videoLink: { ...typography.bodySmall, color: text, marginTop: 2, textDecorationLine: 'underline' },
+    textAction: { justifyContent: 'center', minHeight: 48 },
+    skip: { ...typography.caption, color: muted, paddingHorizontal: 4, textDecorationLine: 'underline' },
+    compactSetRow: { alignItems: 'center', borderBottomColor: border, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: 14, minHeight: 56, paddingHorizontal: 2 },
+    compactSetText: { ...typography.bodySmall, color: text },
+    compactSetSummary: { ...typography.numberSmall, color: muted, flex: 1, textAlign: 'right' },
+    compactSetStatus: { ...typography.captionSmall, color: muted, minWidth: 64, textAlign: 'right' },
+    activeSetEditor: { backgroundColor: highContrast ? background : secondarySurface, borderColor: highContrast ? accent : 'transparent', borderRadius: 16, borderWidth: highContrast ? 2 : 0, gap: 14, marginTop: 8, padding: 16 },
+    setTitle: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+    activeSetHeading: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+    setNumber: { ...typography.titleSmall, color: text },
+    removeSet: { ...typography.captionSmall, color: danger, textDecorationLine: 'underline' },
+    fields: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+    field: { flexGrow: 1, minWidth: 120 },
+    setLabel: { ...typography.captionSmall, color: muted, marginBottom: 4 },
+    stepper: { alignItems: 'center', backgroundColor: highContrast ? background : surface, borderColor: highContrast ? border : 'transparent', borderRadius: 14, borderWidth: highContrast ? 1 : 0, flexDirection: 'row', height: 56, overflow: 'hidden' },
+    stepperButton: { alignItems: 'center', justifyContent: 'center', minHeight: 56, minWidth: 52 },
+    stepperInput: { ...typography.numberLarge, backgroundColor: 'transparent', borderWidth: 0, color: text, flex: 1, fontSize: 28, minHeight: 56, minWidth: 30, paddingHorizontal: 2, paddingVertical: 0, textAlign: 'center' },
+    setInput: { backgroundColor: highContrast ? background : secondarySurface, borderColor: highContrast ? border : 'transparent', borderRadius: 10, borderWidth: highContrast ? 1 : 0, color: text, fontFamily: fontFamilies.data, fontSize: 18, minHeight: 48, paddingHorizontal: 12 },
+    setNotes: { backgroundColor: highContrast ? background : secondarySurface, borderColor: highContrast ? border : 'transparent', borderRadius: 10, borderWidth: highContrast ? 1 : 0, color: text, fontFamily: fontFamilies.text, fontSize: 15, minHeight: 48, paddingHorizontal: 12 },
+    setActions: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+    saveSet: { alignItems: 'center', borderColor: highContrast ? border : colors.mu, borderRadius: 14, borderWidth: 1, justifyContent: 'center', minHeight: 48, minWidth: 120, paddingHorizontal: 12 },
+    saveSetText: { ...typography.bodySmall, color: text, fontWeight: '500' },
+    completionHint: { ...typography.captionSmall, color: muted, flex: 1, minWidth: 145 },
+    addSetText: { ...typography.bodySmall, color: text, textDecorationLine: 'underline' },
+    exerciseActions: { borderTopColor: border, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: 20, marginTop: 8 },
+    detailAction: { alignItems: 'center', flexDirection: 'row', gap: 5, justifyContent: 'center', minHeight: 48 },
+    reference: { borderTopColor: border, borderTopWidth: StyleSheet.hairlineWidth, gap: 4, paddingVertical: 12 },
+    referenceTitle: { ...typography.bodySmall, color: text, marginBottom: 4 },
+    referenceText: { ...typography.caption, color: muted },
+    suggestion: { backgroundColor: secondarySurface, gap: 6, marginTop: 8, padding: 12 },
+    suggestionTitle: { ...typography.bodySmall, color: text },
+    inlineActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 5 },
+    smallAction: { alignItems: 'center', borderColor: highContrast ? border : colors.mu, borderRadius: 12, borderWidth: 1, justifyContent: 'center', minHeight: 48, paddingHorizontal: 12 },
+    smallActionText: { ...typography.caption, color: text },
+    substitution: { ...typography.captionSmall, color: text, marginTop: 4 },
+    substitutionPanel: { borderTopColor: border, borderTopWidth: StyleSheet.hairlineWidth, gap: 8, paddingVertical: 12 },
+    substitutionOption: { borderColor: highContrast ? border : colors.mu, borderRadius: 12, borderWidth: 1, minHeight: 48, padding: 12 },
+    substitutionName: { ...typography.bodySmall, color: text },
+    exerciseNotes: { borderTopColor: border, borderTopWidth: StyleSheet.hairlineWidth, gap: 8, paddingVertical: 12 },
+    saved: { ...typography.caption, color: text },
+    recordNotice: { ...typography.body, color: text, fontWeight: '600', marginBottom: 12 },
+    finish: { borderTopColor: border, borderTopWidth: StyleSheet.hairlineWidth, gap: 12, marginTop: 12, paddingTop: 20 },
+    finishTitle: { ...typography.titleSmall, color: text },
+    input: { backgroundColor: highContrast ? surface : secondarySurface, borderColor: highContrast ? border : 'transparent', borderRadius: 12, borderWidth: highContrast ? 1 : 0, color: text, fontFamily: fontFamilies.text, fontSize: 15, minHeight: 48, paddingHorizontal: 12 },
+    error: { ...typography.caption, color: danger, paddingHorizontal: 2 },
+    footerActions: { flexDirection: 'row', gap: 8 },
+    footerSecondary: { alignItems: 'center', borderColor: border, borderRadius: 14, borderWidth: 1, flex: 1, flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 48, paddingHorizontal: 10 },
+    footerSecondaryText: { ...typography.bodySmall, color: text, fontWeight: '500' },
+    primary: { alignItems: 'center', backgroundColor: accent, borderRadius: 12, justifyContent: 'center', minHeight: 56, paddingHorizontal: 20 },
+    primaryText: { color: onAccent, ...typography.titleSmall },
+    empty: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: 30 },
+    emptyTitle: { ...typography.titleSmall, color: text, marginBottom: 6 },
+    videoBackdrop: { backgroundColor: colors.scrim, justifyContent: 'center', paddingHorizontal: 18 },
+    videoSheet: { backgroundColor: surface, borderRadius: 24, padding: 16 },
+    videoTitle: { ...typography.titleSmall, color: text, marginBottom: 14 },
+    videoAttribution: { ...typography.captionSmall, color: muted, marginTop: 4 },
+    videoClose: { ...typography.caption, color: text, padding: 14, textAlign: 'center', textDecorationLine: 'underline' },
   })
 }

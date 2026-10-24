@@ -1,161 +1,112 @@
-import { useMemo, useRef, useState } from 'react'
-import { FlatList, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import { EXERCISE_PACKS, type ExerciseDefinition } from '@training/training-domain'
-import { SelectableChip } from '../../../components/SelectableChip'
-import { ThemedTextInput } from '../../../components/ThemedTextInput'
+import { useMemo, useRef } from 'react'
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
+import { ChevronRight, Globe, Star } from 'lucide-react-native'
+import type { ExerciseDefinition } from '@training/training-domain'
+import { PrimaryButton } from '../../../components/PrimaryButton'
+import { EmptyState } from '../../../components/ui'
+import { PressableScale, Reveal } from '../../../motion'
 import { shared, type ThemeColors, useTheme } from '../../../theme'
-import {
-  filterExerciseLibrary,
-  exerciseMediaLabel,
-  libraryEmptyMessage,
-  type LibraryFilter,
-} from '../../exercise-library/libraryState'
+import { typography } from '../../../theme/typography'
+import { ExerciseFilters, useExerciseFilters } from '../../exercise-library/ExerciseFilters'
+import { canonicalMuscle, EXERCISE_SOURCE_LABELS, equipmentLabel } from '../../exercise-library/exerciseTaxonomy'
+import { exerciseMediaLabel, libraryEmptyMessage, type LibraryFilter } from '../../exercise-library/libraryState'
 
 export function ExercisePicker({
   exercises,
   excludedId,
   onFavorite,
   onSelect,
+  onSearchOnline,
 }: {
   exercises: ExerciseDefinition[]
   excludedId?: number
   onFavorite?: (id: number, favorite: boolean) => Promise<boolean>
   onSelect: (exercise: ExerciseDefinition) => void
+  /** Abre o catálogo online quando a biblioteca local não resolve a busca. */
+  onSearchOnline?: () => void
 }) {
   const { colors } = useTheme()
   const styles = createStyles(colors)
-  const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<LibraryFilter>({ kind: 'ALL' })
   const lastSelection = useRef({ id: 0, at: 0 })
   const available = useMemo(
     () => exercises.filter((exercise) => !exercise.archived && exercise.id !== excludedId),
     [excludedId, exercises],
   )
-  const muscles = useMemo(
-    () => [...new Set(available.map((exercise) => exercise.primaryMuscleGroup))].sort(),
-    [available],
-  )
-  const equipment = useMemo(
-    () => [...new Set(available.map((exercise) => exercise.equipment))].sort(),
-    [available],
-  )
-  const filtered = useMemo(
-    () => filterExerciseLibrary(available, query, filter),
-    [available, filter, query],
-  )
+  const filters = useExerciseFilters(available)
+  const { filtered, query, active } = filters
   const select = (exercise: ExerciseDefinition) => {
     const now = Date.now()
     if (lastSelection.current.id === exercise.id && now - lastSelection.current.at < 800) return
     lastSelection.current = { id: exercise.id, at: now }
     onSelect(exercise)
   }
+  const emptyFilter: LibraryFilter = active ? { kind: 'MUSCLE', value: '' } : { kind: 'ALL' }
 
   return (
-    <FlatList
-      data={filtered}
-      keyExtractor={(item) => String(item.id)}
-      keyboardShouldPersistTaps="handled"
-      contentContainerStyle={[styles.content, !filtered.length && styles.emptyContent]}
-      ListHeaderComponent={(
-        <View>
-          <ThemedTextInput
-            accessibilityLabel="Buscar exercício"
-            placeholder="Nome, alias, músculo ou equipamento"
-            style={styles.search}
-            value={query}
-            onChangeText={setQuery}
+    <View style={styles.container}>
+      <View style={styles.top}>
+        <ExerciseFilters exercises={available} filters={filters} />
+      </View>
+      <FlatList
+        data={filtered}
+        keyExtractor={(item) => String(item.id)}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={[styles.content, !filtered.length && styles.emptyContent]}
+        ListEmptyComponent={(
+          <EmptyState
+            action={onSearchOnline ? <PrimaryButton icon={<Globe color={colors.tx} size={18} strokeWidth={1.8} />} label="Buscar no catálogo online" onPress={onSearchOnline} secondary /> : undefined}
+            description={onSearchOnline ? 'Altere a busca ou os filtros, ou procure no ExerciseDB e no Wger.' : 'Altere a busca ou os filtros.'}
+            title={libraryEmptyMessage(available.length, query, emptyFilter)}
           />
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categories}>
-            <Filter label="Todos" value={{ kind: 'ALL' }} selected={filter} onSelect={setFilter} />
-            <Filter label="Favoritos" value={{ kind: 'FAVORITES' }} selected={filter} onSelect={setFilter} />
-            <Filter label="Recentes" value={{ kind: 'RECENTS' }} selected={filter} onSelect={setFilter} />
-            <Filter label="Peso corporal" value={{ kind: 'BODYWEIGHT' }} selected={filter} onSelect={setFilter} />
-          </ScrollView>
-          <Text style={styles.groupLabel}>PACOTES</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categories}>
-            {EXERCISE_PACKS.map((pack) => (
-              <Filter key={pack.id} label={pack.name} value={{ kind: 'PACK', value: pack.id }} selected={filter} onSelect={setFilter} />
-            ))}
-          </ScrollView>
-          <Text style={styles.groupLabel}>GRUPO MUSCULAR</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categories}>
-            {muscles.map((muscle) => <Filter key={muscle} label={muscle} value={{ kind: 'MUSCLE', value: muscle }} selected={filter} onSelect={setFilter} />)}
-          </ScrollView>
-          <Text style={styles.groupLabel}>EQUIPAMENTO</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categories}>
-            {equipment.map((item) => <Filter key={item} label={item} value={{ kind: 'EQUIPMENT', value: item }} selected={filter} onSelect={setFilter} />)}
-          </ScrollView>
-        </View>
-      )}
-      ListEmptyComponent={(
-        <View style={styles.empty}>
-          <Text style={styles.emptyTitle}>{libraryEmptyMessage(available.length, query, filter)}</Text>
-          <Text style={styles.emptyText}>Altere a busca ou o filtro.</Text>
-        </View>
-      )}
-      renderItem={({ item }) => (
-        <View style={styles.item}>
-          <TouchableOpacity
-            accessibilityLabel={`Adicionar ${item.name}`}
-            accessibilityRole="button"
-            onPress={() => select(item)}
-            style={styles.itemMain}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={styles.name}>{item.name}</Text>
-              <Text style={styles.meta}>
-                {item.primaryMuscleGroup} · {item.equipment} · {exerciseMediaLabel(item)}
-              </Text>
+        )}
+        renderItem={({ item, index }) => (
+          <Reveal index={Math.min(index, 8)}>
+            <View style={styles.item}>
+              <PressableScale
+                accessibilityLabel={`Adicionar ${item.name}`}
+                accessibilityRole="button"
+                onPress={() => select(item)}
+                pressedScale={0.99}
+                style={styles.itemMain}
+              >
+                <View style={styles.itemCopy}>
+                  <Text style={styles.name}>{item.name}</Text>
+                  <Text style={styles.meta}>
+                    {canonicalMuscle(item.primaryMuscleGroup)} · {equipmentLabel(item.equipment)} · {EXERCISE_SOURCE_LABELS[item.source] ?? item.source}
+                  </Text>
+                  <Text style={styles.media}>{exerciseMediaLabel(item)}</Text>
+                </View>
+                <ChevronRight color={colors.mu} size={18} strokeWidth={1.5} />
+              </PressableScale>
+              {!!onFavorite && (
+                <Pressable
+                  accessibilityLabel={item.favorite ? `Remover ${item.name} dos favoritos` : `Favoritar ${item.name}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: item.favorite }}
+                  onPress={() => void onFavorite(item.id, !item.favorite)}
+                  style={styles.favorite}
+                >
+                  <Star color={item.favorite ? colors.tx : colors.mu} fill={item.favorite ? colors.tx : 'transparent'} size={20} strokeWidth={1.5} />
+                </Pressable>
+              )}
             </View>
-            <Text style={styles.arrow}>→</Text>
-          </TouchableOpacity>
-          {!!onFavorite && (
-            <Pressable
-              accessibilityLabel={item.favorite ? `Remover ${item.name} dos favoritos` : `Favoritar ${item.name}`}
-              accessibilityRole="button"
-              accessibilityState={{ selected: item.favorite }}
-              onPress={() => void onFavorite(item.id, !item.favorite)}
-              style={styles.favorite}
-            >
-              <Text style={styles.favoriteText}>{item.favorite ? '★' : '☆'}</Text>
-            </Pressable>
-          )}
-        </View>
-      )}
-    />
+          </Reveal>
+        )}
+      />
+    </View>
   )
 }
 
-function Filter({
-  label,
-  value,
-  selected,
-  onSelect,
-}: {
-  label: string
-  value: LibraryFilter
-  selected: LibraryFilter
-  onSelect: (value: LibraryFilter) => void
-}) {
-  const active = value.kind === selected.kind
-    && (!('value' in value) || ('value' in selected && value.value === selected.value))
-  return <SelectableChip label={label} selected={active} onPress={() => onSelect(active ? { kind: 'ALL' } : value)} />
-}
-
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  content: { paddingHorizontal: shared.pagePadding, paddingBottom: 45 },
+  container: { flex: 1 },
+  top: { paddingHorizontal: shared.pagePadding },
+  content: { paddingBottom: 48, paddingHorizontal: shared.pagePadding },
   emptyContent: { flexGrow: 1 },
-  search: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 15, borderWidth: 1, color: colors.textPrimary, fontSize: 16, marginBottom: 10, minHeight: 56, paddingHorizontal: 16 },
-  categories: { gap: 8, marginBottom: 12, paddingRight: 12 },
-  groupLabel: { color: colors.textSecondary, fontSize: 12, fontWeight: '900', marginBottom: 6 },
-  item: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, flexDirection: 'row', marginBottom: 7, minHeight: 68 },
-  itemMain: { alignItems: 'center', flex: 1, flexDirection: 'row', minHeight: 68, padding: 13 },
-  name: { color: colors.textPrimary, fontSize: 16, fontWeight: '800', lineHeight: 22 },
-  meta: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, marginTop: 4 },
-  arrow: { color: colors.gray400, fontSize: 17 },
+  item: { alignItems: 'center', borderBottomColor: colors.bd, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', minHeight: 72 },
+  itemMain: { alignItems: 'center', flex: 1, flexDirection: 'row', minHeight: 72, paddingVertical: shared.spacing.md },
+  itemCopy: { flex: 1 },
+  name: { ...typography.body, color: colors.tx, fontWeight: '500' },
+  meta: { ...typography.caption, color: colors.t2, marginTop: 2 },
+  media: { ...typography.captionSmall, color: colors.mu, marginTop: 2 },
   favorite: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 },
-  favoriteText: { color: colors.primary, fontSize: 24 },
-  empty: { alignItems: 'center', flex: 1, justifyContent: 'center', minHeight: 230 },
-  emptyTitle: { color: colors.textPrimary, fontSize: 14, fontWeight: '800', textAlign: 'center' },
-  emptyText: { color: colors.textSecondary, fontSize: 12, marginTop: 5 },
 })

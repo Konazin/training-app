@@ -60,3 +60,10 @@ export async function exportDiagnostic(message: string) {
     await Sharing.shareAsync(file.uri, { mimeType: 'text/plain', dialogTitle: 'Exportar diagnóstico' })
   }
 }
+
+export async function shareHistoryCsv(csv: string) {
+  const file = new File(Paths.cache, `training-historico-${new Date().toISOString().slice(0, 10)}.csv`)
+  await file.write(csv)
+  if (!await Sharing.isAvailableAsync()) throw new Error('Compartilhamento não disponível neste aparelho.')
+  await Sharing.shareAsync(file.uri, { mimeType: 'text/csv', dialogTitle: 'Exportar histórico (CSV)' })
+}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Keyboard, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
+import { X } from 'lucide-react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { shared, useTheme } from '../theme'
 import { typography } from '../theme/typography'
@@ -149,7 +150,7 @@ export function Toast({
         onPress={() => close(toastKey)}
         style={[styles.close, actionBusy && styles.disabled]}
       >
-        <Text style={[styles.closeText, { color: palette.text }]}>×</Text>
+        <X color={palette.text} size={18} strokeWidth={1.7} />
       </Pressable>
     </View>
   )
@@ -162,9 +163,9 @@ export function toastColors(colors: ReturnType<typeof useTheme>['colors'], kind:
 const styles = StyleSheet.create({
   toast: {
     alignItems: 'center',
-    borderRadius: 16,
+    borderRadius: 12,
     borderWidth: 1,
-    elevation: 8,
+    elevation: 0,
     flexDirection: 'row',
     left: shared.screen.horizontalPadding,
     paddingLeft: shared.spacing.lg,
@@ -172,10 +173,9 @@ const styles = StyleSheet.create({
     right: shared.screen.horizontalPadding,
     zIndex: 50,
   },
-  message: { ...typography.label, flex: 1, fontWeight: '700', paddingVertical: shared.spacing.md },
+  message: { ...typography.label, flex: 1, fontWeight: '500', paddingVertical: shared.spacing.md },
   action: { alignItems: 'center', justifyContent: 'center', minHeight: 48, paddingHorizontal: 8 },
-  actionText: { ...typography.label, fontWeight: '900', textDecorationLine: 'underline' },
+  actionText: { ...typography.label, fontWeight: '500', textDecorationLine: 'underline' },
   close: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 },
-  closeText: { fontSize: 24, lineHeight: 28 },
   disabled: { opacity: 0.55 },
 })

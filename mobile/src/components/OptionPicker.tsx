@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Check, ChevronDown, Circle } from 'lucide-react-native'
 import { shared, type ThemeColors, useTheme } from '../theme'
 import { FormField } from './FormField'
 import { PrimaryButton } from './PrimaryButton'
@@ -51,7 +52,9 @@ export function OptionPickerField({
         ]}
       >
         <Text style={[styles.value, !value && styles.placeholder]}>{value || placeholder}</Text>
-        <Text accessibilityElementsHidden style={styles.chevron}>⌄</Text>
+        <View accessibilityElementsHidden>
+          <ChevronDown color={colors.mu} size={20} strokeWidth={1.8} />
+        </View>
       </Pressable>
       {!!error && <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text>}
     </View>
@@ -135,9 +138,13 @@ export function OptionPickerModal({
                     setSelection(option)
                     setError('')
                   }}
-                  style={[styles.option, selected && styles.optionSelected]}
+                  style={({ pressed }) => [styles.option, selected && styles.optionSelected, pressed && styles.pressed]}
                 >
-                  <Text style={styles.optionMarker}>{selected ? '●' : '○'}</Text>
+                  <View style={[styles.optionMarker, selected && styles.optionMarkerSelected]}>
+                    {selected
+                      ? <Check color={colors.on} size={15} strokeWidth={2} />
+                      : <Circle color={colors.mu} size={18} strokeWidth={1.5} />}
+                  </View>
                   <Text style={styles.optionText}>{label}</Text>
                   {selected && <Text style={styles.selectedText}>Selecionada</Text>}
                 </Pressable>
@@ -172,23 +179,23 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   safe: { backgroundColor: colors.background, flex: 1 },
   modalContent: { flex: 1 },
   modalHeader: { paddingHorizontal: shared.pagePadding, paddingTop: 16 },
-  modalTitle: { color: colors.textPrimary, fontSize: 24, fontWeight: '900' },
-  modalDescription: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, marginTop: 5 },
+  modalTitle: { color: colors.tx, fontFamily: 'Geist', fontSize: 25, fontWeight: '500' },
+  modalDescription: { color: colors.t2, fontFamily: 'Geist', fontSize: 14, lineHeight: 20, marginTop: 5 },
   options: { gap: 8, padding: shared.pagePadding },
-  option: { alignItems: 'center', borderColor: colors.border, borderRadius: 15, borderWidth: 1, flexDirection: 'row', minHeight: 56, paddingHorizontal: 16 },
-  optionSelected: { borderColor: colors.primary, borderWidth: 2 },
-  optionMarker: { color: colors.primary, fontSize: 18, marginRight: 10 },
-  optionText: { color: colors.textPrimary, flex: 1, fontSize: 16, fontWeight: '700' },
-  selectedText: { color: colors.textSecondary, fontSize: 12, fontWeight: '800' },
+  option: { alignItems: 'center', borderBottomColor: colors.bd, borderBottomWidth: 1, flexDirection: 'row', minHeight: 56, paddingHorizontal: 8 },
+  optionSelected: { backgroundColor: colors.s2 },
+  optionMarker: { alignItems: 'center', height: 24, justifyContent: 'center', marginRight: 12, width: 24 },
+  optionMarkerSelected: { backgroundColor: colors.ac, borderRadius: 12 },
+  optionText: { color: colors.tx, flex: 1, fontFamily: 'Geist', fontSize: 16, fontWeight: '400' },
+  selectedText: { color: colors.t2, fontFamily: 'Geist', fontSize: 12, fontWeight: '400' },
   modalActions: { flexDirection: 'row', gap: 10, padding: shared.pagePadding },
   field: { marginBottom: 14 },
-  label: { color: colors.textSecondary, fontSize: 14, fontWeight: '800', letterSpacing: 0.6, marginBottom: 7 },
-  trigger: { alignItems: 'center', borderColor: colors.border, borderRadius: 15, borderWidth: 1, flexDirection: 'row', minHeight: 56, paddingHorizontal: 16 },
-  triggerError: { borderColor: colors.danger },
-  value: { color: colors.textPrimary, flex: 1, fontSize: 16 },
-  placeholder: { color: colors.textSecondary },
-  chevron: { color: colors.textSecondary, fontSize: 22 },
-  error: { color: colors.danger, fontSize: 12, marginTop: 6 },
+  label: { color: colors.t2, fontFamily: 'Geist', fontSize: 13, fontWeight: '500', marginBottom: 7 },
+  trigger: { alignItems: 'center', backgroundColor: colors.s1, borderColor: colors.mu, borderRadius: 12, borderWidth: 1, flexDirection: 'row', minHeight: 48, paddingHorizontal: 12 },
+  triggerError: { borderColor: colors.dg, borderWidth: 2 },
+  value: { color: colors.tx, flex: 1, fontFamily: 'Geist', fontSize: 16 },
+  placeholder: { color: colors.mu },
+  error: { color: colors.dg, fontFamily: 'Geist', fontSize: 12, marginTop: 6 },
   pressed: { opacity: 0.75 },
   disabled: { opacity: 0.5 },
 })

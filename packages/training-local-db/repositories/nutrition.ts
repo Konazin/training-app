@@ -59,7 +59,11 @@ export function nutritionRepositories(database: SqlDatabase) {
     const currentGoals = goals(parse(settingsRow?.value_json, {}))
     const preservedGoals = existing && date < localDateKey(new Date()) ? { caloriesKcal: existing.goalCaloriesKcal, proteinGrams: existing.goalProteinGrams, carbohydratesGrams: existing.goalCarbohydratesGrams, fatGrams: existing.goalFatGrams, fiberGrams: existing.goalFiberGrams } : currentGoals
     const value = aggregateNutritionDay(await meals.listByDate(date), preservedGoals)
-    return value ? summaries.upsert(value) : null
+    if (!value) {
+      await database.run('DELETE FROM nutrition_daily_summaries WHERE local_date=?', date)
+      return null
+    }
+    return summaries.upsert(value)
   }
   const maintenance: NutritionMaintenanceRepository = { aggregateDay, closePendingDays: async (today) => { const rows = await database.all<{ local_date: string }>('SELECT DISTINCT local_date FROM nutrition_meals WHERE local_date < ?', today); for (const row of rows) await aggregateDay(row.local_date) }, purgeExpiredMealDetails: async (today, retentionDays = 7) => { const threshold = new Date(`${today}T00:00:00Z`); threshold.setUTCDate(threshold.getUTCDate() - retentionDays); const result = await database.run('DELETE FROM nutrition_meals WHERE local_date < ? AND EXISTS (SELECT 1 FROM nutrition_daily_summaries s WHERE s.local_date=nutrition_meals.local_date)', threshold.toISOString().slice(0, 10)); return result.changes }, run: async (today) => { await maintenance.closePendingDays(today); await maintenance.purgeExpiredMealDetails(today) } }
   return { meals, summaries, maintenance }

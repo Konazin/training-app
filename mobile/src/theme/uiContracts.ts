@@ -17,32 +17,33 @@ export function contrastRatio(foreground: string, background: string) {
 
 export function selectableChipColors(colors: ThemeColors, selected: boolean) {
   return selected
-    ? { backgroundColor: colors.primary, borderColor: colors.primary, color: colors.onPrimary, indicator: true }
-    : { backgroundColor: colors.surface, borderColor: colors.border, color: colors.textPrimary, indicator: false }
+    ? { backgroundColor: colors.ac, borderColor: colors.ac, color: colors.on, indicator: true }
+    : { backgroundColor: 'transparent', borderColor: colors.mu, color: colors.tx, indicator: false }
 }
 
 export function pressedChipColors(colors: ThemeColors) {
-  return { backgroundColor: colors.primaryPressed, borderColor: colors.primaryPressed, color: colors.onPrimary }
+  return { backgroundColor: colors.pressed, borderColor: colors.mu, color: colors.tx }
 }
 
 export function feedbackColors(colors: ThemeColors, kind: 'info' | 'success' | 'warning' | 'error') {
   return {
-    info: { background: colors.surface, border: colors.focus, text: colors.textPrimary },
-    success: { background: colors.successSurface, border: colors.success, text: colors.textPrimary },
-    warning: { background: colors.surfaceSecondary, border: colors.warning, text: colors.textPrimary },
-    error: { background: colors.dangerSurface, border: colors.danger, text: colors.textPrimary },
+    info: { background: colors.s1, border: colors.bd, text: colors.t2 },
+    success: { background: colors.s1, border: colors.bd, text: colors.tx },
+    warning: { background: colors.s1, border: colors.bd, text: colors.tx },
+    error: { background: colors.s1, border: colors.dg, text: colors.dg },
   }[kind]
 }
 
 export function reorderControlColors(colors: ThemeColors, enabled: boolean) {
-  return { color: colors.textPrimary, opacity: enabled ? 1 : 0.2 }
+  return { color: colors.tx, opacity: enabled ? 1 : 0.2 }
 }
 
 export function formFieldColors(colors: ThemeColors, focused: boolean, error: boolean, disabled: boolean) {
   return {
-    backgroundColor: disabled ? colors.surfaceSecondary : colors.surface,
-    borderColor: error ? colors.danger : focused ? colors.focus : colors.border,
-    cursorColor: colors.primary,
+    backgroundColor: disabled ? colors.s2 : colors.s1,
+    color: colors.tx,
+    borderColor: error ? colors.dg : focused ? colors.ac : colors.mu,
+    cursorColor: colors.ac,
     selectionColor: colors.focus,
   }
 }
@@ -55,7 +56,7 @@ export function screenPadding(top: number, bottom: number, includeBottomInset: b
 }
 
 export function tabColors(colors: ThemeColors) {
-  return { active: colors.primary, inactive: colors.textSecondary, background: colors.tabBar }
+  return { active: colors.tx, inactive: colors.mu, background: colors.bg }
 }
 
 export function resolvedDarkTheme(
@@ -72,16 +73,16 @@ export function systemBarStyle(dark: boolean) {
 
 export function workoutPalette(colors: ThemeColors, highContrast: boolean) {
   return highContrast ? colors.workout : {
-    background: colors.background,
-    surface: colors.surface,
-    border: colors.border,
-    text: colors.textPrimary,
-    textSecondary: colors.textSecondary,
-    completed: colors.success,
-    onCompleted: colors.background,
-    pending: colors.surfaceSecondary,
-    timer: colors.textPrimary,
-    timerText: colors.background,
-    danger: colors.danger,
+    background: colors.bg,
+    surface: colors.s1,
+    border: colors.mu,
+    text: colors.tx,
+    textSecondary: colors.t2,
+    completed: colors.tx,
+    onCompleted: colors.bg,
+    pending: colors.s2,
+    timer: colors.ac,
+    timerText: colors.on,
+    danger: colors.dg,
   }
 }

@@ -130,7 +130,8 @@ export type ExternalExerciseCatalog = ExternalExerciseCatalogProvider
 
 export interface ExternalExerciseImportRepository {
   previewExisting(candidates: ExternalExerciseCandidate[]): Promise<ExternalExerciseImportPreview[]>
-  importSelected(candidates: ExternalExerciseCandidate[]): Promise<ExternalExerciseImportResult>
+  /** `restoreArchived`: o usuário escolheu o item de novo, então ele volta a aparecer; atualizações em lote preservam o arquivamento. */
+  importSelected(candidates: ExternalExerciseCandidate[], options?: { restoreArchived?: boolean }): Promise<ExternalExerciseImportResult>
   refreshImported(provider: ExternalExerciseCandidate['provider']): Promise<ExternalExerciseImportResult>
 }
 export interface AiTrainingPlanProvider {

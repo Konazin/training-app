@@ -127,6 +127,8 @@ export interface ExternalExerciseCatalogQuery {
   equipmentIds: number[]
   onlyWithImage: boolean
   onlyWithVideo: boolean
+  /** Cursor opaco da página (providers com paginação por cursor, como ExerciseDB). */
+  cursor?: string
 }
 
 export interface ExternalExerciseMediaCandidate {
@@ -180,6 +182,7 @@ export interface ExternalExerciseCatalogPage {
   hasNext: boolean
   hasPrevious: boolean
   nextCursor?: string
+  previousCursor?: string
 }
 
 export interface ExternalExerciseImportPreview {

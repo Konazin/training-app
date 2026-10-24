@@ -1,13 +1,18 @@
-import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native'
+import { RefreshControl, StyleSheet, Text, View } from 'react-native'
+import { ChevronRight, ClipboardList } from 'lucide-react-native'
 import {
   buildWeeklyTrainingOverview,
   findLatestExerciseLoadReferences,
   type TrainingPlan,
   type WorkoutSession,
 } from '@training/training-domain'
+import { PrimaryButton } from '../components/PrimaryButton'
 import { ScreenHeader } from '../components/ScreenHeader'
 import { ScreenScrollView } from '../components/Screen'
-import { type ThemeColors, useTheme } from '../theme'
+import { EmptyState, InlineNotice } from '../components/ui'
+import { SettingsRow } from '../components/ui/SettingsRow'
+import { AnimatedNumber, ProgressBar, Reveal } from '../motion'
+import { shared, type ThemeColors, useTheme } from '../theme'
 import { typography } from '../theme/typography'
 import { TodayWorkoutCard } from './TodayWorkoutCard'
 import { TrainingWeekSummary } from './TrainingWeekSummary'
@@ -67,96 +72,104 @@ export function HomeScreen({
   return (
     <ScreenScrollView
       includeBottomInset={false}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} tintColor={colors.ink} />}
+      refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} tintColor={colors.tx} />}
       showsVerticalScrollIndicator={false}
     >
-      <ScreenHeader
-        eyebrow={greeting(now)}
-        title="Hoje"
-        description={formatReadableDate(now)}
-      />
-      {!!warning && <Text accessibilityRole="alert" style={styles.warning}>{warning}</Text>}
+      <Reveal>
+        <ScreenHeader
+          description={formatMivDate(now)}
+          title={overview?.today.title ?? 'Hoje'}
+          titleVariant="display"
+        />
+      </Reveal>
+      {!!warning && (
+        <InlineNotice
+          action={<PrimaryButton label="Tentar de novo" onPress={onRefresh} secondary />}
+          message={warning}
+          tone="warning"
+        />
+      )}
       {!!activeSession && (
-        <Pressable
-          accessibilityLabel={`${activeSession.status === 'PAUSED' ? 'Sessão pausada' : 'Sessão em andamento'}: ${activeSession.workoutName}, ${activeSession.dayName}`}
-          accessibilityRole="button"
-          onPress={onContinueSession}
-          style={({ pressed }) => [styles.activeSession, pressed && styles.pressed]}
-        >
-          <Text style={styles.activeEyebrow}>
-            {activeSession.status === 'PAUSED' ? 'SESSÃO PAUSADA' : 'SESSÃO EM ANDAMENTO'}
-          </Text>
-          <Text style={styles.activeTitle}>{activeSession.workoutName} · {activeSession.dayName}</Text>
-          <Text style={styles.activeAction}>
-            {activeSession.status === 'PAUSED' ? 'Retomar treino' : 'Continuar treino'} →
-          </Text>
-        </Pressable>
+        <Reveal index={1} style={styles.block}>
+          <View style={styles.activeSession}>
+            <View style={styles.activeHeader}>
+              <View style={[styles.statusDot, activeSession.status === 'PAUSED' && styles.statusDotPaused]} />
+              <Text style={styles.activeStatus}>
+                {activeSession.status === 'PAUSED' ? 'Sessão pausada' : 'Sessão em andamento'}
+              </Text>
+            </View>
+            <Text style={styles.activeTitle}>{activeSession.workoutName} · {activeSession.dayName}</Text>
+            <View style={styles.activeProgress}>
+              <AnimatedNumber style={styles.activeBig} value={activeSession.completedSets} />
+              <Text style={styles.activeTotal}> / {activeSession.totalPlannedSets} séries</Text>
+            </View>
+            <ProgressBar
+              color={colors.ac}
+              progress={activeSession.totalPlannedSets ? activeSession.completedSets / activeSession.totalPlannedSets : 0}
+              trackColor={colors.s2}
+            />
+            <View style={styles.activeAction}>
+              <PrimaryButton
+                accessibilityLabel={`${activeSession.status === 'PAUSED' ? 'Retomar' : 'Continuar'} treino ${activeSession.workoutName}`}
+                label={activeSession.status === 'PAUSED' ? 'Retomar treino' : 'Continuar treino'}
+                onPress={onContinueSession}
+              />
+            </View>
+          </View>
+        </Reveal>
       )}
       {!normalPlans.length ? (
-        <EmptyPlan
-          title="Nenhuma ficha ativa"
-          description="Crie uma ficha para organizar sua semana de treino."
-          action="Criar primeira ficha"
-          onPress={onCreatePlan}
+        <EmptyState
+          action={(
+            <View style={styles.emptyActions}>
+              <PrimaryButton label="Criar ficha" onPress={onCreatePlan} />
+              <PrimaryButton label="Ver modelos" onPress={onOpenPlans} secondary />
+            </View>
+          )}
+          description="Suas fichas ficam neste aparelho. Crie uma para organizar a semana de treino."
+          icon={<ClipboardList color={colors.tx} size={24} strokeWidth={1.5} />}
+          title="Nenhuma ficha ainda"
         />
       ) : !activePlan ? (
-        <EmptyPlan
-          title="Escolha sua ficha ativa"
-          description="Você possui fichas salvas, mas nenhuma está ativa para esta semana."
-          action="Abrir fichas"
-          onPress={onOpenPlans}
+        <EmptyState
+          action={<PrimaryButton label="Abrir fichas" onPress={onOpenPlans} />}
+          description="Você tem fichas salvas, mas nenhuma está ativa nesta semana."
+          icon={<ClipboardList color={colors.tx} size={24} strokeWidth={1.5} />}
+          title="Escolha uma ficha para hoje"
         />
       ) : overview ? (
         <>
-          <TodayWorkoutCard
-            plan={activePlan}
-            day={overview.today}
-            session={todaySession}
-            references={references}
-            blockedByCurrentSession={activeSession !== null}
-            onStart={() => overview.today.planDayId
-              && onStartToday(activePlan.id, overview.today.planDayId)}
-            onConfigure={() => overview.today.planDayId
-              && onOpenPlanDay(activePlan.id, overview.today.planDayId)}
-            onContinue={onContinueSession}
-            onOpenPlan={onOpenPlans}
-          />
-          <TrainingWeekSummary overview={overview} />
-          <Text style={styles.sectionTitle}>Atalhos</Text>
-          <View style={styles.shortcuts}>
+          {!activeSession && (
+            <Reveal index={1} style={styles.block}>
+              <TodayWorkoutCard
+                plan={activePlan}
+                day={overview.today}
+                session={todaySession}
+                references={references}
+                blockedByCurrentSession={activeSession !== null}
+                onStart={() => overview.today.planDayId
+                  && onStartToday(activePlan.id, overview.today.planDayId)}
+                onConfigure={() => overview.today.planDayId
+                  && onOpenPlanDay(activePlan.id, overview.today.planDayId)}
+                onContinue={onContinueSession}
+                onOpenPlan={onOpenPlans}
+              />
+            </Reveal>
+          )}
+          <Reveal index={2} style={styles.block}>
+            <TrainingWeekSummary overview={overview} />
+          </Reveal>
+          <Reveal index={3}>
+            <Text accessibilityRole="header" style={styles.sectionTitle}>Atalhos</Text>
             <Shortcut label="Ficha ativa" onPress={onOpenPlans} />
             <Shortcut label="Fichas arquivadas" onPress={onOpenArchived} />
             <Shortcut label="Lixeira" badge={trashCount} onPress={onOpenTrash} />
             <Shortcut label="Biblioteca" onPress={onOpenLibrary} />
             <Shortcut label="Integrações" onPress={onOpenIntegrations} />
-          </View>
+          </Reveal>
         </>
       ) : null}
     </ScreenScrollView>
-  )
-}
-
-function EmptyPlan({
-  title,
-  description,
-  action,
-  onPress,
-}: {
-  title: string
-  description: string
-  action: string
-  onPress: () => void
-}) {
-  const { colors } = useTheme()
-  const styles = createStyles(colors)
-  return (
-    <View style={styles.empty}>
-      <Text style={styles.emptyTitle}>{title}</Text>
-      <Text style={styles.emptyDescription}>{description}</Text>
-      <Pressable accessibilityRole="button" onPress={onPress} style={styles.primary}>
-        <Text style={styles.primaryText}>{action}</Text>
-      </Pressable>
-    </View>
   )
 }
 
@@ -172,49 +185,43 @@ function Shortcut({
   const { colors } = useTheme()
   const styles = createStyles(colors)
   return (
-    <Pressable
-      accessibilityLabel={badge ? `${label}, ${badge} ${badge === 1 ? 'item' : 'itens'}` : label}
-      accessibilityRole="button"
+    <SettingsRow
       onPress={onPress}
-      style={({ pressed }) => [styles.shortcut, pressed && styles.pressed]}
-    >
-      <Text style={styles.shortcutText}>{label}</Text>
-      {!!badge && <Text accessibilityRole="text" style={styles.badge}>{badge > 99 ? '99+' : badge}</Text>}
-      <Text style={styles.arrow}>→</Text>
-    </Pressable>
+      title={badge ? `${label}, ${badge} ${badge === 1 ? 'item' : 'itens'}` : label}
+      trailing={(
+        <View style={styles.shortcutTrailing}>
+          {!!badge && <Text accessibilityElementsHidden style={styles.badge}>{badge > 99 ? '99+' : badge}</Text>}
+          <ChevronRight color={colors.mu} size={18} strokeWidth={1.6} />
+        </View>
+      )}
+    />
   )
 }
 
-function greeting(now: Date) {
-  const hour = now.getHours()
-  return hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite'
-}
-
-function formatReadableDate(now: Date) {
-  const text = new Intl.DateTimeFormat('pt-BR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  }).format(now)
-  return text.charAt(0).toLowerCase() + text.slice(1)
+function formatMivDate(now: Date) {
+  const weekday = new Intl.DateTimeFormat('pt-BR', { weekday: 'long' })
+    .format(now)
+    .toLocaleLowerCase('pt-BR')
+  const month = new Intl.DateTimeFormat('pt-BR', { month: 'long' })
+    .format(now)
+    .toLocaleLowerCase('pt-BR')
+  return `${weekday}, ${now.getDate()} de ${month}`
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  warning: { ...typography.bodySmall, backgroundColor: colors.surfaceSecondary, borderRadius: 12, color: colors.warning, marginBottom: 12, padding: 12 },
-  empty: { alignItems: 'flex-start', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 22, borderWidth: 1, padding: 22 },
-  emptyTitle: { color: colors.textPrimary, fontSize: 23, fontWeight: '900', lineHeight: 30 },
-  emptyDescription: { ...typography.body, color: colors.textSecondary, marginTop: 9 },
-  primary: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 14, justifyContent: 'center', marginTop: 20, minHeight: 48, paddingHorizontal: 18 },
-  primaryText: { ...typography.label, color: colors.onPrimary, fontWeight: '900' },
-  activeSession: { backgroundColor: colors.textPrimary, borderRadius: 20, marginBottom: 14, padding: 18 },
-  activeEyebrow: { ...typography.caption, color: colors.background, fontWeight: '900', letterSpacing: 1.4 },
-  activeTitle: { ...typography.body, color: colors.background, fontWeight: '800', marginTop: 8 },
-  activeAction: { ...typography.label, color: colors.primary, fontWeight: '900', marginTop: 14 },
-  sectionTitle: { color: colors.textPrimary, fontSize: 20, fontWeight: '900', marginBottom: 10 },
-  shortcuts: { gap: 8, marginBottom: 12 },
-  shortcut: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, flexDirection: 'row', gap: 10, minHeight: 56, paddingHorizontal: 16 },
-  shortcutText: { ...typography.body, color: colors.textPrimary, flex: 1, fontWeight: '700' },
-  badge: { ...typography.caption, backgroundColor: colors.danger, borderRadius: 12, color: colors.white, fontWeight: '900', minWidth: 24, overflow: 'hidden', paddingHorizontal: 7, paddingVertical: 3, textAlign: 'center' },
-  arrow: { ...typography.body, color: colors.textSecondary },
-  pressed: { opacity: 0.72 },
+  block: { marginBottom: shared.spacing.xl },
+  activeSession: { backgroundColor: colors.s1, borderRadius: shared.radii.lg, padding: shared.spacing.xl },
+  activeHeader: { alignItems: 'center', flexDirection: 'row', gap: shared.spacing.sm },
+  statusDot: { backgroundColor: colors.ac, borderRadius: 4, height: 8, width: 8 },
+  statusDotPaused: { backgroundColor: 'transparent', borderColor: colors.t2, borderWidth: 1.5 },
+  activeStatus: { ...typography.caption, color: colors.t2 },
+  activeTitle: { ...typography.title, color: colors.tx, marginTop: shared.spacing.md },
+  activeProgress: { alignItems: 'baseline', flexDirection: 'row', marginBottom: shared.spacing.md, marginTop: shared.spacing.lg },
+  activeBig: { ...typography.numberLarge, color: colors.tx },
+  activeTotal: { ...typography.bodySmall, color: colors.t2 },
+  activeAction: { marginTop: shared.spacing.xl },
+  emptyActions: { gap: shared.spacing.sm },
+  sectionTitle: { ...typography.titleSmall, color: colors.tx, marginBottom: shared.spacing.xs, marginTop: shared.spacing.sm },
+  shortcutTrailing: { alignItems: 'center', flexDirection: 'row', gap: shared.spacing.sm },
+  badge: { ...typography.captionSmall, backgroundColor: colors.s2, borderRadius: 11, color: colors.tx, minWidth: 22, overflow: 'hidden', paddingHorizontal: 7, paddingVertical: 2, textAlign: 'center' },
 })

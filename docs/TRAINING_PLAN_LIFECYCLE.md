@@ -27,9 +27,10 @@ backup falhar, nada é excluído.
 
 ## Backup e funcionamento offline
 
-O formato `schemaVersion: 2` inclui fichas normais, arquivadas e na lixeira,
-com os dois timestamps. A importação valida as invariantes do ciclo de vida.
-Backups v1 continuam compatíveis e são interpretados com timestamps nulos.
+O formato atual `schemaVersion: 3` inclui fichas normais, arquivadas e na
+lixeira, com os dois timestamps. A importação valida as invariantes do ciclo de
+vida. Backups v1 e v2 continuam compatíveis e são interpretados com timestamps
+nulos quando esses campos estão ausentes.
 Arquivos manuais usam `training-backup-<timestamp>.json`; arquivos automáticos
 usam `training-auto-backup-<timestamp>.json`.
 

@@ -3,17 +3,14 @@
     "name": "Training App",
     "slug": "training-app",
     "scheme": "trainingapp",
+    "platforms": ["android"],
     "icon": "./assets/icon.png",
-    "version": "0.10.0",
+    "version": "0.12.2",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.konazin.trainingapp"
-    },
     "android": {
       "package": "com.konazin.trainingapp",
-      "versionCode": 16,
+      "versionCode": 20,
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#101216"
@@ -24,6 +21,14 @@
       "expo-sqlite",
       "expo-sharing",
       "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Permitir que o Training App fotografe uma refeição somente quando você iniciar uma análise.",
+          "photosPermission": "Permitir que o Training App selecione uma refeição somente quando você iniciar uma análise.",
+          "microphonePermission": false
+        }
+      ],
       [
         "expo-splash-screen",
         {
@@ -39,7 +44,15 @@
           "style": "dark"
         }
       ],
-      "expo-font"
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/Geist.ttf",
+            "./assets/fonts/GeistMono.ttf"
+          ]
+        }
+      ]
     ],
     "extra": {
       "eas": {

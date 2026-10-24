@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Alert, StyleSheet, Text, View } from 'react-native'
+import { ArrowDown, ArrowUp, Check, ChevronRight, Plus, X } from 'lucide-react-native'
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { FormField } from '../../../components/FormField'
@@ -11,6 +12,8 @@ import { useUnsavedChangesGuard } from '../../../navigation/useUnsavedChangesGua
 import type { TrainingPlan } from '../model/trainingPlan'
 import { shared, type ThemeColors, useTheme } from '../../../theme'
 import { reorderControlColors } from '../../../theme/uiContracts'
+import { typography } from '../../../theme/typography'
+import { PressableScale } from '../../../motion'
 
 const labels = {
   MONDAY: 'Segunda-feira',
@@ -102,9 +105,8 @@ export function TrainingPlanDayScreen({
   return (
     <ScreenScrollView>
       <ScreenHeader
-        eyebrow={plan.name}
         title={labels[day.weekday]}
-        description="Configuração deste dia da ficha."
+        description={`${plan.name} · configuração deste dia da ficha.`}
       />
       <View style={styles.form}>
         <FormField label="Título" value={title} onChangeText={setTitle} />
@@ -116,12 +118,12 @@ export function TrainingPlanDayScreen({
           keyboardType="number-pad"
         />
         <FormField label="Observações" value={notes} onChangeText={setNotes} multiline />
-        <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{ checked: restDay }} style={styles.checkboxRow} onPress={() => setRestDay((current) => !current)}>
+        <PressableScale accessibilityRole="checkbox" accessibilityState={{ checked: restDay }} style={styles.checkboxRow} onPress={() => setRestDay((current) => !current)}>
           <View style={[styles.checkbox, restDay && styles.checkboxActive]}>
-            <Text style={styles.checkboxText}>{restDay ? '✓' : ''}</Text>
+            {restDay && <Check color={colors.on} size={14} strokeWidth={2} />}
           </View>
           <Text style={styles.checkboxLabel}>Marcar como dia de descanso</Text>
-        </TouchableOpacity>
+        </PressableScale>
         {!!errors[dayKey] && <Text style={styles.error}>{errors[dayKey]}</Text>}
         <PrimaryButton
           label="Salvar dia"
@@ -134,7 +136,7 @@ export function TrainingPlanDayScreen({
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Atividades opcionais</Text>
-            <TouchableOpacity
+            <PressableScale
               accessibilityLabel="Adicionar atividade"
               accessibilityRole="button"
               style={styles.add}
@@ -143,8 +145,8 @@ export function TrainingPlanDayScreen({
                 dayId: day.id,
               })}
             >
-              <Text style={styles.addText}>＋</Text>
-            </TouchableOpacity>
+              <Plus color={colors.tx} size={19} strokeWidth={1.7} />
+            </PressableScale>
           </View>
           {restActivities.map((activity, index) => (
             <View key={activity.id} style={styles.item}>
@@ -159,7 +161,7 @@ export function TrainingPlanDayScreen({
                 onUp={() => void moveActivity(index, -1)}
                 onDown={() => void moveActivity(index, 1)}
               />
-              <TouchableOpacity accessibilityRole="button" style={styles.itemAction}
+              <PressableScale accessibilityRole="button" style={styles.itemAction}
                 onPress={() => navigation.navigate('RestActivityEditor', {
                   planId: plan.id,
                   dayId: day.id,
@@ -167,8 +169,8 @@ export function TrainingPlanDayScreen({
                 })}
               >
                 <Text style={styles.link}>Editar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity accessibilityLabel={`Remover ${activity.name}`} accessibilityRole="button" style={styles.itemAction}
+              </PressableScale>
+              <PressableScale accessibilityLabel={`Remover ${activity.name}`} accessibilityRole="button" style={styles.itemAction}
                 disabled={busyKeys.has(`activity:remove:${activity.id}`)}
                 onPress={() => Alert.alert(
                   'Remover atividade?',
@@ -183,8 +185,8 @@ export function TrainingPlanDayScreen({
                   ],
                 )}
               >
-                <Text style={styles.remove}>×</Text>
-              </TouchableOpacity>
+                <X color={colors.dg} size={18} strokeWidth={1.7} />
+              </PressableScale>
               {!!errors[`activity:remove:${activity.id}`] && (
                 <Text style={styles.rowError}>{errors[`activity:remove:${activity.id}`]}</Text>
               )}
@@ -213,7 +215,7 @@ export function TrainingPlanDayScreen({
                   onUp={() => void moveExercise(index, -1)}
                   onDown={() => void moveExercise(index, 1)}
                 />
-                <TouchableOpacity accessibilityRole="button" style={styles.itemAction}
+                <PressableScale accessibilityRole="button" style={styles.itemAction}
                   onPress={() => navigation.navigate('DayExerciseEditor', {
                     planId: plan.id,
                     dayId: day.id,
@@ -221,8 +223,8 @@ export function TrainingPlanDayScreen({
                   })}
                 >
                   <Text style={styles.link}>Editar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity accessibilityLabel={`Remover ${exercise.exercise.name}`} accessibilityRole="button" style={styles.itemAction}
+                </PressableScale>
+                <PressableScale accessibilityLabel={`Remover ${exercise.exercise.name}`} accessibilityRole="button" style={styles.itemAction}
                   disabled={busyKeys.has(`exercise:remove:${exercise.id}`)}
                   onPress={() => Alert.alert(
                     'Remover exercício?',
@@ -237,8 +239,8 @@ export function TrainingPlanDayScreen({
                     ],
                   )}
                 >
-                  <Text style={styles.remove}>×</Text>
-                </TouchableOpacity>
+                  <X color={colors.dg} size={18} strokeWidth={1.7} />
+                </PressableScale>
                 {!!errors[`exercise:remove:${exercise.id}`] && (
                   <Text style={styles.rowError}>{errors[`exercise:remove:${exercise.id}`]}</Text>
                 )}
@@ -251,23 +253,29 @@ export function TrainingPlanDayScreen({
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Adicionar da biblioteca</Text>
-            <TouchableOpacity
+            <PressableScale
               accessibilityRole="button"
               style={styles.libraryItem}
               onPress={() => navigation.navigate('ExercisePicker', { planId, dayId })}
             >
-              <Text style={styles.itemTitle}>Buscar exercício</Text>
-              <Text style={styles.link}>Abrir biblioteca →</Text>
-            </TouchableOpacity>
+              <View style={styles.libraryCopy}>
+                <Text style={styles.itemTitle}>Buscar exercício</Text>
+                <Text style={styles.meta}>Adicionar um exercício da biblioteca local.</Text>
+              </View>
+              <View style={styles.libraryAction}>
+                <Text style={styles.link}>Biblioteca</Text>
+                <ChevronRight color={colors.mu} size={18} strokeWidth={1.7} />
+              </View>
+            </PressableScale>
           </View>
           {!!exercises.length && !day.restDay && !dirty && (
-            <TouchableOpacity
+            <PressableScale
               accessibilityRole="button"
               style={styles.start}
               onPress={() => void onStart(plan.id, day.id)}
             >
               <Text style={styles.startText}>Iniciar este treino</Text>
-            </TouchableOpacity>
+            </PressableScale>
           )}
           {!!exercises.length && !day.restDay && dirty && (
             <Text style={styles.saveHint}>Salve as alterações antes de iniciar o treino.</Text>
@@ -296,36 +304,35 @@ function OrderButtons({
   const downColors = reorderControlColors(colors, down && !busy)
   return (
     <View style={{ flexDirection: 'row' }}>
-      <TouchableOpacity accessibilityLabel="Mover para cima" accessibilityRole="button" disabled={!up || busy} onPress={onUp} style={{ alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 }}><Text style={upColors}>↑</Text></TouchableOpacity>
-      <TouchableOpacity accessibilityLabel="Mover para baixo" accessibilityRole="button" disabled={!down || busy} onPress={onDown} style={{ alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 }}><Text style={downColors}>↓</Text></TouchableOpacity>
+      <PressableScale accessibilityLabel="Mover para cima" accessibilityRole="button" disabled={!up || busy} onPress={onUp} style={{ alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48, opacity: upColors.opacity }}><ArrowUp color={colors.tx} size={17} strokeWidth={1.7} /></PressableScale>
+      <PressableScale accessibilityLabel="Mover para baixo" accessibilityRole="button" disabled={!down || busy} onPress={onDown} style={{ alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48, opacity: downColors.opacity }}><ArrowDown color={colors.tx} size={17} strokeWidth={1.7} /></PressableScale>
     </View>
   )
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  form: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 20, borderWidth: 1, marginBottom: 12, padding: 16 },
+  form: { marginBottom: 24 },
   checkboxRow: { alignItems: 'center', flexDirection: 'row', gap: 12, marginBottom: 14, minHeight: 48 },
-  checkbox: { alignItems: 'center', borderColor: colors.border, borderRadius: 6, borderWidth: 1, height: 28, justifyContent: 'center', width: 28 },
-  checkboxActive: { backgroundColor: colors.primary },
-  checkboxText: { color: colors.onPrimary, fontSize: 12, fontWeight: '800' },
-  checkboxLabel: { color: colors.textPrimary, fontSize: 14, fontWeight: '700' },
-  section: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 20, borderWidth: 1, marginBottom: 12, padding: 16 },
+  checkbox: { alignItems: 'center', borderColor: colors.mu, borderRadius: 6, borderWidth: 1, height: 20, justifyContent: 'center', width: 20 },
+  checkboxActive: { backgroundColor: colors.ac, borderColor: colors.ac },
+  checkboxLabel: { ...typography.bodySmall, color: colors.tx },
+  section: { marginBottom: 24 },
   sectionHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  sectionTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: '800', lineHeight: 24, marginBottom: 10 },
-  add: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 12, height: 48, justifyContent: 'center', width: 48 },
-  addText: { color: colors.onPrimary, fontSize: 17 },
-  item: { alignItems: 'center', borderTopColor: colors.border, borderTopWidth: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 6, minHeight: 72 },
-  libraryItem: { alignItems: 'center', borderTopColor: colors.border, borderTopWidth: 1, flexDirection: 'row', minHeight: 64 },
-  itemTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '800', lineHeight: 22 },
-  meta: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, marginTop: 4 },
+  sectionTitle: { ...typography.titleSmall, color: colors.tx, marginBottom: 8 },
+  add: { alignItems: 'center', borderColor: colors.mu, borderRadius: 12, borderWidth: 1, height: 48, justifyContent: 'center', width: 48 },
+  item: { alignItems: 'center', borderTopColor: colors.bd, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', flexWrap: 'wrap', gap: 6, minHeight: 64 },
+  libraryItem: { alignItems: 'center', borderBottomColor: colors.bd, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', minHeight: 56 },
+  libraryCopy: { flex: 1 },
+  libraryAction: { alignItems: 'center', flexDirection: 'row', gap: 2 },
+  itemTitle: { ...typography.body, color: colors.tx, fontWeight: '500' },
+  meta: { ...typography.caption, color: colors.t2, marginTop: 2 },
   itemAction: { alignItems: 'center', justifyContent: 'center', minHeight: 48, minWidth: 48 },
-  link: { color: colors.primary, fontSize: 14, fontWeight: '800' },
-  remove: { color: colors.danger, fontSize: 20 },
-  rowError: { color: colors.danger, fontSize: 12, lineHeight: 16, width: '100%' },
-  error: { color: colors.danger, fontSize: 14, lineHeight: 20, marginBottom: 8 },
-  start: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 16, minHeight: 56, justifyContent: 'center' },
-  startText: { color: colors.onPrimary, fontSize: 16, fontWeight: '800' },
-  saveHint: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, textAlign: 'center' },
-  empty: { alignItems: 'center', flex: 1, justifyContent: 'center' },
-  title: { color: colors.ink, fontSize: 18, fontWeight: '800' },
+  link: { ...typography.bodySmall, color: colors.tx, textDecorationLine: 'underline' },
+  rowError: { ...typography.captionSmall, color: colors.dg, width: '100%' },
+  error: { ...typography.bodySmall, color: colors.dg, marginBottom: 8 },
+  start: { alignItems: 'center', backgroundColor: colors.ac, borderRadius: 12, minHeight: 56, justifyContent: 'center' },
+  startText: { ...typography.titleSmall, color: colors.on },
+  saveHint: { ...typography.bodySmall, color: colors.t2 },
+  empty: { alignItems: 'flex-start', flex: 1, justifyContent: 'center' },
+  title: { ...typography.titleSmall, color: colors.tx },
 })

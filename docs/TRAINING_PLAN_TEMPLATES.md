@@ -39,4 +39,5 @@ lixeira.
 
 Todo o processo é offline e transacional. O botão continua bloqueado durante o
 refresh posterior ao commit. Uma falha de refresh gera aviso sem reverter nem
-repetir a duplicação. O backup permanece no `schemaVersion: 2`.
+repetir a duplicação. O backup atual usa `schemaVersion: 3` e continua aceitando
+schemas 1 e 2.

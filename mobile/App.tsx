@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
-import { Alert, AppState } from 'react-native'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Alert, AppState, Text, View } from 'react-native'
 import {
   DefaultTheme,
   NavigationContainer,
@@ -9,15 +9,23 @@ import {
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator, type NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import {
+  ChartNoAxesColumnIncreasing,
+  ClipboardList,
+  Ellipsis,
+  House,
+  Utensils,
+} from 'lucide-react-native'
 import { NavigationBar } from 'expo-navigation-bar'
 import { StatusBar } from 'expo-status-bar'
 import { type LocalRepositories } from '@training/training-local-db'
 import {
   buildLocalNotices,
   calculateHistoryProgress,
+  sessionsToCsv,
   localDateKey,
   type BackupRepository,
+  type SecretsRepository,
 } from '@training/training-domain'
 import type { MainTabParamList, RootStackParamList } from './src/navigation/types'
 import { useTrainingController } from './src/controllers/useTrainingController'
@@ -38,8 +46,12 @@ import { ExerciseDetailScreen } from './src/features/exercise-library/ExerciseDe
 import { LibraryScreen } from './src/screens/LibraryScreen'
 import { HomeScreen } from './src/screens/HomeScreen'
 import { HistoryScreen } from './src/screens/HistoryScreen'
+import { ExerciseProgressScreen } from './src/features/progress/ExerciseProgressScreen'
+import { PlateCalculatorScreen } from './src/features/progress/PlateCalculatorScreen'
 import { MoreScreen } from './src/screens/MoreScreen'
+import { TabIcon } from './src/components/TabIcon'
 import { NutritionScreen } from './src/features/nutrition/NutritionScreen'
+import { NutritionAiSettingsScreen } from './src/features/nutrition/NutritionAiSettingsScreen'
 import { AppearanceSettingsScreen } from './src/screens/AppearanceSettingsScreen'
 import { IntegrationsScreen } from './src/screens/IntegrationsScreen'
 import { WgerIntegrationScreen } from './src/features/wger/WgerIntegrationScreen'
@@ -48,7 +60,7 @@ import { useAppBootstrap } from './src/features/bootstrap/useAppBootstrap'
 import { useLocalRuntime } from './src/features/bootstrap/useLocalRuntime'
 import { BootstrapScreen } from './src/features/bootstrap/BootstrapScreen'
 import { AppErrorBoundary } from './src/features/bootstrap/AppErrorBoundary'
-import { exportDiagnostic } from './src/integrations/backupFiles'
+import { exportDiagnostic, shareHistoryCsv } from './src/integrations/backupFiles'
 import { getAppVersion } from './src/config/version'
 import { Toast } from './src/components/Toast'
 import { triggerHaptic } from './src/theme/haptics'
@@ -64,6 +76,7 @@ import { Onboarding } from './src/features/onboarding/Onboarding'
 import { useOnboarding } from './src/features/onboarding/useOnboarding'
 import { useStarterPackImportController } from './src/features/exercise-library/useStarterPackImportController'
 import { WGER_STARTER_PACK, recommendedPackEnabled } from '@training/training-domain'
+import { createSecureSecretsRepository, GEMINI_API_KEY_SECRET } from './src/integrations/secureSecrets'
 
 const Stack = createNativeStackNavigator<RootStackParamList>()
 const Tabs = createBottomTabNavigator<MainTabParamList>()
@@ -121,6 +134,8 @@ function LocalApp({
     preferences,
     savedPreferences,
   } = useTheme()
+  const secrets = useMemo(() => createSecureSecretsRepository(), [])
+  const [secretsRevision, setSecretsRevision] = useState(0)
   const controller = useTrainingController(repositories.exercises, repositories.dashboard)
   const maintenanceRun = useRef<Promise<void> | null>(null)
   const runNutritionMaintenance = useCallback(() => {
@@ -235,6 +250,8 @@ function LocalApp({
                 {({ navigation }) => (
                   <MainTabs
                     repositories={repositories}
+                    secrets={secrets}
+                    secretsRevision={secretsRevision}
                     navigation={navigation}
                     controller={controller}
                     trainingPlan={trainingPlan}
@@ -282,6 +299,15 @@ function LocalApp({
                   />
                 )}
               </Stack.Screen>
+              <Stack.Screen name="ExerciseProgress">
+                {() => (
+                  <ExerciseProgressScreen
+                    exercises={controller.exerciseLibrary}
+                    sessions={workoutSession.sessions}
+                  />
+                )}
+              </Stack.Screen>
+              <Stack.Screen name="PlateCalculator" component={PlateCalculatorScreen} />
               <Stack.Screen name="Integrations" component={IntegrationsScreen} />
               <Stack.Screen name="WgerIntegration">
                 {() => (
@@ -291,6 +317,9 @@ function LocalApp({
                     onImported={controller.refresh}
                   />
                 )}
+              </Stack.Screen>
+              <Stack.Screen name="NutritionAiSettings">
+                {() => <NutritionAiSettingsScreen secrets={secrets} onChanged={() => setSecretsRevision((value) => value + 1)} />}
               </Stack.Screen>
               <Stack.Screen name="AppearanceSettings" component={AppearanceSettingsScreen} />
               <Stack.Screen name="TrainingPlanEditor">
@@ -490,6 +519,8 @@ function starterPackMessage(state: ReturnType<typeof useStarterPackImportControl
 
 function MainTabs({
   repositories,
+  secrets,
+  secretsRevision,
   navigation,
   controller,
   trainingPlan,
@@ -501,6 +532,8 @@ function MainTabs({
   onOnboarding,
 }: {
   repositories: LocalRepositories
+  secrets: SecretsRepository
+  secretsRevision: number
   navigation: NativeStackNavigationProp<RootStackParamList>
   controller: ReturnType<typeof useTrainingController>
   trainingPlan: ReturnType<typeof useTrainingPlanController>
@@ -513,12 +546,12 @@ function MainTabs({
 }) {
   const { colors, preferences } = useTheme()
   const insets = useSafeAreaInsets()
-  const icons: Record<keyof MainTabParamList, keyof typeof Ionicons.glyphMap> = {
-    Today: 'home-outline',
-    Plan: 'clipboard-outline',
-    History: 'time-outline',
-    More: 'ellipsis-horizontal-circle-outline',
-    Nutrition: 'nutrition-outline',
+  const icons = {
+    Today: House,
+    Plan: ClipboardList,
+    History: ChartNoAxesColumnIncreasing,
+    More: Ellipsis,
+    Nutrition: Utensils,
   }
   const labels: Record<keyof MainTabParamList, string> = { Today: 'Hoje', Plan: 'Ficha', History: 'Progresso', Nutrition: 'Nutrição', More: 'Mais' }
   const { clock, refreshClock } = useLocalCalendarClock()
@@ -553,21 +586,28 @@ function MainTabs({
   return (
     <Tabs.Navigator screenOptions={({ route }) => ({
       headerShown: false,
-      tabBarActiveBackgroundColor: colors.surfaceSecondary,
-      tabBarActiveTintColor: colors.primary,
-      tabBarInactiveTintColor: colors.textSecondary,
-      tabBarLabel: labels[route.name],
-      tabBarIcon: ({ color, focused }) => <Ionicons color={color} name={focused ? icons[route.name].replace('-outline', '') as keyof typeof Ionicons.glyphMap : icons[route.name]} size={24} />,
-      tabBarItemStyle: { borderRadius: 14, marginHorizontal: 3, minHeight: 56 },
+      tabBarActiveTintColor: colors.tx,
+      tabBarInactiveTintColor: colors.mu,
+      tabBarLabel: ({ color, focused }) => (
+        <Text numberOfLines={2} style={{
+          color,
+          fontFamily: 'Geist',
+          fontSize: 12,
+          fontWeight: focused ? '600' : '400',
+          lineHeight: 16,
+          textAlign: 'center',
+        }}>{labels[route.name]}</Text>
+      ),
+      tabBarIcon: ({ color, focused }) => <TabIcon color={color} focused={focused} icon={icons[route.name]} />,
+      tabBarItemStyle: { minHeight: 68, paddingBottom: 4, paddingTop: 4 },
       tabBarStyle: {
         backgroundColor: colors.tabBar,
-        borderTopColor: colors.border,
-        height: 64 + insets.bottom,
-        paddingBottom: insets.bottom + 4,
-        paddingHorizontal: 6,
-        paddingTop: 4,
+        borderTopColor: colors.bd,
+        height: 68 + insets.bottom,
+        paddingBottom: insets.bottom,
+        paddingHorizontal: 0,
+        paddingTop: 0,
       },
-      tabBarLabelStyle: { fontSize: 12, fontWeight: '700', lineHeight: 16 },
     })}>
       <Tabs.Screen name="Today">
         {({ navigation: tabNavigation }) => (
@@ -626,11 +666,22 @@ function MainTabs({
             progress={historyProgress}
             onRefresh={refreshAll}
             onDateChange={refreshClock}
+            onOpenPlan={() => navigation.navigate('MainTabs', { screen: 'Plan' })}
+            onRepeat={async (planId, dayId) => {
+              const success = await workoutSession.start(planId, dayId)
+              if (success) {
+                void triggerHaptic('SESSION_START', preferences.hapticsEnabled)
+                navigation.navigate('Session')
+              } else {
+                Alert.alert('Não foi possível repetir', 'Já há uma sessão ativa, ou a ficha ou o dia foi removido.')
+              }
+              return success
+            }}
           />
         )}
       </Tabs.Screen>
       <Tabs.Screen name="Nutrition">
-        {() => <NutritionScreen repositories={repositories} />}
+        {() => <NutritionScreen repositories={repositories} secrets={secrets} secretsRevision={secretsRevision} onOpenAiSettings={() => navigation.navigate('NutritionAiSettings')} />}
       </Tabs.Screen>
       <Tabs.Screen name="More">
         {() => (
@@ -638,12 +689,24 @@ function MainTabs({
             busy={backup.busy}
             onAppearance={() => navigation.navigate('AppearanceSettings')}
             onLibrary={() => navigation.navigate('Library')}
+            onPlateCalculator={() => navigation.navigate('PlateCalculator')}
+            onExportCsv={() => {
+              shareHistoryCsv(sessionsToCsv(workoutSession.sessions)).catch((error: unknown) =>
+                Alert.alert('Não foi possível exportar', error instanceof Error ? error.message : 'Tente novamente.'))
+            }}
             onTrash={() => navigation.navigate('TrainingPlanTrash')}
             trashCount={trash.count}
             onIntegrations={() => navigation.navigate('Integrations')}
             onExport={() => void backup.exportBackup()}
             onImport={() => void backup.importBackup()}
-            onErase={() => void backup.eraseAll()}
+            onErase={async () => {
+              if (!await backup.eraseAll()) return
+              try {
+                await secrets.remove(GEMINI_API_KEY_SECRET)
+              } catch {
+                Alert.alert('Dados apagados', 'A chave de IA não pôde ser removida do armazenamento seguro. Remova-a nas configurações de Nutrição.')
+              }
+            }}
             automaticBackups={backup.automaticBackups}
             onRestoreAutomatic={(uri) => void backup.restoreAutomatic(uri)}
             onShareAutomatic={(uri) => void backup.shareAutomatic(uri)}
@@ -680,11 +743,15 @@ function RefreshableHistory({
   progress,
   onRefresh,
   onDateChange,
+  onOpenPlan,
+  onRepeat,
 }: {
+  onRepeat: (planId: number, dayId: number) => Promise<boolean>
   sessions: Parameters<typeof HistoryScreen>[0]['sessions']
   progress: Parameters<typeof HistoryScreen>[0]['progress']
   onRefresh: () => Promise<RefreshAllResult>
   onDateChange: () => void
+  onOpenPlan: () => void
 }) {
   const refreshState = useRefreshUi(onRefresh, onDateChange)
   useRefreshOnFocus(onDateChange)
@@ -695,6 +762,8 @@ function RefreshableHistory({
       loading={refreshState.refreshing}
       warning={refreshState.warning}
       onRefresh={() => void refreshState.refresh()}
+      onOpenPlan={onOpenPlan}
+      onRepeat={onRepeat}
     />
   )
 }

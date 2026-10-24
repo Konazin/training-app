@@ -28,17 +28,19 @@ jest.mock('@react-navigation/native', () => ({
 jest.mock('../theme', () => ({
   appearancePreferenceIds: ['SYSTEM', 'LIGHT', 'DARK'],
   motionPreferenceIds: ['SYSTEM', 'FULL', 'REDUCED', 'OFF'],
-  shared: { spacing: { sm: 8, lg: 16 }, touchTarget: { minimum: 48 } },
+  shared: require('../theme/tokens').shared,
   themePresetIds: ['DARK_BLUE', 'MONOCHROME', 'DRACULA', 'WHITE_BLUE'],
+  resolvePalette: () => ({ bg: '#000000', s1: '#0c0c0c', ac: '#fafafa' }),
   useTheme: () => ({
     colors: new Proxy({}, { get: () => '#000000' }),
     ...mockTheme,
   }),
 }))
-jest.mock('../theme/haptics', () => ({ triggerHaptic: jest.fn() }))
-jest.mock('../theme/typography', () => ({
-  typography: { body: {}, bodySmall: {}, caption: {}, label: {}, title: {} },
+jest.mock('react-native-safe-area-context', () => ({
+  SafeAreaProvider: ({ children }: { children: unknown }) => children,
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
 }))
+jest.mock('../theme/haptics', () => ({ triggerHaptic: jest.fn() }))
 jest.mock('../components/Screen', () => {
   const { View } = require('react-native')
   return { ScreenScrollView: View }
@@ -63,7 +65,7 @@ describe('aparência e movimento renderizados', () => {
 
   it('aplica prévia, informa falha ao salvar e cancela alterações ao sair', async () => {
     const view = await renderAsync(createElement(AppearanceSettingsScreen))
-    fireEvent.press(screen.getByText('Violeta'))
+    fireEvent.press(screen.getByText('Violeta midnight'))
     expect(mockTheme.updatePreview).toHaveBeenCalledWith({ themePreset: 'DRACULA' })
 
     fireEvent.press(screen.getByText('Salvar preferências'))

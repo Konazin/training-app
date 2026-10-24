@@ -56,12 +56,11 @@ export function ExercisePickerScreen({
     <Screen style={styles.container}>
       <View style={styles.header}>
         <ScreenHeader
-          eyebrow={plan.name}
           title="Escolher exercício"
-          description="Busque na biblioteca antes de configurar."
+          description={`Para ${day.title || plan.name}. Busque na biblioteca antes de configurar.`}
         />
       </View>
-      <ExercisePicker exercises={library} onFavorite={onFavorite} onSelect={select} />
+      <ExercisePicker exercises={library} onFavorite={onFavorite} onSelect={select} onSearchOnline={() => navigation.navigate('WgerIntegration')} />
     </Screen>
   )
 }

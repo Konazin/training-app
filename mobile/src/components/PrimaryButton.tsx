@@ -1,6 +1,8 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native'
+import type { ReactNode } from 'react'
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
 import { shared, type ThemeColors, useTheme } from '../theme'
 import { typography } from '../theme/typography'
+import { PressableScale } from '../motion'
 
 interface Props {
   label: string
@@ -8,61 +10,71 @@ interface Props {
   onPress: () => void
   loading?: boolean
   secondary?: boolean
+  /** Ação destrutiva: contorno e texto em vermelho dessaturado, nunca preenchido. */
+  danger?: boolean
   disabled?: boolean
+  highContrast?: boolean
+  icon?: ReactNode
 }
 
-export function PrimaryButton({ label, accessibilityLabel, onPress, loading, secondary, disabled = false }: Props) {
+export function PrimaryButton({ label, accessibilityLabel, onPress, loading, secondary, danger, disabled = false, highContrast = false, icon }: Props) {
   const { colors } = useTheme()
-  const styles = createStyles(colors)
+  const styles = createStyles(colors, highContrast)
+  const inactive = disabled || loading
+  const quiet = secondary || danger
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ busy: loading, disabled: disabled || loading }}
-      disabled={disabled || loading}
+      accessibilityState={{ busy: loading, disabled: inactive }}
+      disabled={inactive}
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
-        secondary && styles.secondary,
-        pressed && styles.pressed,
-        (disabled || loading) && styles.disabled,
+        quiet && styles.quiet,
+        danger && styles.danger,
+        pressed && !inactive && (quiet ? styles.quietPressed : styles.primaryPressed),
+        inactive && styles.disabled,
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={secondary ? colors.textPrimary : colors.onPrimary} />
+        <ActivityIndicator color={quiet ? colors.tx : highContrast ? colors.workout.timerText : colors.on} />
       ) : (
-        <Text style={[styles.label, secondary && styles.secondaryLabel]}>{label}</Text>
+        <View style={styles.content}>
+          {icon}
+          <Text style={[styles.label, quiet && styles.quietLabel, danger && styles.dangerLabel, inactive && styles.disabledLabel]}>{label}</Text>
+        </View>
       )}
-    </Pressable>
+    </PressableScale>
   )
 }
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
+const createStyles = (colors: ThemeColors, highContrast: boolean) => StyleSheet.create({
   button: {
     alignItems: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: shared.radii?.sm ?? 14,
+    backgroundColor: highContrast ? colors.workout.timer : colors.ac,
+    borderRadius: shared.radii.md,
     justifyContent: 'center',
-    minHeight: shared.control?.primaryHeight ?? 54,
-    paddingHorizontal: 18,
+    minHeight: shared.control.primaryHeight,
+    paddingHorizontal: 20,
   },
-  secondary: {
-    backgroundColor: colors.card,
-    borderColor: colors.border,
+  content: { alignItems: 'center', flexDirection: 'row', gap: shared.spacing.sm },
+  quiet: {
+    backgroundColor: 'transparent',
+    borderColor: highContrast ? colors.workout.border : colors.mu,
     borderWidth: 1,
+    minHeight: shared.control.compactHeight,
   },
+  danger: { borderColor: colors.dg },
   label: {
-    color: colors.onPrimary,
-    ...typography.label,
-    fontWeight: '700',
+    color: highContrast ? colors.workout.timerText : colors.on,
+    ...typography.titleSmall,
+    fontWeight: '500',
   },
-  secondaryLabel: {
-    color: colors.ink,
-  },
-  pressed: {
-    opacity: 0.75,
-  },
-  disabled: {
-    opacity: 0.45,
-  },
+  quietLabel: { color: highContrast ? colors.workout.text : colors.tx, ...typography.bodySmall, fontWeight: '500' },
+  dangerLabel: { color: colors.dg },
+  primaryPressed: { backgroundColor: highContrast ? colors.workout.textSecondary : colors.primaryPressed },
+  quietPressed: { backgroundColor: colors.s2 },
+  disabled: { backgroundColor: colors.s2, borderColor: colors.bd },
+  disabledLabel: { color: colors.t2 },
 })
