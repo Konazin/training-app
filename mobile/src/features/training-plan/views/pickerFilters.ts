@@ -26,4 +26,3 @@ export function applyPickerFilters(
   if (facets.pack) result = filterExerciseLibrary(result, '', { kind: 'PACK', value: facets.pack })
   return result
 }
-
