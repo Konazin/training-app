@@ -1,9 +1,10 @@
 # Backup e restauração
 
-O formato permanece em `schemaVersion: 2`; backups v1 e v2 anteriores continuam
+O formato atual usa `schemaVersion: 3`; backups v1 e v2 anteriores continuam
 aceitos. O JSON contém exercícios, metadados de mídia, fichas, dias, atividades,
-sessões, substituições, anotações, séries, configurações, favoritos, recentes e
-aliases opcionais. Bytes de imagens não são incorporados.
+sessões, substituições, anotações, séries, configurações, favoritos, recentes,
+aliases e dados nutricionais opcionais. Bytes de imagens e segredos do
+SecureStore não são incorporados.
 
 ## Restauração
 

@@ -1,120 +1,187 @@
 # Roadmap do produto
 
-1. **Ciclo de vida das fichas e lixeira — Marco 1 IMPLEMENTADO**
-2. **Editor de ficha, templates e duplicação — Marco 2 IMPLEMENTADO, smoke consolidado pendente**
-3. **Home semanal e progresso — Marco 3 IMPLEMENTADO, smoke consolidado pendente**
-4. **Temas, movimento e acessibilidade — Marco 4 IMPLEMENTADO, smoke físico pendente**
-5. **Biblioteca e mídia — Marco 5 IMPLEMENTADO, direção de conteúdo revisada**
-6. **Providers, inteligência local e release candidate — Marco 6 BLOQUEADO PARA TESTES**
-7. **Catálogo multiprovider e redesign visual — Marco 0.10.0 NO-GO**
+## Visão do produto
 
-## Marco 0.10.0 — em validação
+Construir um app de treino pessoal completo, confiável e marcante, feito para
+ser usado no celular Android e continuar útil sem internet. Os dados pessoais
+ficam no aparelho; exportação e restauração são explícitas. Catálogos externos
+e recursos de IA são opcionais e só acessam a rede após uma ação informada pela
+pessoa.
 
-- ExerciseDB/AscendAPI como busca manual primária e Wger como fallback;
-- provider, externalId, origem, licença e atribuição preservados;
-- timeout, cancelamento, paginação, schema validation e mídia HTTPS;
-- versão mobile 0.10.0, `versionCode` 16;
-- export Android, Expo Doctor, smoke visual e testes SQLite ainda pendentes.
+“Majestoso” significa uma experiência coesa e simples de usar, com treinos
+confiáveis, informação pessoal fácil de entender, acessibilidade e acabamento
+visual consistente. Não depende de conta, backend, sincronização obrigatória,
+publicidade ou expansão para web.
 
-## Marco 1 estabilizado
+## Estado atual
 
-- lixeira local com retenção de sete dias;
-- badge com quantidade e aviso de expiração;
-- backup antes de esvaziar;
-- mutation, refresh e Desfazer serializados;
-- backup `schemaVersion: 2`.
+O app principal está em `mobile/`, com destino Android para celular. O candidato
+em desenvolvimento é a versão **0.11.0**, `versionCode` **17**. Esta versão
+está implementada no código do repositório, mas ainda não é uma release
+validada: faltam o APK candidato e a verificação em aparelho físico.
 
-## Marco 2 implementado
+### Feito no código
 
-- seletores de categoria e dificuldade;
-- seis templates locais restritos à criação;
-- criação e duplicação transacionais;
-- prévia persistida para fichas existentes;
-- locks mantidos até o fim dos refreshes;
-- migrations 1 a 5 preservadas;
-- versão mobile 0.5.0, `versionCode` 7.
+- Base local para treinos, planos, exercícios, histórico e preferências, sem
+  conta ou servidor obrigatório; migrations preservadas e backups portáveis
+  compatíveis.
+- Home orientada ao treino de hoje, com semana local, estados textuais,
+  descanso planejado e sessões ativas/pausadas. Histórico concluído permanece
+  visível quando a programação futura muda.
+- Planos com editor, modelos locais, criação/duplicação transacional, ciclo de
+  vida, lixeira com retenção, desfazer e proteção contra ações concorrentes.
+  Consulte [ciclo de vida](TRAINING_PLAN_LIFECYCLE.md) e
+  [modelos](TRAINING_PLAN_TEMPLATES.md).
+- Histórico, métricas de progresso, snapshots de desempenho e progressão
+  explicada e dispensável; anotações locais em séries, exercícios e sessões.
+- Biblioteca local com busca normalizada, filtros, favoritos, recentes e
+  packs; importações preservam origem, identificador e atribuição. O catálogo
+  externo Wger continua manual e opcional.
+- Backup e restauração locais, com validação e fluxo transacional. Consulte
+  [backup e restauração](BACKUP_AND_RESTORE.md).
+- Nutrição permite registrar e editar refeições e itens, configurar metas e
+  consultar resumos diários e de sete dias. Totais sobrevivem à retenção dos
+  detalhes antigos.
+- Análise nutricional por foto e sugestão de cardápio são opcionais. A
+  estimativa pode ser revisada; a sugestão não entra no diário sem ação da
+  pessoa. A imagem é transitória e o envio solicita confirmação.
+- A chave pessoal do Gemini fica no SecureStore, fora do SQLite, logs e
+  backups. Cada solicitação remota informa o que será enviado e pede
+  confirmação.
+- Aparência oferece quatro temas, modos claro/escuro/sistema, opções de
+  movimento, feedback tátil e alto contraste durante o treino. Há semântica
+  acessível e alvos principais de pelo menos 48 dp.
+- `shell-quote` foi fixado em 1.11.0 para resolver a falha crítica registrada
+  no grafo transitivo de ferramentas React Native.
 
-As verificações automatizadas e o export Android passaram. O smoke manual
-continua pendente por falta de aparelho ou emulador; consulte
-[`MARCO_2_ANDROID_SMOKE.md`](MARCO_2_ANDROID_SMOKE.md).
+### Verificações e pendências conhecidas
 
-## Marco 3 implementado
+- Na rodada de desenvolvimento registrada, passaram 294 testes, os
+  typechecks dos workspaces e a exportação Android do Expo. Isso cobre gates
+  automatizados; não substitui instalação e uso em um aparelho.
+- APK, checksum e smoke test físico ainda estão pendentes. Validar instalação
+  limpa e atualização sobre a versão 0.9.3, incluindo dados e backups.
+- A validação manual do Gemini em Android com chave de teste ainda está
+  pendente.
+- O levantamento de dependências registrado para `training-mobile` apontou 45
+  avisos do `npm audit` (31 altos, 14 moderados, nenhum crítico). As correções
+  automáticas sugeridas incluem downgrades incompatíveis de Expo e React
+  Native; planejar atualização coordenada, não aplicar downgrades às cegas.
+- Há testes antigos usando `react-test-renderer` a migrar. A documentação de
+  acessibilidade existe, mas TalkBack, fonte ampliada, redução de movimento e
+  feedback tátil precisam de validação física.
+- A direção visual foi definida pelo MIV completo, acompanhada no marco
+  **M*** abaixo, dedicado exclusivamente à UI/UX.
 
-- Home orientada ao treino de hoje;
-- semana local de segunda-feira a domingo com nove estados textuais;
-- descanso planejado e progresso limitado a cem por cento, contando somente
-  dias atualmente configurados como treino;
-- histórico preservado mesmo quando um dia concluído passa a ser descanso;
-- sessão ativa ou pausada visível mesmo sem ficha ativa resolvida;
-- referência de cargas concluídas anteriores isolada por ficha, sem recomendação;
-- início da sessão de hoje pelo fluxo SQLite existente;
-- resumo semanal expansível e atalhos operacionais;
-- seis métricas movidas para Histórico e progresso;
-- taxa de conclusão baseada em concluídas e não concluídas;
-- data e semana recalculadas por foco, foreground e refresh;
-- estado visual de refresh dedicado, deduplicado e mantido até o fim de todas
-  as leituras, preservando conteúdo em falha parcial;
-- artefatos `.eas-inspect`, `.expo` e `dist` fora da coleta do Vitest;
-- versão mobile 0.6.0, `versionCode` 8;
-- sem migration nova e com backup `schemaVersion: 2`.
+## Marcos
 
-O smoke Android do Marco 3 permanece pendente até existir dispositivo. A
-migração de `react-test-renderer` para Testing Library é dívida técnica.
+| Marco | Objetivo | Estado |
+| --- | --- | --- |
+| M0 — Fechamento do candidato Android 0.11.0 | Gerar e validar o APK local-first | Em andamento; novo APK do código atual e smoke físico pendentes |
+| M* — UI/UX majestosa | Criar e aplicar uma experiência visual e de interação coesa | Em andamento; fundações e primeira passada nas telas centrais; revisão em aparelho pendente |
+| M1 — Profundidade de treino | Tornar histórico e progresso por exercício mais úteis | Planejado |
+| M2 — Confiabilidade técnica | Modernizar dependências e testes com compatibilidade Android | Planejado |
+| M3 — Pronto para distribuição | Fechar critérios de qualidade e publicar o artefato Android | Após M0 e os gates de release |
 
-## Marco 4 em validação
+Os marcos podem se sobrepor quando não houver dependência. O M* segue em
+paralelo ao M0. A direção oficial está no
+[`MIV-Training-App-D-Grafite.pdf`](../MIV-Training-App-D-Grafite.pdf), fora de
+`prompt.md`.
 
-- quatro presets com variantes clara e escura;
-- preferência de aparência e movimento seguindo ou ignorando o sistema;
-- prévia não persistida e confirmação atômica no AsyncStorage;
-- alto contraste dedicado à sessão;
-- feedback tátil isolado e desativável;
-- prévia de movimento reiniciada ao reativar animações;
-- término do descanso roteado pelo helper tátil central;
-- auditoria dos estados, rótulos, progresso e modais acessíveis.
+### M0 — Fechamento do candidato Android 0.11.0
 
-O Marco 4 permanece em validação até a execução do roteiro em um aparelho ou
-emulador Android com TalkBack, fonte ampliada e redução de movimento.
+**Execução iniciada em 2026-10-16.** Após autenticar no EAS, um APK interno foi
+gerado em 2026-10-17, conferido como pacote Android e passou na verificação de
+integridade ZIP. Ele antecede as alterações atuais de Nutrição e precisa ser
+substituído por um novo build. O ambiente continua sem `adb`, emulador ou Android SDK; veja
+o checksum e os detalhes em [`LOCAL_ANDROID_APK.md`](LOCAL_ANDROID_APK.md).
 
-## Marco 5 — conteúdo gerado aposentado
+- [ ] Gerar novo APK interno do código atual e registrar nome, tamanho,
+  checksum SHA-256 e integridade do arquivo.
+- [ ] Instalar em aparelho limpo e atualizar sobre 0.9.3; conferir migração,
+  dados, referências locais e abertura após reinício.
+- [ ] Executar o [roteiro de smoke test Android](LOCAL_ONLY_SMOKE_TEST.md) em
+  modo avião e com rede, incluindo treino, nutrição, permissões, backups e
+  fluxos opcionais do Gemini.
+- [ ] Validar TalkBack, fonte ampliada, teclado, alvos de toque, movimento
+  reduzido e feedback tátil em aparelho real.
+- [ ] Corrigir regressões de severidade bloqueadora ou alta e repetir o roteiro
+  afetado.
 
-- instalações novas com biblioteca vazia;
-- catálogo gerado legado arquivado sem excluir referências;
-- migration 6 para catálogo, aliases, favoritos e recentes;
-- busca local normalizada, visualização em lista ou por músculo, filtros e
-  quatro packs;
-- biblioteca e seletor com favoritos, recentes e proteção contra toque duplo;
-- mídia real diferenciada de placeholders e vídeo sob ação;
-- atribuição externa preservada e notas editáveis separadamente;
-- backup v2 ampliado apenas com campos opcionais;
-- restauração transacional sem recriar catálogo gerado;
-- testes comportamentais renderizados dos fluxos críticos;
-- candidato mobile 0.8.1, `versionCode` 11.
+Critério de saída: APK instalável, upgrade preserva dados, fluxos essenciais
+funcionam offline e nenhum bloqueador conhecido permanece. O procedimento está
+em [`LOCAL_ANDROID_APK.md`](LOCAL_ANDROID_APK.md).
 
-O Marco 5 permanece em validação até o smoke Android do catálogo, mídia,
-upgrade e backup. O Wger continua manual e não participa do bootstrap.
+### M* — UI/UX majestosa
 
-## Marco 6 — candidato Android 0.9.2
+Marco reservado **somente à experiência de uso**: pesquisa de fluxos, sistema
+de design, composição de telas, estados, navegação, interação, movimento e
+acessibilidade. A direção MIV já foi aplicada às fundações e às telas centrais;
+faltam telas secundárias e revisão física. Não inclui novas regras de negócio,
+sincronização, backend, contas ou expansão de plataforma.
 
-- registry tipado de providers, mantendo Wger como integração manual;
-- último desempenho baseado em snapshots concluídos;
-- progressão determinística, explicada, dispensável e nunca automática;
-- substituição local com motivo e desfazer;
-- anotações de série, exercício e sessão;
-- migration 7 aditiva, preservando byte a byte as migrations 1 a 6;
-- backups v2 antigos compatíveis;
-- avisos locais e onboarding dispensável somente em instalações novas;
-- migration 8 arquiva conteúdo `SYSTEM` legado sem apagar dados;
-- versão mobile candidata 0.9.2, `versionCode` 14;
-- manifesto Wger `wger-starter-pack.v1` com 40 aprovados, 38 mídias obrigatórias
-  e 2 opcionais.
+As etapas e critérios estão detalhados em
+[`MARCO_M_UI_UX.md`](MARCO_M_UI_UX.md). As decisões confirmadas incluem tema
+monocromático padrão para novas instalações, Geist + Geist Mono, ícones Lucide,
+incremento de 1 kg por toque e preservação dos registros ao abandonar uma
+sessão.
 
-O candidato 0.9.0 foi substituído e não deve ser submetido a teste formal. O
-0.9.2 está liberado como **GO-TESTS**; o smoke físico segue pendente e o produto
-não está pronto para produção.
-O smoke físico segue pendente e o produto não está pronto para produção.
+### M1 — Profundidade de treino
 
-## Adiado
+- [ ] Criar uma leitura direta do histórico de desempenho por exercício,
+  reutilizando os dados locais já registrados.
+- [ ] Melhorar descoberta, busca e filtro dos exercícios importados e
+  disponíveis, sem consultas externas automáticas.
+- [ ] Revisar os pontos em que a pessoa precisa sair do fluxo para compreender
+  seu progresso ou retomar um plano.
 
-- ordenação avançada da lixeira;
-- auditoria detalhada da origem da exclusão;
-- itens explicitamente reservados para os marcos seguintes.
+Critério de saída: progresso útil sem rede, origem e período dos dados claros,
+sem alterar sessões antigas nem criar dependência de serviço remoto.
+
+### M2 — Confiabilidade técnica
+
+- [ ] Reavaliar os avisos atuais de dependências e atualizar Expo, React Native
+  e grupos compatíveis de forma coordenada, conferindo plugins e exportação
+  Android a cada etapa.
+- [ ] Migrar gradualmente testes de componente de `react-test-renderer` para
+  React Native Testing Library.
+- [ ] Manter testes de domínio, banco, telas críticas e typechecks como gates
+  de desenvolvimento; executar exportação e smoke físico em cada candidato de
+  release.
+- [ ] Registrar decisões de compatibilidade, versões suportadas e avisos que
+  precisem de atualização futura.
+
+Critério de saída: dependências suportadas pelo SDK adotado, sem correções
+automáticas que rebaixem o app para uma combinação incompatível, e gates
+reprodutíveis no ambiente Android.
+
+### M3 — Pronto para distribuição
+
+- [ ] Concluir M0 e os bloqueadores de M*, publicar notas da versão e preparar
+  artefato verificável para distribuição Android.
+- [ ] Fazer uma última instalação limpa e atualização sobre dados locais
+  existentes.
+- [ ] Conferir privacidade, retenção, exportação e restauração no material de
+  release.
+- [ ] Guardar APK e credenciais fora do Git; documentar versão, checksum e
+  roteiro executado.
+
+A avaliação de prontidão, o procedimento e o checklist da 1.0 estão em
+[`RELEASE_1_0.md`](RELEASE_1_0.md).
+
+Critério de saída: uma pessoa consegue instalar, usar offline, recuperar seus
+dados por backup e entender claramente quando uma ação acessa um serviço
+externo.
+
+## Restrições permanentes
+
+- Android em celular; não criar uma versão web nem suporte a tablet como parte
+  deste roadmap.
+- Dados de treino, biblioteca, nutrição, histórico e preferências permanecem
+  no aparelho; sem conta ou sincronização obrigatória.
+- Catálogos externos e IA só rodam após ação explícita. Antes de cada envio de
+  IA, informar os dados enviados e pedir confirmação.
+- Backups portáveis não incluem segredos do provedor nem imagens transitórias
+  de análise.
+- Funcionalidade essencial precisa continuar utilizável offline; rede é um
+  complemento opcional.
