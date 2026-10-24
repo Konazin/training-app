@@ -1,8 +1,18 @@
 # Lançamento do APK 1.0
 
-**Decisão atual: NO-GO para 1.0.**
-**Smoke físico em Android: PENDENTE.**
-**Última versão em desenvolvimento: 0.12.2 (`versionCode` 20).**
+**Decisão atual: GO para 1.0, usando o build 0.12.2 (`versionCode` 20).**
+**Smoke físico em Android: CONCLUÍDO em 2026-10-24, sem bugs observados.**
+
+APK: `training-app-0.12.2-internal.apk`, 96.121.951 bytes, SHA-256
+`66018bd66072dd362f12d1f555df3a76c149e3fa1ec805c0ebfd7b0d36fc0971`.
+O binário testado é o mesmo distribuído; a 1.0 é um rótulo de lançamento e o
+app continua se identificando como 0.12.2. A versão interna passa a 1.0.0 no
+próximo build.
+
+> As seções abaixo registram a avaliação feita antes do smoke (NO-GO). Os
+> bloqueadores 1 a 4 foram resolvidos pelo teste em aparelho. Acessibilidade
+> com TalkBack, fonte ampliada e movimento reduzido não foi validada
+> formalmente e segue como limitação conhecida.
 
 Pacote `com.konazin.trainingapp`, APK interno via EAS (perfil `preview`).
 Este documento define o que a 1.0 promete, o que ainda impede o lançamento, o

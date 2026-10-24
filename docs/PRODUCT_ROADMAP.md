@@ -77,11 +77,11 @@ validada: faltam o APK candidato e a verificação em aparelho físico.
 
 | Marco | Objetivo | Estado |
 | --- | --- | --- |
-| M0 — Fechamento do candidato Android 0.11.0 | Gerar e validar o APK local-first | Em andamento; novo APK do código atual e smoke físico pendentes |
+| M0 — Fechamento do candidato Android | Gerar e validar o APK local-first | Concluído em 2026-10-24: APK 0.12.2 com smoke físico sem bugs |
 | M* — UI/UX majestosa | Criar e aplicar uma experiência visual e de interação coesa | Em andamento; fundações e primeira passada nas telas centrais; revisão em aparelho pendente |
-| M1 — Profundidade de treino | Tornar histórico e progresso por exercício mais úteis | Planejado |
-| M2 — Confiabilidade técnica | Modernizar dependências e testes com compatibilidade Android | Planejado |
-| M3 — Pronto para distribuição | Fechar critérios de qualidade e publicar o artefato Android | Após M0 e os gates de release |
+| M1 — Profundidade de treino | Tornar histórico e progresso por exercício mais úteis | Entregue no código (progresso por exercício, 1RM, recordes); refinamentos na 1.1 |
+| M2 — Confiabilidade técnica | Modernizar dependências e testes com compatibilidade Android | Adiado para a 1.1 |
+| M3 — Pronto para distribuição | Fechar critérios de qualidade e publicar o artefato Android | Release 1.0 com o APK 0.12.2; ver `RELEASE_1_0.md` |
 
 Os marcos podem se sobrepor quando não houver dependência. O M* segue em
 paralelo ao M0. A direção oficial está no
