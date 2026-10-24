@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@training/training-domain": "*",
-    "expo-sqlite": "~56.0.5"
+    "expo-sqlite": "~57.0.4"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

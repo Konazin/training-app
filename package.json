@@ -15,9 +15,6 @@
     "validate:wger-manifest": "node tools/validate-wger-manifest.mjs",
     "postinstall": "node scripts/patch-rn-foojay.mjs"
   },
-  "devDependencies": {
-    "expo-font": "56.0.7"
-  },
   "overrides": {
     "shell-quote": "1.11.0"
   }
