@@ -173,6 +173,25 @@ Critério de saída: uma pessoa consegue instalar, usar offline, recuperar seus
 dados por backup e entender claramente quando uma ação acessa um serviço
 externo.
 
+### Pós-1.0 — Exportar e importar fichas
+
+Hoje só existe backup completo. Não há como exportar ou importar uma ficha de
+treino isoladamente.
+
+- [ ] Botão para exportar uma ficha (ou várias) em arquivo local, com versão de
+  esquema, dias, exercícios, séries alvo e notas; sem histórico, sessões,
+  nutrição nem segredos.
+- [ ] Botão para importar uma ficha de arquivo, com validação e prévia antes de
+  confirmar; sempre cria uma ficha nova, nunca sobrescreve as existentes.
+- [ ] Resolver exercícios importados contra a biblioteca local, preservando
+  origem, identificador e atribuição; tratar exercícios ausentes de forma
+  explícita.
+- [ ] Compartilhar o arquivo pelo seletor nativo do Android, sem rede nem
+  serviço remoto.
+
+Critério de saída: levar uma ficha de um aparelho para outro sem conta, sem
+alterar dados existentes e com falha segura em arquivo inválido.
+
 ## Restrições permanentes
 
 - Android em celular; não criar uma versão web nem suporte a tablet como parte
