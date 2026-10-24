@@ -13,6 +13,9 @@ O perfil EAS `preview` gera o APK interno de `com.konazin.trainingapp`.
   `66018bd66072dd362f12d1f555df3a76c149e3fa1ec805c0ebfd7b0d36fc0971`.
 - Estado: **smoke físico concluído em 2026-10-24**, sem bugs observados. Veja
   [`RELEASE_1_0.md`](RELEASE_1_0.md).
+- O `main` atualiza os pacotes Expo para os patches mais recentes (`expo` 56.0.24,
+  `expo-sqlite` 56.0.6 e outros) depois deste build. O APK 0.12.2 foi gerado com
+  as versões anteriores; o próximo build deve usar as novas e repetir o smoke.
 - APKs 0.9.x, 0.11.0, 0.12.0 e 0.12.1 são históricos.
 
 Para gerar o build:
